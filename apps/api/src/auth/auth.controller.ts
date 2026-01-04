@@ -10,24 +10,26 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  async loginPost(@Body('jwt') jwt: string, @Req() req: any) {
+  async loginPost(@Body('jwt') jwt: string, @Req() req: any, @Res() res: any) {
     if (!jwt) {
       throw new UnauthorizedException('JWT is required');
     }
 
-    const { user, tenant } = await this.authService.handleJwtLogin(jwt);
+    try {
+      const { user, tenant } = await this.authService.handleJwtLogin(jwt);
 
-    // Establish secure HTTP-only session
-    if (req.session) {
-      req.session.set('userId', user.id);
-      req.session.set('tenantId', tenant.id);
+      // Establish secure HTTP-only session
+      if (req.session) {
+        req.session.set('userId', user.id);
+        req.session.set('tenantId', tenant.id);
+      }
+
+      // Redirect to frontend (root)
+      return res.redirect(302, '/');
+    } catch (error) {
+      console.error('[Auth Error] JWT Login failure:', error);
+      throw new UnauthorizedException('Authentication failed');
     }
-
-    return { 
-      message: 'Login successful',
-      userId: user.id,
-      tenantId: tenant.id
-    };
   }
 
   @Get('me')
@@ -56,6 +58,7 @@ export class AuthController {
   @Get('login')
   @Redirect()
   async login(@Query('tssd') tssd: string) {
+    console.log(`[Auth] GET login hit with TSSD: ${tssd}`);
     try {
       if (!tssd) {
         throw new UnauthorizedException('TSSD is required for login');

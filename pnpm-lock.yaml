@@ -17,6 +17,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fastify/formbody':
+        specifier: ^8.0.2
+        version: 8.0.2
       '@fastify/secure-session':
         specifier: ^8.3.0
         version: 8.3.0
