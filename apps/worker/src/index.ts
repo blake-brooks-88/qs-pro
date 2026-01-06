@@ -2,9 +2,14 @@ import { Queue, Worker } from 'bullmq';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
+const logger = {
+  log: (msg: string) => process.stdout.write(`${msg}\n`),
+  error: (msg: string, err?: unknown) => process.stderr.write(`${msg} ${err}\n`),
+};
+
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
-console.log(`Worker starting, connecting to Redis at ${REDIS_URL}...`);
+logger.log(`Worker starting, connecting to Redis at ${REDIS_URL}...`);
 
 const queueName = 'test-queue';
 
@@ -18,7 +23,7 @@ const myQueue = new Queue(queueName, {
 const worker = new Worker(
   queueName,
   async (job) => {
-    console.log(`Processing job ${job.id}:`, job.data);
+    logger.log(`Processing job ${job.id}: ${JSON.stringify(job.data)}`);
   },
   {
     connection: {
@@ -29,11 +34,11 @@ const worker = new Worker(
 );
 
 worker.on('ready', () => {
-  console.log('Worker is ready and connected to Redis!');
+  logger.log('Worker is ready and connected to Redis!');
 });
 
 worker.on('error', (err) => {
-  console.error('Worker error:', err);
+  logger.error('Worker error:', err);
 });
 
-console.log('Worker setup complete.');
+logger.log('Worker setup complete.');
