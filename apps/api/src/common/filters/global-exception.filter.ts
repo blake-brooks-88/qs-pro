@@ -10,8 +10,9 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 
 // Mock Sentry for now as we don't have the SDK installed yet
 const Sentry = {
-  captureException: (exception: any) => {
-    console.log('[Sentry Mock] Captured:', exception);
+  captureException: (exception: unknown) => {
+    // In a real app, this would send to Sentry
+    void exception;
   },
 };
 
@@ -38,7 +39,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.logger.error(`[${status}] ${request.url}`, exception);
       Sentry.captureException(exception);
     } else {
-      this.logger.warn(`[${status}] ${request.url} - ${JSON.stringify(message)}`);
+      this.logger.warn(
+        `[${status}] ${request.url} - ${JSON.stringify(message)}`,
+      );
     }
 
     response.status(status).send({

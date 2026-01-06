@@ -23,8 +23,7 @@ describe('MetadataController', () => {
           useValue: mockService,
         },
       ],
-    })
-    .compile();
+    }).compile();
 
     controller = module.get<MetadataController>(MetadataController);
     service = module.get<MetadataService>(MetadataService);
@@ -45,7 +44,7 @@ describe('MetadataController', () => {
 
       const user = { userId: 'u1', tenantId: 't1' };
       const result = await controller.getFolders(user);
-      
+
       expect(result).toBe(mockResult);
       expect(mockService.getFolders).toHaveBeenCalledWith('t1', 'u1');
     });
@@ -58,9 +57,13 @@ describe('MetadataController', () => {
 
       const user = { userId: 'u1', tenantId: 't1' };
       const result = await controller.getDataExtensions(user, 'eid1');
-      
+
       expect(result).toBe(mockResult);
-      expect(mockService.getDataExtensions).toHaveBeenCalledWith('t1', 'u1', 'eid1');
+      expect(mockService.getDataExtensions).toHaveBeenCalledWith(
+        't1',
+        'u1',
+        'eid1',
+      );
     });
   });
 
@@ -71,7 +74,7 @@ describe('MetadataController', () => {
 
       const user = { userId: 'u1', tenantId: 't1' };
       const result = await controller.getFields(user, 'DE_KEY');
-      
+
       expect(result).toBe(mockResult);
       expect(mockService.getFields).toHaveBeenCalledWith('t1', 'u1', 'DE_KEY');
     });

@@ -1,4 +1,4 @@
-import { Module, Global } from '@nestjs/common';
+import { Module, Global, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createDatabase } from '@qs-pro/database';
 
@@ -8,7 +8,12 @@ import { createDatabase } from '@qs-pro/database';
     {
       provide: 'DATABASE',
       useFactory: (configService: ConfigService) => {
-        const dbUrl = configService.get<string>('DATABASE_URL') || 'postgres://postgres:password@localhost:5432/qs_pro';
+        const logger = new Logger('DatabaseModule');
+        const dbUrl =
+          configService.get<string>('DATABASE_URL') ||
+          'postgres://postgres:password@127.0.0.1:5432/qs_pro';
+        
+        logger.log(`Connecting to database at ${dbUrl.replace(/:[^:]+@/, ':****@')}`);
         return createDatabase(dbUrl);
       },
       inject: [ConfigService],

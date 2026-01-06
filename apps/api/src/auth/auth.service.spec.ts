@@ -3,30 +3,61 @@ import { AuthService } from './auth.service';
 import { ConfigService } from '@nestjs/config';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { 
-  ITenantRepository, 
-  IUserRepository, 
-  ICredentialsRepository 
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  vi,
+} from 'vitest';
+import {
+  ITenantRepository,
+  IUserRepository,
+  ICredentialsRepository,
 } from '@qs-pro/database';
 
 const server = setupServer(
-  http.post('https://test-tssd.auth.marketingcloudapis.com/v2/token', async ({ request }) => {
-    const body = await request.json() as any;
-    
-    if (body.grant_type === 'authorization_code' && body.code === 'valid-code') {
-      return HttpResponse.json({
-        access_token: 'new-access-token',
-        refresh_token: 'new-refresh-token',
-        expires_in: 3600,
-        rest_instance_url: 'https://test-rest.com',
-        soap_instance_url: 'https://test-soap.com',
-        scope: 'read write',
-        token_type: 'Bearer'
-      });
-    }
+  http.post(
+    'https://test-tssd.auth.marketingcloudapis.com/v2/token',
+    async ({ request }) => {
+      const bodyText = await request.text();
+      const params = new URLSearchParams(bodyText);
+      const body = Object.fromEntries(params.entries());
 
-    return new HttpResponse(null, { status: 401 });
-  })
+      if (
+        body.grant_type === 'authorization_code' &&
+        body.code === 'valid-code'
+      ) {
+        return HttpResponse.json({
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 3600,
+          rest_instance_url: 'https://test-rest.com',
+          soap_instance_url: 'https://test-soap.com',
+          scope: 'read write',
+          token_type: 'Bearer',
+        });
+      }
+
+      return new HttpResponse(null, { status: 401 });
+    },
+  ),
+  http.get(
+    'https://test-tssd.auth.marketingcloudapis.com/v2/userinfo',
+    () =>
+      HttpResponse.json({
+        user: {
+          sub: 'sf-sub',
+          name: 'SF User',
+          email: 'sf-user@example.com',
+        },
+        organization: {
+          enterprise_id: 12345,
+        },
+      }),
+  ),
 );
 
 describe('AuthService', () => {
@@ -45,10 +76,12 @@ describe('AuthService', () => {
           provide: ConfigService,
           useValue: {
             get: vi.fn((key: string) => {
-              if (key === 'SFMC_CLIENT_ID') return 'client-id';
-              if (key === 'SFMC_CLIENT_SECRET') return 'client-secret';
-              if (key === 'SFMC_REDIRECT_URI') return 'http://localhost/callback';
-              if (key === 'ENCRYPTION_KEY') return '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+              if (key === 'MCE_CLIENT_ID') return 'client-id';
+              if (key === 'MCE_CLIENT_SECRET') return 'client-secret';
+              if (key === 'MCE_REDIRECT_URI')
+                return 'http://localhost/callback';
+              if (key === 'ENCRYPTION_KEY')
+                return '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
               return null;
             }),
           },
@@ -56,25 +89,41 @@ describe('AuthService', () => {
         {
           provide: 'TENANT_REPOSITORY',
           useValue: {
-            upsert: vi.fn().mockResolvedValue({ id: 't-1', eid: '12345', tssd: 'test-tssd' }),
-            findById: vi.fn().mockResolvedValue({ id: 't-1', eid: '12345', tssd: 'test-tssd' }),
+            upsert: vi.fn().mockResolvedValue({
+              id: 't-1',
+              eid: '12345',
+              tssd: 'test-tssd',
+            }),
+            findById: vi.fn().mockResolvedValue({
+              id: 't-1',
+              eid: '12345',
+              tssd: 'test-tssd',
+            }),
           },
         },
         {
           provide: 'USER_REPOSITORY',
           useValue: {
-            upsert: vi.fn().mockResolvedValue({ id: 'u-1', sfUserId: 'sf-1', tenantId: 't-1' }),
-            findBySfUserId: vi.fn().mockResolvedValue({ id: 'u-1', sfUserId: 'sf-1', tenantId: 't-1' }),
+            upsert: vi.fn().mockResolvedValue({
+              id: 'u-1',
+              sfUserId: 'sf-1',
+              tenantId: 't-1',
+            }),
+            findBySfUserId: vi.fn().mockResolvedValue({
+              id: 'u-1',
+              sfUserId: 'sf-1',
+              tenantId: 't-1',
+            }),
           },
         },
         {
           provide: 'CREDENTIALS_REPOSITORY',
           useValue: {
             upsert: vi.fn().mockResolvedValue({}),
-            findByUserAndTenant: vi.fn().mockResolvedValue({ 
-              userId: 'u-1', 
-              tenantId: 't-1', 
-              refreshToken: 'Q7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u=' 
+            findByUserAndTenant: vi.fn().mockResolvedValue({
+              userId: 'u-1',
+              tenantId: 't-1',
+              refreshToken: 'Q7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u=',
             }),
           },
         },
@@ -87,6 +136,10 @@ describe('AuthService', () => {
     credRepo = module.get('CREDENTIALS_REPOSITORY');
   });
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   afterEach(() => server.resetHandlers());
   afterAll(async () => {
     server.close();
@@ -94,15 +147,39 @@ describe('AuthService', () => {
   });
 
   it('should exchange code for token', async () => {
-    const result = await service.exchangeCodeForToken('test-tssd', 'valid-code');
+    const result = await service.exchangeCodeForToken(
+      'test-tssd',
+      'valid-code',
+    );
     expect(result.access_token).toBe('new-access-token');
   });
 
   it('should handle callback and save tokens', async () => {
-    const result = await service.handleCallback('test-tssd', 'valid-code', 'sf-1', '12345');
+    const result = await service.handleCallback(
+      'test-tssd',
+      'valid-code',
+      'sf-1',
+      '12345',
+    );
     expect(result.user.sfUserId).toBe('sf-1');
     expect(tenantRepo.upsert).toHaveBeenCalled();
     expect(userRepo.upsert).toHaveBeenCalled();
     expect(credRepo.upsert).toHaveBeenCalled();
+  });
+
+  it('should derive user identifiers from userinfo', async () => {
+    await service.handleCallback('test-tssd', 'valid-code');
+
+    expect(tenantRepo.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ eid: '12345', tssd: 'test-tssd' }),
+    );
+    expect(userRepo.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sfUserId: 'sf-sub',
+        tenantId: 't-1',
+        email: 'sf-user@example.com',
+        name: 'SF User',
+      }),
+    );
   });
 });
