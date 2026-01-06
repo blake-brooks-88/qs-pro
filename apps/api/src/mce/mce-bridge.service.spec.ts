@@ -6,16 +6,6 @@ import axios, { AxiosError } from 'axios';
 import { UnauthorizedException } from '@nestjs/common';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-vi.mock('axios', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('axios')>();
-  return {
-    ...actual,
-    request: vi.fn(),
-    isAxiosError: (payload: unknown): payload is AxiosError =>
-      (payload as Record<string, unknown>)?.isAxiosError === true,
-  };
-});
-
 describe('MceBridgeService', () => {
   let service: MceBridgeService;
   let authService: AuthService;
@@ -65,10 +55,7 @@ describe('MceBridgeService', () => {
 
   describe('request', () => {
     it('should make a request with refreshed token and correct base URL', async () => {
-      const mockRequest = vi
-        .fn()
-        .mockResolvedValue({ data: { success: true } });
-      vi.mocked(axios.request).mockImplementation(mockRequest);
+      vi.spyOn(axios, 'request').mockResolvedValue({ data: { success: true } } as any);
 
       const response = await service.request('tenant-1', 'user-1', {
         method: 'GET',
@@ -92,10 +79,7 @@ describe('MceBridgeService', () => {
     });
 
     it('should handle SOAP requests using POST and specific content type', async () => {
-      const mockRequest = vi
-        .fn()
-        .mockResolvedValue({ data: '<soap>response</soap>' });
-      vi.mocked(axios.request).mockImplementation(mockRequest);
+      vi.spyOn(axios, 'request').mockResolvedValue({ data: '<soap>response</soap>' } as any);
 
       const soapBody = '<RetrieveRequestMsg>...</RetrieveRequestMsg>';
 
@@ -116,16 +100,18 @@ describe('MceBridgeService', () => {
     });
 
     it('should normalize axios 401 error to ProblemDetails', async () => {
-      const error = {
-        isAxiosError: true,
-        response: {
+      const error = new AxiosError(
+        'Unauthorized',
+        'ERR_BAD_REQUEST',
+        undefined,
+        undefined,
+        {
           status: 401,
           statusText: 'Unauthorized',
           data: { message: 'Token expired' },
-        },
-      };
-      const mockRequest = vi.fn().mockRejectedValue(error);
-      vi.mocked(axios.request).mockImplementation(mockRequest);
+        } as any,
+      );
+      vi.spyOn(axios, 'request').mockRejectedValue(error);
 
       try {
         await service.request('tenant-1', 'user-1', { url: '/test' });
@@ -141,16 +127,18 @@ describe('MceBridgeService', () => {
     });
 
     it('should normalize axios 500 error to ProblemDetails', async () => {
-      const error = {
-        isAxiosError: true,
-        response: {
+      const error = new AxiosError(
+        'Internal Server Error',
+        'ERR_BAD_RESPONSE',
+        undefined,
+        undefined,
+        {
           status: 500,
           statusText: 'Internal Server Error',
           data: { message: 'Something went wrong' },
-        },
-      };
-      const mockRequest = vi.fn().mockRejectedValue(error);
-      vi.mocked(axios.request).mockImplementation(mockRequest);
+        } as any,
+      );
+      vi.spyOn(axios, 'request').mockRejectedValue(error);
 
       try {
         await service.request('tenant-1', 'user-1', { url: '/test' });

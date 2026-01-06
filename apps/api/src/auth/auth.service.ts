@@ -261,6 +261,7 @@ export class AuthService {
     if (!encryptionKey) {
       throw new InternalServerErrorException('ENCRYPTION_KEY not configured');
     }
+    const encryptedAccessToken = encrypt(tokenData.access_token, encryptionKey);
     const encryptedRefreshToken = encrypt(
       tokenData.refresh_token,
       encryptionKey,
@@ -269,7 +270,7 @@ export class AuthService {
     await this.credRepo.upsert({
       tenantId,
       userId,
-      accessToken: tokenData.access_token,
+      accessToken: encryptedAccessToken,
       refreshToken: encryptedRefreshToken,
       expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       updatedAt: new Date(),
@@ -471,7 +472,12 @@ export class AuthService {
     if (!tenant) throw new UnauthorizedException('Tenant not found');
 
     if (creds.accessToken && this.isAccessTokenValid(creds.expiresAt)) {
-      return { accessToken: creds.accessToken, tssd: tenant.tssd };
+      const encryptionKey = this.configService.get<string>('ENCRYPTION_KEY');
+      if (!encryptionKey) {
+        throw new InternalServerErrorException('ENCRYPTION_KEY not configured');
+      }
+      const decryptedAccessToken = decrypt(creds.accessToken, encryptionKey);
+      return { accessToken: decryptedAccessToken, tssd: tenant.tssd };
     }
 
     const encryptionKey = this.configService.get<string>('ENCRYPTION_KEY');

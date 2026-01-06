@@ -36,6 +36,7 @@ Tokens are stored server-side in the database (Credentials table).
 
 - Access token: stored as plaintext in DB for server-side API calls.
 - Refresh token: stored encrypted at rest using AES-256-GCM via `encrypt()`/`decrypt()` from `@qs-pro/database`.
+- Access token: stored encrypted at rest using the same AES-256-GCM mechanism; decrypted only just-in-time for outbound MCE API calls.
 - Encryption key:
   - `ENCRYPTION_KEY` must be a stable 32-byte hex key (as required by `@qs-pro/database`).
 
@@ -134,4 +135,3 @@ Optional (recommended for stricter JWT validation if MCE provides these claims):
 
 - `MCE_JWT_ISSUER`
 - `MCE_JWT_AUDIENCE`
-
