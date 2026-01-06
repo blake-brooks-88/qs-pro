@@ -47,10 +47,10 @@ describe('MetadataService', () => {
     it('should return folders from cache if available', async () => {
       mockCache.get.mockResolvedValue([{ id: '1', Name: 'Test' }]);
 
-      const result = await service.getFolders('t1', 'u1');
+      const result = await service.getFolders('t1', 'u1', 'mid1');
 
       expect(result).toEqual([{ id: '1', Name: 'Test' }]);
-      expect(mockCache.get).toHaveBeenCalledWith('folders:t1');
+      expect(mockCache.get).toHaveBeenCalledWith('folders:t1:mid1');
       expect(bridge.soapRequest).not.toHaveBeenCalled();
     });
 
@@ -64,12 +64,12 @@ describe('MetadataService', () => {
         },
       });
 
-      const result = await service.getFolders('t1', 'u1');
+      const result = await service.getFolders('t1', 'u1', 'mid1');
 
       expect(result).toEqual([{ ID: '1', Name: 'Folder1' }]);
       expect(bridge.soapRequest).toHaveBeenCalled();
       expect(mockCache.set).toHaveBeenCalledWith(
-        'folders:t1',
+        'folders:t1:mid1',
         expect.any(Array),
         600000,
       ); // 10 mins
@@ -97,7 +97,7 @@ describe('MetadataService', () => {
           },
         });
 
-      const result = await service.getDataExtensions('t1', 'u1', 'eid123');
+      const result = await service.getDataExtensions('t1', 'u1', 'mid1', 'eid123');
 
       expect(result).toHaveLength(2);
       expect(result.find((r) => r.CustomerKey === 'DE1')).toBeDefined();
@@ -117,10 +117,10 @@ describe('MetadataService', () => {
         Body: { RetrieveResponseMsg: { Results: [{ Name: 'Field1' }] } },
       });
 
-      await service.getFields('t1', 'u1', deKey);
+      await service.getFields('t1', 'u1', 'mid1', deKey);
 
       expect(mockCache.set).toHaveBeenCalledWith(
-        `fields:t1:${deKey}`,
+        `fields:t1:mid1:${deKey}`,
         expect.any(Array),
         1800000,
       ); // 30 mins

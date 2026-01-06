@@ -10,8 +10,8 @@ export class MetadataService {
     @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
   ) {}
 
-  async getFolders(tenantId: string, userId: string) {
-    const cacheKey = `folders:${tenantId}`;
+  async getFolders(tenantId: string, userId: string, mid: string) {
+    const cacheKey = `folders:${tenantId}:${mid}`;
     const cached = await this.cacheManager.get(cacheKey);
     if (cached) return cached;
 
@@ -35,6 +35,7 @@ export class MetadataService {
     const response = await this.bridge.soapRequest(
       tenantId,
       userId,
+      mid,
       soapBody,
       'Retrieve',
     );
@@ -49,15 +50,15 @@ export class MetadataService {
     return folders;
   }
 
-  async getDataExtensions(tenantId: string, userId: string, eid: string) {
+  async getDataExtensions(tenantId: string, userId: string, mid: string, eid: string) {
     // 1. Local DEs
-    const localPromise = this.fetchDataExtensions(tenantId, userId);
+    const localPromise = this.fetchDataExtensions(tenantId, userId, mid);
 
     // 2. Shared DEs (Context of Enterprise)
     // To retrieve shared items, we often need to query QueryContext/ClientIDs or just base retrieval depending on visibility.
     // Standard pattern for Shared DEs in MCE often involves querying specific folders or using ClientID in the RetrieveRequest.
     // For now, we will assume a standard Retrieve with ClientID injection for the Shared context.
-    const sharedPromise = this.fetchDataExtensions(tenantId, userId, eid);
+    const sharedPromise = this.fetchDataExtensions(tenantId, userId, mid, eid);
 
     const [local, shared] = await Promise.all([localPromise, sharedPromise]);
 
@@ -68,6 +69,7 @@ export class MetadataService {
   private async fetchDataExtensions(
     tenantId: string,
     userId: string,
+    mid: string,
     clientId?: string,
   ) {
     const clientContext = clientId
@@ -94,6 +96,7 @@ export class MetadataService {
     const response = await this.bridge.soapRequest(
       tenantId,
       userId,
+      mid,
       soapBody,
       'Retrieve',
     );
@@ -101,8 +104,8 @@ export class MetadataService {
     return Array.isArray(results) ? results : [results];
   }
 
-  async getFields(tenantId: string, userId: string, deKey: string) {
-    const cacheKey = `fields:${tenantId}:${deKey}`;
+  async getFields(tenantId: string, userId: string, mid: string, deKey: string) {
+    const cacheKey = `fields:${tenantId}:${mid}:${deKey}`;
     const cached = await this.cacheManager.get(cacheKey);
     if (cached) return cached;
 
@@ -127,6 +130,7 @@ export class MetadataService {
     const response = await this.bridge.soapRequest(
       tenantId,
       userId,
+      mid,
       soapBody,
       'Retrieve',
     );

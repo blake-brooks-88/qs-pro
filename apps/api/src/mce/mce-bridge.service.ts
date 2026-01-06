@@ -41,12 +41,14 @@ export class MceBridgeService {
   async request<T = any>(
     tenantId: string,
     userId: string,
+    mid: string,
     config: AxiosRequestConfig,
   ): Promise<T> {
     try {
       const { accessToken, tssd } = await this.authService.refreshToken(
         tenantId,
         userId,
+        mid,
       );
 
       // Determine Base URL (REST by default)
@@ -74,6 +76,7 @@ export class MceBridgeService {
   async soapRequest(
     tenantId: string,
     userId: string,
+    mid: string,
     soapBody: string,
     soapAction: string,
   ): Promise<any> {
@@ -81,6 +84,7 @@ export class MceBridgeService {
       const { accessToken, tssd } = await this.authService.refreshToken(
         tenantId,
         userId,
+        mid,
       );
       const envelope = this.buildSoapEnvelope(accessToken, soapBody, tssd);
 

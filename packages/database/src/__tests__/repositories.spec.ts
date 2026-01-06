@@ -3,7 +3,6 @@ import { PostgresJsDatabase, drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { tenants, users, credentials } from '../schema';
 import { DrizzleTenantRepository, DrizzleUserRepository, DrizzleCredentialsRepository } from '../repositories/drizzle-repositories';
-import { eq } from 'drizzle-orm';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -63,6 +62,7 @@ describe('Drizzle Repositories', () => {
     const credData = {
       tenantId: tenant.id,
       userId: user.id,
+      mid: 'mid-123',
       accessToken: 'access-123',
       refreshToken: 'refresh-encrypted',
       expiresAt: new Date(Date.now() + 3600000),
@@ -71,7 +71,11 @@ describe('Drizzle Repositories', () => {
     const savedCred = await credRepo.upsert(credData);
     expect(savedCred.accessToken).toBe(credData.accessToken);
 
-    const foundCred = await credRepo.findByUserAndTenant(user.id, tenant.id);
+    const foundCred = await credRepo.findByUserTenantMid(
+      user.id,
+      tenant.id,
+      'mid-123',
+    );
     expect(foundCred?.id).toBe(savedCred.id);
   });
 });

@@ -57,7 +57,7 @@ describe('MceBridgeService', () => {
     it('should make a request with refreshed token and correct base URL', async () => {
       vi.spyOn(axios, 'request').mockResolvedValue({ data: { success: true } } as any);
 
-      const response = await service.request('tenant-1', 'user-1', {
+      const response = await service.request('tenant-1', 'user-1', 'mid-1', {
         method: 'GET',
         url: '/asset/v1/content/assets', // Relative URL
       });
@@ -65,6 +65,7 @@ describe('MceBridgeService', () => {
       expect(authService.refreshToken).toHaveBeenCalledWith(
         'tenant-1',
         'user-1',
+        'mid-1',
       );
       expect(axios.request).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -83,7 +84,7 @@ describe('MceBridgeService', () => {
 
       const soapBody = '<RetrieveRequestMsg>...</RetrieveRequestMsg>';
 
-      await service.soapRequest('tenant-1', 'user-1', soapBody, 'Retrieve');
+      await service.soapRequest('tenant-1', 'user-1', 'mid-1', soapBody, 'Retrieve');
 
       expect(axios.request).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -114,7 +115,7 @@ describe('MceBridgeService', () => {
       vi.spyOn(axios, 'request').mockRejectedValue(error);
 
       try {
-        await service.request('tenant-1', 'user-1', { url: '/test' });
+        await service.request('tenant-1', 'user-1', 'mid-1', { url: '/test' });
         // Should fail
         expect(true).toBe(false);
       } catch (e: unknown) {
@@ -141,7 +142,7 @@ describe('MceBridgeService', () => {
       vi.spyOn(axios, 'request').mockRejectedValue(error);
 
       try {
-        await service.request('tenant-1', 'user-1', { url: '/test' });
+        await service.request('tenant-1', 'user-1', 'mid-1', { url: '/test' });
         expect(true).toBe(false);
       } catch (e: unknown) {
         const err = e as any;

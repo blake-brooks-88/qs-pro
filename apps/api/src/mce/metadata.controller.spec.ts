@@ -42,11 +42,11 @@ describe('MetadataController', () => {
       const mockResult = [{ id: '1', Name: 'Folder' }];
       mockService.getFolders.mockResolvedValue(mockResult);
 
-      const user = { userId: 'u1', tenantId: 't1' };
+      const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
       const result = await controller.getFolders(user);
 
       expect(result).toBe(mockResult);
-      expect(mockService.getFolders).toHaveBeenCalledWith('t1', 'u1');
+      expect(mockService.getFolders).toHaveBeenCalledWith('t1', 'u1', 'mid1');
     });
   });
 
@@ -55,13 +55,14 @@ describe('MetadataController', () => {
       const mockResult = [{ CustomerKey: 'DE1' }];
       mockService.getDataExtensions.mockResolvedValue(mockResult);
 
-      const user = { userId: 'u1', tenantId: 't1' };
+      const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
       const result = await controller.getDataExtensions(user, 'eid1');
 
       expect(result).toBe(mockResult);
       expect(mockService.getDataExtensions).toHaveBeenCalledWith(
         't1',
         'u1',
+        'mid1',
         'eid1',
       );
     });
@@ -72,11 +73,16 @@ describe('MetadataController', () => {
       const mockResult = [{ Name: 'Field1' }];
       mockService.getFields.mockResolvedValue(mockResult);
 
-      const user = { userId: 'u1', tenantId: 't1' };
+      const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
       const result = await controller.getFields(user, 'DE_KEY');
 
       expect(result).toBe(mockResult);
-      expect(mockService.getFields).toHaveBeenCalledWith('t1', 'u1', 'DE_KEY');
+      expect(mockService.getFields).toHaveBeenCalledWith(
+        't1',
+        'u1',
+        'mid1',
+        'DE_KEY',
+      );
     });
   });
 });

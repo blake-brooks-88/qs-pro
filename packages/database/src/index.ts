@@ -6,6 +6,11 @@ export const createDatabase = (connectionString: string) => {
   return drizzle(client);
 };
 
+export const createSqlClient = (connectionString: string) => postgres(connectionString);
+
+export const createDatabaseFromClient = (client: ReturnType<typeof postgres>) =>
+  drizzle(client);
+
 export * from 'drizzle-orm';
 export * from './schema';
 export * from './crypto';

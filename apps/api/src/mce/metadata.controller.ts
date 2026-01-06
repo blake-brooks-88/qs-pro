@@ -13,7 +13,7 @@ export class MetadataController {
 
   @Get('folders')
   async getFolders(@CurrentUser() user: UserSession) {
-    return this.metadataService.getFolders(user.tenantId, user.userId);
+    return this.metadataService.getFolders(user.tenantId, user.userId, user.mid);
   }
 
   @Get('data-extensions')
@@ -24,12 +24,13 @@ export class MetadataController {
     return this.metadataService.getDataExtensions(
       user.tenantId,
       user.userId,
+      user.mid,
       eid,
     );
   }
 
   @Get('fields')
   async getFields(@CurrentUser() user: UserSession, @Query('key') key: string) {
-    return this.metadataService.getFields(user.tenantId, user.userId, key);
+    return this.metadataService.getFields(user.tenantId, user.userId, user.mid, key);
   }
 }
