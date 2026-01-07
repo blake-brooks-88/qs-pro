@@ -1,34 +1,38 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createDatabaseFromClient } from '@qs-pro/database';
+import type { Sql } from 'postgres';
 import { runWithDbContext, getDbFromContext } from './db-context';
 
 @Injectable()
 export class RlsContextService {
   private readonly logger = new Logger(RlsContextService.name);
 
-  constructor(@Inject('SQL_CLIENT') private readonly sql: any) {}
+  constructor(@Inject('SQL_CLIENT') private readonly sql: Sql) {}
 
-  private makeDrizzleCompatibleSql(reserved: any): any {
+  private makeDrizzleCompatibleSql(reserved: Sql): Sql {
     // postgres.js `reserve()` returns a Sql tag function without `.options`, but
     // drizzle-orm's postgres-js driver expects `client.options.parsers` to exist.
     // Copy the base client options/parameters onto the reserved Sql tag.
-    if (!reserved || typeof reserved !== 'function') return reserved;
+    const reservedWithMeta = reserved as Sql & {
+      options: Sql['options'];
+      parameters: Sql['parameters'];
+    };
 
-    if (!('options' in reserved)) {
-      Object.defineProperty(reserved, 'options', {
-        value: this.sql?.options,
+    if (!('options' in reservedWithMeta)) {
+      Object.defineProperty(reservedWithMeta, 'options', {
+        value: this.sql.options,
         enumerable: false,
       });
     }
 
-    if (!('parameters' in reserved)) {
-      Object.defineProperty(reserved, 'parameters', {
-        value: this.sql?.parameters,
+    if (!('parameters' in reservedWithMeta)) {
+      Object.defineProperty(reservedWithMeta, 'parameters', {
+        value: this.sql.parameters,
         enumerable: false,
       });
     }
 
-    return reserved;
+    return reservedWithMeta;
   }
 
   async runWithTenantContext<T>(
@@ -50,7 +54,9 @@ export class RlsContextService {
       const db = createDatabaseFromClient(
         this.makeDrizzleCompatibleSql(reserved),
       );
-      return await runWithDbContext(db, fn);
+      // We cast the schema-specific db to the generic Record version used by the context holder.
+
+      return runWithDbContext(db, fn);
     } catch (error) {
       this.logger.error(
         'Failed to run with tenant context',
@@ -64,7 +70,7 @@ export class RlsContextService {
       } catch {
         // Best-effort cleanup; connection is released regardless.
       }
-      await reserved.release();
+      reserved.release();
     }
   }
 }

@@ -3,6 +3,24 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as cacheManager from 'cache-manager';
 import { MceBridgeService } from './mce-bridge.service';
 
+interface MceSoapFolder {
+  ID: string | number;
+  Name: string;
+  ParentFolder?: {
+    ID: string | number;
+  };
+  Description?: string;
+  [key: string]: unknown;
+}
+
+interface MceSoapResponse {
+  Body?: {
+    RetrieveResponseMsg?: {
+      Results?: unknown[];
+    };
+  };
+}
+
 @Injectable()
 export class MetadataService {
   constructor(
@@ -15,7 +33,7 @@ export class MetadataService {
     userId: string,
     mid: string,
     eid?: string,
-  ) {
+  ): Promise<unknown> {
     const cacheKey = eid
       ? `folders:${tenantId}:${mid}:${eid}`
       : `folders:${tenantId}:${mid}`;
@@ -41,7 +59,7 @@ export class MetadataService {
     userId: string,
     mid: string,
     clientId?: string,
-  ) {
+  ): Promise<MceSoapFolder[]> {
     const clientContext = clientId
       ? `
       <ClientIDs>
@@ -68,17 +86,19 @@ export class MetadataService {
       </RetrieveRequestMsg>
     `;
 
-    const response = await this.bridge.soapRequest(
+    const response = (await this.bridge.soapRequest(
       tenantId,
       userId,
       mid,
       soapBody,
       'Retrieve',
-    );
+    )) as MceSoapResponse;
     const results = response?.Body?.RetrieveResponseMsg?.Results || [];
 
     // Normalize if single result (SOAP quirk) - though array is typical from simple-xml parsers usually
-    const folders = Array.isArray(results) ? results : [results];
+    const folders = (
+      Array.isArray(results) ? results : [results]
+    ) as MceSoapFolder[];
 
     if (!clientId) return folders;
 
@@ -97,13 +117,14 @@ export class MetadataService {
     });
   }
 
-  private dedupeFolders(folders: Record<string, unknown>[]) {
-    const seen = new Map<string, Record<string, unknown>>();
-    const deduped: Record<string, unknown>[] = [];
+  private dedupeFolders(folders: MceSoapFolder[]): MceSoapFolder[] {
+    const seen = new Map<string, MceSoapFolder>();
+    const deduped: MceSoapFolder[] = [];
 
     folders.forEach((folder) => {
       const rawId = folder.ID ?? folder.Id ?? folder.id;
-      const id = rawId ? String(rawId) : null;
+      const id =
+        rawId !== null && rawId !== undefined ? String(rawId as string) : null;
       if (!id) {
         deduped.push(folder);
         return;
@@ -121,7 +142,7 @@ export class MetadataService {
     userId: string,
     mid: string,
     eid: string,
-  ) {
+  ): Promise<unknown[]> {
     // 1. Local DEs
     const localPromise = this.fetchDataExtensions(tenantId, userId, mid);
 
@@ -142,7 +163,7 @@ export class MetadataService {
     userId: string,
     mid: string,
     clientId?: string,
-  ) {
+  ): Promise<unknown[]> {
     const clientContext = clientId
       ? `
       <ClientIDs>
@@ -164,13 +185,13 @@ export class MetadataService {
       </RetrieveRequestMsg>
     `;
 
-    const response = await this.bridge.soapRequest(
+    const response = (await this.bridge.soapRequest(
       tenantId,
       userId,
       mid,
       soapBody,
       'Retrieve',
-    );
+    )) as MceSoapResponse;
     const results = response?.Body?.RetrieveResponseMsg?.Results || [];
     return Array.isArray(results) ? results : [results];
   }
@@ -180,10 +201,10 @@ export class MetadataService {
     userId: string,
     mid: string,
     deKey: string,
-  ) {
+  ): Promise<unknown[]> {
     const cacheKey = `fields:${tenantId}:${mid}:${deKey}`;
     const cached = await this.cacheManager.get(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as unknown[];
 
     const soapBody = `
       <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
@@ -203,13 +224,13 @@ export class MetadataService {
       </RetrieveRequestMsg>
     `;
 
-    const response = await this.bridge.soapRequest(
+    const response = (await this.bridge.soapRequest(
       tenantId,
       userId,
       mid,
       soapBody,
       'Retrieve',
-    );
+    )) as MceSoapResponse;
     const results = response?.Body?.RetrieveResponseMsg?.Results || [];
     const fields = Array.isArray(results) ? results : [results];
 

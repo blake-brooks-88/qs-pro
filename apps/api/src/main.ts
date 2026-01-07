@@ -10,7 +10,14 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { createDatabaseFromClient } from '@qs-pro/database';
+import type { Sql } from 'postgres';
 import { getDbFromContext, runWithDbContext } from './database/db-context';
+
+type Session = {
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
+  delete(): void;
+};
 
 async function bootstrap() {
   const adapter = new FastifyAdapter({
@@ -82,38 +89,41 @@ async function bootstrap() {
     },
   });
 
-  const sqlClient = app.get('SQL_CLIENT');
+  const sqlClient = app.get<Sql>('SQL_CLIENT');
 
-  const makeDrizzleCompatibleSql = (reserved: any): any => {
-    if (!reserved || typeof reserved !== 'function') return reserved;
+  const makeDrizzleCompatibleSql = (reserved: Sql): Sql => {
+    const reservedWithMeta = reserved as Sql & {
+      options: Sql['options'];
+      parameters: Sql['parameters'];
+    };
 
-    if (!('options' in reserved)) {
-      Object.defineProperty(reserved, 'options', {
-        value: sqlClient?.options,
+    if (!('options' in reservedWithMeta)) {
+      Object.defineProperty(reservedWithMeta, 'options', {
+        value: sqlClient.options,
         enumerable: false,
       });
     }
 
-    if (!('parameters' in reserved)) {
-      Object.defineProperty(reserved, 'parameters', {
-        value: sqlClient?.parameters,
+    if (!('parameters' in reservedWithMeta)) {
+      Object.defineProperty(reservedWithMeta, 'parameters', {
+        value: sqlClient.parameters,
         enumerable: false,
       });
     }
 
-    return reserved;
+    return reservedWithMeta;
   };
 
   // Establish request-scoped RLS context after secure-session runs (so `req.session` is available).
   // With FORCE RLS enabled, all DB reads/writes must run on a connection where these settings are set.
   // Use `runWithDbContext(db, done)` to reliably propagate AsyncLocalStorage through Fastify/Nest.
-  adapter.getInstance().addHook('onRequest', (req, reply, done) => {
+  adapter.getInstance().addHook('onRequest', (req, _reply, done) => {
     if (getDbFromContext()) return done();
     if (req.method === 'OPTIONS') return done();
 
-    const session: any = (req as any).session;
-    const tenantId = session?.get?.('tenantId');
-    const mid = session?.get?.('mid');
+    const session = (req as unknown as { session: Session }).session;
+    const tenantId = session?.get('tenantId');
+    const mid = session?.get('mid');
     if (typeof tenantId !== 'string' || typeof mid !== 'string') return done();
 
     void (async () => {
@@ -129,19 +139,26 @@ async function bootstrap() {
         } catch {
           // ignore
         }
-        await reserved.release();
+        reserved.release();
       };
 
-      reply.raw.once('finish', () => void cleanup());
-      reply.raw.once('close', () => void cleanup());
-      reply.raw.once('error', () => void cleanup());
+      _reply.raw.once('finish', () => {
+        void cleanup();
+      });
+      _reply.raw.once('close', () => {
+        void cleanup();
+      });
+      _reply.raw.once('error', () => {
+        void cleanup();
+      });
 
       await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
       await reserved`SELECT set_config('app.mid', ${mid}, false)`;
 
       const db = createDatabaseFromClient(makeDrizzleCompatibleSql(reserved));
+      // Cast to generic schema for context holder
       runWithDbContext(db, done);
-    })().catch((error) => done(error));
+    })().catch((error: Error) => done(error));
   });
 
   // MCE can be configured to send the OAuth authorization code back to the app root (`/`).
@@ -166,4 +183,7 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
