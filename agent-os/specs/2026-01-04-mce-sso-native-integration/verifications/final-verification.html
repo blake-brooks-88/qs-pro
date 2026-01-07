@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Report: MCE Native SSO Integration</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 30px; }
+        .status { font-weight: bold; padding: 5px 10px; border-radius: 4px; }
+        .passed { background-color: #d4edda; color: #155724; }
+        .issues { background-color: #fff3cd; color: #856404; }
+        .failed { background-color: #f8d7da; color: #721c24; }
+        code { background-color: #f8f9fa; padding: 2px 4px; border-radius: 4px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+        pre { background-color: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        .task-list { list-style: none; padding-left: 0; }
+        .task-list li { margin-bottom: 5px; }
+        .task-list li::before { content: "✓ "; color: #28a745; font-weight: bold; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Verification Report: MCE Native SSO Integration</h1>
+    
+    <p><strong>Spec:</strong> <code>2026-01-04-mce-sso-native-integration</code></p>
+    <p><strong>Date:</strong> Sunday, January 4, 2026</p>
+    <p><strong>Verifier:</strong> implementation-verifier</p>
+    <p><strong>Status:</strong> <span class="status passed">✅ Passed</span></p>
+
+    <hr>
+
+    <h2>Executive Summary</h2>
+    <p>The MCE Native SSO Integration has been successfully implemented. The application now supports seamless login from the Salesforce Marketing Cloud Engagement App Switcher using signed JWTs. Just-In-Time provisioning of Tenants and Users is functional, and secure HTTP-only sessions are established correctly. UI cleanup has been performed to remove manual login entry points.</p>
+
+    <hr>
+
+    <h2>1. Tasks Verification</h2>
+    <p><strong>Status:</strong> <span class="status passed">✅ All Complete</span></p>
+
+    <ul class="task-list">
+        <li>Task Group 1: Repository Enhancements
+            <ul>
+                <li>Tenant/User upsert logic with <code>onConflictDoUpdate</code> verified.</li>
+                <li>Correct TSSD and User Metadata updates tested.</li>
+            </ul>
+        </li>
+        <li>Task Group 2: JWT Authentication & Handshake
+            <ul>
+                <li>JWT verification using <code>jose</code> and <code>MCE_JWT_SIGNING_SECRET</code>.</li>
+                <li>Extraction of EID, MID, UserID, and TSSD context.</li>
+                <li>Server-to-server OAuth handshake for initial tokens.</li>
+                <li>Secure HTTP-only session cookie (<code>@fastify/secure-session</code>).</li>
+            </ul>
+        </li>
+        <li>Task Group 3: UI Cleanup & Flow
+            <ul>
+                <li>Manual login page replaced with <code>LaunchInstructionsPage</code>.</li>
+                <li>App entry point updated with auto-auth check (<code>/api/auth/me</code>).</li>
+                <li>Auto-redirection to Verifier page implemented.</li>
+            </ul>
+        </li>
+        <li>Task Group 4: Final Verification
+            <ul>
+                <li>E2E tests covering full JWT POST -> Session -> Identity flow.</li>
+                <li>Regression testing of Metadata Controller with SessionGuard.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <hr>
+
+    <h2>2. Documentation Verification</h2>
+    <p><strong>Status:</strong> <span class="status passed">✅ Complete</span></p>
+    <ul>
+        <li>Updated <code>tasks.md</code> with completed checkboxes.</li>
+        <li>New tests added: <code>upsert-conflict.spec.ts</code>, <code>jwt.spec.ts</code>, and updated <code>auth.e2e-spec.ts</code>.</li>
+    </ul>
+
+    <hr>
+
+    <h2>3. Roadmap Updates</h2>
+    <p><strong>Status:</strong> <span class="status passed">✅ Updated</span></p>
+    <ul>
+        <li>Roadmap item 2: "Authentication & Token Wallet" remains marked as complete (fully implemented native SSO).</li>
+    </ul>
+
+    <hr>
+
+    <h2>4. Test Suite Results</h2>
+    <p><strong>Status:</strong> <span class="status passed">✅ All Passing</span></p>
+    
+    <h3>Test Summary</h3>
+    <ul>
+        <li><strong>Database Tests:</strong> 7 passed</li>
+        <li><strong>API Unit Tests:</strong> 20 passed</li>
+        <li><strong>API E2E Tests:</strong> 4 passed</li>
+        <li><strong>Web Unit Tests:</strong> 6 passed</li>
+    </ul>
+
+    <h3>Failed Tests</h3>
+    <p>None - all tests passing.</p>
+
+    <h3>Notes</h3>
+    <p>MSW warnings in E2E tests for unhandled requests to <code>/auth/login</code> and <code>/auth/me</code> are expected as they are handled by the actual NestJS app during <code>supertest</code> calls, not by MSW mocks.</p>
+</body>
+</html>

@@ -1,0 +1,63 @@
+/* Query++ Design Tokens (from product/design-system) */
+:root {
+  --radius: 0.5rem;
+
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+
+  --primary: #D900FF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FF0055;
+  --secondary-foreground: #FFFFFF;
+
+  --success: #00FF94;
+  --success-foreground: #0F172A;
+  --warning: #FF9F1C;
+  --warning-foreground: #FFFFFF;
+  --error: #FF3333;
+  --error-foreground: #FFFFFF;
+
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #D900FF;
+
+  --surface: #F1F5F9;
+  --surface-hover: #E2E8F0;
+}
+
+.dark {
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+  --card: #1E293B;
+  --card-foreground: #F8FAFC;
+  --popover: #1E293B;
+  --popover-foreground: #F8FAFC;
+
+  --primary: #D900FF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FF0055;
+  --secondary-foreground: #FFFFFF;
+
+  --success: #00FF94;
+  --success-foreground: #0F172A;
+  --warning: #FF9F1C;
+  --warning-foreground: #FFFFFF;
+  --error: #FF3333;
+  --error-foreground: #FFFFFF;
+
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --border: #334155;
+  --input: #334155;
+  --ring: #D900FF;
+
+  --surface: #1E293B;
+  --surface-hover: #334155;
+}
+

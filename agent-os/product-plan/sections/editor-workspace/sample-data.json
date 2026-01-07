@@ -1,0 +1,96 @@
+{
+  "_meta": {
+    "models": {
+      "folders": "Hierarchical containers for organizing Saved Queries (internal) and Data Extensions (MCE).",
+      "savedQueries": "Persistent SQL scripts stored in the user's library.",
+      "dataExtensions": "Marketing Cloud tables including their schema definitions and metadata.",
+      "executionResult": "The results, performance metrics, and pagination state of a query run."
+    },
+    "relationships": [
+      "Folders contain either other Folders, SavedQueries, or DataExtensions.",
+      "DataExtensions contain many Fields defining their schema.",
+      "SavedQueries produce an ExecutionResult when run."
+    ]
+  },
+  "folders": [
+    { "id": "f-1", "name": "Standard Data Views", "parentId": null, "type": "data-extension" },
+    { "id": "f-2", "name": "Salesforce Integration", "parentId": null, "type": "data-extension" },
+    { "id": "f-3", "name": "Production Segments", "parentId": null, "type": "data-extension" },
+    { "id": "f-4", "name": "Daily Maintenance", "parentId": null, "type": "library" },
+    { "id": "f-5", "name": "Compliance & Audits", "parentId": null, "type": "library" },
+    { "id": "f-6", "name": "Archive", "parentId": "f-4", "type": "library" },
+    { "id": "f-7", "name": "2024 Cleanup", "parentId": "f-6", "type": "library" }
+  ],
+  "savedQueries": [
+    {
+      "id": "q-101",
+      "name": "Active Subscribers 30d",
+      "folderId": "f-4",
+      "content": "SELECT \n  SubscriberKey, \n  EmailAddress, \n  Status \nFROM [_Subscribers] \nWHERE Status = 'Active' \nAND DateJoined > DATEADD(day, -30, GETDATE())",
+      "updatedAt": "2024-01-05T14:20:00Z"
+    },
+    {
+      "id": "q-102",
+      "name": "Bounce Cleanup Script",
+      "folderId": "f-6",
+      "content": "SELECT \n  s.EmailAddress, \n  b.BounceCategory \nFROM [_Subscribers] s\nJOIN [_Bounce] b ON s.SubscriberKey = b.SubscriberKey\nWHERE b.BounceCategory = 'Hard Bounce'",
+      "updatedAt": "2024-01-04T09:15:00Z"
+    },
+    {
+      "id": "q-103",
+      "name": "Abandoned Cart Recovery",
+      "folderId": "f-3",
+      "content": "SELECT TOP 100 * FROM [Cart_Items] WHERE IsConverted = 0",
+      "updatedAt": "2024-01-06T11:00:00Z"
+    },
+    {
+      "id": "q-104",
+      "name": "Old Subscriber Audit",
+      "folderId": "f-7",
+      "content": "SELECT * FROM [_Subscribers] WHERE CreatedDate < '2020-01-01'",
+      "updatedAt": "2024-01-07T12:00:00Z"
+    }
+  ],
+  "dataExtensions": [
+    {
+      "id": "de-201",
+      "name": "Master_Subscriber_List",
+      "customerKey": "MSL_001",
+      "folderId": "f-3",
+      "description": "Primary source of truth for all active subscribers.",
+      "fields": [
+        { "name": "SubscriberKey", "type": "Text", "length": 255, "isPrimaryKey": true, "isNullable": false },
+        { "name": "EmailAddress", "type": "Email", "length": 254, "isPrimaryKey": false, "isNullable": false },
+        { "name": "OptInStatus", "type": "Boolean", "isPrimaryKey": false, "isNullable": true },
+        { "name": "LastLogin", "type": "Date", "isPrimaryKey": false, "isNullable": true }
+      ]
+    },
+    {
+      "id": "de-202",
+      "name": "Global_Unsubscribes",
+      "customerKey": "UNSUB_01",
+      "folderId": "f-5",
+      "description": "Historical audit of all unsubscribed users.",
+      "fields": [
+        { "name": "Email", "type": "Email", "length": 254, "isPrimaryKey": true, "isNullable": false },
+        { "name": "UnsubscribeDate", "type": "Date", "isPrimaryKey": false, "isNullable": false },
+        { "name": "Reason", "type": "Text", "length": 500, "isPrimaryKey": false, "isNullable": true }
+      ]
+    }
+  ],
+  "executionResult": {
+    "status": "success",
+    "runtime": "1.4s",
+    "totalRows": 1250,
+    "currentPage": 1,
+    "pageSize": 50,
+    "columns": ["SubscriberKey", "EmailAddress", "Status", "JoinedDate"],
+    "rows": [
+      { "SubscriberKey": "SUB_001", "EmailAddress": "alex.morgan@test.com", "Status": "Active", "JoinedDate": "2023-12-01" },
+      { "SubscriberKey": "SUB_002", "EmailAddress": "jordan.smith@test.com", "Status": "Active", "JoinedDate": "2023-12-05" },
+      { "SubscriberKey": "SUB_003", "EmailAddress": "casey.jones@test.com", "Status": "Held", "JoinedDate": "2023-12-10" },
+      { "SubscriberKey": "SUB_004", "EmailAddress": "riley.taylor@test.com", "Status": "Active", "JoinedDate": "2023-12-12" },
+      { "SubscriberKey": "SUB_005", "EmailAddress": "morgan.free@test.com", "Status": "Unsubscribed", "JoinedDate": "2023-12-15" }
+    ]
+  }
+}
