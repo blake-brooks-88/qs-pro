@@ -92,6 +92,8 @@
   --color-ring: var(--ring);
   --color-accent: var(--surface);
   --color-accent-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
   --color-destructive: var(--error);
   --color-destructive-foreground: var(--error-foreground);
   --radius-lg: var(--radius);

@@ -84,6 +84,56 @@ describe('MetadataService', () => {
         600000,
       ); // 10 mins
     });
+
+    it('should paginate if MoreDataAvailable is returned', async () => {
+      mockCache.get.mockResolvedValue(null);
+      mockBridge.soapRequest.mockImplementation(async (_tid, _uid, _mid, body) => {
+        if (body.includes('<ClientID>eid1</ClientID>')) {
+          // Shared Call
+          return {
+            Body: {
+              RetrieveResponseMsg: {
+                OverallStatus: 'OK',
+                Results: [{ ID: '3', Name: 'Folder3' }],
+              },
+            },
+          };
+        }
+        if (body.includes('<ContinueRequest>req-123</ContinueRequest>')) {
+          // Local Call - Page 2
+          return {
+            Body: {
+              RetrieveResponseMsg: {
+                OverallStatus: 'OK',
+                Results: [{ ID: '2', Name: 'Folder2' }],
+              },
+            },
+          };
+        }
+        // Local Call - Page 1
+        return {
+          Body: {
+            RetrieveResponseMsg: {
+              OverallStatus: 'MoreDataAvailable',
+              RequestID: 'req-123',
+              Results: [{ ID: '1', Name: 'Folder1' }],
+            },
+          },
+        };
+      });
+
+      const result = await service.getFolders('t1', 'u1', 'mid1', 'eid1');
+
+      expect(result).toHaveLength(3);
+      // 1 Local Page 1, 1 Local Page 2, 1 Shared Page 1
+      expect(mockBridge.soapRequest).toHaveBeenCalledTimes(3);
+
+      // Verify at least one call used ContinueRequest
+      const callBodies = mockBridge.soapRequest.mock.calls.map((c) => c[3]);
+      expect(callBodies.some((b) => b.includes('<ContinueRequest>req-123</ContinueRequest>'))).toBe(
+        true,
+      );
+    });
   });
 
   describe('getDataExtensions', () => {

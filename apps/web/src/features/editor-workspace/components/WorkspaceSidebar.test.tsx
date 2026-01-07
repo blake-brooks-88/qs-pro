@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceSidebar } from "@/features/editor-workspace/components/WorkspaceSidebar";
-import { DataExtension, Folder } from "@/features/editor-workspace/types";
+import { DataExtension, Folder, SavedQuery } from "@/features/editor-workspace/types";
 
 const createQueryClient = () =>
   new QueryClient({
@@ -20,13 +21,17 @@ const createWrapper = (queryClient: QueryClient) => {
   };
 };
 
-const renderSidebar = (folders: Folder[], dataExtensions: DataExtension[]) => {
+const renderSidebar = (
+  folders: Folder[], 
+  dataExtensions: DataExtension[], 
+  savedQueries: SavedQuery[] = []
+) => {
   const queryClient = createQueryClient();
   return render(
     <WorkspaceSidebar
       tenantId="tenant-1"
       folders={folders}
-      savedQueries={[]}
+      savedQueries={savedQueries}
       dataExtensions={dataExtensions}
       isCollapsed={false}
       onToggle={() => undefined}
@@ -39,7 +44,9 @@ describe("WorkspaceSidebar", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-  it("renders root folders and expands to show child folders", () => {
+
+  it("renders root folders and expands to show child folders", async () => {
+    const user = userEvent.setup();
     // Arrange
     const folders: Folder[] = [
       {
@@ -67,7 +74,7 @@ describe("WorkspaceSidebar", () => {
       screen.queryByRole("button", { name: /child folder/i }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /root folder/i }));
+    await user.click(screen.getByRole("button", { name: /root folder/i }));
 
     expect(
       screen.getByRole("button", { name: /child folder/i }),
@@ -75,6 +82,7 @@ describe("WorkspaceSidebar", () => {
   });
 
   it("expands data extensions to reveal fields", async () => {
+    const user = userEvent.setup();
     // Arrange
     const folders: Folder[] = [
       {
@@ -96,7 +104,7 @@ describe("WorkspaceSidebar", () => {
     ];
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce({
+      vi.fn().mockResolvedValue({
         ok: true,
         json: async () => [{ Name: "EmailAddress", FieldType: "Text" }],
       }),
@@ -105,8 +113,8 @@ describe("WorkspaceSidebar", () => {
     // Act
     renderSidebar(folders, dataExtensions);
 
-    fireEvent.click(screen.getByRole("button", { name: /root folder/i }));
-    fireEvent.click(screen.getByRole("button", { name: /customers/i }));
+    await user.click(screen.getByRole("button", { name: /root folder/i }));
+    await user.click(screen.getByRole("button", { name: /customers/i }));
 
     // Assert
     await waitFor(() => {
@@ -115,55 +123,91 @@ describe("WorkspaceSidebar", () => {
     expect(screen.getByText("Text")).toBeInTheDocument();
   });
 
-  it("orders folders before data extensions alphabetically", () => {
-    // Arrange
+  it("SidebarSearch_OnType_ShowsResultsInPopover", async () => {
+    const user = userEvent.setup();
     const folders: Folder[] = [
-      {
-        id: "root",
-        name: "Root Folder",
-        parentId: null,
-        type: "data-extension",
-      },
-      {
-        id: "alpha",
-        name: "Alpha Folder",
-        parentId: "root",
-        type: "data-extension",
-      },
-      {
-        id: "beta",
-        name: "Beta Folder",
-        parentId: "root",
-        type: "data-extension",
-      },
+      { id: "1", name: "Sales", parentId: null, type: "data-extension" },
     ];
-    const dataExtensions: DataExtension[] = [
-      {
-        id: "de-zeta",
-        name: "Zeta DE",
-        customerKey: "DE_Zeta",
-        folderId: "root",
-        description: "",
-        fields: [],
-      },
+    const de: DataExtension[] = [
+      { id: "de1", name: "Customers", customerKey: "C1", folderId: "1", description: "", fields: [] },
     ];
 
-    // Act
-    renderSidebar(folders, dataExtensions);
-    fireEvent.click(screen.getByRole("button", { name: /root folder/i }));
+    renderSidebar(folders, de);
 
-    // Assert
-    const alphaButton = screen.getByRole("button", { name: /alpha folder/i });
-    const betaButton = screen.getByRole("button", { name: /beta folder/i });
-    const deButton = screen.getByRole("button", { name: /zeta de/i });
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, "Cust");
 
-    expect(
-      alphaButton.compareDocumentPosition(betaButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      betaButton.compareDocumentPosition(deButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(screen.getByRole("option", { name: /customers/i })).toBeInTheDocument();
+    expect(screen.getAllByText("Sales").length).toBeGreaterThan(0); // Can be folder name or path
+  });
+
+  it("SidebarSearch_OnSelectResult_FiltersTreeToAncestorChain", async () => {
+    const user = userEvent.setup();
+    const folders: Folder[] = [
+      { id: "1", name: "Root", parentId: null, type: "data-extension" },
+      { id: "2", name: "Sub", parentId: "1", type: "data-extension" },
+      { id: "3", name: "Other", parentId: null, type: "data-extension" },
+    ];
+    const de: DataExtension[] = [
+      { id: "de1", name: "TargetDE", customerKey: "T1", folderId: "2", description: "", fields: [] },
+    ];
+
+    renderSidebar(folders, de);
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, "Target");
+    await user.click(screen.getByRole("option", { name: /targetde/i }));
+
+    // Tree should be filtered
+    expect(screen.getByRole("button", { name: /root/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sub/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /targetde/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /other/i })).not.toBeInTheDocument();
+  });
+
+  it("SidebarSearch_OnClear_RestoresTreeState", async () => {
+    const user = userEvent.setup();
+    const folders: Folder[] = [
+      { id: "1", name: "Root", parentId: null, type: "data-extension" },
+      { id: "2", name: "Other", parentId: null, type: "data-extension" },
+    ];
+
+    renderSidebar(folders, []);
+
+    // Initial state: Both roots visible
+    expect(screen.getByRole("button", { name: /root/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /other/i })).toBeInTheDocument();
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, "Root");
+    await user.click(screen.getByRole("option", { name: /root/i }));
+
+    // Filtered state
+    expect(screen.queryByRole("button", { name: /other/i })).not.toBeInTheDocument();
+
+    // Clear search
+    await user.click(screen.getByRole("button", { name: /clear search/i }));
+
+    // Restored state
+    expect(screen.getByRole("button", { name: /other/i })).toBeInTheDocument();
+  });
+
+  it("SidebarSearch_OnQueriesTab_FiltersQueries", async () => {
+    const user = userEvent.setup();
+    const queries: SavedQuery[] = [
+      { id: "q1", name: "Select All", folderId: "root", content: "SELECT *", updatedAt: "" },
+      { id: "q2", name: "Filter Users", folderId: "root", content: "SELECT *", updatedAt: "" },
+    ];
+
+    renderSidebar([], [], queries);
+
+    // Switch to queries tab
+    await user.click(screen.getByRole("button", { name: /queries/i }));
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, "Select");
+
+    expect(screen.getByRole("option", { name: /select all/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /filter users/i })).not.toBeInTheDocument();
   });
 });

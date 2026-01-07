@@ -16,6 +16,8 @@ interface MceSoapFolder {
 interface MceSoapResponse {
   Body?: {
     RetrieveResponseMsg?: {
+      OverallStatus?: string;
+      RequestID?: string;
       Results?: unknown[];
     };
   };
@@ -68,7 +70,21 @@ export class MetadataService {
     `
       : '';
 
-    const soapBody = `
+    let allFolders: MceSoapFolder[] = [];
+    let continueRequest: string | null = null;
+    let page = 1;
+    const MAX_PAGES = 50;
+
+    do {
+      const soapBody = continueRequest
+        ? `
+      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+         <RetrieveRequest>
+            <ContinueRequest>${continueRequest}</ContinueRequest>
+         </RetrieveRequest>
+      </RetrieveRequestMsg>
+    `
+        : `
       <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
          <RetrieveRequest>
             ${clientContext}
@@ -86,23 +102,29 @@ export class MetadataService {
       </RetrieveRequestMsg>
     `;
 
-    const response = (await this.bridge.soapRequest(
-      tenantId,
-      userId,
-      mid,
-      soapBody,
-      'Retrieve',
-    )) as MceSoapResponse;
-    const results = response?.Body?.RetrieveResponseMsg?.Results || [];
+      const response = (await this.bridge.soapRequest(
+        tenantId,
+        userId,
+        mid,
+        soapBody,
+        'Retrieve',
+      )) as MceSoapResponse;
 
-    // Normalize if single result (SOAP quirk) - though array is typical from simple-xml parsers usually
-    const folders = (
-      Array.isArray(results) ? results : [results]
-    ) as MceSoapFolder[];
+      const retrieveResponse = response?.Body?.RetrieveResponseMsg;
+      const results = retrieveResponse?.Results || [];
+      const folders = (Array.isArray(results) ? results : [results]) as MceSoapFolder[];
 
-    if (!clientId) return folders;
+      allFolders = allFolders.concat(folders);
 
-    return folders.map((folder) => {
+      const status = retrieveResponse?.OverallStatus;
+      continueRequest =
+        status === 'MoreDataAvailable' ? retrieveResponse?.RequestID ?? null : null;
+      page++;
+    } while (continueRequest && page <= MAX_PAGES);
+
+    if (!clientId) return allFolders;
+
+    return allFolders.map((folder) => {
       const name = typeof folder.Name === 'string' ? folder.Name : null;
       const rawParentId = folder?.ParentFolder?.ID ?? null;
       const parentId =
@@ -147,14 +169,10 @@ export class MetadataService {
     const localPromise = this.fetchDataExtensions(tenantId, userId, mid);
 
     // 2. Shared DEs (Context of Enterprise)
-    // To retrieve shared items, we often need to query QueryContext/ClientIDs or just base retrieval depending on visibility.
-    // Standard pattern for Shared DEs in MCE often involves querying specific folders or using ClientID in the RetrieveRequest.
-    // For now, we will assume a standard Retrieve with ClientID injection for the Shared context.
     const sharedPromise = this.fetchDataExtensions(tenantId, userId, mid, eid);
 
     const [local, shared] = await Promise.all([localPromise, sharedPromise]);
 
-    // Merge, potentially deduping by CustomerKey if needed, but usually they are distinct
     return [...local, ...shared];
   }
 
@@ -172,7 +190,21 @@ export class MetadataService {
     `
       : '';
 
-    const soapBody = `
+    let allDEs: unknown[] = [];
+    let continueRequest: string | null = null;
+    let page = 1;
+    const MAX_PAGES = 50;
+
+    do {
+      const soapBody = continueRequest
+        ? `
+      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+         <RetrieveRequest>
+            <ContinueRequest>${continueRequest}</ContinueRequest>
+         </RetrieveRequest>
+      </RetrieveRequestMsg>
+    `
+        : `
       <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
          <RetrieveRequest>
             ${clientContext}
@@ -185,15 +217,27 @@ export class MetadataService {
       </RetrieveRequestMsg>
     `;
 
-    const response = (await this.bridge.soapRequest(
-      tenantId,
-      userId,
-      mid,
-      soapBody,
-      'Retrieve',
-    )) as MceSoapResponse;
-    const results = response?.Body?.RetrieveResponseMsg?.Results || [];
-    return Array.isArray(results) ? results : [results];
+      const response = (await this.bridge.soapRequest(
+        tenantId,
+        userId,
+        mid,
+        soapBody,
+        'Retrieve',
+      )) as MceSoapResponse;
+
+      const retrieveResponse = response?.Body?.RetrieveResponseMsg;
+      const results = retrieveResponse?.Results || [];
+      const des = Array.isArray(results) ? results : [results];
+
+      allDEs = allDEs.concat(des);
+
+      const status = retrieveResponse?.OverallStatus;
+      continueRequest =
+        status === 'MoreDataAvailable' ? retrieveResponse?.RequestID ?? null : null;
+      page++;
+    } while (continueRequest && page <= MAX_PAGES);
+
+    return allDEs;
   }
 
   async getFields(
