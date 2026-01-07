@@ -1,62 +1,40 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import path from 'path'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import path from "path";
 
 // https://vitejs.dev/config/
 
 export default defineConfig({
-
   plugins: [tailwindcss(), react()],
 
   resolve: {
-
     alias: {
-
-      '@': path.resolve(__dirname, './src'),
-
+      "@": path.resolve(__dirname, "./src"),
     },
-
   },
 
   server: {
-
     port: 5173,
 
-    host: '0.0.0.0', // Required for tunnel access
+    host: "0.0.0.0", // Required for tunnel access
 
-    allowedHosts: [
-
-      "dev.queryplusplus.app",
-
-      ".loca.lt",
-
-      ".ngrok-free.dev"
-
-    ],
+    allowedHosts: ["dev.queryplusplus.app", ".loca.lt", ".ngrok-free.dev"],
 
     hmr: {
+      protocol: "wss",
 
-      protocol: 'wss',
-
-      host: 'dev.queryplusplus.app',
+      host: "dev.queryplusplus.app",
 
       clientPort: 443,
-
     },
 
     proxy: {
-
-      '/api': {
-
-        target: 'http://127.0.0.1:3000',
+      "/api": {
+        target: "http://127.0.0.1:3000",
 
         changeOrigin: true,
-
       },
-
     },
-
   },
-
-})
+});
