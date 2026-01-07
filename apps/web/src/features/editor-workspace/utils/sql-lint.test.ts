@@ -94,8 +94,7 @@ describe("sql lint", () => {
     expect(
       diagnostics.some(
         (diag) =>
-          diag.severity === "prereq" &&
-          diag.message.includes("FROM clause"),
+          diag.severity === "prereq" && diag.message.includes("FROM clause"),
       ),
     ).toBe(true);
   });
@@ -219,64 +218,61 @@ describe("sql lint", () => {
     ).toBe(false);
   });
 
-  test(
-    "lintSql_WithAmbiguousFieldAndAliasesButUnqualified_ReturnsError",
-    () => {
-      // Arrange
-      const sql =
-        "SELECT EmailAddress FROM [DE One] a JOIN [DE Two] b ON a.Id = b.Id";
-      const dataExtensions: DataExtension[] = [
-        {
-          id: "de-1",
-          name: "DE One",
-          customerKey: "DE One",
-          folderId: "local",
-          description: "",
-          fields: [
-            {
-              name: "EmailAddress",
-              type: "Email",
-              isPrimaryKey: false,
-              isNullable: true,
-            },
-            {
-              name: "Id",
-              type: "Text",
-              isPrimaryKey: false,
-              isNullable: true,
-            },
-          ],
-        },
-        {
-          id: "de-2",
-          name: "DE Two",
-          customerKey: "DE Two",
-          folderId: "local",
-          description: "",
-          fields: [
-            {
-              name: "EmailAddress",
-              type: "Email",
-              isPrimaryKey: false,
-              isNullable: true,
-            },
-            {
-              name: "Id",
-              type: "Text",
-              isPrimaryKey: false,
-              isNullable: true,
-            },
-          ],
-        },
-      ];
+  test("lintSql_WithAmbiguousFieldAndAliasesButUnqualified_ReturnsError", () => {
+    // Arrange
+    const sql =
+      "SELECT EmailAddress FROM [DE One] a JOIN [DE Two] b ON a.Id = b.Id";
+    const dataExtensions: DataExtension[] = [
+      {
+        id: "de-1",
+        name: "DE One",
+        customerKey: "DE One",
+        folderId: "local",
+        description: "",
+        fields: [
+          {
+            name: "EmailAddress",
+            type: "Email",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+          {
+            name: "Id",
+            type: "Text",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+        ],
+      },
+      {
+        id: "de-2",
+        name: "DE Two",
+        customerKey: "DE Two",
+        folderId: "local",
+        description: "",
+        fields: [
+          {
+            name: "EmailAddress",
+            type: "Email",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+          {
+            name: "Id",
+            type: "Text",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+        ],
+      },
+    ];
 
-      // Act
-      const diagnostics = lintSql(sql, { dataExtensions });
+    // Act
+    const diagnostics = lintSql(sql, { dataExtensions });
 
-      // Assert
-      expect(
-        diagnostics.some((diag) => diag.message.includes("Ambiguous field")),
-      ).toBe(true);
-    },
-  );
+    // Assert
+    expect(
+      diagnostics.some((diag) => diag.message.includes("Ambiguous field")),
+    ).toBe(true);
+  });
 });

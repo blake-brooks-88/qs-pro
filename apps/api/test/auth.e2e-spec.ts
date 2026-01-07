@@ -1,16 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import {
-  createDatabase,
-  ITenantRepository,
-  IUserRepository,
-  ICredentialsRepository,
-} from '@qs-pro/database';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { ITenantRepository, IUserRepository } from '@qs-pro/database';
 import * as jose from 'jose';
 import {
   FastifyAdapter,
@@ -34,8 +28,6 @@ const server = setupServer(
 
 describe('Auth (e2e)', () => {
   let app: NestFastifyApplication;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let db: any;
 
   beforeAll(async () => {
     server.listen();
@@ -65,8 +57,6 @@ describe('Auth (e2e)', () => {
 
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
-
-    db = app.get('DATABASE');
   });
 
   afterAll(async () => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { MetadataService } from './metadata.service';
 import { MceBridgeService } from './mce-bridge.service';
@@ -8,7 +9,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 describe('MetadataService', () => {
   let service: MetadataService;
   let bridge: MceBridgeService;
-  let cache: Cache;
 
   const mockBridge = {
     soapRequest: vi.fn(),
@@ -36,7 +36,6 @@ describe('MetadataService', () => {
 
     service = module.get<MetadataService>(MetadataService);
     bridge = module.get<MceBridgeService>(MceBridgeService);
-    cache = module.get(CACHE_MANAGER);
   });
 
   afterEach(() => {

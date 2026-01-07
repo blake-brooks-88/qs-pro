@@ -113,10 +113,13 @@ export function EditorWorkspace({
   }, [sqlDiagnostics]);
   const runBlockMessage = useMemo(() => {
     if (!blockingDiagnostic) return null;
-    return formatDiagnosticMessage(blockingDiagnostic, activeTab?.content ?? "");
+    return formatDiagnosticMessage(
+      blockingDiagnostic,
+      activeTab?.content ?? "",
+    );
   }, [activeTab?.content, blockingDiagnostic]);
   const runTooltipMessage = hasBlockingDiagnostics
-    ? runBlockMessage ?? "Query is missing required SQL."
+    ? (runBlockMessage ?? "Query is missing required SQL.")
     : "Execute SQL (Ctrl+Enter)";
 
   // Dirty State & BeforeUnload
@@ -677,7 +680,7 @@ export function EditorWorkspace({
           }}
         />
 
-        <SaveQueryModal 
+        <SaveQueryModal
           isOpen={isSaveModalOpen}
           folders={folders}
           initialName={activeTab.name}
@@ -696,7 +699,7 @@ export function EditorWorkspace({
           onConfirm={() => {}}
         />
 
-        <ConfirmationDialog 
+        <ConfirmationDialog
           isOpen={isConfirmCloseOpen}
           title="Unsaved Changes"
           description="You have unsaved changes in this tab. Closing it will discard these changes forever. Are you sure?"

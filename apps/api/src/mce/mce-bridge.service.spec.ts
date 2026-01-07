@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { MceBridgeService } from './mce-bridge.service';
 import { AuthService } from '../auth/auth.service';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosError } from 'axios';
-import { UnauthorizedException } from '@nestjs/common';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { HttpException } from '@nestjs/common';
 
 describe('MceBridgeService', () => {
   let service: MceBridgeService;
@@ -44,7 +45,7 @@ describe('MceBridgeService', () => {
     it('should construct a valid SOAP envelope with token', () => {
       const body = '<RetrieveRequest>...</RetrieveRequest>';
       const token = 'my-access-token';
-      const envelope = service.buildSoapEnvelope(token, body, 'test-tssd');
+      const envelope = service.buildSoapEnvelope(token, body);
 
       expect(envelope).toContain('<soap:Envelope');
       expect(envelope).toContain(token);
@@ -57,19 +58,19 @@ describe('MceBridgeService', () => {
     it('should make a request with refreshed token and correct base URL', async () => {
       vi.spyOn(axios, 'request').mockResolvedValue({
         data: { success: true },
-      } as any);
+      });
 
       const response = await service.request('tenant-1', 'user-1', 'mid-1', {
         method: 'GET',
         url: '/asset/v1/content/assets', // Relative URL
       });
 
-      expect(authService.refreshToken).toHaveBeenCalledWith(
+      expect(vi.mocked(authService.refreshToken)).toHaveBeenCalledWith(
         'tenant-1',
         'user-1',
         'mid-1',
       );
-      expect(axios.request).toHaveBeenCalledWith(
+      expect(vi.mocked(axios.request)).toHaveBeenCalledWith(
         expect.objectContaining({
           baseURL: 'https://test-tssd.rest.marketingcloudapis.com',
           url: '/asset/v1/content/assets',
@@ -84,7 +85,7 @@ describe('MceBridgeService', () => {
     it('should handle SOAP requests using POST and specific content type', async () => {
       vi.spyOn(axios, 'request').mockResolvedValue({
         data: '<soap>response</soap>',
-      } as any);
+      });
 
       const soapBody = '<RetrieveRequestMsg>...</RetrieveRequestMsg>';
 
@@ -96,7 +97,7 @@ describe('MceBridgeService', () => {
         'Retrieve',
       );
 
-      expect(axios.request).toHaveBeenCalledWith(
+      expect(vi.mocked(axios.request)).toHaveBeenCalledWith(
         expect.objectContaining({
           baseURL: 'https://test-tssd.soap.marketingcloudapis.com',
           url: '/Service.asmx',
@@ -114,13 +115,15 @@ describe('MceBridgeService', () => {
       const error = new AxiosError(
         'Unauthorized',
         'ERR_BAD_REQUEST',
-        undefined,
-        undefined,
+        {} as InternalAxiosRequestConfig,
+        null,
         {
           status: 401,
           statusText: 'Unauthorized',
           data: { message: 'Token expired' },
-        } as any,
+          headers: {},
+          config: {} as InternalAxiosRequestConfig,
+        },
       );
       vi.spyOn(axios, 'request').mockRejectedValue(error);
 
@@ -129,7 +132,7 @@ describe('MceBridgeService', () => {
         // Should fail
         expect(true).toBe(false);
       } catch (e: unknown) {
-        const err = e as any; // Temporary bypass for complex exception object
+        const err = e as HttpException;
         expect(err.getStatus()).toBe(401);
         const response = err.getResponse() as Record<string, unknown>;
         expect(response.title).toBe('Unauthorized');
@@ -141,13 +144,15 @@ describe('MceBridgeService', () => {
       const error = new AxiosError(
         'Internal Server Error',
         'ERR_BAD_RESPONSE',
-        undefined,
-        undefined,
+        {} as InternalAxiosRequestConfig,
+        null,
         {
           status: 500,
           statusText: 'Internal Server Error',
           data: { message: 'Something went wrong' },
-        } as any,
+          headers: {},
+          config: {} as InternalAxiosRequestConfig,
+        },
       );
       vi.spyOn(axios, 'request').mockRejectedValue(error);
 
@@ -155,7 +160,7 @@ describe('MceBridgeService', () => {
         await service.request('tenant-1', 'user-1', 'mid-1', { url: '/test' });
         expect(true).toBe(false);
       } catch (e: unknown) {
-        const err = e as any;
+        const err = e as HttpException;
         expect(err.getStatus()).toBe(500);
         const response = err.getResponse() as Record<string, unknown>;
         expect(response.title).toBe('Internal Server Error');

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+/* eslint-disable @typescript-eslint/unbound-method */
 import { AuthService } from './auth.service';
 import { ConfigService } from '@nestjs/config';
 import { setupServer } from 'msw/node';
@@ -178,18 +179,18 @@ describe('AuthService', () => {
       'mid-1',
     );
     expect(result.user.sfUserId).toBe('sf-1');
-    expect(tenantRepo.upsert).toHaveBeenCalled();
-    expect(userRepo.upsert).toHaveBeenCalled();
-    expect(credRepo.upsert).toHaveBeenCalled();
+    expect(vi.mocked(tenantRepo.upsert)).toHaveBeenCalled();
+    expect(vi.mocked(userRepo.upsert)).toHaveBeenCalled();
+    expect(vi.mocked(credRepo.upsert)).toHaveBeenCalled();
   });
 
   it('should derive user identifiers from userinfo', async () => {
     await service.handleCallback('test-tssd', 'valid-code');
 
-    expect(tenantRepo.upsert).toHaveBeenCalledWith(
+    expect(vi.mocked(tenantRepo.upsert)).toHaveBeenCalledWith(
       expect.objectContaining({ eid: '12345', tssd: 'test-tssd' }),
     );
-    expect(userRepo.upsert).toHaveBeenCalledWith(
+    expect(vi.mocked(userRepo.upsert)).toHaveBeenCalledWith(
       expect.objectContaining({
         sfUserId: 'sf-sub',
         tenantId: 't-1',

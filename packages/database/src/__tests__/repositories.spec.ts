@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
+import { PostgresJsDatabase, drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { tenants, users, credentials } from "../schema";
 import {

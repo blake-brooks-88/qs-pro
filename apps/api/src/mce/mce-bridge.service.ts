@@ -1,6 +1,6 @@
-import { Injectable, HttpException, HttpStatus, Inject } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosRequestConfig, AxiosError } from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { AuthService } from '../auth/auth.service';
 import { parseSoapXml } from './soap-xml.util';
 
@@ -23,7 +23,7 @@ export class MceBridgeService {
   /**
    * Constructs a SOAP Envelope for MCE
    */
-  buildSoapEnvelope(token: string, body: string, tssd: string): string {
+  buildSoapEnvelope(token: string, body: string): string {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
    <soap:Header>
@@ -86,7 +86,7 @@ export class MceBridgeService {
         userId,
         mid,
       );
-      const envelope = this.buildSoapEnvelope(accessToken, soapBody, tssd);
+      const envelope = this.buildSoapEnvelope(accessToken, soapBody);
 
       const baseUrl = `https://${tssd}.soap.marketingcloudapis.com`;
 
