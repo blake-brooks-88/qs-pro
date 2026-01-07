@@ -1,28 +1,34 @@
-import { eq, and } from 'drizzle-orm';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { tenants, users, credentials } from '../schema';
-import { 
-  ITenantRepository, 
-  IUserRepository, 
+import { eq, and } from "drizzle-orm";
+import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { tenants, users, credentials } from "../schema";
+import {
+  ITenantRepository,
+  IUserRepository,
   ICredentialsRepository,
   Tenant,
   NewTenant,
   User,
   NewUser,
   Credential,
-  NewCredential
-} from '../interfaces';
+  NewCredential,
+} from "../interfaces";
 
 export class DrizzleTenantRepository implements ITenantRepository {
-  constructor(private db: any) {} // Using 'any' for now to avoid complex Drizzle type issues in this turn
+  constructor(private db: PostgresJsDatabase) {}
 
   async findById(id: string): Promise<Tenant | undefined> {
-    const [result] = await this.db.select().from(tenants).where(eq(tenants.id, id));
+    const [result] = await this.db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.id, id));
     return result;
   }
 
   async findByEid(eid: string): Promise<Tenant | undefined> {
-    const [result] = await this.db.select().from(tenants).where(eq(tenants.eid, eid));
+    const [result] = await this.db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.eid, eid));
     return result;
   }
 
@@ -40,7 +46,7 @@ export class DrizzleTenantRepository implements ITenantRepository {
 }
 
 export class DrizzleUserRepository implements IUserRepository {
-  constructor(private db: any) {}
+  constructor(private db: PostgresJsDatabase) {}
 
   async findById(id: string): Promise<User | undefined> {
     const [result] = await this.db.select().from(users).where(eq(users.id, id));
@@ -48,7 +54,10 @@ export class DrizzleUserRepository implements IUserRepository {
   }
 
   async findBySfUserId(sfUserId: string): Promise<User | undefined> {
-    const [result] = await this.db.select().from(users).where(eq(users.sfUserId, sfUserId));
+    const [result] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.sfUserId, sfUserId));
     return result;
   }
 
@@ -58,10 +67,10 @@ export class DrizzleUserRepository implements IUserRepository {
       .values(user)
       .onConflictDoUpdate({
         target: users.sfUserId,
-        set: { 
+        set: {
           email: user.email,
           name: user.name,
-          tenantId: user.tenantId
+          tenantId: user.tenantId,
         },
       })
       .returning();
@@ -70,7 +79,7 @@ export class DrizzleUserRepository implements IUserRepository {
 }
 
 export class DrizzleCredentialsRepository implements ICredentialsRepository {
-  constructor(private db: any) {}
+  constructor(private db: PostgresJsDatabase) {}
 
   async findByUserTenantMid(
     userId: string,
@@ -84,8 +93,8 @@ export class DrizzleCredentialsRepository implements ICredentialsRepository {
         and(
           eq(credentials.userId, userId),
           eq(credentials.tenantId, tenantId),
-          eq(credentials.mid, mid)
-        )
+          eq(credentials.mid, mid),
+        ),
       );
     return result;
   }

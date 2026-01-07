@@ -1,4 +1,4 @@
-import { tenants, users, credentials } from '../schema';
+import { tenants, users, credentials } from "../schema";
 
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;

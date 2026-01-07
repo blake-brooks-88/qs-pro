@@ -1,15 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { PostgresJsDatabase, drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import { tenants, users, credentials } from '../schema';
-import { DrizzleTenantRepository, DrizzleUserRepository } from '../repositories/drizzle-repositories';
-import * as dotenv from 'dotenv';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { PostgresJsDatabase, drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { tenants, users, credentials } from "../schema";
+import {
+  DrizzleTenantRepository,
+  DrizzleUserRepository,
+} from "../repositories/drizzle-repositories";
+import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const connectionString = process.env.DATABASE_URL || 'postgres://postgres:password@localhost:5432/qs_pro';
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgres://postgres:password@localhost:5432/qs_pro";
 
-describe('Upsert Conflict Behavior', () => {
+describe("Upsert Conflict Behavior", () => {
   let db: PostgresJsDatabase;
   let client: postgres.Sql;
   let tenantRepo: DrizzleTenantRepository;
@@ -31,10 +36,10 @@ describe('Upsert Conflict Behavior', () => {
     await client.end();
   });
 
-  it('Tenant: should update tssd on EID conflict', async () => {
-    const eid = 'test-eid-1';
-    const initialTssd = 'tssd-1';
-    const updatedTssd = 'tssd-updated';
+  it("Tenant: should update tssd on EID conflict", async () => {
+    const eid = "test-eid-1";
+    const initialTssd = "tssd-1";
+    const updatedTssd = "tssd-updated";
 
     // First upsert
     await tenantRepo.upsert({ eid, tssd: initialTssd });
@@ -44,29 +49,32 @@ describe('Upsert Conflict Behavior', () => {
     // Second upsert with same EID, different TSSD
     await tenantRepo.upsert({ eid, tssd: updatedTssd });
     const secondFetch = await tenantRepo.findByEid(eid);
-    
+
     expect(secondFetch?.id).toBe(firstFetch?.id); // ID should remain the same
     expect(secondFetch?.tssd).toBe(updatedTssd); // TSSD should be updated
   });
 
-  it('User: should update metadata and tenantId on SfUserId conflict', async () => {
+  it("User: should update metadata and tenantId on SfUserId conflict", async () => {
     // Need a tenant first
-    const tenant = await tenantRepo.upsert({ eid: 'tenant-2', tssd: 'tssd-2' });
-    const tenant2 = await tenantRepo.upsert({ eid: 'tenant-3', tssd: 'tssd-3' });
+    const tenant = await tenantRepo.upsert({ eid: "tenant-2", tssd: "tssd-2" });
+    const tenant2 = await tenantRepo.upsert({
+      eid: "tenant-3",
+      tssd: "tssd-3",
+    });
 
-    const sfUserId = 'sf-user-1';
+    const sfUserId = "sf-user-1";
     const initialData = {
       sfUserId,
       tenantId: tenant.id,
-      email: 'initial@example.com',
-      name: 'Initial Name'
+      email: "initial@example.com",
+      name: "Initial Name",
     };
 
     const updatedData = {
       sfUserId,
       tenantId: tenant2.id,
-      email: 'updated@example.com',
-      name: 'Updated Name'
+      email: "updated@example.com",
+      name: "Updated Name",
     };
 
     // First upsert
