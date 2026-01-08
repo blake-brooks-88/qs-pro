@@ -17,6 +17,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLaunchHelp, setShowLaunchHelp] = useState(false);
+  const [oauthRedirectAttempted, setOauthRedirectAttempted] = useState(false);
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -39,8 +40,24 @@ function App() {
       } catch (err) {
         if (cancelled) return;
         if (axios.isAxiosError(err)) {
+          if (
+            err.response?.status === 401 &&
+            typeof err.response?.data === "object" &&
+            err.response?.data !== null &&
+            "reason" in err.response.data &&
+            (err.response.data as { reason?: unknown }).reason === "reauth_required"
+          ) {
+            logout();
+            setShowLaunchHelp(true);
+            return;
+          }
           if (err.response?.status === 401) {
             logout();
+            if (isEmbedded && !oauthRedirectAttempted) {
+              setOauthRedirectAttempted(true);
+              window.location.assign("/api/auth/login");
+              return;
+            }
             if (isEmbedded && attempt < maxAttempts) {
               attempt += 1;
               const delayMs = Math.min(1000 * attempt, 5000);
