@@ -6,13 +6,15 @@ This API authenticates users launching the app from Salesforce Marketing Cloud E
 
 We support two entry points:
 
-1. **MCE App Switcher SSO (JWT → server-to-server token exchange)**
+1. **MCE App Switcher SSO (JWT → server-to-server token exchange)** — *Legacy Packages only*
    - `POST /api/auth/login` receives an MCE-signed JWT from the MCE iframe.
    - The API verifies the JWT signature, extracts identity + stack (`tssd`), performs an OAuth token exchange, stores tokens, and sets a secure session cookie.
 
-2. **OAuth Authorization Code flow (redirect-based)**
+2. **OAuth Authorization Code flow (redirect-based)** — *Enhanced Packages (current)*
    - `GET /api/auth/login` redirects the browser to `https://{tssd}.auth.marketingcloudapis.com/v2/authorize`.
    - `GET /api/auth/callback` receives the authorization code, exchanges it for tokens, stores tokens, and sets a secure session cookie.
+
+**Important:** Enhanced Packages (created after ~2023) do NOT post a JWT. They use the OAuth 2.0 Authorization Code flow exclusively. The `GET /api/auth/login` endpoint is loaded directly in the MCE iframe, which then redirects through the OAuth flow.
 
 After either entry point, authenticated requests are authorized via the session cookie (not by passing access tokens from the browser).
 
@@ -103,30 +105,43 @@ The browser never receives refresh tokens.
 8. Redirect:
    - Responds `302` to `/` (frontend entry).
 
-### 2) OAuth Authorization Code (redirect-based)
+### 2) OAuth Authorization Code (redirect-based) — Enhanced Packages
 
-This is a redirect-based OAuth flow useful for initial authorization and local verification.
+This is the primary authentication flow for Enhanced Packages (created after ~2023). MCE does NOT post a JWT; instead, it loads the login endpoint directly in an iframe.
 
 #### 2.1 Start: `GET /api/auth/login`
 
-1. Resolve the target stack domain (`tssd`) from:
+MCE loads this endpoint directly in an iframe when the user clicks the app in App Switcher.
+
+1. Check if user already has a valid session → redirect to `/` immediately.
+2. Resolve the target stack domain (`tssd`) from:
    - `?tssd=...` (validated), or
-   - `MCE_TSSD` (validated)
-2. Generate a random CSRF `state` value and bind it to the current session:
+   - `MCE_TSSD` environment variable (validated)
+3. Generate a random CSRF `state` value using `crypto.randomBytes(16)` and bind it to the current session:
    - Stored as `oauth_state_nonce`, `oauth_state_tssd`, `oauth_state_created_at`.
-3. Redirect to:
-   - `https://{tssd}.auth.marketingcloudapis.com/v2/authorize?...&state=...`
+4. Redirect (302) to MCE OAuth authorize endpoint:
+   - `https://{tssd}.auth.marketingcloudapis.com/v2/authorize?response_type=code&client_id=...&redirect_uri=...&state=...`
+
+**Note:** The OAuth authorize page (`*.auth.marketingcloudapis.com`) sets `X-Frame-Options: DENY`, which temporarily blanks the iframe during the redirect chain. This is expected behavior—the browser navigates through the OAuth flow and returns to the callback.
 
 #### 2.2 Callback: `GET /api/auth/callback`
 
-1. Validate the `state` value against the session (one-time, max age ~10 minutes).
+After the user authorizes, MCE redirects back to this endpoint with `?code=...&state=...`.
+
+1. Validate the `state` value against the session:
+   - One-time use (consumed immediately)
+   - Max age ~10 minutes
+   - Nonce and TSSD must match session values
 2. Exchange the authorization code for tokens:
    - `POST https://{tssd}.auth.marketingcloudapis.com/v2/token`
    - `grant_type=authorization_code`
-3. If `sf_user_id` / `eid` aren’t provided by the platform, call:
+3. If `sf_user_id` / `eid` / `mid` aren't provided by the platform, call:
    - `GET https://{tssd}.auth.marketingcloudapis.com/v2/userinfo`
-   - Derive user + org identifiers.
-4. Upsert Tenant and User, store tokens, set the session (`userId`, `tenantId`), and redirect to `/`.
+   - Derive user, org, and BU identifiers.
+4. Upsert Tenant and User, store encrypted tokens, set the session (`userId`, `tenantId`, `mid`).
+5. Redirect (302) to `/` using NestJS `@Redirect()` decorator.
+
+**Important:** The callback uses `@Redirect()` decorator with `return { url: '/', statusCode: 302 }` pattern—NOT `res.redirect()`. This is required for NestJS+Fastify to properly send a 302 response.
 
 ### Root Callback Handoff (MCE iframe)
 
@@ -148,12 +163,50 @@ Key security properties are implemented at the API boundary:
 
 - **JWT integrity:** `jose.jwtVerify()` verifies signatures; we also restrict algorithms to `HS256` and require specific identity claims to be present.
 - **Stack isolation:** `tssd` is validated with a strict `[a-z0-9-]+` allowlist before constructing any MCE domain URLs.
-- **OAuth CSRF protection:** the redirect-based flow uses a random, session-bound `state` value that is short-lived and single-use.
+- **OAuth CSRF protection:** the redirect-based flow uses a random, session-bound `state` value that is short-lived (~10 min) and single-use. The nonce is generated using `crypto.randomBytes(16)` for sufficient entropy.
 - **No browser token storage:** refresh tokens never reach the browser; they are stored encrypted in the database.
 - **Defense in depth via RLS:** tenant + BU isolation is enforced by the database (including for accidental query mistakes).
 - **Session security:** cookies are `HttpOnly` and `Secure`. `SameSite=None` is required for iframe-based embedding, so the API must be served over HTTPS.
-- **Least authority endpoints:** refresh and “me” endpoints are session-protected; callers can’t refresh tokens for arbitrary `tenantId`/`userId` values.
+- **Least authority endpoints:** refresh and "me" endpoints are session-protected; callers can't refresh tokens for arbitrary `tenantId`/`userId` values.
 - **No OAuth secrets in logs:** request logging and error responses redact query strings to avoid leaking OAuth `code`/`state`.
+
+## AppExchange Security Review Compliance
+
+This implementation is designed to pass the Salesforce AppExchange security review. Key compliance points:
+
+### Session Cookie Requirements (OWASP)
+- **`Secure` flag:** Always set (required for `SameSite=None`); ensures cookies are only sent over HTTPS.
+- **`HttpOnly` flag:** Always set; prevents JavaScript from reading the session cookie, mitigating XSS attacks.
+- **Sufficient entropy:** Session IDs are generated by `@fastify/secure-session` using cryptographically secure randomness.
+- **Unique per-session:** Each session gets a unique cookie value; cookies are never reused.
+- **Session invalidation:** `session.delete()` is called on logout and re-authentication scenarios.
+
+### OAuth Requirements
+- **No SessionID exfiltration:** We never send Salesforce SessionIDs to external systems.
+- **OAuth 2.0 Authorization Code flow:** Uses the recommended flow for web applications, not deprecated Device Flow.
+- **CSRF protection:** All OAuth callbacks validate a session-bound, time-limited, single-use `state` parameter.
+- **Server-to-server token exchange:** Authorization codes are exchanged server-side; tokens never reach the browser.
+
+### Token Storage Requirements
+- **Encryption at rest:** Access and refresh tokens are encrypted using AES-256-GCM via the `encrypt()`/`decrypt()` functions from `@qs-pro/database`.
+- **No browser storage:** Tokens are stored server-side in the database, keyed by `(tenantId, userId, mid)`.
+- **Encryption key management:** `ENCRYPTION_KEY` must be a 32-byte hex key stored securely (environment variable, not in code).
+
+### Multi-Tenant Security
+- **Row-Level Security (RLS):** Postgres enforces tenant + BU isolation at the database layer.
+- **Per-request context:** RLS context (`app.tenant_id`, `app.mid`) is set on a reserved connection for each request.
+- **No cross-tenant access:** Even application bugs cannot access other tenants' data due to RLS enforcement.
+
+### OWASP Top 10 Mitigations
+- **A01 Broken Access Control:** RLS + session guards enforce authorization.
+- **A02 Cryptographic Failures:** AES-256-GCM for token encryption; TLS for data in transit.
+- **A03 Injection:** Parameterized queries via Drizzle ORM; TSSD allowlist prevents URL injection.
+- **A07 CSRF:** Session-bound, time-limited, single-use OAuth state tokens.
+
+### External Integration Security
+- **HTTPS only:** All MCE API calls use `https://{tssd}.auth.marketingcloudapis.com`.
+- **Tenant-specific endpoints:** Uses customer's TSSD subdomain for multi-tenant AppExchange compatibility.
+- **No debug mode:** Production deployments do not expose debug endpoints or verbose error messages.
 
 ## Configuration
 
