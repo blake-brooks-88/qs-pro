@@ -1,10 +1,27 @@
 import type { InlineSuggestionRule } from "../types";
+import { IDENTITY_FIELD_PATTERNS } from "@/features/editor-workspace/constants";
+import type { DataExtensionField } from "@/features/editor-workspace/types";
 
 /**
  * Normalizes a field name for comparison (lowercase, remove non-alphanumeric).
  */
 const normalizeField = (name: string): string =>
   name.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+/**
+ * Checks if a field name is an SFMC identity field.
+ */
+const isIdentityField = (fieldName: string): boolean =>
+  IDENTITY_FIELD_PATTERNS.some((pattern) => pattern.test(fieldName));
+
+/**
+ * Interface for field match results with priority ranking.
+ */
+interface FieldMatch {
+  left: DataExtensionField;
+  right: DataExtensionField;
+  priority: number;
+}
 
 /**
  * Rule: After ON keyword, suggest field conditions like "a.id = b.id"
@@ -48,40 +65,81 @@ export const joinConditionRule: InlineSuggestionRule = {
       getFieldsForTable(rightTable),
     ]);
 
-    // Build a map of normalized field names to actual names for right table
-    const rightFieldMap = new Map(
-      rightFields.map((f) => [normalizeField(f.name), f.name])
-    );
+    // Find matching fields with priority ranking
+    const matches: FieldMatch[] = [];
 
-    // Find matching fields
-    const matches: Array<{ left: string; right: string; exact: boolean }> = [];
+    // 1. Exact name matches (highest priority)
+    for (const leftField of leftFields) {
+      const exactMatch = rightFields.find(
+        (r) => r.name.toLowerCase() === leftField.name.toLowerCase()
+      );
+      if (exactMatch) {
+        matches.push({
+          left: leftField,
+          right: exactMatch,
+          priority: 1,
+        });
+      }
+    }
+
+    // 2. SFMC identity field equivalences (e.g., ContactID = SubscriberKey)
+    const leftIdentityFields = leftFields.filter((f) => isIdentityField(f.name));
+    const rightIdentityFields = rightFields.filter((f) => isIdentityField(f.name));
+
+    for (const leftField of leftIdentityFields) {
+      for (const rightField of rightIdentityFields) {
+        // Skip if already matched exactly
+        const alreadyMatched = matches.some(
+          (m) => m.left.name === leftField.name && m.right.name === rightField.name
+        );
+        if (!alreadyMatched) {
+          matches.push({
+            left: leftField,
+            right: rightField,
+            priority: 2,
+          });
+        }
+      }
+    }
+
+    // 3. Normalized name matches (ID/Key suffixes)
+    const rightFieldMap = new Map(
+      rightFields.map((f) => [normalizeField(f.name), f])
+    );
 
     for (const leftField of leftFields) {
       const normalized = normalizeField(leftField.name);
       const rightMatch = rightFieldMap.get(normalized);
+
       if (rightMatch) {
-        matches.push({
-          left: leftField.name,
-          right: rightMatch,
-          exact: leftField.name === rightMatch,
-        });
+        // Skip if already matched
+        const alreadyMatched = matches.some(
+          (m) => m.left.name === leftField.name && m.right.name === rightMatch.name
+        );
+        if (!alreadyMatched) {
+          matches.push({
+            left: leftField,
+            right: rightMatch,
+            priority: 3,
+          });
+        }
       }
     }
 
     if (matches.length === 0) return null;
 
-    // Prioritize exact matches
-    matches.sort((a, b) => (b.exact ? 1 : 0) - (a.exact ? 1 : 0));
+    // Sort by priority (lower number = higher priority)
+    matches.sort((a, b) => a.priority - b.priority);
 
     const bestMatch = matches[0];
     const leftAlias = leftTable.alias ?? leftTable.qualifiedName;
     const rightAlias = rightTable.alias ?? rightTable.qualifiedName;
 
     return {
-      text: `${leftAlias}.${bestMatch.left} = ${rightAlias}.${bestMatch.right}`,
+      text: `${leftAlias}.${bestMatch.left.name} = ${rightAlias}.${bestMatch.right.name}`,
       priority: 60,
       alternatives: matches.slice(1, 4).map(
-        (m) => `${leftAlias}.${m.left} = ${rightAlias}.${m.right}`
+        (m) => `${leftAlias}.${m.left.name} = ${rightAlias}.${m.right.name}`
       ),
     };
   },

@@ -44,7 +44,10 @@ export const aliasSuggestionRule: InlineSuggestionRule = {
     const lastTable = ctx.tablesInScope[ctx.tablesInScope.length - 1];
     if (!lastTable) return null;
 
-    const alias = generateSmartAlias(lastTable.name, ctx.existingAliases);
+    // Strip ENT. prefix for alias generation to use the actual table name
+    const tableName = lastTable.name;
+    const nameForAlias = tableName.replace(/^ENT\./i, "");
+    const alias = generateSmartAlias(nameForAlias, ctx.existingAliases);
 
     return {
       text: ` AS ${alias}`,

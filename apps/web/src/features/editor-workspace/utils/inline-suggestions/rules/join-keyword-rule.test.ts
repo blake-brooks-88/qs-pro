@@ -67,4 +67,14 @@ describe("joinKeywordRule", () => {
     expect(suggestion?.text).toBe(" JOIN");
     expect(suggestion?.priority).toBe(100);
   });
+
+  test("matches_AfterLEFTInSELECTClause_ReturnsFalse", () => {
+    const ctx = buildContext("SELECT LEFT");
+    expect(joinKeywordRule.matches(ctx)).toBe(false);
+  });
+
+  test("matches_AfterRIGHTInSELECTClause_ReturnsFalse", () => {
+    const ctx = buildContext("SELECT RIGHT");
+    expect(joinKeywordRule.matches(ctx)).toBe(false);
+  });
 });
