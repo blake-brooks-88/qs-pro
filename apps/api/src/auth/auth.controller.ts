@@ -47,10 +47,10 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @Redirect()
   async loginPost(
     @Body() body: LoginPostBody,
     @Req() req: SessionRequest,
-    @Res() res: FastifyReply,
   ) {
     const jwt = this.extractJwt(body);
 
@@ -80,7 +80,7 @@ export class AuthController {
         return { ok: true };
       }
 
-      return await res.redirect('/', 302);
+      return { url: '/', statusCode: 302 };
     } catch (error) {
       this.logger.error(
         'JWT Login failure',
@@ -95,6 +95,7 @@ export class AuthController {
   async me(
     @CurrentUser() userSession: UserSession,
     @Req() req: SessionRequest,
+    @Res({ passthrough: true }) res: FastifyReply,
   ) {
     const user = await this.authService.findUserById(userSession.userId);
     const tenant = await this.authService.findTenantById(userSession.tenantId);
@@ -107,7 +108,14 @@ export class AuthController {
       await this.authService.refreshToken(tenant.id, user.id, userSession.mid);
     } catch (error) {
       req.session?.delete();
-      throw error;
+      res.status(401);
+      return {
+        reason: 'reauth_required',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Authentication failed; please re-authenticate.',
+      };
     }
 
     return { user, tenant };
@@ -119,8 +127,23 @@ export class AuthController {
     @Query('tssd') tssd: string | undefined,
     @Query('jwt') jwtFromQuery: string | undefined,
     @Req() req: SessionRequest,
-    @Res() res: FastifyReply,
   ) {
+    const referer = String(req.headers.referer ?? '');
+    const headerValue = (
+      req.headers as unknown as { 'sec-fetch-dest'?: unknown }
+    )['sec-fetch-dest'];
+    const secFetchDest = (
+      typeof headerValue === 'string' ? headerValue : ''
+    ).toLowerCase();
+    const isMceReferer =
+      referer.includes('mc.exacttarget.com') ||
+      referer.includes('.exacttarget.com') ||
+      referer.includes('.marketingcloudapps.com');
+    const isIframeNavigation = secFetchDest === 'iframe';
+    const isMceEmbed = isMceReferer || isIframeNavigation;
+
+    const jwt = this.extractJwt(jwtFromQuery);
+
     const session = req.session;
     const userId = session?.get('userId');
     const tenantId = session?.get('tenantId');
@@ -150,7 +173,6 @@ export class AuthController {
         throw new InternalServerErrorException('Session not available');
       }
 
-      const jwt = this.extractJwt(jwtFromQuery);
       if (jwt) {
         const {
           user,
@@ -160,20 +182,13 @@ export class AuthController {
         session.set('userId', user.id);
         session.set('tenantId', tenant.id);
         session.set('mid', resolvedMid);
-        return await res.redirect('/', 302);
+        return { url: '/', statusCode: 302 };
       }
 
       if (!resolvedTssd) {
-        const referer = String(req.headers.referer ?? '');
-        const isMceEmbed =
-          referer.includes('mc.exacttarget.com') ||
-          referer.includes('.exacttarget.com') ||
-          referer.includes('.marketingcloudapps.com');
-
         if (isMceEmbed) {
           return { url: '/', statusCode: 302 };
         }
-
         throw new UnauthorizedException(
           'TSSD is required for login. Set MCE_TSSD.',
         );
@@ -197,11 +212,11 @@ export class AuthController {
   }
 
   @Get('callback')
+  @Redirect()
   async callback(
     @Query('code') code: string,
     @Query('state') state: string,
     @Req() req: SessionRequest,
-    @Res() res: FastifyReply,
     @Query('sf_user_id') sfUserId?: string,
     @Query('eid') eid?: string,
     @Query('mid') mid?: string,
@@ -230,7 +245,7 @@ export class AuthController {
     req.session.set('tenantId', result.tenant.id);
     req.session.set('mid', result.mid);
 
-    return res.redirect('/');
+    return { url: '/', statusCode: 302 };
   }
 
   @Get('refresh')

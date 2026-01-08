@@ -584,6 +584,20 @@ export class AuthService {
       await this.saveTokens(tenant.id, userId, mid, tokenData);
       return { accessToken: tokenData.access_token, tssd: tenant.tssd };
     } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data;
+        const errorCode =
+          data && typeof data === 'object' && 'error' in data
+            ? typeof (data as { error?: unknown }).error === 'string'
+              ? (data as { error?: string }).error
+              : ''
+            : '';
+        if (errorCode === 'access_denied' || errorCode === 'invalid_grant') {
+          throw new UnauthorizedException(
+            'MCE session is invalid or access is revoked. Please re-authenticate.',
+          );
+        }
+      }
       this.logTokenError('Refresh token failed', error);
       throw new UnauthorizedException('Failed to refresh token');
     }
