@@ -115,7 +115,12 @@ export class AuthController {
 
   @Get('login')
   @Redirect()
-  login(@Query('tssd') tssd: string | undefined, @Req() req: SessionRequest) {
+  async login(
+    @Query('tssd') tssd: string | undefined,
+    @Query('jwt') jwtFromQuery: string | undefined,
+    @Req() req: SessionRequest,
+    @Res() res: FastifyReply,
+  ) {
     const session = req.session;
     const userId = session?.get('userId');
     const tenantId = session?.get('tenantId');
@@ -141,14 +146,37 @@ export class AuthController {
         session.delete();
       }
 
+      if (!session) {
+        throw new InternalServerErrorException('Session not available');
+      }
+
+      const jwt = this.extractJwt(jwtFromQuery);
+      if (jwt) {
+        const {
+          user,
+          tenant,
+          mid: resolvedMid,
+        } = await this.authService.handleJwtLogin(jwt);
+        session.set('userId', user.id);
+        session.set('tenantId', tenant.id);
+        session.set('mid', resolvedMid);
+        return await res.redirect('/', 302);
+      }
+
       if (!resolvedTssd) {
+        const referer = String(req.headers.referer ?? '');
+        const isMceEmbed =
+          referer.includes('mc.exacttarget.com') ||
+          referer.includes('.exacttarget.com') ||
+          referer.includes('.marketingcloudapps.com');
+
+        if (isMceEmbed) {
+          return { url: '/', statusCode: 302 };
+        }
+
         throw new UnauthorizedException(
           'TSSD is required for login. Set MCE_TSSD.',
         );
-      }
-
-      if (!session) {
-        throw new InternalServerErrorException('Session not available');
       }
 
       const nonce = randomBytes(16).toString('base64url');

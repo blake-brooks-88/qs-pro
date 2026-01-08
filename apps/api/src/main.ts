@@ -77,6 +77,22 @@ async function bootstrap() {
 
   const cookieDomain = configService.get<string>('COOKIE_DOMAIN') ?? undefined;
 
+  const cookiePartitionedRaw =
+    configService.get<string>('COOKIE_PARTITIONED') ?? undefined;
+  const cookiePartitioned =
+    cookiePartitionedRaw === 'true'
+      ? true
+      : cookiePartitionedRaw === 'false'
+        ? false
+        : cookieSameSite === 'none';
+
+  if (cookiePartitioned && cookieDomain) {
+    logger.error(
+      'Invalid cookie configuration: COOKIE_PARTITIONED=true cannot be used with COOKIE_DOMAIN (partitioned cookies must be host-only).',
+    );
+    throw new Error('Invalid cookie configuration');
+  }
+
   await app.register(secureSession, {
     secret: sessionSecret,
     salt: sessionSalt,
@@ -85,6 +101,7 @@ async function bootstrap() {
       httpOnly: true,
       secure: cookieSecure,
       sameSite: cookieSameSite,
+      partitioned: cookiePartitioned,
       ...(cookieDomain ? { domain: cookieDomain } : {}),
     },
   });

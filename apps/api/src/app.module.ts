@@ -6,6 +6,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { DatabaseModule } from './database/database.module';
 import { MceModule } from './mce/mce.module';
+import { RedisModule } from './redis/redis.module';
+import { ShellQueryModule } from './shell-query/shell-query.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import path from 'node:path';
 
@@ -22,6 +24,8 @@ import path from 'node:path';
     AuthModule,
     UsersModule,
     MceModule,
+    RedisModule,
+    ShellQueryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
