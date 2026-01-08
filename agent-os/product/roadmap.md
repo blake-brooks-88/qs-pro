@@ -7,6 +7,8 @@
 4. [x] **Enhanced Package OAuth Documentation & Regression Tests** — Document the MCE iframe OAuth flow and add tests that assert `v2/userinfo` mapping and callback behavior. `S`
 5. [x] **MCE Bridge & Metadata Discovery** — Build the "Bridge" utility (auto-signing, TSSD resolution) and iteratively implement discovery for Folders, DEs, and Field definitions. `M`
 6. [ ] **Shell Query Engine (Backend)** — Build the BullMQ worker for "Shell Query" orchestration, Asset Recycling (Shell/Temp DEs), and the Pass-through streaming API. `L`
+   - **Dev/Prod routing requirement:** `/` must serve the web app (SPA) and `/api/*` must reach the API; if `/` is unreachable, Cloudflare will return a framed error page and the MCE iframe will appear blank.
+   - **Embed/session requirement:** session cookie must be `Secure` + `SameSite=None` for MCE iframe; production should use a single public origin with `/api/*` rewrites (e.g., Vercel rewrites to Heroku) to keep cookies same-origin.
 7. [x] **Sidebar & Schema Explorer (Frontend)** — Implement the primary sidebar with Lazy-Loaded Metadata for Data Extensions, folders, and the Snippet Library. `M`
 7b. [x] **Sidebar DE search (Frontend)** — Enable users to search for DEs in the sidebar by leveraging the metadata cache. `M`
 8. [ ] **Query Execution & Results Viewer** — Implement the "Run to Temp" execution flow, response streaming, and the Virtualized Grid. `M`
