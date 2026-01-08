@@ -26,8 +26,10 @@ describe("autocomplete keyword helpers", () => {
     const contextualKeywords = getContextualKeywords(lastKeyword);
 
     // Assert
+    expect(contextualKeywords).toContain("FROM");
     expect(contextualKeywords).toContain("DISTINCT");
     expect(contextualKeywords).toContain("TOP");
+    expect(contextualKeywords).toContain("CASE");
     expect(contextualKeywords).toContain("AS");
   });
 

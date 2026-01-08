@@ -27,15 +27,12 @@ import {
   getSharedFolderIds,
   getSqlCursorContext,
   extractSelectFieldRanges,
-  type SqlTableReference,
 } from "@/features/editor-workspace/utils/sql-context";
-import {
-  useJoinSuggestions,
-  type JoinSuggestionOverrides,
-} from "@/features/editor-workspace/utils/join-suggestions";
 import type { SqlDiagnostic } from "@/features/editor-workspace/utils/sql-diagnostics";
 import { toMonacoMarkers } from "@/features/editor-workspace/utils/sql-diagnostics";
 import { getContextualKeywords } from "@/features/editor-workspace/utils/autocomplete-keyword";
+import { evaluateInlineSuggestions } from "@/features/editor-workspace/utils/inline-suggestions";
+import type { InlineSuggestionContext } from "@/features/editor-workspace/utils/inline-suggestions";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 
@@ -90,7 +87,6 @@ interface MonacoQueryEditorProps {
   dataExtensions: DataExtension[];
   folders: Folder[];
   tenantId?: string | null;
-  joinSuggestionOverrides?: JoinSuggestionOverrides;
   className?: string;
 }
 
@@ -103,7 +99,6 @@ export function MonacoQueryEditor({
   dataExtensions,
   folders,
   tenantId,
-  joinSuggestionOverrides,
   className,
 }: MonacoQueryEditorProps) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -114,7 +109,6 @@ export function MonacoQueryEditor({
   const inlineCompletionDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const autoBracketRef = useRef(false);
   const queryClient = useQueryClient();
-  const getJoinSuggestions = useJoinSuggestions(joinSuggestionOverrides);
 
   // Debounce the value to prevent excessive decoration updates during rapid typing
   const debouncedValue = useDebouncedValue(value, 150);
@@ -239,6 +233,9 @@ export function MonacoQueryEditor({
       editorRef.current = editorInstance;
       monacoRef.current = monacoInstance;
 
+      // Focus the editor so user can start typing immediately
+      editorInstance.focus();
+
       applyMonacoTheme(monacoInstance);
 
       const model = editorInstance.getModel();
@@ -253,12 +250,21 @@ export function MonacoQueryEditor({
       completionDisposableRef.current?.dispose();
       completionDisposableRef.current =
         monacoInstance.languages.registerCompletionItemProvider("sql", {
-          triggerCharacters: [" ", ".", "[", ",", ")", "\n", "\t"],
+          triggerCharacters: [" ", ".", "[", ",", ")"],
           provideCompletionItems: async (model, position) => {
             const text = model.getValue();
             const cursorIndex = model.getOffsetAt(position);
             const context = getSqlCursorContext(text, cursorIndex);
             const bracketRange = getBracketReplacementRange(model, position);
+
+            // Compute word range for suggestions - Monaco uses this to replace the current word
+            const wordInfo = model.getWordUntilPosition(position);
+            const wordRange = new monacoInstance.Range(
+              position.lineNumber,
+              wordInfo.startColumn,
+              position.lineNumber,
+              position.column,
+            );
 
             // Get contextual keywords for prioritization
             const contextualKeywords = new Set(
@@ -268,14 +274,23 @@ export function MonacoQueryEditor({
             // Build keyword suggestions with sortText prioritization
             // Note: We don't filter by currentWord here - Monaco handles that internally
             // This ensures keywords are always available as fallback suggestions
-            const keywordSuggestions = SQL_KEYWORDS.map((keyword) => ({
-              label: keyword,
-              insertText: keyword,
-              kind: monacoInstance.languages.CompletionItemKind.Keyword,
-              sortText: contextualKeywords.has(keyword)
-                ? `0-${keyword}`
-                : `1-${keyword}`,
-            }));
+            const keywordsWithBrackets = new Set(["FROM", "JOIN"]);
+            const keywordSuggestions = SQL_KEYWORDS.map((keyword) => {
+              const needsBrackets = keywordsWithBrackets.has(keyword);
+              return {
+                label: keyword,
+                insertText: needsBrackets ? `${keyword} [$0]` : keyword,
+                insertTextRules: needsBrackets
+                  ? monacoInstance.languages.CompletionItemInsertTextRule
+                      .InsertAsSnippet
+                  : undefined,
+                kind: monacoInstance.languages.CompletionItemKind.Keyword,
+                sortText: contextualKeywords.has(keyword)
+                  ? `0-${keyword}`
+                  : `1-${keyword}`,
+                range: wordRange,
+              };
+            });
 
             if (context.aliasBeforeDot) {
               const table = resolveTableForAlias(
@@ -292,7 +307,7 @@ export function MonacoQueryEditor({
               if (table.isSubquery) {
                 fields = table.outputFields.map((name) => ({
                   name,
-                  type: "Text",
+                  type: "Text" as const,
                   isPrimaryKey: false,
                   isNullable: true,
                 }));
@@ -309,8 +324,10 @@ export function MonacoQueryEditor({
                 insertText: suggestion.insertText,
                 detail: suggestion.detail,
                 kind: monacoInstance.languages.CompletionItemKind.Field,
-                sortText: `2-${suggestion.label}`,
+                sortText: suggestion.label,
+                range: wordRange,
               }));
+              // Only return field suggestions when completing after alias.
               return { suggestions };
             }
 
@@ -320,12 +337,6 @@ export function MonacoQueryEditor({
                 context.cursorInFromJoinTable ||
                 bracketRange.inBracket;
               if (shouldSuggestTables) {
-                const joinTail = model
-                  .getValue()
-                  .slice(cursorIndex, cursorIndex + 10);
-                const shouldAppendOn =
-                  context.lastKeyword === "join" && !/^\s*on\b/i.test(joinTail);
-
                 const suggestionsBase = buildDataExtensionSuggestions(
                   dataExtensionsRef.current,
                   sharedFolderIdsRef.current,
@@ -352,13 +363,9 @@ export function MonacoQueryEditor({
                       : bracketRange;
                   const insertText = bracketRange.inBracket
                     ? suggestion.isShared
-                      ? shouldAppendOn
-                        ? `ENT.[${suggestion.name}] ON `
-                        : `ENT.[${suggestion.name}]`
+                      ? `ENT.[${suggestion.name}]`
                       : suggestion.name
-                    : shouldAppendOn
-                      ? `${suggestion.insertText} ON `
-                      : suggestion.insertText;
+                    : suggestion.insertText;
                   const range = bracketRange.inBracket
                     ? (() => {
                         const startPos = model.getPositionAt(
@@ -367,25 +374,14 @@ export function MonacoQueryEditor({
                         const endPos = model.getPositionAt(
                           replaceOffsets.endOffset,
                         );
-                        return {
-                          startLineNumber: startPos.lineNumber,
-                          startColumn: startPos.column,
-                          endLineNumber: endPos.lineNumber,
-                          endColumn: endPos.column,
-                        };
+                        return new monacoInstance.Range(
+                          startPos.lineNumber,
+                          startPos.column,
+                          endPos.lineNumber,
+                          endPos.column,
+                        );
                       })()
-                    : undefined;
-                  const insertOffset = bracketRange.hasClosingBracket
-                    ? bracketRange.endOffset + 1
-                    : bracketRange.endOffset;
-                  const insertPosition = model.getPositionAt(insertOffset);
-                  const tail = model
-                    .getValue()
-                    .slice(insertOffset, insertOffset + 10);
-                  const shouldInsertOn =
-                    shouldAppendOn &&
-                    !suggestion.isShared &&
-                    !/^\s*on\b/i.test(tail);
+                    : wordRange;
 
                   return {
                     label: suggestion.label,
@@ -397,20 +393,6 @@ export function MonacoQueryEditor({
                         : `Fields: ${countResults[index]}`,
                     range,
                     sortText: `2-${suggestion.label}`,
-                    additionalTextEdits:
-                      bracketRange.inBracket && shouldInsertOn
-                        ? [
-                            {
-                              range: new monacoInstance.Range(
-                                insertPosition.lineNumber,
-                                insertPosition.column,
-                                insertPosition.lineNumber,
-                                insertPosition.column,
-                              ),
-                              text: " ON ",
-                            },
-                          ]
-                        : undefined,
                   };
                 });
                 return { suggestions: [...suggestions, ...keywordSuggestions] };
@@ -450,23 +432,15 @@ export function MonacoQueryEditor({
                 detail: suggestion.detail,
                 kind: monacoInstance.languages.CompletionItemKind.Field,
                 sortText: `2-${suggestion.label}`,
+                range: wordRange,
               }));
               return {
                 suggestions: [...suggestions, ...keywordSuggestions],
               };
             }
 
-            if (
-              context.lastKeyword === "join" &&
-              context.hasFromJoinTable &&
-              !context.cursorInFromJoinTable &&
-              !context.currentWord
-            ) {
-              return {
-                suggestions: keywordSuggestions,
-              };
-            }
-
+            // Fallback: return all keywords - Monaco only calls this when triggered
+            // and handles filtering suggestions to match what the user typed
             return { suggestions: keywordSuggestions };
           },
         });
@@ -477,61 +451,61 @@ export function MonacoQueryEditor({
           provideInlineCompletions: async (model, position) => {
             const text = model.getValue();
             const cursorIndex = model.getOffsetAt(position);
-            const context = getSqlCursorContext(text, cursorIndex);
+            const sqlContext = getSqlCursorContext(text, cursorIndex);
 
-            if (context.lastKeyword !== "on" || context.currentWord) {
-              return { items: [] };
-            }
-
-            if (context.tablesInScope.length < 2) {
-              return { items: [] };
-            }
-
-            const rightTable =
-              context.tablesInScope[context.tablesInScope.length - 1];
-            const leftTable =
-              context.tablesInScope[context.tablesInScope.length - 2];
-
-            const resolveFields = async (table: SqlTableReference) => {
-              if (table.isSubquery) {
-                return table.outputFields.map((name) => ({
-                  name,
-                  type: "Text",
-                  isPrimaryKey: false,
-                  isNullable: true,
-                }));
-              }
-              const dataExtension = resolveDataExtension(table.name);
-              const customerKey = dataExtension?.customerKey ?? table.name;
-              return fetchFields(customerKey);
+            const ctx: InlineSuggestionContext = {
+              sql: text,
+              cursorIndex,
+              sqlContext,
+              tablesInScope: sqlContext.tablesInScope,
+              existingAliases: new Set(
+                sqlContext.tablesInScope
+                  .map((t) => t.alias?.toLowerCase())
+                  .filter((a): a is string => Boolean(a))
+              ),
+              getFieldsForTable: async (table) => {
+                if (table.isSubquery) {
+                  return table.outputFields.map((name) => ({
+                    name,
+                    type: "Text" as const,
+                    isPrimaryKey: false,
+                    isNullable: true,
+                  }));
+                }
+                const dataExtension = resolveDataExtension(table.name);
+                const customerKey = dataExtension?.customerKey ?? table.name;
+                return fetchFields(customerKey);
+              },
             };
 
-            const [leftFields, rightFields] = await Promise.all([
-              resolveFields(leftTable),
-              resolveFields(rightTable),
-            ]);
+            const suggestion = await evaluateInlineSuggestions(ctx);
 
-            const suggestions = getJoinSuggestions({
-              leftTable,
-              rightTable,
-              leftFields,
-              rightFields,
-            });
-
-            if (suggestions.length === 0) {
+            if (!suggestion) {
               return { items: [] };
             }
 
             return {
-              items: suggestions.map((suggestion) => ({
-                insertText: suggestion.text,
-                range: new monacoInstance.Range(
-                  position.lineNumber,
-                  position.column,
-                  position.lineNumber,
-                  position.column,
-                ),
-              })),
+              items: [
+                {
+                  insertText: suggestion.text,
+                  range: new monacoInstance.Range(
+                    position.lineNumber,
+                    position.column,
+                    position.lineNumber,
+                    position.column,
+                  ),
+                },
+                // Include alternatives if available
+                ...(suggestion.alternatives || []).map((alt) => ({
+                  insertText: alt,
+                  range: new monacoInstance.Range(
+                    position.lineNumber,
+                    position.column,
+                    position.lineNumber,
+                    position.column,
+                  ),
+                })),
+              ],
             };
           },
           freeInlineCompletions: () => {},
@@ -633,7 +607,6 @@ export function MonacoQueryEditor({
       fetchFields,
       getFieldsCount,
       getBracketReplacementRange,
-      getJoinSuggestions,
       onRunRequest,
       onSave,
       resolveDataExtension,

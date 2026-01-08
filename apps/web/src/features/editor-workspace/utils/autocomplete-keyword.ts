@@ -14,7 +14,7 @@ export const getContextualKeywords = (lastKeyword: string | null): string[] => {
     case "where":
       return ["AND", "OR", "IN", "NOT", "LIKE", "BETWEEN"];
     case "select":
-      return ["DISTINCT", "TOP", "AS"];
+      return ["FROM", "DISTINCT", "TOP", "CASE", "AS"];
     case "from":
       return ["WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "ON"];
     case "join":

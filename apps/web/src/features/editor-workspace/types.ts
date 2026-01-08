@@ -109,5 +109,4 @@ export interface EditorWorkspaceProps {
   onTabClose?: (tabId: string) => void;
   onTabChange?: (tabId: string) => void;
   onNewTab?: () => void;
-  joinSuggestionOverrides?: import("@/features/editor-workspace/utils/join-suggestions").JoinSuggestionOverrides;
 }

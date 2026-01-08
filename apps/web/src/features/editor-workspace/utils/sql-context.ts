@@ -48,6 +48,30 @@ const isAliasToken = (token?: SqlToken) => {
   return !KEYWORDS.has(token.value.toLowerCase());
 };
 
+/**
+ * Extracts alias from tokens starting at a given index.
+ * Handles both "TableName alias" and "TableName AS alias" patterns.
+ */
+const extractAliasFromTokens = (
+  tokens: SqlToken[],
+  startIndex: number,
+): string | undefined => {
+  let index = startIndex;
+
+  // Skip symbol tokens (commas, dots, etc.)
+  while (tokens[index] && tokens[index].type === "symbol") {
+    index += 1;
+  }
+
+  // Handle optional AS keyword
+  if (tokens[index]?.value.toLowerCase() === "as") {
+    index += 1;
+  }
+
+  // Return alias if valid
+  return isAliasToken(tokens[index]) ? tokens[index].value : undefined;
+};
+
 const isWhitespace = (value: string) => /\s/.test(value);
 
 const scanUntil = (sql: string, startIndex: number, endChar: string) => {
@@ -382,18 +406,13 @@ export const extractTableReferences = (sql: string): SqlTableReference[] => {
       const subqueryEnd = findClosingParenIndex(sql, subqueryStart);
       const subquerySql = sql.slice(subqueryStart + 1, subqueryEnd);
       const outputFields = extractSelectFields(subquerySql);
-      const afterSubqueryTokens = tokens.filter(
-        (candidate) =>
-          candidate.startIndex > subqueryEnd && candidate.type !== "symbol",
+      const aliasTokenIndex = tokens.findIndex(
+        (t) => t.startIndex > subqueryEnd,
       );
-      let alias: string | undefined;
-      const firstToken = afterSubqueryTokens[0];
-      if (firstToken?.value.toLowerCase() === "as") {
-        const nextToken = afterSubqueryTokens[1];
-        alias = isAliasToken(nextToken) ? nextToken?.value : undefined;
-      } else if (isAliasToken(firstToken)) {
-        alias = firstToken?.value;
-      }
+      const alias =
+        aliasTokenIndex !== -1
+          ? extractAliasFromTokens(tokens, aliasTokenIndex)
+          : undefined;
 
       references.push({
         name: "subquery",
@@ -436,20 +455,10 @@ export const extractTableReferences = (sql: string): SqlTableReference[] => {
       isBracketed = entNameToken.type === "bracket";
     }
 
-    let alias: string | undefined;
-    let aliasIndex = nextIndex + 1;
-
-    while (tokens[aliasIndex] && tokens[aliasIndex].type === "symbol") {
-      aliasIndex += 1;
-    }
-
-    if (tokens[aliasIndex]?.value.toLowerCase() === "as") {
-      aliasIndex += 1;
-    }
-
-    if (isAliasToken(tokens[aliasIndex])) {
-      alias = tokens[aliasIndex]?.value;
-    }
+    // For ENT patterns, table is at nextIndex+2; otherwise nextIndex
+    const tableTokenIndex =
+      entToken && dotToken?.value === "." ? nextIndex + 2 : nextIndex;
+    const alias = extractAliasFromTokens(tokens, tableTokenIndex + 1);
 
     references.push({
       name: tableName,
@@ -554,7 +563,12 @@ const getAliasBeforeDot = (sql: string, cursorIndex: number) => {
   const bracketMatch = /\[([^\]]+)\]\.$/.exec(textBefore);
   if (bracketMatch) return bracketMatch[1];
   const wordMatch = /([A-Za-z0-9_]+)\.$/.exec(textBefore);
-  return wordMatch?.[1] ?? null;
+  const alias = wordMatch?.[1] ?? null;
+
+  // ENT is the shared folder prefix, not an alias
+  if (alias?.toLowerCase() === "ent") return null;
+
+  return alias;
 };
 
 const getLastKeyword = (

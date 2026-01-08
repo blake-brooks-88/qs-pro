@@ -64,7 +64,6 @@ export function EditorWorkspace({
   onTabClose,
   onTabChange,
   onNewTab,
-  joinSuggestionOverrides,
 }: EditorWorkspaceProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     initialSidebarCollapsed,
@@ -466,7 +465,6 @@ export function EditorWorkspace({
                   dataExtensions={dataExtensions}
                   folders={folders}
                   tenantId={tenantId}
-                  joinSuggestionOverrides={joinSuggestionOverrides}
                   className="h-full"
                 />
               </div>

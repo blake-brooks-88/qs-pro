@@ -3,6 +3,7 @@ import type { DataExtension, Folder } from "@/features/editor-workspace/types";
 import {
   buildDataExtensionSuggestions,
   fuzzyMatch,
+  resolveTableForAlias,
 } from "@/features/editor-workspace/utils/sql-autocomplete";
 import {
   getSharedFolderIds,
@@ -113,5 +114,63 @@ describe("sql autocomplete helpers", () => {
     // Assert
     expect(context.hasTableReference).toBe(true);
     expect(context.cursorInTableReference).toBe(false);
+  });
+
+  test("getSqlCursorContext_WithEntTableAlias_ExtractsAlias", () => {
+    // Arrange
+    const sql = "SELECT * FROM ENT.[Table1] t1 INNER JOIN ENT.[Table2] t2 ON ";
+    const cursorIndex = sql.length;
+
+    // Act
+    const context = getSqlCursorContext(sql, cursorIndex);
+
+    // Assert
+    expect(context.tablesInScope).toHaveLength(2);
+    expect(context.tablesInScope[0]?.alias).toBe("t1");
+    expect(context.tablesInScope[1]?.alias).toBe("t2");
+  });
+
+  test("getSqlCursorContext_WithAliasDot_ReturnsAliasBeforeDot", () => {
+    // Arrange - cursor right after "t1."
+    const sql = "SELECT t1. FROM ENT.[Table1] t1";
+    const cursorIndex = sql.indexOf("t1.") + 3; // After the dot
+
+    // Act
+    const context = getSqlCursorContext(sql, cursorIndex);
+
+    // Assert
+    expect(context.aliasBeforeDot).toBe("t1");
+    expect(context.tablesInScope).toHaveLength(1);
+    expect(context.tablesInScope[0]?.alias).toBe("t1");
+  });
+
+  test("resolveTableForAlias_WithEntTable_FindsTableByAlias", () => {
+    // Arrange
+    const sql = "SELECT t1. FROM ENT.[Table1] t1";
+    const cursorIndex = sql.indexOf("t1.") + 3;
+    const context = getSqlCursorContext(sql, cursorIndex);
+
+    // Act
+    const table = resolveTableForAlias("t1", context.tablesInScope);
+
+    // Assert
+    expect(table).toBeDefined();
+    expect(table?.alias).toBe("t1");
+    expect(table?.qualifiedName).toBe("ENT.Table1");
+  });
+
+  test("resolveTableForAlias_WithRegularTable_FindsTableByAlias", () => {
+    // Arrange
+    const sql = "SELECT t1. FROM [Table1] t1";
+    const cursorIndex = sql.indexOf("t1.") + 3;
+    const context = getSqlCursorContext(sql, cursorIndex);
+
+    // Act
+    const table = resolveTableForAlias("t1", context.tablesInScope);
+
+    // Assert
+    expect(table).toBeDefined();
+    expect(table?.alias).toBe("t1");
+    expect(table?.qualifiedName).toBe("Table1");
   });
 });

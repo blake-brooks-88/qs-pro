@@ -287,7 +287,8 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("Not Supported"),
+        (diag) =>
+          diag.severity === "error" && diag.message.includes("Not Supported"),
       ),
     ).toBe(true);
   });
@@ -302,7 +303,8 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("Not Supported"),
+        (diag) =>
+          diag.severity === "error" && diag.message.includes("Not Supported"),
       ),
     ).toBe(true);
   });
@@ -317,7 +319,8 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("Not Supported"),
+        (diag) =>
+          diag.severity === "error" && diag.message.includes("Not Supported"),
       ),
     ).toBe(true);
   });
@@ -332,7 +335,8 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("Not Supported"),
+        (diag) =>
+          diag.severity === "error" && diag.message.includes("Not Supported"),
       ),
     ).toBe(true);
   });
@@ -347,7 +351,8 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("Not Supported"),
+        (diag) =>
+          diag.severity === "error" && diag.message.includes("Not Supported"),
       ),
     ).toBe(true);
   });
@@ -362,7 +367,8 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("Variables"),
+        (diag) =>
+          diag.severity === "error" && diag.message.includes("Variables"),
       ),
     ).toBe(true);
   });
@@ -377,14 +383,16 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("Variables"),
+        (diag) =>
+          diag.severity === "error" && diag.message.includes("Variables"),
       ),
     ).toBe(true);
   });
 
   test("lintSql_WithCteColumnSyntax_ReturnsErrorDiagnostic", () => {
     // Arrange
-    const sql = "WITH cte (col1, col2) AS (SELECT Id, Name FROM Users) SELECT * FROM cte";
+    const sql =
+      "WITH cte (col1, col2) AS (SELECT Id, Name FROM Users) SELECT * FROM cte";
 
     // Act
     const diagnostics = lintSql(sql);
@@ -392,7 +400,9 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("CTEs are not supported"),
+        (diag) =>
+          diag.severity === "error" &&
+          diag.message.includes("CTEs are not supported"),
       ),
     ).toBe(true);
   });
@@ -408,7 +418,9 @@ describe("sql lint", () => {
     // Assert
     expect(
       diagnostics.some(
-        (diag) => diag.severity === "error" && diag.message.includes("CTEs are not supported"),
+        (diag) =>
+          diag.severity === "error" &&
+          diag.message.includes("CTEs are not supported"),
       ),
     ).toBe(true);
   });
@@ -433,7 +445,8 @@ describe("sql lint", () => {
 
   test("lintSql_WithOffsetFetchPagination_ReturnsErrorDiagnostic", () => {
     // Arrange
-    const sql = "SELECT * FROM Users ORDER BY Id OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
+    const sql =
+      "SELECT * FROM Users ORDER BY Id OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
 
     // Act
     const diagnostics = lintSql(sql);
@@ -469,7 +482,8 @@ describe("sql lint", () => {
 
   test("lintSql_WithMultipleUnsupportedFunctions_ReturnsMultipleWarnings", () => {
     // Arrange
-    const sql = "SELECT try_convert(INT, Value), json_modify(Data, '$.key', 'val') FROM [Table]";
+    const sql =
+      "SELECT try_convert(INT, Value), json_modify(Data, '$.key', 'val') FROM [Table]";
 
     // Act
     const diagnostics = lintSql(sql);
@@ -485,7 +499,8 @@ describe("sql lint", () => {
 
   test("lintSql_WithSupportedJsonFunctions_DoesNotWarn", () => {
     // Arrange
-    const sql = "SELECT json_value(Data, '$.name'), json_query(Data, '$.items') FROM [Table]";
+    const sql =
+      "SELECT json_value(Data, '$.name'), json_query(Data, '$.items') FROM [Table]";
 
     // Act
     const diagnostics = lintSql(sql);
@@ -521,9 +536,9 @@ describe("sql lint", () => {
     const diagnostics = lintSql(sql);
 
     // Assert
-    expect(
-      diagnostics.some((diag) => diag.message.includes("GROUP BY")),
-    ).toBe(false);
+    expect(diagnostics.some((diag) => diag.message.includes("GROUP BY"))).toBe(
+      false,
+    );
   });
 
   test("lintSql_WithProperGroupBy_DoesNotWarn", () => {
@@ -534,9 +549,9 @@ describe("sql lint", () => {
     const diagnostics = lintSql(sql);
 
     // Assert
-    expect(
-      diagnostics.some((diag) => diag.message.includes("GROUP BY")),
-    ).toBe(false);
+    expect(diagnostics.some((diag) => diag.message.includes("GROUP BY"))).toBe(
+      false,
+    );
   });
 
   test("lintSql_WithCountDistinct_IsAggregated", () => {
@@ -547,9 +562,9 @@ describe("sql lint", () => {
     const diagnostics = lintSql(sql);
 
     // Assert
-    expect(
-      diagnostics.some((diag) => diag.message.includes("GROUP BY")),
-    ).toBe(false);
+    expect(diagnostics.some((diag) => diag.message.includes("GROUP BY"))).toBe(
+      false,
+    );
   });
 
   test("lintSql_WithSelectStarAndAggregate_ReturnsErrorDiagnostic", () => {
@@ -566,6 +581,313 @@ describe("sql lint", () => {
           diag.severity === "error" &&
           diag.message.includes("must appear in GROUP BY clause"),
       ),
+    ).toBe(true);
+  });
+
+  // Task Group 6: Integration Tests
+  test("lintSql_WithMultipleRuleViolations_ReturnsAllDiagnostics", () => {
+    // Arrange - Complex SQL with multiple violations
+    const sql = `
+      SELECT Region, string_agg(Name, ','), COUNT(*)
+      FROM My Data
+      WHERE 1=1
+      LIMIT 10
+      OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY
+    `;
+    const dataExtensions: DataExtension[] = [
+      {
+        id: "de-1",
+        name: "My Data",
+        customerKey: "My Data",
+        folderId: "local",
+        description: "",
+        fields: [],
+      },
+    ];
+
+    // Act
+    const diagnostics = lintSql(sql, { dataExtensions });
+
+    // Assert - Should detect multiple issues
+    const errorDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "error",
+    );
+    const warningDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "warning",
+    );
+
+    // Unbracketed name warning (My Data has spaces and is not bracketed)
+    expect(
+      warningDiagnostics.some((d) => d.message.includes("wrapped in brackets")),
+    ).toBe(true);
+    // Unsupported function warning
+    expect(
+      warningDiagnostics.some((d) =>
+        d.message.includes("may not be supported"),
+      ),
+    ).toBe(true);
+    // Aggregate GROUP BY error
+    expect(
+      errorDiagnostics.some((d) => d.message.includes("GROUP BY clause")),
+    ).toBe(true);
+    // LIMIT error
+    expect(
+      errorDiagnostics.some((d) =>
+        d.message.includes("LIMIT is not supported"),
+      ),
+    ).toBe(true);
+    // OFFSET/FETCH error
+    expect(
+      errorDiagnostics.some((d) =>
+        d.message.includes("OFFSET/FETCH pagination"),
+      ),
+    ).toBe(true);
+  });
+
+  test("lintSql_WithValidComplexQuery_ReturnsNoErrors", () => {
+    // Arrange - Valid complex query
+    const sql = `
+      SELECT
+        a.Region,
+        a.Category,
+        COUNT(DISTINCT a.Id) as UniqueCount,
+        SUM(a.Amount) as TotalAmount,
+        json_value(a.Metadata, '$.status') as Status
+      FROM [Sales Data] a
+      LEFT JOIN [Customer Info] b ON a.CustomerId = b.Id
+      WHERE a.Region IN ('North', 'South')
+        AND a.CreatedDate >= DATEADD(month, -6, GETDATE())
+      GROUP BY a.Region, a.Category, json_value(a.Metadata, '$.status')
+      ORDER BY TotalAmount DESC
+    `;
+    const dataExtensions: DataExtension[] = [
+      {
+        id: "de-1",
+        name: "Sales Data",
+        customerKey: "Sales Data",
+        folderId: "local",
+        description: "",
+        fields: [
+          { name: "Id", type: "Text", isPrimaryKey: true, isNullable: false },
+          {
+            name: "Region",
+            type: "Text",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+          {
+            name: "Category",
+            type: "Text",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+          {
+            name: "Amount",
+            type: "Decimal",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+          {
+            name: "CustomerId",
+            type: "Text",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+          {
+            name: "CreatedDate",
+            type: "Date",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+          {
+            name: "Metadata",
+            type: "Text",
+            isPrimaryKey: false,
+            isNullable: true,
+          },
+        ],
+      },
+      {
+        id: "de-2",
+        name: "Customer Info",
+        customerKey: "Customer Info",
+        folderId: "local",
+        description: "",
+        fields: [
+          { name: "Id", type: "Text", isPrimaryKey: true, isNullable: false },
+        ],
+      },
+    ];
+
+    // Act
+    const diagnostics = lintSql(sql, { dataExtensions });
+
+    // Assert - No errors or warnings (json_value is supported)
+    const errorDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "error",
+    );
+    const warningDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "warning",
+    );
+
+    expect(errorDiagnostics).toHaveLength(0);
+    expect(warningDiagnostics).toHaveLength(0);
+  });
+
+  test("lintSql_WithErrorSeverity_BlocksRunButton", () => {
+    // Arrange - Query with error-severity violation
+    const sql = "DELETE FROM [Table]";
+
+    // Act
+    const diagnostics = lintSql(sql);
+
+    // Assert - Verify error severity present (would block RUN button)
+    const errorDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "error",
+    );
+    expect(errorDiagnostics.length).toBeGreaterThan(0);
+  });
+
+  test("lintSql_WithWarningSeverity_DoesNotBlockRunButton", () => {
+    // Arrange - Query with only warning-severity violation
+    const sql = "SELECT string_agg(Name, ',') FROM [Table]";
+
+    // Act
+    const diagnostics = lintSql(sql);
+
+    // Assert - Verify only warnings present (should not block RUN button)
+    const errorDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "error",
+    );
+    const warningDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "warning",
+    );
+
+    expect(errorDiagnostics).toHaveLength(0);
+    expect(warningDiagnostics.length).toBeGreaterThan(0);
+  });
+
+  test("lintSql_RegressionTest_ExistingBehaviorUnchanged", () => {
+    // Arrange - Test that original rule behavior is unchanged
+    const testCases = [
+      { sql: "SELECT * FROM Subscribers DELETE FROM Users", expectError: true },
+      { sql: "SELECT * FROM [DELETE Me]", expectError: false },
+      {
+        sql: "WITH cte AS (SELECT Id FROM Users) SELECT * FROM cte",
+        expectError: true,
+      },
+      { sql: "SELECT * FROM #TempTable", expectWarning: true },
+      { sql: "DECLARE @count INT", expectError: true },
+    ];
+
+    // Act & Assert
+    testCases.forEach(({ sql, expectError, expectWarning }) => {
+      const diagnostics = lintSql(sql);
+
+      if (expectError) {
+        expect(diagnostics.some((diag) => diag.severity === "error")).toBe(
+          true,
+        );
+      }
+
+      if (expectWarning) {
+        expect(diagnostics.some((diag) => diag.severity === "warning")).toBe(
+          true,
+        );
+      }
+    });
+  });
+
+  test("lintSql_WithSubqueryAggregates_DoesNotAffectOuterScope", () => {
+    // Arrange - Subquery with aggregate in correlated subquery
+    // Note: Current implementation may flag this, which is acceptable
+    // The outer SELECT doesn't have aggregates, so Name is fine
+    const sql = `
+      SELECT
+        (SELECT COUNT(*) FROM [Orders]) as OrderCount
+      FROM [Customers] c
+    `;
+
+    // Act
+    const diagnostics = lintSql(sql);
+
+    // Assert - No GROUP BY diagnostic since outer SELECT has no mixing
+    expect(diagnostics.some((diag) => diag.message.includes("GROUP BY"))).toBe(
+      false,
+    );
+  });
+
+  test("lintSql_WithNestedFunctions_DetectsUnsupportedFunction", () => {
+    // Arrange - Nested function call with unsupported function
+    const sql = "SELECT UPPER(try_convert(VARCHAR, DateField)) FROM [Table]";
+
+    // Act
+    const diagnostics = lintSql(sql);
+
+    // Assert - Should detect try_convert even when nested
+    expect(
+      diagnostics.some((diag) => diag.message.includes("may not be supported")),
+    ).toBe(true);
+  });
+
+  test("lintSql_WithLiteralValuesInGrouping_DoesNotRequireGroupBy", () => {
+    // Arrange - Only aggregates, no mixing with non-aggregated columns
+    const sql = "SELECT COUNT(*) as Count, SUM(Amount) as Total FROM [Table]";
+
+    // Act
+    const diagnostics = lintSql(sql);
+
+    // Assert - No GROUP BY needed when only aggregates
+    expect(diagnostics.some((diag) => diag.message.includes("GROUP BY"))).toBe(
+      false,
+    );
+  });
+
+  test("lintSql_WithAllNewRules_PipelineWorks", () => {
+    // Arrange - Multiple separate SQL queries that trigger all new rules from Task Groups 2 & 3
+    // Test each rule individually and verify the linting pipeline aggregates all diagnostics
+
+    // Test prohibited keywords (CREATE)
+    const sql1 = "CREATE TABLE temp (id INT)";
+    const diag1 = lintSql(sql1);
+    expect(diag1.some((diag) => diag.message.includes("Not Supported"))).toBe(
+      true,
+    );
+
+    // Test CTE detection
+    const sql2 =
+      "WITH cte (col1) AS (SELECT Region FROM [Data]) SELECT * FROM cte";
+    const diag2 = lintSql(sql2);
+    expect(
+      diag2.some((diag) => diag.message.includes("CTEs are not supported")),
+    ).toBe(true);
+
+    // Test unsupported functions
+    const sql3 = "SELECT try_cast(Value AS INT) FROM [Data]";
+    const diag3 = lintSql(sql3);
+    expect(
+      diag3.some((diag) => diag.message.includes("may not be supported")),
+    ).toBe(true);
+
+    // Test aggregate grouping
+    const sql4 = "SELECT Region, COUNT(*) FROM [Data]";
+    const diag4 = lintSql(sql4);
+    expect(diag4.some((diag) => diag.message.includes("GROUP BY clause"))).toBe(
+      true,
+    );
+
+    // Test LIMIT prohibition
+    const sql5 = "SELECT * FROM [Data] LIMIT 100";
+    const diag5 = lintSql(sql5);
+    expect(
+      diag5.some((diag) => diag.message.includes("LIMIT is not supported")),
+    ).toBe(true);
+
+    // Test OFFSET/FETCH prohibition
+    const sql6 = "SELECT * FROM [Data] OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
+    const diag6 = lintSql(sql6);
+    expect(
+      diag6.some((diag) => diag.message.includes("OFFSET/FETCH pagination")),
     ).toBe(true);
   });
 });

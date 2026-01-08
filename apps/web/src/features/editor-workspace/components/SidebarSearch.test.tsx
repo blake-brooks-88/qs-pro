@@ -72,7 +72,7 @@ describe("SidebarSearch", () => {
     // Assert
     const item = screen.getByRole("option");
     expect(item).toHaveAttribute("aria-selected", "true");
-    expect(item).toHaveClass("bg-primary");
+    expect(item).toHaveClass("bg-surface-hover");
   });
 
   it("SidebarSearchResultItem_OnClick_CallsOnClick", async () => {

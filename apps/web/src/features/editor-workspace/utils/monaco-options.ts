@@ -24,6 +24,7 @@ export const getEditorOptions =
     rulers: [100],
     autoClosingBrackets: "always",
     autoClosingQuotes: "always",
+    autoClosingDelete: "always",
     autoIndent: "advanced",
     formatOnPaste: false,
     formatOnType: false,
