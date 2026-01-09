@@ -96,6 +96,16 @@
   --color-surface-hover: var(--surface-hover);
   --color-destructive: var(--error);
   --color-destructive-foreground: var(--error-foreground);
+  --color-pro-badge-bg: var(--pro-badge-bg);
+  --color-pro-badge-foreground: var(--pro-badge-foreground);
+  --color-pro-badge-icon: var(--pro-badge-icon);
+  --color-pro-badge-accent: var(--pro-badge-accent);
+  --color-enterprise-badge-bg: var(--enterprise-badge-bg);
+  --color-enterprise-badge-foreground: var(--enterprise-badge-foreground);
+  --color-enterprise-badge-icon: var(--enterprise-badge-icon);
+  --color-enterprise-badge-accent: var(--enterprise-badge-accent);
+  --color-pro-shadow: var(--pro-shadow);
+  --color-enterprise-shadow: var(--enterprise-shadow);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -122,6 +132,33 @@
 }
 
 @layer utilities {
+/* Premium badge subtle pulse */
+@keyframes badge-pulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(255, 159, 28, 0.4);
+  }
+  50% {
+    box-shadow: 0 2px 12px rgba(255, 159, 28, 0.6);
+  }
+}
+
+@keyframes badge-pulse-enterprise {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+  }
+  50% {
+    box-shadow: 0 2px 12px rgba(124, 58, 237, 0.6);
+  }
+}
+
+.animate-badge-pulse-pro {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+.animate-badge-pulse-enterprise {
+  animation: badge-pulse-enterprise 2s ease-in-out infinite;
+}
+
 .monaco-de-name {
   @apply text-success font-semibold;
 }

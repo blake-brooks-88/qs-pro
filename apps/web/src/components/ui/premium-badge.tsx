@@ -106,7 +106,7 @@ const PremiumPopoverContent = React.forwardRef<
   const theme = isPro
     ? {
         // Pro: Energetic Orange & Pink
-        wrapper: "border-pro-badge-bg/20 shadow-[0_8px_32px_-8px_rgba(255,159,28,0.25)]",
+        wrapper: "border-pro-badge-bg/20 shadow-[0_8px_32px_-8px_var(--color-pro-shadow)]",
         spotlight: "bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-pro-badge-bg/10 via-transparent to-transparent",
         iconWrapper: "bg-gradient-to-br from-pro-badge-bg to-pro-badge-accent text-white shadow-lg shadow-pro-badge-bg/20",
         title: "text-foreground",
@@ -115,7 +115,7 @@ const PremiumPopoverContent = React.forwardRef<
       }
     : {
         // Enterprise: Regal Purple & Gold (High Contrast)
-        wrapper: "border-enterprise-badge-accent/30 shadow-[0_8px_32px_-8px_rgba(124,58,237,0.3)]",
+        wrapper: "border-enterprise-badge-accent/30 shadow-[0_8px_32px_-8px_var(--color-enterprise-shadow)]",
         // Using accent (lighter purple) for the spotlight to avoid "dark/muted" feel
         spotlight: "bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-enterprise-badge-accent/15 via-transparent to-transparent",
         // Purple bg with Gold icon for contrast
@@ -129,7 +129,7 @@ const PremiumPopoverContent = React.forwardRef<
     <Popover.Content
       ref={ref}
       className={cn(
-        "z-[9999] w-[340px] overflow-hidden rounded-2xl border bg-card/95 p-0 backdrop-blur-xl transition-all",
+        "z-[9999] w-[340px] overflow-hidden rounded-2xl border bg-card/95 p-0 backdrop-blur-xl transition-all outline-none",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-bottom-2",
         "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
         theme.wrapper

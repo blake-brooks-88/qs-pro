@@ -3,6 +3,22 @@
 
   --background: #F8FAFC;
   --foreground: #0F172A;
+
+  /* Pro badge - warm gold/amber tones */
+  --pro-badge-bg: #FF9F1C;
+  --pro-badge-foreground: #FFFFFF;
+  --pro-badge-icon: #FFFFFF;
+  --pro-badge-accent: #FF0055;
+
+  /* Enterprise badge - premium purple/violet tones */
+  --enterprise-badge-bg: #7C3AED;
+  --enterprise-badge-foreground: #FFFFFF;
+  --enterprise-badge-icon: #FCD34D;
+  --enterprise-badge-accent: #A855F7;
+  
+  --pro-shadow: rgba(255, 159, 28, 0.25);
+  --enterprise-shadow: rgba(124, 58, 237, 0.3);
+
   --card: #FFFFFF;
   --card-foreground: #0F172A;
   --popover: #FFFFFF;
@@ -131,4 +147,19 @@
 
   --surface: #1E293B;
   --surface-hover: #334155;
+
+  /* Pro badge - slightly brighter in dark mode */
+  --pro-badge-bg: #FBBF24;
+  --pro-badge-foreground: #0F172A;
+  --pro-badge-icon: #0F172A;
+  --pro-badge-accent: #FF0055;
+
+  /* Enterprise badge - richer purple in dark mode */
+  --enterprise-badge-bg: #8B5CF6;
+  --enterprise-badge-foreground: #FFFFFF;
+  --enterprise-badge-icon: #FDE047;
+  --enterprise-badge-accent: #C084FC;
+  
+  --pro-shadow: rgba(251, 191, 36, 0.25);
+  --enterprise-shadow: rgba(139, 92, 246, 0.3);
 }
