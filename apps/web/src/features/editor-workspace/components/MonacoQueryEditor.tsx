@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useTheme } from "next-themes";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import { useQueryClient } from "@tanstack/react-query";
@@ -105,6 +106,7 @@ export function MonacoQueryEditor({
   tenantId,
   className,
 }: MonacoQueryEditorProps) {
+  const { resolvedTheme } = useTheme();
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof Monaco | null>(null);
   const decorationRef = useRef<string[]>([]);
@@ -223,6 +225,16 @@ export function MonacoQueryEditor({
   useEffect(() => {
     dataExtensionsRef.current = dataExtensions;
   }, [dataExtensions]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const monaco = monacoRef.current;
+      if (monaco) {
+        applyMonacoTheme(monaco);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [resolvedTheme]);
 
   useEffect(() => {
     sharedFolderIdsRef.current = sharedFolderIds;
