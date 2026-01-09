@@ -42,3 +42,18 @@
 ## Agent-Specific Instructions
 - Use `agent-os/standards/` for detailed conventions.
 - Ignore `agent-os/standards/backend-intent/` (legacy, conflicting guidance).
+
+## MCE SQL Reference
+
+**CRITICAL:** When working on SQL editor features (linting, autocomplete, syntax highlighting, validation), you MUST follow the MCE SQL Reference:
+
+`apps/web/src/features/editor-workspace/utils/sql-lint/MCE-SQL-REFERENCE.md`
+
+This document is the authoritative source for:
+- Supported SQL operations in Marketing Cloud Engagement
+- Prohibited keywords and statements (INSERT, UPDATE, DELETE, etc.)
+- Supported and unsupported functions
+- Best practice warnings
+- Current lint rules and their behavior
+
+All lint rules, autocomplete suggestions, and editor validations MUST align with this reference. Do not introduce SQL features that are not documented as supported in MCE.
