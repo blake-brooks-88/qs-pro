@@ -2,22 +2,7 @@ import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
 import { MC } from "@/constants/marketing-cloud";
 
-/**
- * List of functions that may not be supported in Marketing Cloud SQL.
- * Note: json_value and json_query ARE supported (SQL Server 2016).
- */
-const UNSUPPORTED_FUNCTIONS: Record<string, string | null> = {
-  string_agg: null,
-  string_split: null,
-  json_modify: null,
-  openjson: null,
-  isjson: null,
-  try_convert: "Use CONVERT() instead",
-  try_cast: "Use CAST() instead",
-  try_parse: null,
-};
-
-const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
+const getWithNolockDiagnostics = (sql: string): SqlDiagnostic[] => {
   const diagnostics: SqlDiagnostic[] = [];
   let index = 0;
   let inSingleQuote = false;
@@ -30,7 +15,6 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
     const char = sql[index];
     const nextChar = sql[index + 1];
 
-    // Handle comments
     if (inLineComment) {
       if (char === "\n") {
         inLineComment = false;
@@ -49,7 +33,6 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Handle strings
     if (inSingleQuote) {
       if (char === "'") {
         if (nextChar === "'") {
@@ -70,7 +53,6 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Handle brackets
     if (inBracket) {
       if (char === "]") {
         inBracket = false;
@@ -79,7 +61,6 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Start of comment
     if (char === "-" && nextChar === "-") {
       inLineComment = true;
       index += 2;
@@ -92,7 +73,6 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Start of string
     if (char === "'") {
       inSingleQuote = true;
       index += 1;
@@ -105,14 +85,12 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Start of bracket
     if (char === "[") {
       inBracket = true;
       index += 1;
       continue;
     }
 
-    // Check for function names
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
@@ -121,22 +99,50 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       }
       const word = sql.slice(start, end).toLowerCase();
 
-      // Skip whitespace after word
-      let checkIndex = end;
-      while (checkIndex < sql.length && /\s/.test(sql[checkIndex])) {
-        checkIndex += 1;
-      }
+      if (word === "with") {
+        // Skip whitespace after WITH
+        let pos = end;
+        while (pos < sql.length && /\s/.test(sql[pos])) {
+          pos += 1;
+        }
 
-      // Check if followed by opening parenthesis (indicates function call)
-      if (checkIndex < sql.length && sql[checkIndex] === "(") {
-        const alternative = UNSUPPORTED_FUNCTIONS[word];
-        if (alternative !== undefined) {
-          const message = alternative
-            ? `${word.toUpperCase()}() is not available in ${MC.SHORT}. ${alternative}`
-            : `${word.toUpperCase()}() is not available in ${MC.SHORT}. There is no direct equivalent.`;
-          diagnostics.push(
-            createDiagnostic(message, "error", start, end),
-          );
+        // Check if followed by (NOLOCK) or ( NOLOCK )
+        if (pos < sql.length && sql[pos] === "(") {
+          let innerPos = pos + 1;
+          // Skip whitespace inside parentheses
+          while (innerPos < sql.length && /\s/.test(sql[innerPos])) {
+            innerPos += 1;
+          }
+
+          // Check for NOLOCK
+          if (innerPos < sql.length && isWordChar(sql[innerPos])) {
+            let wordStart = innerPos;
+            let wordEnd = innerPos + 1;
+            while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
+              wordEnd += 1;
+            }
+            const innerWord = sql.slice(wordStart, wordEnd).toLowerCase();
+
+            if (innerWord === "nolock") {
+              // Skip whitespace after NOLOCK
+              let closePos = wordEnd;
+              while (closePos < sql.length && /\s/.test(sql[closePos])) {
+                closePos += 1;
+              }
+
+              // Check for closing parenthesis
+              if (closePos < sql.length && sql[closePos] === ")") {
+                diagnostics.push(
+                  createDiagnostic(
+                    `WITH (NOLOCK) is redundant in ${MC.SHORT}. All queries already run in read-uncommitted isolation, so this hint has no effect. Consider removing it.`,
+                    "warning",
+                    start,
+                    closePos + 1,
+                  ),
+                );
+              }
+            }
+          }
         }
       }
 
@@ -151,12 +157,13 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
 };
 
 /**
- * Rule to detect potentially unsupported functions in Marketing Cloud SQL.
+ * Rule to warn about WITH (NOLOCK) usage.
+ * This hint is redundant in MCE as queries already run in isolation.
  */
-export const unsupportedFunctionsRule: LintRule = {
-  id: "unsupported-functions",
-  name: "Unsupported Functions",
+export const withNolockRule: LintRule = {
+  id: "with-nolock",
+  name: "WITH (NOLOCK) Warning",
   check: (context: LintContext) => {
-    return getUnsupportedFunctionDiagnostics(context.sql);
+    return getWithNolockDiagnostics(context.sql);
   },
 };

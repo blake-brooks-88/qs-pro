@@ -2,22 +2,7 @@ import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
 import { MC } from "@/constants/marketing-cloud";
 
-/**
- * List of functions that may not be supported in Marketing Cloud SQL.
- * Note: json_value and json_query ARE supported (SQL Server 2016).
- */
-const UNSUPPORTED_FUNCTIONS: Record<string, string | null> = {
-  string_agg: null,
-  string_split: null,
-  json_modify: null,
-  openjson: null,
-  isjson: null,
-  try_convert: "Use CONVERT() instead",
-  try_cast: "Use CAST() instead",
-  try_parse: null,
-};
-
-const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
+const getVariableUsageDiagnostics = (sql: string): SqlDiagnostic[] => {
   const diagnostics: SqlDiagnostic[] = [];
   let index = 0;
   let inSingleQuote = false;
@@ -30,7 +15,7 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
     const char = sql[index];
     const nextChar = sql[index + 1];
 
-    // Handle comments
+    // Handle line comments
     if (inLineComment) {
       if (char === "\n") {
         inLineComment = false;
@@ -39,6 +24,7 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
+    // Handle block comments
     if (inBlockComment) {
       if (char === "*" && nextChar === "/") {
         inBlockComment = false;
@@ -49,7 +35,7 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Handle strings
+    // Handle single-quoted strings
     if (inSingleQuote) {
       if (char === "'") {
         if (nextChar === "'") {
@@ -62,6 +48,7 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
+    // Handle double-quoted identifiers
     if (inDoubleQuote) {
       if (char === '"') {
         inDoubleQuote = false;
@@ -70,7 +57,7 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Handle brackets
+    // Handle bracketed identifiers
     if (inBracket) {
       if (char === "]") {
         inBracket = false;
@@ -79,69 +66,66 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
       continue;
     }
 
-    // Start of comment
+    // Start of line comment
     if (char === "-" && nextChar === "-") {
       inLineComment = true;
       index += 2;
       continue;
     }
 
+    // Start of block comment
     if (char === "/" && nextChar === "*") {
       inBlockComment = true;
       index += 2;
       continue;
     }
 
-    // Start of string
+    // Start of single-quoted string
     if (char === "'") {
       inSingleQuote = true;
       index += 1;
       continue;
     }
 
+    // Start of double-quoted identifier
     if (char === '"') {
       inDoubleQuote = true;
       index += 1;
       continue;
     }
 
-    // Start of bracket
+    // Start of bracketed identifier
     if (char === "[") {
       inBracket = true;
       index += 1;
       continue;
     }
 
-    // Check for function names
-    if (isWordChar(char)) {
+    // Check for @ symbol (variable marker)
+    if (char === "@") {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
-        end += 1;
-      }
-      const word = sql.slice(start, end).toLowerCase();
 
-      // Skip whitespace after word
-      let checkIndex = end;
-      while (checkIndex < sql.length && /\s/.test(sql[checkIndex])) {
-        checkIndex += 1;
-      }
-
-      // Check if followed by opening parenthesis (indicates function call)
-      if (checkIndex < sql.length && sql[checkIndex] === "(") {
-        const alternative = UNSUPPORTED_FUNCTIONS[word];
-        if (alternative !== undefined) {
-          const message = alternative
-            ? `${word.toUpperCase()}() is not available in ${MC.SHORT}. ${alternative}`
-            : `${word.toUpperCase()}() is not available in ${MC.SHORT}. There is no direct equivalent.`;
-          diagnostics.push(
-            createDiagnostic(message, "error", start, end),
-          );
+      // Check if it's a variable (@ followed by word characters)
+      if (end < sql.length && isWordChar(sql[end])) {
+        // Consume the variable name
+        while (end < sql.length && isWordChar(sql[end])) {
+          end += 1;
         }
-      }
 
-      index = end;
-      continue;
+        const variableName = sql.slice(start, end);
+        diagnostics.push(
+          createDiagnostic(
+            `SQL variables are not supported in ${MC.SHORT}. Remove the variable '${variableName}' or replace it with a literal value.`,
+            "error",
+            start,
+            end,
+          ),
+        );
+
+        index = end;
+        continue;
+      }
     }
 
     index += 1;
@@ -151,12 +135,13 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
 };
 
 /**
- * Rule to detect potentially unsupported functions in Marketing Cloud SQL.
+ * Rule to detect SQL variable usage in MCE SQL.
+ * MCE does not support variables like @variableName.
  */
-export const unsupportedFunctionsRule: LintRule = {
-  id: "unsupported-functions",
-  name: "Unsupported Functions",
+export const variableUsageRule: LintRule = {
+  id: "variable-usage",
+  name: "Variable Usage",
   check: (context: LintContext) => {
-    return getUnsupportedFunctionDiagnostics(context.sql);
+    return getVariableUsageDiagnostics(context.sql);
   },
 };

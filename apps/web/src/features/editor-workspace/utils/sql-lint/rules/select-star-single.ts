@@ -1,8 +1,7 @@
 import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
-import { MC } from "@/constants/marketing-cloud";
 
-const getOffsetFetchProhibitionDiagnostics = (sql: string): SqlDiagnostic[] => {
+const getSelectStarSingleDiagnostics = (sql: string): SqlDiagnostic[] => {
   const diagnostics: SqlDiagnostic[] = [];
   let index = 0;
   let inSingleQuote = false;
@@ -10,6 +9,15 @@ const getOffsetFetchProhibitionDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBracket = false;
   let inLineComment = false;
   let inBlockComment = false;
+
+  // First pass: check if query contains JOIN
+  const sqlLower = sql.toLowerCase();
+  const hasJoin = /\bjoin\b/i.test(sqlLower);
+
+  // Only check for SELECT * if no JOIN is present
+  if (hasJoin) {
+    return diagnostics;
+  }
 
   while (index < sql.length) {
     const char = sql[index];
@@ -99,17 +107,27 @@ const getOffsetFetchProhibitionDiagnostics = (sql: string): SqlDiagnostic[] => {
       }
       const word = sql.slice(start, end).toLowerCase();
 
-      if (word === "offset") {
-        const rest = sql.slice(end);
-        if (/\bFETCH\s+(NEXT|FIRST)\b/i.test(rest)) {
-          diagnostics.push(
-            createDiagnostic(
-              `OFFSET/FETCH pagination is not supported in ${MC.SHORT}. There is no direct equivalent — use TOP for simple row limiting, or filter by a unique key for manual pagination.`,
-              "error",
-              start,
-              end,
-            ),
-          );
+      if (word === "select") {
+        // Skip whitespace after SELECT
+        let pos = end;
+        while (pos < sql.length && /\s/.test(sql[pos])) {
+          pos += 1;
+        }
+
+        // Check if next character is * (not part of a block comment)
+        if (pos < sql.length && sql[pos] === "*") {
+          // Make sure it's not the start of a block comment
+          const nextAfterStar = sql[pos + 1];
+          if (nextAfterStar !== "/") {
+            diagnostics.push(
+              createDiagnostic(
+                "Consider listing columns explicitly instead of using SELECT *. This improves query performance and prevents issues if the table structure changes.",
+                "warning",
+                pos,
+                pos + 1,
+              ),
+            );
+          }
         }
       }
 
@@ -124,12 +142,13 @@ const getOffsetFetchProhibitionDiagnostics = (sql: string): SqlDiagnostic[] => {
 };
 
 /**
- * Rule to detect OFFSET...FETCH pagination pattern.
+ * Rule to warn about SELECT * usage on single tables (no JOINs).
+ * Best practice to list columns explicitly for better performance and maintainability.
  */
-export const offsetFetchProhibitionRule: LintRule = {
-  id: "offset-fetch-prohibition",
-  name: "OFFSET/FETCH Prohibition",
+export const selectStarSingleRule: LintRule = {
+  id: "select-star-single",
+  name: "SELECT * Warning (Single Table)",
   check: (context: LintContext) => {
-    return getOffsetFetchProhibitionDiagnostics(context.sql);
+    return getSelectStarSingleDiagnostics(context.sql);
   },
 };

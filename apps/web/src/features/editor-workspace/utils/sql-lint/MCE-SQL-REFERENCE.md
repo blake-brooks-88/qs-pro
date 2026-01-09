@@ -163,7 +163,10 @@ SFMC SQL is based on SQL Server 2019 with significant restrictions. Marketing Cl
 ### Unsupported Clauses
 - WITH (Common Table Expressions)
 - LIMIT (use TOP instead)
-- OFFSET / FETCH (pagination not supported)
+
+### OFFSET / FETCH Requirements
+- OFFSET and FETCH **are supported** but require ORDER BY
+- ORDER BY in subqueries requires TOP or OFFSET (cannot use ORDER BY alone in subquery)
 
 ### Column Alias Restrictions
 - Column aliases cannot be used in WHERE, HAVING, ORDER BY, or GROUP BY clauses
@@ -210,7 +213,8 @@ SFMC SQL is based on SQL Server 2019 with significant restrictions. Marketing Cl
 | unbracketed-names | warning | Warns about names that need brackets |
 | ambiguous-fields | error | Detects ambiguous field references in JOINs |
 | limit-prohibition | error | Blocks LIMIT keyword (use TOP instead) |
-| offset-fetch-prohibition | error | Blocks OFFSET/FETCH syntax |
+| offset-without-order-by | error | OFFSET/FETCH requires ORDER BY clause |
+| order-by-in-subquery | error | ORDER BY in subquery requires TOP or OFFSET |
 | unsupported-functions | warning | Warns about potentially unsupported functions |
 | aggregate-grouping | error | Validates GROUP BY requirements for aggregates |
 | comma-validation | error | Detects invalid comma usage (trailing, leading, double) |

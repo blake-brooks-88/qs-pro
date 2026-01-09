@@ -11,7 +11,7 @@ const getUnbracketedSpaceWarnings = (
   const spaceNames = new Set(
     dataExtensions
       .map((de) => de.name.trim())
-      .filter((name) => name.includes(" "))
+      .filter((name) => name.includes(" ") || name.includes("-"))
       .map((name) => name.toLowerCase()),
   );
 
@@ -32,8 +32,8 @@ const getUnbracketedSpaceWarnings = (
     .filter(({ candidate }) => spaceNames.has(candidate))
     .map(({ reference }) =>
       createDiagnostic(
-        "Data Extension names with spaces must be wrapped in brackets. Example: `FROM [My Data Extension]` instead of `FROM My Data Extension`.",
-        "warning",
+        "Data Extension names with spaces or hyphens must be wrapped in brackets. Example: `FROM [My Data Extension]` or `FROM [My-Data-Extension]`.",
+        "error",
         reference.startIndex,
         reference.endIndex,
       ),

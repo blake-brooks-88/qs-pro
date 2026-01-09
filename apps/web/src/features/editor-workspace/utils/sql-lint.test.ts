@@ -16,15 +16,18 @@ describe("sql lint", () => {
     ).toBe(true);
   });
 
-  test("lintSql_WithKeywordInsideBrackets_DoesNotReport", () => {
+  test("lintSql_WithKeywordInsideBrackets_DoesNotReportProhibitedKeyword", () => {
     // Arrange
-    const sql = "SELECT * FROM [DELETE Me]";
+    const sql = "SELECT Name FROM [DELETE Me]";
 
     // Act
     const diagnostics = lintSql(sql);
 
-    // Assert
-    expect(diagnostics.length).toBe(0);
+    // Assert - Should not report DELETE as prohibited keyword since it's in brackets
+    // May have other warnings (like select-star) but no prohibited keyword error
+    expect(
+      diagnostics.some((diag) => diag.message.includes("not supported in MCE")),
+    ).toBe(false);
   });
 
   test("lintSql_WithCte_ReturnsWarningDiagnostic", () => {
@@ -443,44 +446,61 @@ describe("sql lint", () => {
     ).toBe(true);
   });
 
-  test("lintSql_WithOffsetFetchPagination_ReturnsErrorDiagnostic", () => {
-    // Arrange
+  test("lintSql_WithOffsetFetchWithOrderBy_IsValid", () => {
+    // Arrange - OFFSET/FETCH with ORDER BY is now valid in MCE
     const sql =
-      "SELECT * FROM Users ORDER BY Id OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
+      "SELECT Name FROM Users ORDER BY Id OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
 
     // Act
     const diagnostics = lintSql(sql);
 
-    // Assert
+    // Assert - Should not have errors for OFFSET (it's valid with ORDER BY)
+    // May have warnings but no OFFSET-related errors
     expect(
       diagnostics.some(
         (diag) =>
           diag.severity === "error" &&
-          diag.message.includes("OFFSET/FETCH pagination is not supported") &&
-          diag.message.includes("use TOP"),
+          diag.message.toLowerCase().includes("offset"),
+      ),
+    ).toBe(false);
+  });
+
+  test("lintSql_WithOffsetWithoutOrderBy_ReturnsError", () => {
+    // Arrange - OFFSET without ORDER BY is an error
+    const sql = "SELECT Name FROM Users OFFSET 10 ROWS";
+
+    // Act
+    const diagnostics = lintSql(sql);
+
+    // Assert - Should have error for OFFSET without ORDER BY
+    expect(
+      diagnostics.some(
+        (diag) =>
+          diag.severity === "error" &&
+          (diag.message.includes("OFFSET requires") || diag.message.includes("ORDER BY")),
       ),
     ).toBe(true);
   });
 
   // Task Group 3: New Linting Rules tests
-  test("lintSql_WithUnsupportedFunction_ReturnsWarningDiagnostic", () => {
+  test("lintSql_WithUnsupportedFunction_ReturnsErrorDiagnostic", () => {
     // Arrange
     const sql = "SELECT string_agg(Name, ',') FROM [Users]";
 
     // Act
     const diagnostics = lintSql(sql);
 
-    // Assert
+    // Assert - unsupported functions are now errors (not warnings)
     expect(
       diagnostics.some(
         (diag) =>
-          diag.severity === "warning" &&
+          diag.severity === "error" &&
           diag.message.includes("not available in MCE"),
       ),
     ).toBe(true);
   });
 
-  test("lintSql_WithMultipleUnsupportedFunctions_ReturnsMultipleWarnings", () => {
+  test("lintSql_WithMultipleUnsupportedFunctions_ReturnsMultipleErrors", () => {
     // Arrange
     const sql =
       "SELECT try_convert(INT, Value), json_modify(Data, '$.key', 'val') FROM [Table]";
@@ -488,13 +508,13 @@ describe("sql lint", () => {
     // Act
     const diagnostics = lintSql(sql);
 
-    // Assert
-    const unsupportedWarnings = diagnostics.filter(
+    // Assert - unsupported functions are now errors (not warnings)
+    const unsupportedErrors = diagnostics.filter(
       (diag) =>
-        diag.severity === "warning" &&
+        diag.severity === "error" &&
         diag.message.includes("not available in MCE"),
     );
-    expect(unsupportedWarnings.length).toBeGreaterThanOrEqual(2);
+    expect(unsupportedErrors.length).toBeGreaterThanOrEqual(2);
   });
 
   test("lintSql_WithSupportedJsonFunctions_DoesNotWarn", () => {
@@ -587,6 +607,7 @@ describe("sql lint", () => {
   // Task Group 6: Integration Tests
   test("lintSql_WithMultipleRuleViolations_ReturnsAllDiagnostics", () => {
     // Arrange - Complex SQL with multiple violations
+    // Note: OFFSET without ORDER BY is an error, and unbracketed names/unsupported functions are now errors
     const sql = `
       SELECT Region, string_agg(Name, ','), COUNT(*)
       FROM My Data
@@ -608,21 +629,18 @@ describe("sql lint", () => {
     // Act
     const diagnostics = lintSql(sql, { dataExtensions });
 
-    // Assert - Should detect multiple issues
+    // Assert - Should detect multiple issues (all are errors now)
     const errorDiagnostics = diagnostics.filter(
       (diag) => diag.severity === "error",
     );
-    const warningDiagnostics = diagnostics.filter(
-      (diag) => diag.severity === "warning",
-    );
 
-    // Unbracketed name warning (My Data has spaces and is not bracketed)
+    // Unbracketed name error (My Data has spaces and is not bracketed) - now an error
     expect(
-      warningDiagnostics.some((d) => d.message.includes("wrapped in brackets")),
+      errorDiagnostics.some((d) => d.message.includes("bracket")),
     ).toBe(true);
-    // Unsupported function warning
+    // Unsupported function error - now an error
     expect(
-      warningDiagnostics.some((d) =>
+      errorDiagnostics.some((d) =>
         d.message.includes("not available in MCE"),
       ),
     ).toBe(true);
@@ -636,10 +654,10 @@ describe("sql lint", () => {
         d.message.includes("LIMIT is not supported"),
       ),
     ).toBe(true);
-    // OFFSET/FETCH error
+    // OFFSET without ORDER BY error (new behavior)
     expect(
       errorDiagnostics.some((d) =>
-        d.message.includes("OFFSET/FETCH pagination"),
+        d.message.includes("OFFSET requires") || d.message.includes("ORDER BY"),
       ),
     ).toBe(true);
   });
@@ -749,8 +767,9 @@ describe("sql lint", () => {
   });
 
   test("lintSql_WithWarningSeverity_DoesNotBlockRunButton", () => {
-    // Arrange - Query with only warning-severity violation
-    const sql = "SELECT string_agg(Name, ',') FROM [Table]";
+    // Arrange - Query with only warning-severity violations
+    // Use SELECT * (single table) and <> operator which are warnings
+    const sql = "SELECT * FROM [Table] WHERE Status <> 'Active'";
 
     // Act
     const diagnostics = lintSql(sql);
@@ -877,11 +896,11 @@ describe("sql lint", () => {
       diag5.some((diag) => diag.message.includes("LIMIT is not supported")),
     ).toBe(true);
 
-    // Test OFFSET/FETCH prohibition
+    // Test OFFSET without ORDER BY (OFFSET is allowed but requires ORDER BY)
     const sql6 = "SELECT * FROM [Data] OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
     const diag6 = lintSql(sql6);
     expect(
-      diag6.some((diag) => diag.message.includes("OFFSET/FETCH pagination")),
+      diag6.some((diag) => diag.message.includes("OFFSET requires") || diag.message.includes("ORDER BY")),
     ).toBe(true);
   });
 });
