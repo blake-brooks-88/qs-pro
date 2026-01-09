@@ -31,6 +31,14 @@ api.interceptors.response.use(
       }
     }
 
+    // Handle SEAT_LIMIT_EXCEEDED error
+    if (
+      error.response?.data?.code === "SEAT_LIMIT_EXCEEDED" ||
+      error.response?.data?.error === "SEAT_LIMIT_EXCEEDED"
+    ) {
+      toast.error("Your organization has reached its seat limit");
+    }
+
     return Promise.reject(error);
   },
 );
