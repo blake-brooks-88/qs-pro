@@ -104,27 +104,25 @@ const PremiumPopoverContent = React.forwardRef<
   const tierLabel = tier === "enterprise" ? "Enterprise" : "Pro";
   const isPro = tier === "pro";
 
-  // Re-imagined Design System
+  // Option 1: Prismatic Floating Icon Theme
   const theme = isPro
     ? {
-        // Pro: Energetic Orange & Pink
-        wrapper: "border-pro-badge-bg/20 shadow-[0_8px_32px_-8px_var(--color-pro-shadow)]",
-        spotlight: "bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-pro-badge-bg/10 via-transparent to-transparent",
-        iconWrapper: "bg-gradient-to-br from-pro-badge-bg to-pro-badge-accent text-white shadow-lg shadow-pro-badge-bg/20",
+        // Pro: Energetic Orange/Pink
+        wrapper: "border-pro-badge-bg/10 shadow-[0_20px_40px_-12px_var(--color-pro-shadow)]",
+        spotlight: "bg-pro-badge-bg", // Used in opacity layer
+        icon: "text-pro-badge-bg drop-shadow-[0_4px_12px_rgba(255,159,28,0.4)]", // Orange glow
         title: "text-foreground",
         tierText: "text-pro-badge-bg",
-        button: "bg-gradient-to-r from-pro-badge-bg to-pro-badge-accent hover:shadow-lg hover:shadow-pro-badge-bg/25 text-white",
+        button: "bg-gradient-to-r from-pro-badge-bg to-pro-badge-accent text-white shadow-lg shadow-pro-badge-bg/25 hover:shadow-pro-badge-bg/40",
       }
     : {
-        // Enterprise: Regal Purple & Gold (High Contrast)
-        wrapper: "border-enterprise-badge-accent/30 shadow-[0_8px_32px_-8px_var(--color-enterprise-shadow)]",
-        // Using accent (lighter purple) for the spotlight to avoid "dark/muted" feel
-        spotlight: "bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-enterprise-badge-accent/15 via-transparent to-transparent",
-        // Purple bg with Gold icon for contrast
-        iconWrapper: "bg-gradient-to-br from-enterprise-badge-bg to-enterprise-badge-accent text-enterprise-badge-icon shadow-lg shadow-enterprise-badge-bg/30",
+        // Enterprise: Regal Purple/Gold
+        wrapper: "border-enterprise-badge-accent/20 shadow-[0_20px_40px_-12px_var(--color-enterprise-shadow)]",
+        spotlight: "bg-enterprise-badge-accent", // Lighter purple for glow
+        icon: "text-enterprise-badge-icon drop-shadow-[0_4px_12px_rgba(252,211,77,0.4)]", // Gold glow
         title: "text-foreground",
-        tierText: "text-enterprise-badge-accent", // Lighter purple for text
-        button: "bg-gradient-to-r from-enterprise-badge-bg to-enterprise-badge-accent hover:shadow-lg hover:shadow-enterprise-badge-bg/25 text-white",
+        tierText: "text-enterprise-badge-accent",
+        button: "bg-gradient-to-r from-enterprise-badge-bg to-enterprise-badge-accent text-white shadow-lg shadow-enterprise-badge-bg/25 hover:shadow-enterprise-badge-bg/40",
       };
 
   return (
@@ -134,73 +132,88 @@ const PremiumPopoverContent = React.forwardRef<
           ref={ref}
           asChild
           forceMount
-          sideOffset={12}
+          sideOffset={16}
           align="end"
-          alignOffset={-8}
-          arrowPadding={12}
+          alignOffset={-12}
           collisionPadding={16}
           {...props}
         >
           <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
+            initial={{ opacity: 0, scale: 0.96, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 4 }}
             transition={{
               type: "spring",
-              stiffness: 500,
+              stiffness: 400,
               damping: 30,
-              mass: 0.8,
             }}
             className={cn(
-              "z-[9999] w-[340px] overflow-hidden rounded-2xl border bg-card/95 p-0 backdrop-blur-xl outline-none",
+              "z-[9999] w-[320px] overflow-hidden rounded-2xl border bg-card/95 p-0 backdrop-blur-2xl outline-none",
               theme.wrapper
             )}
           >
-            {/* Ambient Spotlight */}
-            <div className={cn("absolute inset-0 pointer-events-none", theme.spotlight)} />
+            {/* --- Prismatic Spotlight Effect --- */}
+            {/* A large, soft gradient orb positioned behind the icon area */}
+            <div 
+              className={cn(
+                "absolute -left-16 -top-16 h-48 w-48 rounded-full blur-3xl opacity-15 pointer-events-none",
+                theme.spotlight
+              )} 
+            />
+            
+            {/* Secondary subtle light leak from bottom right */}
+            <div className={cn(
+              "absolute -bottom-10 -right-10 h-32 w-32 rounded-full blur-2xl opacity-5 pointer-events-none",
+              theme.spotlight
+            )} />
 
-            {/* Subtle Background Depth Element */}
-            <div className="absolute -right-10 -top-10 pointer-events-none select-none">
+            {/* Subtle Watermark - Top Right Filler */}
+            <div className="absolute -right-6 -top-6 pointer-events-none select-none opacity-[0.03]">
               <CrownStar
                 weight="Duotone"
                 className={cn(
-                  "h-48 w-48 opacity-[0.03] rotate-12 transform-gpu",
-                  isPro ? "text-pro-badge-bg" : "text-enterprise-badge-accent"
+                  "h-40 w-40 -rotate-12 transform-gpu",
+                  isPro ? "text-pro-badge-bg" : "text-enterprise-badge-icon"
                 )}
               />
             </div>
 
-            <div className="relative p-6 flex flex-col gap-5">
-
-              {/* Top Row: Icon & Tier Label */}
-              <div className="flex items-start justify-between">
-                <div className="relative">
-                  {/* Dynamic Back Layer */}
-                  <div className={cn(
-                    "absolute inset-0 rounded-2xl rotate-6 scale-90 opacity-60 transition-transform duration-500 group-hover:rotate-12",
-                    theme.iconWrapper
-                  )} />
-
-                  {/* Main Icon Layer */}
-                  <div className={cn(
-                    "relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 ring-1 ring-black/5 backdrop-blur-sm",
-                    theme.iconWrapper
-                  )}>
-                    <CrownStar weight="BoldDuotone" className="h-6 w-6 relative z-10" />
-                  </div>
-                </div>
-
-                <span className={cn(
-                  "font-display text-[10px] font-black uppercase tracking-widest",
+            <div className="relative p-6 flex flex-col">
+              
+              {/* Header: Tier Label & Close/Action Area */}
+              <div className="flex items-center justify-between mb-4">
+                 <span className={cn(
+                  "font-display text-[10px] font-black uppercase tracking-widest opacity-80",
                   theme.tierText
                 )}>
-                  {tierLabel}
+                  {tierLabel} Access
                 </span>
+                {/* Optional: We could add a close button here if needed, but per "Membership Card" style, we usually keep it clean */}
+              </div>
+
+              {/* Hero: The Floating Prismatic Icon */}
+              <div className="relative mb-6 flex justify-start">
+                 <motion.div
+                    animate={{ 
+                      y: [0, -6, 0],
+                      rotate: [0, 1, 0, -1, 0]
+                    }}
+                    transition={{
+                      duration: 5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                 >
+                    <CrownStar 
+                      weight="BoldDuotone" 
+                      className={cn("h-14 w-14 transition-all duration-300", theme.icon)} 
+                    />
+                 </motion.div>
               </div>
 
               {/* Content Block */}
-              <div className="space-y-2">
-                <h4 className={cn("font-display text-xl font-bold tracking-tight", theme.title)}>
+              <div className="space-y-2 mb-6">
+                <h4 className={cn("font-display text-lg font-bold tracking-tight", theme.title)}>
                   {title}
                 </h4>
                 <p className="text-sm text-muted-foreground leading-relaxed font-medium">
@@ -213,25 +226,27 @@ const PremiumPopoverContent = React.forwardRef<
                 <button
                   onClick={onCtaClick}
                   className={cn(
-                    "group relative w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all duration-300",
-                    "hover:-translate-y-0.5 active:translate-y-0",
+                    "group relative w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all duration-300",
+                    "hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]",
                     theme.button
                   )}
                 >
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-b from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <span className="relative z-10 flex items-center gap-2">
                     {ctaLabel}
-                    <CrownStar weight="Bold" className="h-4 w-4" />
+                    <motion.span
+                      animate={{ x: [0, 3, 0] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                    >
+                      <CrownStar weight="Bold" className="h-4 w-4" />
+                    </motion.span>
                   </span>
+                  {/* Internal Shimmer */}
+                  <div className="absolute inset-0 rounded-xl overflow-hidden">
+                    <div className="absolute top-0 left-[-100%] h-full w-1/2 -skew-x-12 bg-white/20 blur-md transition-all duration-700 group-hover:left-[200%]" />
+                  </div>
                 </button>
               )}
             </div>
-
-            <Popover.Arrow
-              className="fill-card/95"
-              width={16}
-              height={8}
-            />
           </motion.div>
         </Popover.Content>
       )}
