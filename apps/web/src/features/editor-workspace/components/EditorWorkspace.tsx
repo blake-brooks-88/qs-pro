@@ -37,6 +37,7 @@ import {
 import { cn } from "@/lib/utils";
 import { lintSql } from "@/features/editor-workspace/utils/sql-lint";
 import { formatDiagnosticMessage } from "@/features/editor-workspace/utils/sql-diagnostics";
+import { FeatureGate } from "@/components/FeatureGate";
 
 export function EditorWorkspace({
   tenantId,
@@ -293,7 +294,7 @@ export function EditorWorkspace({
 
   return (
     <Tooltip.Provider delayDuration={400}>
-      <div className="flex flex-1 overflow-hidden bg-background text-foreground font-sans h-full">
+      <div className="flex flex-1 bg-background text-foreground font-sans h-full">
         {/* Sidebar Explorer */}
         <WorkspaceSidebar
           tenantId={tenantId}
@@ -333,7 +334,7 @@ export function EditorWorkspace({
         {/* Main IDE Workspace */}
         <div ref={workspaceRef} className="flex-1 flex flex-col min-w-0">
           {/* Workspace Header / Toolbar */}
-          <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
+          <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 overflow-visible">
             <div className="flex items-center gap-4">
               <div className="flex items-center">
                 <Tooltip.Root>
@@ -385,7 +386,7 @@ export function EditorWorkspace({
 
               <div className="h-4 w-px bg-border mx-1" />
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 overflow-visible">
                 <ToolbarButton
                   icon={<Diskette size={18} />}
                   label={activeTab.isDirty ? "Save Changes*" : "Save Query"}
@@ -402,16 +403,18 @@ export function EditorWorkspace({
                   label="Export Results"
                 />
                 <div className="h-4 w-px bg-border mx-1" />
-                <ToolbarButton
-                  icon={<Database size={18} />}
-                  label="Create Data Extension"
-                  onClick={handleCreateDE}
-                  className="text-primary hover:text-primary-foreground hover:bg-primary"
-                />
+                <FeatureGate feature="createDataExtension" variant="button">
+                  <ToolbarButton
+                    icon={<Database size={18} />}
+                    label="Create Data Extension"
+                    onClick={handleCreateDE}
+                    className="text-primary hover:text-primary-foreground hover:bg-primary"
+                  />
+                </FeatureGate>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 overflow-visible">
               <div className="hidden sm:flex flex-col items-end mr-2">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Active Tab
@@ -423,35 +426,37 @@ export function EditorWorkspace({
                   )}
                 </span>
               </div>
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <button
-                    onClick={handleOpenQueryActivityModal}
-                    className="flex items-center gap-2 border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground h-8 px-4 rounded-md text-xs font-bold transition-all group active:scale-95"
-                  >
-                    <Rocket
-                      size={16}
-                      weight="Bold"
-                      className="group-hover:animate-bounce"
-                    />
-                    Deploy to Automation
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
-                    sideOffset={5}
-                  >
-                    Create permanent MCE Activity
-                    <Tooltip.Arrow className="fill-foreground" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
+              <FeatureGate feature="deployToAutomation" variant="button">
+                <Tooltip.Root>
+                  <Tooltip.Trigger asChild>
+                    <button
+                      onClick={handleOpenQueryActivityModal}
+                      className="flex items-center gap-2 border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground h-8 px-4 rounded-md text-xs font-bold transition-all group active:scale-95"
+                    >
+                      <Rocket
+                        size={16}
+                        weight="Bold"
+                        className="group-hover:animate-bounce"
+                      />
+                      Deploy to Automation
+                    </button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
+                      sideOffset={5}
+                    >
+                      Create permanent MCE Activity
+                      <Tooltip.Arrow className="fill-foreground" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              </FeatureGate>
             </div>
           </div>
 
           {/* Editor & Results Pane Split */}
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {/* Editor Area with Vertical Tabs */}
             <div className="flex-1 flex min-h-0">
               {/* Monaco Editor Pane */}
