@@ -108,11 +108,11 @@ const PremiumPopoverContent = React.forwardRef<
   const theme = isPro
     ? {
         // Pro: Orange
-        wrapper: "border-pro-badge-bg/20 shadow-xl shadow-pro-badge-bg/5 dark:shadow-[0_0_50px_-15px_var(--color-pro-shadow)] bg-white/95 dark:bg-[#0a0a0a]/95",
-        lensRing: "border-pro-badge-bg/30 bg-pro-badge-bg/5 dark:bg-pro-badge-bg/10",
+        wrapper: "border-pro-badge-bg/20 shadow-xl dark:shadow-[0_0_50px_-15px_var(--color-pro-shadow)] bg-popover/95",
+        lensRing: "border-pro-badge-bg/50 bg-pro-badge-bg/15 dark:border-pro-badge-bg/30 dark:bg-pro-badge-bg/10",
         lensGlow: "shadow-[0_0_20px_var(--color-pro-badge-bg)]",
-        icon: "text-pro-badge-bg drop-shadow-[0_2px_8px_rgba(255,159,28,0.25)] dark:drop-shadow-[0_0_12px_var(--color-pro-badge-bg)]",
-        title: "text-foreground",
+        icon: "text-pro-badge-bg dark:drop-shadow-[0_0_12px_var(--color-pro-badge-bg)]",
+        title: "text-popover-foreground",
         tierText: "text-pro-badge-bg",
         shimmer: "via-pro-badge-bg/10 dark:via-pro-badge-bg/20",
         descBorder: "from-pro-badge-bg/50 to-transparent",
@@ -120,11 +120,11 @@ const PremiumPopoverContent = React.forwardRef<
       }
     : {
         // Enterprise: Purple
-        wrapper: "border-enterprise-badge-accent/20 shadow-xl shadow-enterprise-badge-accent/5 dark:shadow-[0_0_50px_-15px_var(--color-enterprise-shadow)] bg-white/95 dark:bg-[#050505]/95",
-        lensRing: "border-enterprise-badge-accent/30 bg-enterprise-badge-accent/5 dark:bg-enterprise-badge-accent/10",
+        wrapper: "border-enterprise-badge-accent/20 shadow-xl dark:shadow-[0_0_50px_-15px_var(--color-enterprise-shadow)] bg-popover/95",
+        lensRing: "border-enterprise-badge-icon/60 bg-enterprise-badge-icon/20 dark:border-enterprise-badge-icon/30 dark:bg-enterprise-badge-icon/15",
         lensGlow: "shadow-[0_0_20px_var(--color-enterprise-badge-accent)]",
-        icon: "text-enterprise-badge-icon drop-shadow-[0_2px_8px_rgba(124,58,237,0.25)] dark:drop-shadow-[0_0_15px_var(--color-enterprise-badge-accent)]",
-        title: "text-foreground",
+        icon: "text-enterprise-badge-accent dark:drop-shadow-[0_0_15px_var(--color-enterprise-badge-accent)]",
+        title: "text-popover-foreground",
         tierText: "text-enterprise-badge-accent",
         shimmer: "via-enterprise-badge-accent/10 dark:via-enterprise-badge-accent/20",
         descBorder: "from-enterprise-badge-accent/50 to-transparent",
@@ -171,7 +171,7 @@ const PremiumPopoverContent = React.forwardRef<
             />
 
             {/* Grid Pattern Background (Adaptive Contrast) */}
-             <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+             <div className="absolute inset-0 bg-[linear-gradient(to_right,var(--color-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border)_1px,transparent_1px)] opacity-40 dark:opacity-20 bg-[size:24px_24px] pointer-events-none" />
 
             <div className="relative z-10 p-5 flex flex-col gap-5">
               
@@ -189,24 +189,28 @@ const PremiumPopoverContent = React.forwardRef<
                       )} 
                     />
                     
-                    {/* 2. Inner Glow Pulse */}
+                    {/* 2. Inner Glow Pulse (dark mode only) */}
                     <motion.div
                         animate={{ scale: [0.85, 1, 0.85], opacity: [0.3, 0.6, 0.3] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                         className={cn(
-                            "absolute inset-0 rounded-full blur-xl bg-current opacity-20", 
+                            "absolute inset-0 rounded-full blur-xl bg-current hidden dark:block dark:opacity-20",
                             isPro ? "text-pro-badge-bg" : "text-enterprise-badge-accent"
                         )}
                     />
 
-                    {/* 3. Floating Icon */}
+                    {/* 3. Floating Icon - Bold in light, BoldDuotone in dark */}
                     <motion.div
                         animate={{ y: [-3, 3, -3] }}
                         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                     >
-                        <CrownStar 
-                            weight="BoldDuotone" 
-                            className={cn("h-7 w-7 relative z-10", theme.icon)} 
+                        <CrownStar
+                            weight="Bold"
+                            className={cn("h-7 w-7 relative z-10 dark:hidden", theme.icon)}
+                        />
+                        <CrownStar
+                            weight="BoldDuotone"
+                            className={cn("h-7 w-7 relative z-10 hidden dark:block", theme.icon)}
                         />
                     </motion.div>
                 </div>
