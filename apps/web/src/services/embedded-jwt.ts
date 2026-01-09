@@ -1,6 +1,21 @@
 let bufferedJwt: string | null = null;
 let listenerInitialized = false;
 
+function isAllowedMceOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase();
+    return (
+      host === "mc.exacttarget.com" ||
+      host.endsWith(".exacttarget.com") ||
+      host.endsWith(".marketingcloudapps.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function extractJwtFromUnknown(value: unknown): string | null {
   const isProbablyJwt = (candidate: string): boolean =>
     /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(candidate);
@@ -32,6 +47,11 @@ export function startEmbeddedJwtListener(): void {
   listenerInitialized = true;
 
   window.addEventListener("message", (event: MessageEvent) => {
+    // Only accept SSO JWTs from the parent MCE frame.
+    if (window.self === window.top) return;
+    if (event.source !== window.parent) return;
+    if (!isAllowedMceOrigin(event.origin)) return;
+
     const jwt = extractJwtFromUnknown(event.data);
     if (!jwt) return;
     bufferedJwt = jwt;
@@ -43,4 +63,3 @@ export function consumeEmbeddedJwt(): string | null {
   bufferedJwt = null;
   return jwt;
 }
-

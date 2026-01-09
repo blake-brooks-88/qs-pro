@@ -6,6 +6,20 @@ const api = axios.create({
   baseURL: "/api",
 });
 
+api.interceptors.request.use((config) => {
+  const method = (config.method ?? "get").toLowerCase();
+  const isUnsafe =
+    method === "post" || method === "put" || method === "patch" || method === "delete";
+  if (!isUnsafe) return config;
+
+  const csrfToken = useAuthStore.getState().csrfToken;
+  if (!csrfToken) return config;
+
+  config.headers = config.headers ?? {};
+  config.headers["x-csrf-token"] = csrfToken;
+  return config;
+});
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

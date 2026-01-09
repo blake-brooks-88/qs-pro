@@ -36,7 +36,7 @@ function App() {
       try {
         const response = await axios.get("/api/auth/me");
         if (cancelled) return;
-        setAuth(response.data.user, response.data.tenant);
+        setAuth(response.data.user, response.data.tenant, response.data.csrfToken);
       } catch (err) {
         if (cancelled) return;
         if (axios.isAxiosError(err)) {
@@ -102,7 +102,7 @@ function App() {
         if (cancelled) return;
         const response = await axios.get("/api/auth/me");
         if (cancelled) return;
-        setAuth(response.data.user, response.data.tenant);
+        setAuth(response.data.user, response.data.tenant, response.data.csrfToken);
       } catch {
         // Intentionally ignore; backend will reject invalid/expired JWTs.
       } finally {

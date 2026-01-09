@@ -7,6 +7,7 @@ describe("useAuthStore", () => {
     useAuthStore.setState({
       user: null,
       tenant: null,
+      csrfToken: null,
       isAuthenticated: false,
     });
   });
@@ -32,6 +33,7 @@ describe("useAuthStore", () => {
     expect(state.isAuthenticated).toBe(true);
     expect(state.user).toEqual(user);
     expect(state.tenant).toEqual(tenant);
+    expect(state.csrfToken).toBeNull();
   });
 
   it("should logout and clear state", () => {
@@ -43,11 +45,12 @@ describe("useAuthStore", () => {
     };
     const tenant = { id: "t1", eid: "e1", tssd: "tssd1" };
 
-    useAuthStore.getState().setAuth(user, tenant);
+    useAuthStore.getState().setAuth(user, tenant, "csrf-123");
     useAuthStore.getState().logout();
 
     const state = useAuthStore.getState();
     expect(state.isAuthenticated).toBe(false);
     expect(state.user).toBeNull();
+    expect(state.csrfToken).toBeNull();
   });
 });
