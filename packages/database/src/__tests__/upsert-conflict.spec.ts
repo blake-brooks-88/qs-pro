@@ -11,7 +11,9 @@ import { eq, inArray } from "drizzle-orm";
 // DATABASE_URL is loaded from root .env via vitest.setup.ts
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is required for database tests");
+  throw new Error(
+    "DATABASE_URL environment variable is required for database tests",
+  );
 }
 
 // Use unique test identifiers to avoid conflicts with other test suites
@@ -65,7 +67,10 @@ describe("Upsert Conflict Behavior", () => {
 
   it("User: should update metadata and tenantId on SfUserId conflict", async () => {
     // Need a tenant first
-    const tenant = await tenantRepo.upsert({ eid: `${TEST_EID_PREFIX}tenant-2`, tssd: "tssd-2" });
+    const tenant = await tenantRepo.upsert({
+      eid: `${TEST_EID_PREFIX}tenant-2`,
+      tssd: "tssd-2",
+    });
     createdTenantIds.push(tenant.id);
     const tenant2 = await tenantRepo.upsert({
       eid: `${TEST_EID_PREFIX}tenant-3`,

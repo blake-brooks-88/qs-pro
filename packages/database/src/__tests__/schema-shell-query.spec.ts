@@ -7,7 +7,9 @@ import { eq } from "drizzle-orm";
 // DATABASE_URL is loaded from root .env via vitest.setup.ts
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is required for database tests");
+  throw new Error(
+    "DATABASE_URL environment variable is required for database tests",
+  );
 }
 
 describe("Shell Query Engine Schema", () => {
