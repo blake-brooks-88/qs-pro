@@ -4,6 +4,8 @@ This roadmap outlines the development phases for Query++ (QS Pro), progressing f
 
 **Key Principle:** Security and observability infrastructure is built in Phase 1 so that all subsequent features are instrumented from the start—no painful retrofits.
 
+**Checklist mapping:** Roadmap items reference section numbers in `docs/security-review-materials/APPEXCHANGE-SECURITY-REVIEW-CHECKLIST.md` (example: “Checklist: 6” = Authentication and Session Management).
+
 ## How to Read This
 
 - This roadmap is intentionally high-level; each item should be “spec-able” without fully defining all epic details here.
@@ -19,16 +21,26 @@ The foundation phase establishes the core product AND the infrastructure pattern
 ### Completed
 
 - [x] **Project Foundation & Monorepo Setup** — Initialize project, Docker (Redis/Postgres), and implement the Tenant-Aware Repository pattern with Drizzle ORM. `S`
+  - Checklist: 5 (Injection prevention foundations), 11 (Database/Redis foundations)
 - [x] **Authentication & Token Wallet** — Implement App Switcher (JWT) SSO flow, Web App OAuth handshake, and the secure "Token Wallet" for encrypted refresh tokens. `M`
+  - Checklist: 6 (OAuth + session management), 7 (MCE enhanced package requirements), 8 (Token encryption at rest)
 - [x] **Enhanced Package App Login Flow** — Refactor App Switcher login to use iframe GET + OAuth authorization code + `v2/userinfo` for enhanced packages, with proper session cookies. `S`
+  - Checklist: 6 (Session security), 7 (Iframe embedding + cookie constraints)
 - [x] **Enhanced Package OAuth Documentation & Regression Tests** — Document the MCE iframe OAuth flow and add tests that assert `v2/userinfo` mapping and callback behavior. `S`
+  - Checklist: 6 (OAuth correctness), 7 (User context mapping)
 - [x] **MCE Bridge & Metadata Discovery** — Build the "Bridge" utility (auto-signing, TSSD resolution) and implement discovery for folders, DEs, and field definitions. `M`
+  - Checklist: 7 (Server-side API authentication; no browser tokens), 9 (API security / proxy behavior)
 - [x] **Sidebar & Schema Explorer (Frontend)** — Primary sidebar with lazy-loaded metadata for Data Extensions, folders, and schema. `M`
+  - Checklist: 10 (Frontend security)
 - [x] **Sidebar DE Search (Frontend)** — Search for DEs in the sidebar using the metadata cache. `S`
+  - Checklist: 10 (Frontend security)
 - [x] **Database Row Level Security (RLS)** — Tenant/BU isolation with Postgres RLS policies + per-request context binding. `M`
+  - Checklist: 5 (Broken access control), 11 (Database security)
 - [x] **Feature Flag Infrastructure** — Tier-based feature gating with `FeatureGate` component, `useFeature` hook, and per-tenant overrides. `M`
+  - Checklist: 5 (Least privilege / access control support)
 - [x] **Editor Guardrails & Autocomplete v1** — Monaco editor with modular SQL linting (MCE-aligned), contextual autocomplete, inline suggestions, and tests. `L`
   - Authoritative reference: `apps/web/src/features/editor-workspace/utils/sql-lint/MCE-SQL-REFERENCE.md`
+  - Checklist: 5 (Injection prevention / guardrails), 10 (Frontend security)
 
 ### Core Product Features (Next)
 
@@ -36,28 +48,35 @@ The foundation phase establishes the core product AND the infrastructure pattern
   - API endpoints exist: `POST /api/runs`, `GET /api/runs/:runId/events` (SSE), `GET /api/runs/:runId/results`
   - Rate limiting exists: per-user concurrent run cap + per-user SSE connection cap
   - Embedded requirement: `Secure` + `SameSite=None` cookies for MCE iframe embedding
+  - Checklist: 6 (Session + CSRF posture), 8 (Zero-data proxy pattern), 9 (Rate limiting + API auth)
 
 - [ ] **Query Execution (Web↔API↔Worker) & Results Viewer** — Wire editor “RUN” to backend runs, status streaming, and paged results. `M`
   - Already in place (web UI): results pane UI exists, but `apps/web/src/features/editor-workspace/EditorWorkspacePage.tsx` currently doesn’t call the API.
   - Spec notes: keep results “zero-data proxy” (no row persistence), use paging, and degrade gracefully on upstream SFMC errors/timeouts.
+  - Wire CSRF end-to-end: attach `x-csrf-token` to all state-changing requests and add tests that assert requests without CSRF are rejected.
+  - Checklist: 6 (Session security), 8 (Zero-data proxy), 9 (CSRF + API security + error handling)
 
 - [ ] **Saved Queries & History (User Persistence)** — Queries persist across sessions; users can organize and return to work quickly. `M`
   - Already in place (DB): `query_history` table exists in `packages/database/src/schema.ts`.
   - Already in place (UI scaffolding): sidebar supports `savedQueries`, but it’s currently fed an empty list.
   - Spec notes: define “saved query” vs “run history”, retention per tier, and BU scoping.
+  - Checklist: 5 (Access control), 8 (Retention policies), 9 (Input validation)
 
 - [ ] **Target DE Wizard & Automation Deployment** — “Run to Target” + “Deploy to Automation” (Query Activity) end-to-end. `L`
   - Already in place (UI scaffolding): `apps/web/src/features/editor-workspace/components/QueryActivityModal.tsx` exists; needs backend implementation and wiring.
   - Spec notes: idempotency (avoid duplicates), naming rules, and clear rollback when SFMC operations partially fail.
+  - Checklist: 5 (Authorization), 6 (CSRF on state-changing operations), 9 (Input validation + error handling)
 
 - [ ] **Snippet Library v1 (Persistence + CRUD)** — Backend endpoints + UI wiring for saving/reusing SQL snippets. `M`
   - Already in place (DB): `snippets` table exists in `packages/database/src/schema.ts`.
   - Spec notes: keep sharing rules aligned with workspace model (Phase 2) so we don’t rewrite later.
+  - Checklist: 5 (Access control), 8 (Data retention/privacy), 9 (Input validation)
 
 - [ ] **Monetization v1 (Free/Pro/Enterprise)** — Subscription tiers with Salesforce LMA integration. `M`
   - Seat limits enforcement
   - Upgrade prompts and paywall UI
   - License verification
+  - Checklist: 5 (Least privilege / authorization), 9 (Abuse controls), 12 (Operational security)
 
 ### Foundational Infrastructure (Next)
 
@@ -68,6 +87,7 @@ These establish patterns used by ALL subsequent features. Build once, instrument
   - `audit_logs` table with tenant-scoped, immutable event records
   - `AuditService` with `log()` method for emitting events
   - Standard event types: auth, data access, resource mutations
+  - Checklist: 12 (Logging and monitoring + audit logging), 5 (Log access control failures)
 
 - [ ] **Observability & Monitoring** — Centralized logging and tracing. `M`
   - Already in place: health endpoints exist in API + worker; worker exposes Prometheus metrics and Bull Board.
@@ -75,6 +95,8 @@ These establish patterns used by ALL subsequent features. Build once, instrument
   - Tracing (OpenTelemetry or similar), including upstream SFMC calls
   - Error tracking (Sentry or similar) replacing the current stub in `apps/api/src/common/filters/global-exception.filter.ts`
   - Health endpoints should cover DB/Redis dependency checks (not just “ok”)
+  - Ensure operational endpoints are protected or private-network-only (e.g. worker `/metrics`), and included in the external asset inventory for scanning.
+  - Checklist: 12 (Operational security), 4 (Host and platform security), 11 (Infrastructure security)
 
   > **Operational Dashboards (FYI):**
   > - **Bull Board** — available at `/admin/queues` on worker service for queue monitoring (protected by `ADMIN_API_KEY`)
@@ -87,17 +109,42 @@ These establish patterns used by ALL subsequent features. Build once, instrument
   - Request validation middleware / global pipe
   - Consistent error response format
   - Validation schema patterns for reuse
+  - Checklist: 5 (Injection prevention), 9 (Input validation)
+
+- [ ] **Client-Safe Error Contract** — Standardize error responses and logging so clients never receive sensitive details. `S`
+  - Generic user-facing messages + stable error codes (no stack traces, no upstream payloads).
+  - Detailed diagnostics only in server-side logs (with correlation IDs).
+  - Checklist: 9 (Error handling), 5 (Security misconfiguration)
+
+- [ ] **RLS Coverage Audit & Enforcement** — Ensure tenant/BU isolation applies to every tenant-scoped table (including new and future tables). `S`
+  - Add/verify `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` policies for all tenant-scoped tables (including `shell_query_runs`, `tenant_settings`, and future workspace tables).
+  - Add regression tests that fail if cross-tenant reads/writes are possible.
+  - Checklist: 5 (Broken access control), 11 (Database security)
+
+- [ ] **Outbound MCE Request Hardening (SOAP/REST)** — Make outbound SFMC/MCE calls safe by construction. `M`
+  - XML escaping/CDATA for all SOAP-injected values; strict allowlists for identifiers used in SOAP structure.
+  - Host allowlisting (SFMC endpoints only), timeouts, and max response size limits for axios calls.
+  - Checklist: 5 (Injection prevention), 9 (SSRF / outbound request safety)
+
+- [ ] **Session Lifecycle Compliance** — Complete AppExchange-aligned session controls. `S`
+  - Explicit logout endpoint + session invalidation behavior.
+  - Session timeout/rotation policy (configurable), with tests proving expected behavior.
+  - Checklist: 6 (Session security), 7 (Iframe cookie constraints)
 
 - [ ] **Usage Quotas & Limits** — Tier-based limits infrastructure. `M`
   - Already in place: per-user concurrency limits for shell query runs + per-user SSE connection limits.
   - Query execution quotas (per user/tenant/month)
   - Storage limits (snippets, history retention)
   - Usage tracking and enforcement (soft warnings + hard blocks)
+  - Define retention windows and deletion behavior per tier (history, runs, logs) so storage and compliance requirements are explicit.
+  - Checklist: 8 (Data retention), 9 (Rate limiting), 12 (Operational security)
 
 - [ ] **Embedded App Baseline Security** — Ensure the app behaves correctly in MCE iframe constraints while staying AppExchange-friendly. `M`
   - Security headers baseline (CSP/frame-ancestors strategy, HSTS, nosniff) without breaking iframe embedding
   - Cookie posture (`SameSite=None`, `Secure`, partitioned cookies where applicable) and CSRF posture for redirects
   - CORS posture (if/where needed) and edge protection strategy (CDN/WAF)
+  - Remove or lock down any stub/debug endpoints before submission (e.g. unauthenticated stubs).
+  - Checklist: 10 (Frontend security / headers), 6 (Cookie posture + CSRF), 5 (Security misconfiguration)
 
 ---
 
@@ -114,16 +161,19 @@ The admin and management layer that gives customers visibility and control.
   - `tenant_admin` role for billing, settings, audit log access
   - Distinct from workspace-level roles
   - First user in tenant auto-assigned as admin
+  - Checklist: 5 (Broken access control / least privilege)
 
 - [ ] **Audit Log Viewer** — Admin UI for viewing and exporting audit trails. `M`
   - Filterable log viewer (by user, action, date range)
   - CSV/JSON export capability
   - Feature-gated to enterprise tier (logs are captured for all tiers)
+  - Checklist: 12 (Audit logging)
 
 - [ ] **Subscription Management UI** — Self-service subscription management for admins. `M`
   - View current plan and usage
   - See seat allocation and limits
   - Upgrade/downgrade flows (via Salesforce AppExchange)
+  - Checklist: 5 (Authorization on admin-only settings)
 
 ### Epic B: Workspaces & Collaboration
 > See: `docs/epics/workspaces-collaboration.md`
@@ -134,27 +184,32 @@ Team organization features for enterprises with multiple teams.
   - `workspaces` table (id, tenant_id, name, created_by)
   - `workspace_members` table (workspace_id, user_id, role)
   - Default workspace auto-creation for new tenants
+  - Checklist: 5 (Broken access control), 11 (Database security/RLS)
 
 - [ ] **RBAC (Hardcoded Roles)** — Role-based access control for workspace permissions. `M`
   - Four roles: `owner`, `admin`, `member`, `viewer`
   - Permission matrix for workspace actions
   - Backend authorization middleware
+  - Checklist: 5 (Broken access control)
 
 - [ ] **Workspace Management UI** — CRUD interface for workspace administration. `M`
   - Create/rename/delete workspaces
   - View workspace members
   - Workspace switcher in app shell
+  - Checklist: 5 (Authorization)
 
 - [ ] **Workspace Membership** — Invite and manage workspace members. `M`
   - Invite users by email
   - Accept/decline invitations
   - Change member roles
   - Remove members
+  - Checklist: 5 (Authorization), 12 (Audit logging for membership changes)
 
 - [ ] **Workspace-Scoped Snippets** — Extend snippets to support workspace sharing. `M`
   - Add `workspace_id` to snippets table
   - Visibility levels: `private`, `workspace`, `tenant`
   - RLS policies for workspace isolation
+  - Checklist: 5 (Broken access control), 11 (Database security/RLS)
 
 ---
 
@@ -185,6 +240,7 @@ Features for global brands and agencies with team collaboration needs.
   - Shared snippet folders within workspaces
   - Snippet permissions (view, edit, delete)
   - Snippet usage analytics
+  - Checklist: 5 (Broken access control), 12 (Audit logging)
 
 - [ ] **System Data View Scenario Builder** — Pre-built join templates for complex Data View queries. `M`
   - Journey/Click/Open flow templates
@@ -196,11 +252,13 @@ Features for global brands and agencies with team collaboration needs.
   - SOAP-based batch deployment
   - Deployment status tracking
   - Shared folder support for cross-BU DEs
+  - Checklist: 5 (Authorization), 6 (CSRF on state-changing operations), 9 (Outbound request safety)
 
 - [ ] **Advanced Audit & Compliance** — Enhanced audit capabilities for regulated industries. `M`
   - Log streaming to external SIEM (Datadog, Splunk)
   - Extended retention (1-2 years)
   - Compliance report generation
+  - Checklist: 12 (Audit logging + monitoring), 13 (Enterprise security policies)
 
 ---
 
@@ -214,21 +272,25 @@ Final hardening and compliance work before AppExchange submission. This starts a
   - Key store integration (AWS Secrets Manager, HashiCorp Vault, or similar)
   - Secret rotation capabilities
   - Audit trail for secret access
+  - Checklist: 4 (Host and platform security), 8 (Encryption key management), 11 (Infrastructure security)
 
 - [ ] **HTTP Security Headers** — Implement strict browser security policies. `S`
   - Content Security Policy (CSP)
   - HSTS, X-Frame-Options, X-Content-Type-Options
   - CORS configuration review
+  - Checklist: 10 (HTTP security headers), 7 (Iframe embedding / frame-ancestors)
 
 - [ ] **Rate Limiting & DDoS Protection** — Protect API from abuse. `S`
   - Per-user and per-tenant rate limits
   - Unauthenticated endpoint protection
   - Integration with CDN/WAF if needed
+  - Checklist: 9 (Rate limiting), 11 (WAF/DDoS)
 
 - [ ] **Support/Admin Access Controls** — Audited, least-privilege cross-tenant support path. `M`
   - Break-glass access for support
   - Full audit trail of support access
   - Time-limited access tokens
+  - Checklist: 5 (Broken access control), 12 (Audit logging), 13 (Enterprise controls)
 
 ### AppExchange Security Review Prep
 
@@ -237,16 +299,26 @@ Final hardening and compliance work before AppExchange submission. This starts a
   - Data flow diagrams
   - Incident response plan
   - Privacy policy and DPA
+  - Checklist: 2 (Required documentation), 8 (Privacy), 12 (Incident response)
+
+- [ ] **Security Scanning Pack (SAST/DAST/Deps/TLS/Headers) + SBOM** — Produce required scan artifacts and remediation tracking for submission. `M`
+  - SAST report + remediation notes (and false-positive dossier where applicable)
+  - Authenticated DAST report (ZAP/Burp) + remediation notes
+  - Dependency audit (pnpm audit/Snyk) results + risk acceptance docs if needed
+  - TLS/headers evidence (SSL Labs + securityheaders.com), plus SBOM (CycloneDX/SPDX recommended)
+  - Checklist: 3 (Security scanning requirements), 1 (Dependency CVE verification), 2 (SBOM)
 
 - [ ] **Penetration Testing** — Third-party security assessment. `M`
   - Engage pen testing vendor
   - Remediate findings
   - Document results for AppExchange review
+  - Checklist: 3 (DAST/pentest evidence), 5 (OWASP coverage validation)
 
 - [ ] **AppExchange Security Review Submission** — Complete Salesforce security review. `L`
   - Submit application for review
   - Address reviewer feedback
   - Obtain security approval
+  - Checklist: 1 (Pre-submission preparation), 2 (Required documentation), 3 (Scan artifacts)
 
 ### Production Infrastructure
 
@@ -255,11 +327,13 @@ Final hardening and compliance work before AppExchange submission. This starts a
   - Redis with TLS
   - CDN configuration
   - Monitoring and alerting
+  - Checklist: 11 (Infrastructure security), 4 (Host and platform security), 12 (Monitoring)
 
 - [ ] **Disaster Recovery & Backup** — Business continuity planning. `M`
   - Automated backup verification
   - Recovery runbooks
   - RTO/RPO documentation
+  - Checklist: 12 (Disaster recovery)
 
 ---
 
