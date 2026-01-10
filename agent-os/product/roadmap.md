@@ -12,6 +12,7 @@ This roadmap outlines the development phases for Query++ (QS Pro), progressing f
 
 | Date | Change |
 |------|--------|
+| 2026-01-10 | **Launch Slice restructure** — Added usage caps model, defined true MVP scope, deferred Enterprise to post-launch. Based on 8-audit synthesis. Previous roadmap: `7b88b82` |
 | 2026-01-10 | Added feature tier definitions (Core/Pro/Enterprise) based on brainstorming session. Added version control and promotion features. Reorganized Phase 3 to align with tier structure. |
 
 ---
@@ -22,19 +23,95 @@ Features are organized into three tiers based on target buyer and value proposit
 
 | Tier | Target Buyer | Value Proposition |
 |------|--------------|-------------------|
-| **Core/Free** | Individual developers, consultants | "Stop the bleeding" — modern editor experience that solves daily pain points |
-| **Pro** | Power users, individual architects | "Productivity + persistence" — version history, one-click deploy, efficiency tools |
-| **Enterprise** | Teams, agencies, global brands | "Governed promotion + collaboration" — QA→Prod workflow, team features, audit |
+| **Core/Free** | Individual developers, consultants | "Stop the bleeding" — modern editor with usage caps |
+| **Pro** | Power users, individual architects | "Productivity + persistence" — unlimited usage, version history, deploy |
+| **Enterprise** | Teams, agencies, global brands | "Governed promotion + collaboration" — QA→Prod, RBAC, audit |
 
-See Phase 3 for detailed feature breakdowns by tier.
+### Usage Caps Model
+
+Usage caps create natural upgrade pressure while keeping Core valuable:
+
+| Capability | Core/Free | Pro | Enterprise |
+|------------|-----------|-----|------------|
+| Query runs | 50/month | Unlimited | Unlimited |
+| Saved queries | 10 | Unlimited | Unlimited |
+| Version history | ✗ | ✓ | ✓ |
+| One-way deploy | ✗ | ✓ | ✓ |
+| QA→Prod promotion | ✗ | ✗ | ✓ |
+| Team workspaces | ✗ | ✗ | ✓ |
+| Audit log viewer | ✗ | ✗ | ✓ |
+
+See "Launch Slice" for what ships in v1.0.
 
 ---
 
 ## How to Read This
 
-- This roadmap is intentionally high-level; each item should be “spec-able” without fully defining all epic details here.
-- Items include key constraints and “already implemented” notes so we don’t re-plan work that’s already done.
+- This roadmap is intentionally high-level; each item should be "spec-able" without fully defining all epic details here.
+- Items include key constraints and "already implemented" notes so we don't re-plan work that's already done.
 - **Sizing:** `S` = Small (1-2 days), `M` = Medium (3-5 days), `L` = Large (1-2 weeks)
+
+---
+
+## Launch Slice (v1.0)
+
+**This is what must ship for AppExchange launch. Everything else is post-launch.**
+
+The goal: A user can connect their MCE org, write a query with autocomplete, run it, see results, and save it — in under 5 minutes. Pro users get unlimited usage + version history. Enterprise is deferred until Pro customers ask for governance.
+
+### v1.0 Scope
+
+#### Core Tier (Free with Caps)
+- [x] Monaco editor + syntax highlighting
+- [x] DE/field autocomplete (from metadata cache)
+- [x] Data Views autocomplete + joins
+- [x] MCE-specific linting
+- [ ] **Query execution (Web↔API↔Worker)** — THE critical path
+- [ ] **Saved queries** — basic persistence (10 query cap for free)
+- [ ] **Usage caps enforcement** — 50 runs/month, 10 saved queries
+- [ ] Keyboard shortcuts (Cmd+Enter to run)
+
+#### Pro Tier (14-Day Trial, Then Subscription)
+- [ ] **Unlimited query runs** — cap lifted
+- [ ] **Unlimited saved queries** — cap lifted
+- [ ] **Linear version history + rollback** — never lose work
+- [ ] **Query execution history** — view past runs
+- [ ] **One-way deploy to Query Activity** — fire and forget
+
+#### Security Baseline (AppExchange Required)
+- [ ] RLS coverage audit + enforcement tests
+- [ ] Session lifecycle compliance (logout, timeout)
+- [ ] Embedded app baseline security (CSP, cookies, CSRF)
+- [ ] Input validation patterns (Zod across API)
+- [ ] Client-safe error contract
+
+#### Monetization
+- [ ] LMA integration for license verification
+- [ ] Upgrade prompts when caps hit
+- [ ] Pro trial activation (14 days full access)
+
+### Deferred to Post-Launch
+
+| Feature | Reason |
+|---------|--------|
+| Enterprise tier (all features) | Build when Pro customers ask for governance |
+| Smart Fix-It | Nice-to-have, not launch critical |
+| Performance Linting | MCE doesn't expose data; wait for signal |
+| Sample Value Hover | Edge case |
+| Query prettify/format | Can ship post-launch |
+| Import from Automation Studio | Can ship post-launch |
+| Create target DE from query | Can ship post-launch |
+| Silent auto-retry | Can ship post-launch |
+| Multiple editor tabs | Can ship post-launch |
+| Personal snippets | Can ship post-launch |
+| Pre-flight validation | Can ship post-launch |
+
+### Success Criteria
+
+- [ ] First-run loop works: connect → write → run → see results → save
+- [ ] Time-to-first-query < 5 minutes for new users
+- [ ] Pro trial converts at ≥5% (B2B freemium benchmark)
+- [ ] AppExchange security review passes
 
 ---
 
@@ -247,24 +324,54 @@ Advanced features that differentiate Pro and Enterprise tiers. Built on top of c
 
 ### Core/Free Tier Features
 
-These features ship in Phase 1 and are available to all users. Listed here for tier completeness.
+These features ship in Phase 1. See "Launch Slice" for what's in v1.0 vs post-launch.
 
-| Feature | Phase | Status |
-|---------|-------|--------|
-| Monaco editor + syntax highlighting | 1 | ✓ Complete |
-| DE/field autocomplete (from metadata cache) | 1 | ✓ Complete |
-| Data Views autocomplete + joins (hardcoded schemas) | 1 | ✓ Complete |
-| MCE-specific linting (MCE-SQL-REFERENCE aligned) | 1 | ✓ Complete |
-| Real-time result preview (Shell Query) | 1 | In progress |
-| Query prettify/format | 1 | Planned |
-| Import query content from Automation Studio | 1 | Planned |
-| Create target DE from query definition | 1 | Planned |
-| Silent auto-retry for transient MCE errors | 1 | Planned |
-| Keyboard shortcuts (Cmd+Enter, etc.) | 1 | Planned |
+| Feature | v1.0 Launch | Status |
+|---------|-------------|--------|
+| Monaco editor + syntax highlighting | ✓ | Complete |
+| DE/field autocomplete (from metadata cache) | ✓ | Complete |
+| Data Views autocomplete + joins (hardcoded schemas) | ✓ | Complete |
+| MCE-specific linting (MCE-SQL-REFERENCE aligned) | ✓ | Complete |
+| Real-time result preview (Shell Query) | ✓ | In progress |
+| Keyboard shortcuts (Cmd+Enter, etc.) | ✓ | Planned |
+| Usage caps (50 runs/month, 10 saved queries) | ✓ | Planned |
+| Query prettify/format | Post-launch | Planned |
+| Import query content from Automation Studio | Post-launch | Planned |
+| Create target DE from query definition | Post-launch | Planned |
+| Silent auto-retry for transient MCE errors | Post-launch | Planned |
 
 ### Pro Tier Features
 
 Features for individual architects and power users. Value prop: "Productivity + persistence."
+
+#### Pro Launch Features (v1.0)
+
+- [ ] **Unlimited Query Runs** — Remove the 50/month cap. `S`
+  - Tier check on run creation
+  - Upgrade prompt when free users hit cap
+
+- [ ] **Unlimited Saved Queries** — Remove the 10 query cap. `S`
+  - Tier check on save
+  - Upgrade prompt when free users hit cap
+
+- [ ] **Query Execution History** — View past runs, durations, row counts. `M`
+  - Per-user history of query executions
+  - Filter by date, query, status
+  - Re-run from history
+
+- [ ] **Linear Version History + Rollback** — Never lose work, append-only history. `M`
+  - Every save creates immutable version
+  - View timeline of all changes with diff
+  - Rollback = create new version with old content (nothing deleted)
+  - Audit trail preserved
+
+- [ ] **Create Query Activity (One-Way Push)** — Deploy query to MCE as Query Activity. `M`
+  - One-click push to single MCE target
+  - Create associated target DE
+  - "Fire and forget" — no ongoing sync relationship
+  - Checklist: 5 (Authorization), 6 (CSRF), 9 (Input validation)
+
+#### Pro Post-Launch Features (Customer Signal)
 
 - [ ] **Sample Value Hover** — Quick field value lookup via API call. `S`
   - Hover over field, click to fetch sample non-null value from DE
@@ -292,29 +399,14 @@ Features for individual architects and power users. Value prop: "Productivity + 
   - Timeout risk warnings (30-minute limit)
   - No actual performance data from MCE (not exposed)
 
-- [ ] **Query Execution History** — View past runs, durations, row counts. `M`
-  - Per-user history of query executions
-  - Filter by date, query, status
-  - Re-run from history
-
-- [ ] **Linear Version History + Rollback** — Never lose work, append-only history. `M`
-  - Every save creates immutable version
-  - View timeline of all changes with diff
-  - Rollback = create new version with old content (nothing deleted)
-  - Audit trail preserved
-
-- [ ] **Create Query Activity (One-Way Push)** — Deploy query to MCE as Query Activity. `M`
-  - One-click push to single MCE target
-  - Create associated target DE
-  - "Fire and forget" — no ongoing sync relationship
-  - Checklist: 5 (Authorization), 6 (CSRF), 9 (Input validation)
-
 - [ ] **Pre-Flight Query Validation** — Detect PK conflicts and nullability violations before saving to Target DEs. `M`
   - Schema validation against target DE structure
   - PK conflict detection
   - Nullability warnings
 
-### Enterprise Tier Features
+### Enterprise Tier Features (Post-Launch / Customer Signal Required)
+
+**Note:** Enterprise is deferred until Pro customers request governance features. Build when you have paying Pro customers asking for QA→Prod workflows, team collaboration, or audit requirements.
 
 Features for global brands and agencies with team collaboration needs. Value prop: "Governed promotion + collaboration."
 
@@ -384,7 +476,7 @@ Features for global brands and agencies with team collaboration needs. Value pro
   - Compliance report generation
   - Checklist: 12 (Audit logging + monitoring), 13 (Enterprise security policies)
 
-#### Future Enterprise (Post-MVP, Customer Signal Needed)
+#### Future Enterprise (Speculative / Strong Signal Needed)
 
 - [ ] **System Data View Scenario Builder** — Pre-built join templates for complex Data View queries. `M`
   - Journey/Click/Open flow templates
@@ -482,11 +574,14 @@ Final hardening and compliance work before AppExchange submission. This starts a
 
 ## Notes
 
-- **Build order:** Phase 1 foundational infrastructure (audit logging, observability, quotas) must be complete before Phase 2+ features so they can be instrumented as built.
+- **Launch Slice is law:** Only items in the Launch Slice section block v1.0. Everything else is post-launch.
+- **Build order:** Launch Slice first, then Phase 1 remainders, then Phase 2/3 based on customer signal.
 - **Feature flags:** All tier-specific features gated via `FeatureKey` system in `packages/shared-types/src/features.ts`.
-- **Audit logging:** Infrastructure in Phase 1; viewer UI in Phase 2. Logs captured for all tiers; viewing is enterprise-only.
+- **Audit logging:** Infrastructure in Phase 1; viewer UI is Enterprise (post-launch). Logs captured for all tiers.
 - **SQL guardrails:** All SQL linting/autocomplete behavior must align with `apps/web/src/features/editor-workspace/utils/sql-lint/MCE-SQL-REFERENCE.md`.
-- **Tier philosophy:** Core solves daily pain points (editor UX). Pro adds productivity + persistence (version history, one-way deploy). Enterprise adds governance + collaboration (QA→Prod promotion, team features, RBAC).
-- **Version control model:** Append-only history (Pro), Deploy Targets with promotion flow (Enterprise). See `docs/brainstorming/version-control/` for design details.
+- **Tier philosophy:** Core solves daily pain points with usage caps. Pro removes caps + adds persistence. Enterprise adds governance (post-launch).
+- **Usage caps rationale:** Based on [First Page Sage benchmarks](https://firstpagesage.com/seo-blog/saas-freemium-conversion-rates/), B2B freemium converts at 3-10%. Caps create upgrade pressure without punishing users.
+- **Version control model:** Append-only history (Pro), Deploy Targets with promotion flow (Enterprise post-launch). See `docs/brainstorming/version-control/` for design details.
 - **Licensing model:** AppExchange org-level licensing (per-seat or per-org). Individual users cannot upgrade independently within a client org; the org admin controls seat assignment.
-- **MVP strategy:** Phased launch (Option C) — ship Core + key Enterprise features, add remaining based on customer demand. Avoid over-building before validation.
+- **MVP strategy:** Ship Core + Pro for v1.0. Defer Enterprise until Pro customers request governance features. Validate before building.
+- **Audit references:** See `docs/audits/01-10-2026-roadmap/` for the 8-audit synthesis that informed this restructure.
