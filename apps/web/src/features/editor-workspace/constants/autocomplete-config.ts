@@ -29,7 +29,7 @@ export const SFMC_IDENTITY_FIELDS = [
  * Used to detect identity fields in SQL queries regardless of casing.
  */
 export const IDENTITY_FIELD_PATTERNS = SFMC_IDENTITY_FIELDS.map(
-  (field) => new RegExp(`^${field}$`, "i")
+  (field) => new RegExp(`^${field}$`, "i"),
 );
 
 /**

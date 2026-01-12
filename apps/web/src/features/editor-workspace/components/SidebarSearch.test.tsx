@@ -2,15 +2,22 @@ import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { SidebarSearch, SidebarSearchResults, SidebarSearchResultItem, SidebarSearchRoot } from "./SidebarSearch";
+import {
+  SidebarSearch,
+  SidebarSearchResults,
+  SidebarSearchResultItem,
+  SidebarSearchRoot,
+} from "./SidebarSearch";
 
 describe("SidebarSearch", () => {
   it("SidebarSearch_OnRender_ShowsPlaceholder", () => {
     // Arrange
     render(<SidebarSearch placeholder="Search folders..." />);
-    
+
     // Assert
-    expect(screen.getByPlaceholderText("Search folders...")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Search folders..."),
+    ).toBeInTheDocument();
   });
 
   it("SidebarSearch_OnType_CallsOnChange", async () => {
@@ -32,7 +39,7 @@ describe("SidebarSearch", () => {
     const user = userEvent.setup();
     const onClear = vi.fn();
     render(<SidebarSearch value="test" onClear={onClear} showClear readOnly />);
-    
+
     // Act
     const clearButton = screen.getByRole("button", { name: /clear search/i });
     await user.click(clearButton);
@@ -46,7 +53,7 @@ describe("SidebarSearch", () => {
     render(
       <SidebarSearchResults isOpen={true}>
         <div data-testid="child">Result</div>
-      </SidebarSearchResults>
+      </SidebarSearchResults>,
     );
 
     // Assert
@@ -58,7 +65,7 @@ describe("SidebarSearch", () => {
     render(
       <SidebarSearchResults isOpen={false}>
         <div data-testid="child">Result</div>
-      </SidebarSearchResults>
+      </SidebarSearchResults>,
     );
 
     // Assert
@@ -67,8 +74,10 @@ describe("SidebarSearch", () => {
 
   it("SidebarSearchResultItem_WhenActive_HasActiveStyles", () => {
     // Arrange
-    render(<SidebarSearchResultItem active={true}>Item</SidebarSearchResultItem>);
-    
+    render(
+      <SidebarSearchResultItem active={true}>Item</SidebarSearchResultItem>,
+    );
+
     // Assert
     const item = screen.getByRole("option");
     expect(item).toHaveAttribute("aria-selected", "true");
@@ -79,8 +88,10 @@ describe("SidebarSearch", () => {
     // Arrange
     const user = userEvent.setup();
     const onClick = vi.fn();
-    render(<SidebarSearchResultItem onClick={onClick}>Item</SidebarSearchResultItem>);
-    
+    render(
+      <SidebarSearchResultItem onClick={onClick}>Item</SidebarSearchResultItem>,
+    );
+
     // Act
     await user.click(screen.getByRole("option"));
 
@@ -93,12 +104,12 @@ describe("SidebarSearch", () => {
     const TestComponent = () => {
       const [activeIndex, setActiveIndex] = React.useState(-1);
       const items = ["Item 1", "Item 2", "Item 3"];
-      
+
       const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "ArrowDown") {
-          setActiveIndex(prev => (prev + 1) % items.length);
+          setActiveIndex((prev) => (prev + 1) % items.length);
         } else if (e.key === "ArrowUp") {
-          setActiveIndex(prev => (prev - 1 + items.length) % items.length);
+          setActiveIndex((prev) => (prev - 1 + items.length) % items.length);
         }
       };
 
@@ -121,7 +132,7 @@ describe("SidebarSearch", () => {
 
     // Act
     await user.type(input, "{arrowdown}");
-    
+
     // Assert
     const options = screen.getAllByRole("option");
     expect(options[0]).toHaveAttribute("aria-selected", "true");
@@ -137,7 +148,9 @@ describe("SidebarSearch", () => {
       const [isOpen, setIsOpen] = React.useState(true);
       return (
         <div>
-          <SidebarSearch onKeyDown={(e) => e.key === "Escape" && setIsOpen(false)} />
+          <SidebarSearch
+            onKeyDown={(e) => e.key === "Escape" && setIsOpen(false)}
+          />
           <SidebarSearchResults isOpen={isOpen}>
             <SidebarSearchResultItem>Item</SidebarSearchResultItem>
           </SidebarSearchResults>
@@ -164,7 +177,7 @@ describe("SidebarSearch", () => {
         <SidebarSearchRoot onOpenChange={onOpenChange}>
           <SidebarSearch />
         </SidebarSearchRoot>
-      </div>
+      </div>,
     );
 
     // Act

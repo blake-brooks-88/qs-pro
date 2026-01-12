@@ -4,7 +4,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceSidebar } from "@/features/editor-workspace/components/WorkspaceSidebar";
-import { DataExtension, Folder, SavedQuery } from "@/features/editor-workspace/types";
+import {
+  DataExtension,
+  Folder,
+  SavedQuery,
+} from "@/features/editor-workspace/types";
 
 const createQueryClient = () =>
   new QueryClient({
@@ -22,9 +26,9 @@ const createWrapper = (queryClient: QueryClient) => {
 };
 
 const renderSidebar = (
-  folders: Folder[], 
-  dataExtensions: DataExtension[], 
-  savedQueries: SavedQuery[] = []
+  folders: Folder[],
+  dataExtensions: DataExtension[],
+  savedQueries: SavedQuery[] = [],
 ) => {
   const queryClient = createQueryClient();
   return render(
@@ -129,7 +133,14 @@ describe("WorkspaceSidebar", () => {
       { id: "1", name: "Sales", parentId: null, type: "data-extension" },
     ];
     const de: DataExtension[] = [
-      { id: "de1", name: "Customers", customerKey: "C1", folderId: "1", description: "", fields: [] },
+      {
+        id: "de1",
+        name: "Customers",
+        customerKey: "C1",
+        folderId: "1",
+        description: "",
+        fields: [],
+      },
     ];
 
     renderSidebar(folders, de);
@@ -137,7 +148,9 @@ describe("WorkspaceSidebar", () => {
     const searchInput = screen.getByPlaceholderText(/search/i);
     await user.type(searchInput, "Cust");
 
-    expect(screen.getByRole("option", { name: /customers/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /customers/i }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Sales").length).toBeGreaterThan(0); // Can be folder name or path
   });
 
@@ -149,7 +162,14 @@ describe("WorkspaceSidebar", () => {
       { id: "3", name: "Other", parentId: null, type: "data-extension" },
     ];
     const de: DataExtension[] = [
-      { id: "de1", name: "TargetDE", customerKey: "T1", folderId: "2", description: "", fields: [] },
+      {
+        id: "de1",
+        name: "TargetDE",
+        customerKey: "T1",
+        folderId: "2",
+        description: "",
+        fields: [],
+      },
     ];
 
     renderSidebar(folders, de);
@@ -161,8 +181,12 @@ describe("WorkspaceSidebar", () => {
     // Tree should be filtered
     expect(screen.getByRole("button", { name: /root/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sub/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /targetde/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /other/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /targetde/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /other/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("SidebarSearch_OnClear_RestoresTreeState", async () => {
@@ -183,7 +207,9 @@ describe("WorkspaceSidebar", () => {
     await user.click(screen.getByRole("option", { name: /root/i }));
 
     // Filtered state
-    expect(screen.queryByRole("button", { name: /other/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /other/i }),
+    ).not.toBeInTheDocument();
 
     // Clear search
     await user.click(screen.getByRole("button", { name: /clear search/i }));
@@ -195,8 +221,20 @@ describe("WorkspaceSidebar", () => {
   it("SidebarSearch_OnQueriesTab_FiltersQueries", async () => {
     const user = userEvent.setup();
     const queries: SavedQuery[] = [
-      { id: "q1", name: "Select All", folderId: "root", content: "SELECT *", updatedAt: "" },
-      { id: "q2", name: "Filter Users", folderId: "root", content: "SELECT *", updatedAt: "" },
+      {
+        id: "q1",
+        name: "Select All",
+        folderId: "root",
+        content: "SELECT *",
+        updatedAt: "",
+      },
+      {
+        id: "q2",
+        name: "Filter Users",
+        folderId: "root",
+        content: "SELECT *",
+        updatedAt: "",
+      },
     ];
 
     renderSidebar([], [], queries);
@@ -207,7 +245,11 @@ describe("WorkspaceSidebar", () => {
     const searchInput = screen.getByPlaceholderText(/search/i);
     await user.type(searchInput, "Select");
 
-    expect(screen.getByRole("option", { name: /select all/i })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /filter users/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /select all/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /filter users/i }),
+    ).not.toBeInTheDocument();
   });
 });

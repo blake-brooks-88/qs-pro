@@ -102,8 +102,7 @@ describe("Autocomplete Integration - Complete User Workflows", () => {
       // Scenario: User types "SELECT * FROM Users u INNER JOIN Or"
       // Expected: Dropdown triggers when "Or" reaches 2 characters
 
-      // Arrange - cursor after "O"
-      const sqlOneChar = "SELECT * FROM Users u INNER JOIN O";
+      // Arrange - cursor after "O" (single character, shouldn't trigger)
       const shouldShowAfterOne = shouldTriggerDropdown(undefined, "O");
 
       // Arrange - cursor after "Or"

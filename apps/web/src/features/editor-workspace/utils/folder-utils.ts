@@ -4,7 +4,10 @@ import type { Folder } from "../types";
  * Returns an array of folders representing the ancestor chain from root to the given folderId.
  * The chain includes the folder identified by folderId if it exists.
  */
-export function getFolderAncestors(folders: Folder[], folderId: string | null): Folder[] {
+export function getFolderAncestors(
+  folders: Folder[],
+  folderId: string | null,
+): Folder[] {
   if (!folderId) return [];
 
   const ancestors: Folder[] = [];
@@ -28,7 +31,10 @@ export function getFolderAncestors(folders: Folder[], folderId: string | null): 
 /**
  * Returns a displayable path string for a folder (e.g., "Root > Subfolder > TargetedFolder").
  */
-export function getFolderPath(folders: Folder[], folderId: string | null): string {
+export function getFolderPath(
+  folders: Folder[],
+  folderId: string | null,
+): string {
   const ancestors = getFolderAncestors(folders, folderId);
   return ancestors.map((f) => f.name).join(" > ");
 }

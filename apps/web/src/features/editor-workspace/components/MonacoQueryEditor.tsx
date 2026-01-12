@@ -267,7 +267,11 @@ export function MonacoQueryEditor({
       completionDisposableRef.current =
         monacoInstance.languages.registerCompletionItemProvider("sql", {
           triggerCharacters: [".", "["],
-          provideCompletionItems: async (model, position, completionContext) => {
+          provideCompletionItems: async (
+            model,
+            position,
+            completionContext,
+          ) => {
             const text = model.getValue();
             const cursorIndex = model.getOffsetAt(position);
             const sqlContext = getSqlCursorContext(text, cursorIndex);
@@ -303,7 +307,8 @@ export function MonacoQueryEditor({
                 return {
                   suggestions: [
                     {
-                      label: "⚠️ Cannot expand: multiple tables without aliases",
+                      label:
+                        "⚠️ Cannot expand: multiple tables without aliases",
                       kind: monacoInstance.languages.CompletionItemKind.Issue,
                       insertText: "*",
                       detail: "Add table aliases to disambiguate columns",
@@ -340,7 +345,9 @@ export function MonacoQueryEditor({
                     ? `[${field.name}]`
                     : field.name;
 
-                  const fullName = prefix ? `${prefix}.${fieldName}` : fieldName;
+                  const fullName = prefix
+                    ? `${prefix}.${fieldName}`
+                    : fieldName;
 
                   columnList.push(fullName);
                 }
@@ -365,7 +372,8 @@ export function MonacoQueryEditor({
                     suggestions: [
                       {
                         label: `Expand to ${columnList.length} columns`,
-                        kind: monacoInstance.languages.CompletionItemKind.Snippet,
+                        kind: monacoInstance.languages.CompletionItemKind
+                          .Snippet,
                         insertText: expandedColumns,
                         detail: "Expand * to full column list",
                         documentation: expandedColumns,
@@ -384,7 +392,8 @@ export function MonacoQueryEditor({
 
             // For immediate trigger chars (. [ _), allow 1-char minimum
             const isImmediateContext =
-              triggerChar && IMMEDIATE_TRIGGER_CHARS.includes(triggerChar as never);
+              triggerChar &&
+              IMMEDIATE_TRIGGER_CHARS.includes(triggerChar as never);
 
             // For general typing, require 2+ chars
             if (!isImmediateContext && currentWord.length < MIN_TRIGGER_CHARS) {
@@ -596,7 +605,7 @@ export function MonacoQueryEditor({
               existingAliases: new Set(
                 sqlContext.tablesInScope
                   .map((t) => t.alias?.toLowerCase())
-                  .filter((a): a is string => Boolean(a))
+                  .filter((a): a is string => Boolean(a)),
               ),
               getFieldsForTable: async (table) => {
                 if (table.isSubquery) {
@@ -644,7 +653,11 @@ export function MonacoQueryEditor({
             };
           },
           freeInlineCompletions: () => {},
-        });
+          // Monaco 0.52+ may call this instead of freeInlineCompletions
+          disposeInlineCompletions: () => {},
+        } as Parameters<
+          typeof monacoInstance.languages.registerInlineCompletionsProvider
+        >[1]);
 
       monacoInstance.languages.setLanguageConfiguration("sql", {
         comments: {
@@ -662,20 +675,25 @@ export function MonacoQueryEditor({
         onEnterRules: [
           // After SELECT/FROM/WHERE/JOIN - indent next line
           {
-            beforeText: /^\s*(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|FULL\s+JOIN|GROUP\s+BY|ORDER\s+BY|HAVING)\b.*$/i,
-            action: { indentAction: monacoInstance.languages.IndentAction.Indent }
+            beforeText:
+              /^\s*(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|FULL\s+JOIN|GROUP\s+BY|ORDER\s+BY|HAVING)\b.*$/i,
+            action: {
+              indentAction: monacoInstance.languages.IndentAction.Indent,
+            },
           },
           // Before major clauses - outdent to match SELECT level
           {
             beforeText: /^\s*$/,
             afterText: /^\s*(FROM|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING)\b/i,
-            action: { indentAction: monacoInstance.languages.IndentAction.Outdent }
-          }
+            action: {
+              indentAction: monacoInstance.languages.IndentAction.Outdent,
+            },
+          },
         ],
         indentationRules: {
           increaseIndentPattern: /^\s*(SELECT|FROM|WHERE|CASE)\b/i,
-          decreaseIndentPattern: /^\s*(END|FROM|WHERE|GROUP|ORDER)\b/i
-        }
+          decreaseIndentPattern: /^\s*(END|FROM|WHERE|GROUP|ORDER)\b/i,
+        },
       });
 
       autoBracketDisposableRef.current?.dispose();

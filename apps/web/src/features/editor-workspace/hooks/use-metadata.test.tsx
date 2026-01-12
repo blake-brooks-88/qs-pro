@@ -145,7 +145,9 @@ describe("use-metadata hooks", () => {
     const getFoldersMock = vi.mocked(metadataService.getFolders);
     const getDataExtensionsMock = vi.mocked(metadataService.getDataExtensions);
 
-    getFoldersMock.mockResolvedValueOnce([{ ID: 10, Name: "Root", ParentFolder: null }]);
+    getFoldersMock.mockResolvedValueOnce([
+      { ID: 10, Name: "Root", ParentFolder: null },
+    ]);
     getDataExtensionsMock.mockResolvedValueOnce([
       { CustomerKey: "DE_Alpha", Name: "Alpha", CategoryID: 200 },
     ]);

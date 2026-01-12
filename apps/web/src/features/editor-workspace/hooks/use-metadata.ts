@@ -20,6 +20,11 @@ import {
   type DataExtensionResponseDto,
   type DataFolderResponseDto,
 } from "@/services/metadata";
+import {
+  getSystemDataViewFolders,
+  getSystemDataViewExtensions,
+} from "@/services/system-data-views";
+import { useFeature } from "@/hooks/use-feature";
 
 interface MetadataState {
   folders: Folder[];
@@ -202,7 +207,9 @@ const formatErrorDescription = (error: unknown) => {
   const statusText =
     typeof status === "number" ? `HTTP ${status}` : "Request failed";
 
-  return path ? `${statusText} • ${path} — ${message}` : `${statusText} — ${message}`;
+  return path
+    ? `${statusText} • ${path} — ${message}`
+    : `${statusText} — ${message}`;
 };
 
 const buildMetadataError = (
@@ -339,6 +346,8 @@ export function useMetadata({
   tenantId?: string | null;
   eid?: string;
 } = {}): MetadataState {
+  const systemDataViewsEnabled = useFeature("systemDataViews");
+
   const folderQuery = useMetadataFolders(tenantId, eid);
 
   usePrefetchDataExtensions({
@@ -364,9 +373,24 @@ export function useMetadata({
       ? buildMetadataError("dataExtensions", dataExtensionsQuery.error)
       : null;
 
+  // Merge system data views when feature is enabled
+  const baseFolders = folderQuery.data ?? [];
+  const baseDataExtensions = dataExtensionsQuery.data ?? [];
+
+  const folders = systemDataViewsEnabled
+    ? [...baseFolders, ...mapFolders(getSystemDataViewFolders())]
+    : baseFolders;
+
+  const dataExtensions = systemDataViewsEnabled
+    ? [
+        ...baseDataExtensions,
+        ...mapDataExtensions(getSystemDataViewExtensions()),
+      ]
+    : baseDataExtensions;
+
   return {
-    folders: folderQuery.data ?? [],
-    dataExtensions: dataExtensionsQuery.data ?? [],
+    folders,
+    dataExtensions,
     isLoading: folderQuery.isLoading,
     isDataExtensionsFetching,
     error,

@@ -80,9 +80,9 @@ function DataExtensionNode({
         className={cn(
           "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors",
           depth > 0 && "ml-2",
-          isSelected 
-            ? "bg-surface-hover text-foreground font-medium" 
-            : "text-foreground/80 hover:text-foreground hover:bg-surface-hover"
+          isSelected
+            ? "bg-surface-hover text-foreground font-medium"
+            : "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
         )}
       >
         <AltArrowRight
@@ -90,7 +90,7 @@ function DataExtensionNode({
           className={cn(
             "transition-transform text-muted-foreground/70 shrink-0",
             isExpanded ? "rotate-90" : "",
-            isSelected && "text-foreground/70"
+            isSelected && "text-foreground/70",
           )}
         />
         <Database
@@ -98,7 +98,9 @@ function DataExtensionNode({
           weight="Linear"
           className={cn(
             "shrink-0 transition-colors",
-            isSelected ? "text-foreground" : "text-primary/60 group-hover:text-primary"
+            isSelected
+              ? "text-foreground"
+              : "text-primary/60 group-hover:text-primary",
           )}
         />
         <span className="truncate">{dataExtension.name}</span>
@@ -173,15 +175,18 @@ export function WorkspaceSidebar({
     setIsResizing(false);
   }, []);
 
-  const resize = useCallback((e: MouseEvent) => {
-    if (isResizing) {
-      const newWidth = e.clientX;
-      if (newWidth >= 200 && newWidth <= 600) {
-        setWidth(newWidth);
-        localStorage.setItem("workspace-sidebar-width", newWidth.toString());
+  const resize = useCallback(
+    (e: MouseEvent) => {
+      if (isResizing) {
+        const newWidth = e.clientX;
+        if (newWidth >= 200 && newWidth <= 600) {
+          setWidth(newWidth);
+          localStorage.setItem("workspace-sidebar-width", newWidth.toString());
+        }
       }
-    }
-  }, [isResizing]);
+    },
+    [isResizing],
+  );
 
   useEffect(() => {
     window.addEventListener("mousemove", resize);
@@ -196,9 +201,15 @@ export function WorkspaceSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
-  const [focusedItemType, setFocusedItemType] = useState<"de" | "query" | "folder" | null>(null);
-  const [preSearchExpandedFolders, setPreSearchExpandedFolders] = useState<Record<string, boolean>>({});
-  const [preSearchExpandedDEs, setPreSearchExpandedDEs] = useState<Record<string, boolean>>({});
+  const [focusedItemType, setFocusedItemType] = useState<
+    "de" | "query" | "folder" | null
+  >(null);
+  const [preSearchExpandedFolders, setPreSearchExpandedFolders] = useState<
+    Record<string, boolean>
+  >({});
+  const [preSearchExpandedDEs, setPreSearchExpandedDEs] = useState<
+    Record<string, boolean>
+  >({});
   const [activeIndex, setActiveIndex] = useState(-1);
 
   const foldersByParent = useMemo(() => {
@@ -231,10 +242,10 @@ export function WorkspaceSidebar({
 
     if (activeTab === "de") {
       const data = [
-        ...folders.map(f => ({ ...f, searchType: "folder" as const })),
-        ...dataExtensions.map(de => ({ ...de, searchType: "de" as const }))
+        ...folders.map((f) => ({ ...f, searchType: "folder" as const })),
+        ...dataExtensions.map((de) => ({ ...de, searchType: "de" as const })),
       ];
-      
+
       const fuse = new Fuse(data, {
         keys: ["name"],
         threshold: 0.35,
@@ -243,24 +254,35 @@ export function WorkspaceSidebar({
         minMatchCharLength: 1,
       });
 
-      return fuse.search(searchQuery).map(result => ({
-        id: result.item.id,
-        name: result.item.name,
-        type: result.item.searchType,
-        path: getFolderPath(folders, result.item.searchType === "folder" ? (result.item as Folder).parentId : (result.item as DataExtension).folderId),
-      })).slice(0, 50);
+      return fuse
+        .search(searchQuery)
+        .map((result) => ({
+          id: result.item.id,
+          name: result.item.name,
+          type: result.item.searchType,
+          path: getFolderPath(
+            folders,
+            result.item.searchType === "folder"
+              ? (result.item as Folder).parentId
+              : (result.item as DataExtension).folderId,
+          ),
+        }))
+        .slice(0, 50);
     } else {
       const fuse = new Fuse(savedQueries, {
         keys: ["name"],
         threshold: 0.35,
       });
 
-      return fuse.search(searchQuery).map(result => ({
-        id: result.item.id,
-        name: result.item.name,
-        type: "query" as const,
-        path: getFolderPath(folders, result.item.folderId),
-      })).slice(0, 50);
+      return fuse
+        .search(searchQuery)
+        .map((result) => ({
+          id: result.item.id,
+          name: result.item.name,
+          type: "query" as const,
+          path: getFolderPath(folders, result.item.folderId),
+        }))
+        .slice(0, 50);
     }
   }, [activeTab, searchQuery, folders, dataExtensions, savedQueries]);
 
@@ -277,14 +299,14 @@ export function WorkspaceSidebar({
     setActiveIndex(-1);
 
     const newExpandedFolders = { ...expandedFolderIds };
-    
+
     let folderIdToResolve: string | null = null;
     if (type === "de") {
-      const de = dataExtensions.find(d => d.id === id);
+      const de = dataExtensions.find((d) => d.id === id);
       folderIdToResolve = de?.folderId ?? null;
-      setExpandedDeIds(prev => ({ ...prev, [id]: true }));
+      setExpandedDeIds((prev) => ({ ...prev, [id]: true }));
     } else if (type === "query") {
-      const q = savedQueries.find(query => query.id === id);
+      const q = savedQueries.find((query) => query.id === id);
       folderIdToResolve = q?.folderId ?? null;
     } else {
       folderIdToResolve = id;
@@ -292,7 +314,7 @@ export function WorkspaceSidebar({
 
     if (folderIdToResolve) {
       const ancestors = getFolderAncestors(folders, folderIdToResolve);
-      ancestors.forEach(f => {
+      ancestors.forEach((f) => {
         newExpandedFolders[f.id] = true;
       });
     }
@@ -319,10 +341,12 @@ export function WorkspaceSidebar({
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex(prev => (prev + 1) % searchResults.length);
+      setActiveIndex((prev) => (prev + 1) % searchResults.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
+      setActiveIndex(
+        (prev) => (prev - 1 + searchResults.length) % searchResults.length,
+      );
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
       const result = searchResults[activeIndex];
@@ -333,24 +357,27 @@ export function WorkspaceSidebar({
     }
   };
 
-  const isVisible = (id: string, type: "folder" | "de" | "query", parentId: string | null) => {
+  const isVisible = (id: string, type: "folder" | "de" | "query") => {
     if (!focusedItemId) return true;
 
     if (type === "folder") {
       if (focusedItemId === id && focusedItemType === "folder") return true;
-      
+
       let targetFolderId: string | null = null;
       if (focusedItemType === "de") {
-        targetFolderId = dataExtensions.find(de => de.id === focusedItemId)?.folderId ?? null;
+        targetFolderId =
+          dataExtensions.find((de) => de.id === focusedItemId)?.folderId ??
+          null;
       } else if (focusedItemType === "query") {
-        targetFolderId = savedQueries.find(q => q.id === focusedItemId)?.folderId ?? null;
+        targetFolderId =
+          savedQueries.find((q) => q.id === focusedItemId)?.folderId ?? null;
       } else {
         targetFolderId = focusedItemId;
       }
 
       if (targetFolderId) {
         const ancestors = getFolderAncestors(folders, targetFolderId);
-        return ancestors.some(a => a.id === id);
+        return ancestors.some((a) => a.id === id);
       }
       return false;
     }
@@ -363,12 +390,18 @@ export function WorkspaceSidebar({
       (folder) => folder.parentId === parentId && folder.type === "library",
     );
 
-    const visibleFolders = currentFolders.filter(f => isVisible(f.id, "folder", parentId));
+    const visibleFolders = currentFolders.filter((f) =>
+      isVisible(f.id, "folder"),
+    );
     const visibleQueries = savedQueries
       .filter((query) => query.folderId === parentId)
-      .filter(q => isVisible(q.id, "query", parentId));
+      .filter((q) => isVisible(q.id, "query"));
 
-    if (focusedItemId && visibleFolders.length === 0 && visibleQueries.length === 0) {
+    if (
+      focusedItemId &&
+      visibleFolders.length === 0 &&
+      visibleQueries.length === 0
+    ) {
       return null;
     }
 
@@ -381,7 +414,7 @@ export function WorkspaceSidebar({
       >
         {visibleFolders.sort(sortByName).map((folder) => (
           <div key={folder.id} className="space-y-0.5">
-            <div 
+            <div
               className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-hover cursor-pointer group rounded"
               title={folder.name}
             >
@@ -395,38 +428,38 @@ export function WorkspaceSidebar({
           </div>
         ))}
 
-        {visibleQueries
-          .sort(sortByName)
-          .map((query) => (
-            <button
-              key={query.id}
-              type="button"
-              onClick={() => onSelectQuery?.(query.id)}
-              title={query.name}
+        {visibleQueries.sort(sortByName).map((query) => (
+          <button
+            key={query.id}
+            type="button"
+            onClick={() => onSelectQuery?.(query.id)}
+            title={query.name}
+            className={cn(
+              "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors",
+              focusedItemId === query.id
+                ? "bg-surface-hover text-foreground font-medium"
+                : "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
+            )}
+          >
+            <CodeFile
+              size={16}
+              weight="Linear"
               className={cn(
-                "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors",
-                focusedItemId === query.id 
-                  ? "bg-surface-hover text-foreground font-medium" 
-                  : "text-foreground/80 hover:text-foreground hover:bg-surface-hover"
+                "transition-colors shrink-0",
+                focusedItemId === query.id
+                  ? "text-foreground"
+                  : "text-secondary/60 group-hover:text-secondary",
               )}
-            >
-              <CodeFile
-                size={16}
-                weight="Linear"
-                className={cn(
-                  "transition-colors shrink-0",
-                  focusedItemId === query.id ? "text-foreground" : "text-secondary/60 group-hover:text-secondary"
-                )}
-              />
-              <span className="truncate">{query.name}</span>
-            </button>
-          ))}
+            />
+            <span className="truncate">{query.name}</span>
+          </button>
+        ))}
       </div>
     );
   };
 
   const renderFolderNode = (folder: Folder, depth: number) => {
-    if (!isVisible(folder.id, "folder", folder.parentId)) return null;
+    if (!isVisible(folder.id, "folder")) return null;
 
     const isExpanded = Boolean(expandedFolderIds[folder.id]);
     const childFolders = foldersByParent.get(folder.id) ?? [];
@@ -469,7 +502,7 @@ export function WorkspaceSidebar({
           <div className="ml-3 border-l border-border/50 pl-2 space-y-1">
             {childFolders.map((child) => renderFolderNode(child, depth + 1))}
             {childDataExtensions
-              .filter(de => isVisible(de.id, "de", folder.id))
+              .filter((de) => isVisible(de.id, "de"))
               .map((dataExtension) => (
                 <DataExtensionNode
                   key={dataExtension.id}
@@ -532,7 +565,7 @@ export function WorkspaceSidebar({
   const rootDataExtensions = dataExtensionsByFolder.get(null) ?? [];
 
   return (
-    <div 
+    <div
       ref={sidebarRef}
       style={{ width: `${width}px` }}
       className="relative border-r border-border bg-background flex flex-col shrink-0 animate-fade-in group/sidebar"
@@ -557,7 +590,11 @@ export function WorkspaceSidebar({
               : "border-transparent text-muted-foreground hover:text-foreground",
           )}
         >
-          <Database size={16} weight={activeTab === "de" ? "Bold" : "Linear"} className="shrink-0" />
+          <Database
+            size={16}
+            weight={activeTab === "de" ? "Bold" : "Linear"}
+            className="shrink-0"
+          />
           Data
         </button>
         <button
@@ -591,7 +628,11 @@ export function WorkspaceSidebar({
       <div className="p-2 border-b border-border/50 bg-muted/20">
         <SidebarSearchRoot onOpenChange={setIsSearchOpen}>
           <SidebarSearch
-            placeholder={activeTab === "de" ? "Search Data Extensions..." : "Search Queries..."}
+            placeholder={
+              activeTab === "de"
+                ? "Search Data Extensions..."
+                : "Search Queries..."
+            }
             density="compact"
             value={searchQuery}
             onChange={(e) => {
@@ -604,7 +645,9 @@ export function WorkspaceSidebar({
             onClear={handleClearSearch}
             showClear={Boolean(focusedItemId || searchQuery)}
           />
-          <SidebarSearchResults isOpen={isSearchOpen && searchResults.length > 0}>
+          <SidebarSearchResults
+            isOpen={isSearchOpen && searchResults.length > 0}
+          >
             {searchResults.map((result, idx) => (
               <SidebarSearchResultItem
                 key={`${result.type}-${result.id}`}
@@ -614,9 +657,24 @@ export function WorkspaceSidebar({
               >
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-1.5">
-                    {result.type === "de" && <Database size={14} className="text-primary/70 shrink-0" />}
-                    {result.type === "folder" && <FolderIcon size={14} className="text-muted-foreground/70 shrink-0" />}
-                    {result.type === "query" && <CodeFile size={14} className="text-secondary/70 shrink-0" />}
+                    {result.type === "de" && (
+                      <Database
+                        size={14}
+                        className="text-primary/70 shrink-0"
+                      />
+                    )}
+                    {result.type === "folder" && (
+                      <FolderIcon
+                        size={14}
+                        className="text-muted-foreground/70 shrink-0"
+                      />
+                    )}
+                    {result.type === "query" && (
+                      <CodeFile
+                        size={14}
+                        className="text-secondary/70 shrink-0"
+                      />
+                    )}
                     <span className="font-medium truncate">{result.name}</span>
                   </div>
                   {result.path && (
@@ -653,7 +711,7 @@ export function WorkspaceSidebar({
             <>
               {rootFolders.map((folder) => renderFolderNode(folder, 0))}
               {rootDataExtensions
-                .filter(de => isVisible(de.id, "de", null))
+                .filter((de) => isVisible(de.id, "de"))
                 .map((dataExtension) => (
                   <DataExtensionNode
                     key={dataExtension.id}

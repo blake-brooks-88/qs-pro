@@ -17,7 +17,9 @@ import type { SqlTableReference } from "@/features/editor-workspace/utils/sql-co
  */
 const expandAsterisk = async (
   tablesInScope: SqlTableReference[],
-  getFieldsForTable: (table: SqlTableReference) => Promise<DataExtensionField[]>,
+  getFieldsForTable: (
+    table: SqlTableReference,
+  ) => Promise<DataExtensionField[]>,
 ): Promise<{ success: boolean; columns?: string[]; error?: string }> => {
   // Check for ambiguity: multiple tables without aliases
   const tablesWithoutAliases = tablesInScope.filter((t) => !t.alias);

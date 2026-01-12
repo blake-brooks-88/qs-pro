@@ -47,7 +47,7 @@ describe("AutocompleteConfig", () => {
 
       testCases.forEach((testCase) => {
         const matches = IDENTITY_FIELD_PATTERNS.some((pattern) =>
-          pattern.test(testCase)
+          pattern.test(testCase),
         );
         expect(matches).toBe(true);
       });
@@ -63,7 +63,7 @@ describe("AutocompleteConfig", () => {
 
       testCases.forEach((testCase) => {
         const matches = IDENTITY_FIELD_PATTERNS.some((pattern) =>
-          pattern.test(testCase)
+          pattern.test(testCase),
         );
         expect(matches).toBe(true);
       });
@@ -74,7 +74,7 @@ describe("AutocompleteConfig", () => {
 
       testCases.forEach((testCase) => {
         const matches = IDENTITY_FIELD_PATTERNS.some((pattern) =>
-          pattern.test(testCase)
+          pattern.test(testCase),
         );
         expect(matches).toBe(false);
       });

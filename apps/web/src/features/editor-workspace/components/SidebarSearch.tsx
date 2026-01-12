@@ -14,19 +14,21 @@ const sidebarSearchVariants = cva(
         dense: "h-7",
       },
       variant: {
-        default: "bg-muted/50 border border-transparent focus-within:border-primary/30 focus-within:bg-background focus-within:shadow-sm rounded-md",
+        default:
+          "bg-muted/50 border border-transparent focus-within:border-primary/30 focus-within:bg-background focus-within:shadow-sm rounded-md",
         ghost: "bg-transparent border-none focus-within:bg-muted/30 rounded",
-      }
+      },
     },
     defaultVariants: {
       density: "default",
       variant: "default",
     },
-  }
+  },
 );
 
 export interface SidebarSearchProps
-  extends React.InputHTMLAttributes<HTMLInputElement>,
+  extends
+    React.InputHTMLAttributes<HTMLInputElement>,
     VariantProps<typeof sidebarSearchVariants> {
   onClear?: () => void;
   showClear?: boolean;
@@ -35,23 +37,34 @@ export interface SidebarSearchProps
   rightElement?: React.ReactNode;
 }
 
-export const SidebarSearch = React.forwardRef<HTMLInputElement, SidebarSearchProps>(
-  ({ 
-    className, 
-    containerClassName, 
-    density, 
-    variant, 
-    onClear, 
-    showClear, 
-    leftIcon,
-    rightElement,
-    ...props 
-  }, ref) => {
+export const SidebarSearch = React.forwardRef<
+  HTMLInputElement,
+  SidebarSearchProps
+>(
+  (
+    {
+      className,
+      containerClassName,
+      density,
+      variant,
+      onClear,
+      showClear,
+      leftIcon,
+      rightElement,
+      ...props
+    },
+    ref,
+  ) => {
     const hasValue = Boolean(props.value || props.defaultValue);
     const shouldShowClear = showClear ?? hasValue;
 
     return (
-      <div className={cn(sidebarSearchVariants({ density, variant }), containerClassName)}>
+      <div
+        className={cn(
+          sidebarSearchVariants({ density, variant }),
+          containerClassName,
+        )}
+      >
         <div className="absolute left-3 flex items-center pointer-events-none text-muted-foreground/60 group-focus-within:text-primary/70 transition-colors">
           {leftIcon ?? <Magnifer size={density === "dense" ? 14 : 16} />}
         </div>
@@ -60,7 +73,7 @@ export const SidebarSearch = React.forwardRef<HTMLInputElement, SidebarSearchPro
           ref={ref}
           className={cn(
             "flex h-full w-full bg-transparent pl-10 pr-10 py-1 text-sm outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-50",
-            className
+            className,
           )}
         />
         <div className="absolute right-2 flex items-center gap-1">
@@ -78,7 +91,7 @@ export const SidebarSearch = React.forwardRef<HTMLInputElement, SidebarSearchPro
         </div>
       </div>
     );
-  }
+  },
 );
 
 SidebarSearch.displayName = "SidebarSearch";
@@ -89,10 +102,10 @@ export interface SidebarSearchResultsProps {
   isOpen?: boolean;
 }
 
-export const SidebarSearchResults = ({ 
-  children, 
-  className, 
-  isOpen = false 
+export const SidebarSearchResults = ({
+  children,
+  className,
+  isOpen = false,
 }: SidebarSearchResultsProps) => {
   if (!isOpen) return null;
 
@@ -100,7 +113,7 @@ export const SidebarSearchResults = ({
     <div
       className={cn(
         "absolute z-50 w-full mt-1 max-h-[300px] overflow-y-auto bg-popover text-popover-foreground border border-border shadow-lg rounded-md animate-in fade-in zoom-in-95 duration-100",
-        className
+        className,
       )}
       role="listbox"
     >
@@ -135,8 +148,10 @@ export const SidebarSearchResultItem = ({
       onMouseEnter={onMouseEnter}
       className={cn(
         "px-3 py-2 text-xs cursor-pointer transition-colors",
-        active ? "bg-surface-hover text-foreground font-medium" : "hover:bg-surface-hover text-foreground/90",
-        className
+        active
+          ? "bg-surface-hover text-foreground font-medium"
+          : "hover:bg-surface-hover text-foreground/90",
+        className,
       )}
     >
       {children}
@@ -150,10 +165,10 @@ export interface SidebarSearchRootProps {
   className?: string;
 }
 
-export const SidebarSearchRoot = ({ 
-  children, 
+export const SidebarSearchRoot = ({
+  children,
   onOpenChange,
-  className 
+  className,
 }: SidebarSearchRootProps) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
