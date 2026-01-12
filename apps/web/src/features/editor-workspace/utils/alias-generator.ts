@@ -8,20 +8,16 @@
  */
 export function generateSmartAlias(
   tableName: string,
-  existingAliases: Set<string>
+  existingAliases: Set<string>,
 ): string {
   // Strip brackets if present
   const clean = tableName.replace(/^\[|\]$/g, "").trim();
 
   // Extract words from various formats
-  const words = clean
-    .split(/(?=[A-Z])|[\s_-]+/)
-    .filter(w => w.length > 0);
+  const words = clean.split(/(?=[A-Z])|[\s_-]+/).filter((w) => w.length > 0);
 
   // Generate initials
-  const initials = words
-    .map(w => w[0]?.toLowerCase() || "")
-    .join("");
+  const initials = words.map((w) => w[0]?.toLowerCase() || "").join("");
 
   // Try initials first
   if (initials && !existingAliases.has(initials)) {

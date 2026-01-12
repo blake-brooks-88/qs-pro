@@ -53,7 +53,8 @@ describe("isInsideComment", () => {
   });
 
   it("isInsideComment_CursorInsideBlockComment_ReturnsTrue", () => {
-    const sql = "SELECT * FROM Users /* this is a\nmulti-line| comment */\nWHERE id = 1";
+    const sql =
+      "SELECT * FROM Users /* this is a\nmulti-line| comment */\nWHERE id = 1";
     const cursorIndex = sql.indexOf("|");
     const result = isInsideComment(sql, cursorIndex);
     expect(result).toBe(true);

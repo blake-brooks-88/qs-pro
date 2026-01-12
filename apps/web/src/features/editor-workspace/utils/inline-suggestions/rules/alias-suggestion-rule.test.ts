@@ -14,7 +14,7 @@ const buildContext = (sql: string): InlineSuggestionContext => {
     existingAliases: new Set(
       sqlContext.tablesInScope
         .map((t) => t.alias?.toLowerCase())
-        .filter((a): a is string => Boolean(a))
+        .filter((a): a is string => Boolean(a)),
     ),
     getFieldsForTable: async () => [],
   };

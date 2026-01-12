@@ -11,7 +11,10 @@ export const aliasSuggestionRule: InlineSuggestionRule = {
     const { sqlContext, sql, cursorIndex } = ctx;
 
     // Must be after FROM or JOIN keyword
-    if (sqlContext.lastKeyword !== "join" && sqlContext.lastKeyword !== "from") {
+    if (
+      sqlContext.lastKeyword !== "join" &&
+      sqlContext.lastKeyword !== "from"
+    ) {
       return false;
     }
 
@@ -51,6 +54,7 @@ export const aliasSuggestionRule: InlineSuggestionRule = {
 
     // Strip ENT. prefix for alias generation to use the actual table name
     const tableName = lastTable.name;
+    if (!tableName) return null;
     const nameForAlias = tableName.replace(/^ENT\./i, "");
     const alias = generateSmartAlias(nameForAlias, ctx.existingAliases);
 

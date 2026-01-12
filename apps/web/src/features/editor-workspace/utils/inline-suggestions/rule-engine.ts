@@ -16,10 +16,10 @@ import {
  * First matching rule wins.
  */
 const RULES = [
-  joinKeywordRule,      // Priority 100: INNER → " JOIN"
-  aliasSuggestionRule,  // Priority 80: table → " AS alias"
-  onKeywordRule,        // Priority 70: alias → " ON "
-  joinConditionRule,    // Priority 60: ON → "a.id = b.id"
+  joinKeywordRule, // Priority 100: INNER → " JOIN"
+  aliasSuggestionRule, // Priority 80: table → " AS alias"
+  onKeywordRule, // Priority 70: alias → " ON "
+  joinConditionRule, // Priority 60: ON → "a.id = b.id"
 ];
 
 /**
@@ -34,7 +34,7 @@ const RULES = [
  * - Inside function parentheses
  */
 export async function evaluateInlineSuggestions(
-  ctx: InlineSuggestionContext
+  ctx: InlineSuggestionContext,
 ): Promise<InlineSuggestion | null> {
   // Negative conditions - return early if any match
   if (isInsideString(ctx.sql, ctx.cursorIndex)) return null;

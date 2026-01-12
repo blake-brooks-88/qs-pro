@@ -15,7 +15,7 @@ function createMockContext(
     tablesInScope?: InlineSuggestionContext["tablesInScope"];
     existingAliases?: string[];
     fieldData?: Record<string, DataExtensionField[]>;
-  } = {}
+  } = {},
 ): InlineSuggestionContext {
   const sqlContext = getSqlCursorContext(sql, cursorIndex);
 
@@ -66,7 +66,9 @@ describe("aliasSuggestionRule", () => {
 
       // Act
       const matches = aliasSuggestionRule.matches(ctx);
-      const suggestion = matches ? await aliasSuggestionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await aliasSuggestionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);
@@ -148,7 +150,9 @@ describe("aliasSuggestionRule", () => {
 
       // Act
       const matches = aliasSuggestionRule.matches(ctx);
-      const suggestion = matches ? await aliasSuggestionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await aliasSuggestionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);
@@ -203,7 +207,9 @@ describe("aliasSuggestionRule", () => {
 
       // Act
       const matches = aliasSuggestionRule.matches(ctx);
-      const suggestion = matches ? await aliasSuggestionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await aliasSuggestionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);
@@ -248,19 +254,41 @@ describe("joinConditionRule", () => {
         ],
         fieldData: {
           Users: [
-            { name: "ContactID", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "Name", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "ContactID",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "Name",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
           Contacts: [
-            { name: "SubscriberKey", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "Email", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "SubscriberKey",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "Email",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
         },
       });
 
       // Act
       const matches = joinConditionRule.matches(ctx);
-      const suggestion = matches ? await joinConditionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await joinConditionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);
@@ -301,19 +329,41 @@ describe("joinConditionRule", () => {
         ],
         fieldData: {
           Users: [
-            { name: "ContactID", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "SubscriberKey", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "ContactID",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "SubscriberKey",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
           Contacts: [
-            { name: "SubscriberKey", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "ContactID", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "SubscriberKey",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "ContactID",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
         },
       });
 
       // Act
       const matches = joinConditionRule.matches(ctx);
-      const suggestion = matches ? await joinConditionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await joinConditionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);
@@ -323,7 +373,9 @@ describe("joinConditionRule", () => {
       // Should include alternative with SubscriberKey match
       expect(suggestion?.alternatives).toBeDefined();
       expect(suggestion?.alternatives?.length).toBeGreaterThan(0);
-      expect(suggestion?.alternatives?.some(alt => alt.includes("SubscriberKey"))).toBe(true);
+      expect(
+        suggestion?.alternatives?.some((alt) => alt.includes("SubscriberKey")),
+      ).toBe(true);
     });
 
     it("joinConditionRule_ContactKeyAnd_ContactKey_MatchesIdentityFields", async () => {
@@ -357,19 +409,41 @@ describe("joinConditionRule", () => {
         ],
         fieldData: {
           Orders: [
-            { name: "_ContactKey", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "OrderDate", type: "Date", isPrimaryKey: false, isNullable: true },
+            {
+              name: "_ContactKey",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "OrderDate",
+              type: "Date",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
           Customers: [
-            { name: "ContactKey", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "Name", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "ContactKey",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "Name",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
         },
       });
 
       // Act
       const matches = joinConditionRule.matches(ctx);
-      const suggestion = matches ? await joinConditionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await joinConditionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);
@@ -411,21 +485,53 @@ describe("joinConditionRule", () => {
         ],
         fieldData: {
           Users: [
-            { name: "UserID", type: "Number", isPrimaryKey: true, isNullable: false },
-            { name: "ContactID", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "Name", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "UserID",
+              type: "Number",
+              isPrimaryKey: true,
+              isNullable: false,
+            },
+            {
+              name: "ContactID",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "Name",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
           Contacts: [
-            { name: "UserID", type: "Number", isPrimaryKey: false, isNullable: true },
-            { name: "SubscriberKey", type: "Text", isPrimaryKey: false, isNullable: true },
-            { name: "Email", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "UserID",
+              type: "Number",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "SubscriberKey",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
+            {
+              name: "Email",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
         },
       });
 
       // Act
       const matches = joinConditionRule.matches(ctx);
-      const suggestion = matches ? await joinConditionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await joinConditionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);
@@ -434,9 +540,11 @@ describe("joinConditionRule", () => {
       expect(suggestion?.text).toBe("u.UserID = c.UserID");
       // Identity field alternatives should be included
       expect(suggestion?.alternatives).toBeDefined();
-      expect(suggestion?.alternatives?.some(alt =>
-        alt.includes("ContactID") && alt.includes("SubscriberKey")
-      )).toBe(true);
+      expect(
+        suggestion?.alternatives?.some(
+          (alt) => alt.includes("ContactID") && alt.includes("SubscriberKey"),
+        ),
+      ).toBe(true);
     });
 
     it("joinConditionRule_NoExactMatch_SuggestsIdKeySuffixFields", async () => {
@@ -470,19 +578,41 @@ describe("joinConditionRule", () => {
         ],
         fieldData: {
           Orders: [
-            { name: "OrderID", type: "Number", isPrimaryKey: true, isNullable: false },
-            { name: "CustomerID", type: "Number", isPrimaryKey: false, isNullable: true },
+            {
+              name: "OrderID",
+              type: "Number",
+              isPrimaryKey: true,
+              isNullable: false,
+            },
+            {
+              name: "CustomerID",
+              type: "Number",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
           Customers: [
-            { name: "CustomerID", type: "Number", isPrimaryKey: true, isNullable: false },
-            { name: "Name", type: "Text", isPrimaryKey: false, isNullable: true },
+            {
+              name: "CustomerID",
+              type: "Number",
+              isPrimaryKey: true,
+              isNullable: false,
+            },
+            {
+              name: "Name",
+              type: "Text",
+              isPrimaryKey: false,
+              isNullable: true,
+            },
           ],
         },
       });
 
       // Act
       const matches = joinConditionRule.matches(ctx);
-      const suggestion = matches ? await joinConditionRule.getSuggestion(ctx) : null;
+      const suggestion = matches
+        ? await joinConditionRule.getSuggestion(ctx)
+        : null;
 
       // Assert
       expect(matches).toBe(true);

@@ -14,7 +14,7 @@ const makeFields = (names: string[]): DataExtensionField[] =>
 
 const buildContext = (
   sql: string,
-  fieldsByAlias: Record<string, string[]> = {}
+  fieldsByAlias: Record<string, string[]> = {},
 ): InlineSuggestionContext => {
   const cursorIndex = sql.length;
   const sqlContext = getSqlCursorContext(sql, cursorIndex);
@@ -26,7 +26,7 @@ const buildContext = (
     existingAliases: new Set(
       sqlContext.tablesInScope
         .map((t) => t.alias?.toLowerCase())
-        .filter((a): a is string => Boolean(a))
+        .filter((a): a is string => Boolean(a)),
     ),
     getFieldsForTable: async (table) => {
       const alias = table.alias?.toLowerCase() || table.name.toLowerCase();
@@ -58,28 +58,28 @@ describe("joinConditionRule", () => {
   });
 
   test("getSuggestion_WithMatchingFields_ReturnsSuggestion", async () => {
-    const ctx = buildContext(
-      "SELECT * FROM [A] a JOIN [B] b ON ",
-      { a: ["customerId", "name"], b: ["customerId", "email"] }
-    );
+    const ctx = buildContext("SELECT * FROM [A] a JOIN [B] b ON ", {
+      a: ["customerId", "name"],
+      b: ["customerId", "email"],
+    });
     const suggestion = await joinConditionRule.getSuggestion(ctx);
     expect(suggestion?.text).toBe("a.customerId = b.customerId");
   });
 
   test("getSuggestion_WithNoMatchingFields_ReturnsNull", async () => {
-    const ctx = buildContext(
-      "SELECT * FROM [A] a JOIN [B] b ON ",
-      { a: ["id"], b: ["email"] }
-    );
+    const ctx = buildContext("SELECT * FROM [A] a JOIN [B] b ON ", {
+      a: ["id"],
+      b: ["email"],
+    });
     const suggestion = await joinConditionRule.getSuggestion(ctx);
     expect(suggestion).toBeNull();
   });
 
   test("getSuggestion_PrioritizesExactMatch", async () => {
-    const ctx = buildContext(
-      "SELECT * FROM [A] a JOIN [B] b ON ",
-      { a: ["SubscriberKey", "EmailAddress"], b: ["SubscriberKey", "email"] }
-    );
+    const ctx = buildContext("SELECT * FROM [A] a JOIN [B] b ON ", {
+      a: ["SubscriberKey", "EmailAddress"],
+      b: ["SubscriberKey", "email"],
+    });
     const suggestion = await joinConditionRule.getSuggestion(ctx);
     // Should match SubscriberKey exactly, not fuzzy match EmailAddress to email
     expect(suggestion?.text).toContain("SubscriberKey");

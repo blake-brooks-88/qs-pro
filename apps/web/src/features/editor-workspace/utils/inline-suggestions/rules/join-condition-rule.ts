@@ -71,7 +71,7 @@ export const joinConditionRule: InlineSuggestionRule = {
     // 1. Exact name matches (highest priority)
     for (const leftField of leftFields) {
       const exactMatch = rightFields.find(
-        (r) => r.name.toLowerCase() === leftField.name.toLowerCase()
+        (r) => r.name.toLowerCase() === leftField.name.toLowerCase(),
       );
       if (exactMatch) {
         matches.push({
@@ -83,14 +83,19 @@ export const joinConditionRule: InlineSuggestionRule = {
     }
 
     // 2. SFMC identity field equivalences (e.g., ContactID = SubscriberKey)
-    const leftIdentityFields = leftFields.filter((f) => isIdentityField(f.name));
-    const rightIdentityFields = rightFields.filter((f) => isIdentityField(f.name));
+    const leftIdentityFields = leftFields.filter((f) =>
+      isIdentityField(f.name),
+    );
+    const rightIdentityFields = rightFields.filter((f) =>
+      isIdentityField(f.name),
+    );
 
     for (const leftField of leftIdentityFields) {
       for (const rightField of rightIdentityFields) {
         // Skip if already matched exactly
         const alreadyMatched = matches.some(
-          (m) => m.left.name === leftField.name && m.right.name === rightField.name
+          (m) =>
+            m.left.name === leftField.name && m.right.name === rightField.name,
         );
         if (!alreadyMatched) {
           matches.push({
@@ -104,7 +109,7 @@ export const joinConditionRule: InlineSuggestionRule = {
 
     // 3. Normalized name matches (ID/Key suffixes)
     const rightFieldMap = new Map(
-      rightFields.map((f) => [normalizeField(f.name), f])
+      rightFields.map((f) => [normalizeField(f.name), f]),
     );
 
     for (const leftField of leftFields) {
@@ -114,7 +119,8 @@ export const joinConditionRule: InlineSuggestionRule = {
       if (rightMatch) {
         // Skip if already matched
         const alreadyMatched = matches.some(
-          (m) => m.left.name === leftField.name && m.right.name === rightMatch.name
+          (m) =>
+            m.left.name === leftField.name && m.right.name === rightMatch.name,
         );
         if (!alreadyMatched) {
           matches.push({
@@ -138,9 +144,11 @@ export const joinConditionRule: InlineSuggestionRule = {
     return {
       text: `${leftAlias}.${bestMatch.left.name} = ${rightAlias}.${bestMatch.right.name}`,
       priority: 60,
-      alternatives: matches.slice(1, 4).map(
-        (m) => `${leftAlias}.${m.left.name} = ${rightAlias}.${m.right.name}`
-      ),
+      alternatives: matches
+        .slice(1, 4)
+        .map(
+          (m) => `${leftAlias}.${m.left.name} = ${rightAlias}.${m.right.name}`,
+        ),
     };
   },
 };

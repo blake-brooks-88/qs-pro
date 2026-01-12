@@ -19,7 +19,9 @@ export interface InlineSuggestionContext {
    * Async function to fetch fields for a table.
    * Lazy-loaded to avoid unnecessary API calls.
    */
-  getFieldsForTable: (table: SqlTableReference) => Promise<DataExtensionField[]>;
+  getFieldsForTable: (
+    table: SqlTableReference,
+  ) => Promise<DataExtensionField[]>;
 }
 
 /**
@@ -45,5 +47,7 @@ export interface InlineSuggestionRule {
   /** Check if this rule applies to the current context */
   matches: (ctx: InlineSuggestionContext) => boolean;
   /** Generate the suggestion. Return null to skip this rule. */
-  getSuggestion: (ctx: InlineSuggestionContext) => Promise<InlineSuggestion | null>;
+  getSuggestion: (
+    ctx: InlineSuggestionContext,
+  ) => Promise<InlineSuggestion | null>;
 }
