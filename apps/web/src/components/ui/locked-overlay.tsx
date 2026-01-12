@@ -35,8 +35,12 @@ const lockedChildrenVariants = cva("", {
 });
 
 export interface LockedOverlayProps
-  extends VariantProps<typeof lockedOverlayVariants>,
-    Pick<PremiumBadgeProps, "tier" | "title" | "description" | "ctaLabel" | "onCtaClick"> {
+  extends
+    VariantProps<typeof lockedOverlayVariants>,
+    Pick<
+      PremiumBadgeProps,
+      "tier" | "title" | "description" | "ctaLabel" | "onCtaClick"
+    > {
   locked: boolean;
   children: React.ReactNode;
   badgeSize?: PremiumBadgeProps["size"];

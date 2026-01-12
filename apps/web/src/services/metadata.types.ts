@@ -17,4 +17,3 @@ export interface DataExtensionFieldResponseDto {
   IsPrimaryKey?: boolean | string;
   IsRequired?: boolean | string;
 }
-

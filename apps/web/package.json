@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:preview": "vite --mode preview",
     "build": "tsc && vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 50",
     "typecheck": "tsc --noEmit",

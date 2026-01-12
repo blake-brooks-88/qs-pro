@@ -26,7 +26,9 @@ api.interceptors.response.use(
       if (user && tenant) {
         try {
           // Attempt silent refresh
-          await api.get("/auth/refresh", { _retry: true } as RetriableRequestConfig);
+          await api.get("/auth/refresh", {
+            _retry: true,
+          } as RetriableRequestConfig);
 
           // Retry the original request
           return api(originalRequest);

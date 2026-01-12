@@ -27,4 +27,3 @@ export async function loginWithJwt(jwt: string): Promise<void> {
     { headers: { Accept: "application/json" } },
   );
 }
-

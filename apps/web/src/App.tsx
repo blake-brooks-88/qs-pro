@@ -7,8 +7,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { consumeEmbeddedJwt } from "@/services/embedded-jwt";
 import { getMe, loginWithJwt } from "@/services/auth";
-import type { Tenant, User } from "@/store/auth-store";
-import { isPreviewModeEnabled } from "@/utils/preview-mode";
 
 function isProbablyJwt(candidate: string): boolean {
   return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(candidate);
@@ -39,8 +37,6 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [showLaunchHelp, setShowLaunchHelp] = useState(false);
   const [oauthRedirectAttempted, setOauthRedirectAttempted] = useState(false);
-  const [previewActive, setPreviewActive] = useState(false);
-  const previewEnabled = useMemo(() => isPreviewModeEnabled(), []);
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -55,37 +51,11 @@ function App() {
     let attempt = 0;
     const maxAttempts = 6;
 
-    const seedPreviewAuth = (): void => {
-      const user: User = {
-        id: "preview-user",
-        sfUserId: "preview-user",
-        email: "preview@local.test",
-        name: "Preview User",
-      };
-      const tenant: Tenant = {
-        id: "preview-tenant",
-        eid: "0000000",
-        tssd: "preview",
-      };
-      setAuth(user, tenant, null);
-      setPreviewActive(true);
-      setError(null);
-    };
-
-    if (previewEnabled) {
-      seedPreviewAuth();
-      setIsLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
     const checkAuth = async (): Promise<void> => {
       try {
         const response = await getMe();
         if (cancelled) return;
         setAuth(response.user, response.tenant, response.csrfToken);
-        setPreviewActive(false);
       } catch (err) {
         if (cancelled) return;
         const status = getHttpStatus(err);
@@ -131,10 +101,10 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [setAuth, logout, isEmbedded, oauthRedirectAttempted, previewEnabled]);
+  }, [setAuth, logout, isEmbedded, oauthRedirectAttempted]);
 
   useEffect(() => {
-    if (!isEmbedded || isAuthenticated || previewEnabled) return;
+    if (!isEmbedded || isAuthenticated) return;
 
     let cancelled = false;
     let loginInFlight = false;
@@ -164,11 +134,13 @@ function App() {
 
     const jwtFromQuery =
       typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("jwt")?.trim() ?? null
+        ? (new URLSearchParams(window.location.search).get("jwt")?.trim() ??
+          null)
         : null;
 
     const jwtCandidate =
-      bufferedJwt || (jwtFromQuery && isProbablyJwt(jwtFromQuery) ? jwtFromQuery : null);
+      bufferedJwt ||
+      (jwtFromQuery && isProbablyJwt(jwtFromQuery) ? jwtFromQuery : null);
     if (jwtCandidate) void tryJwtLogin(jwtCandidate);
 
     window.addEventListener("message", handleMessage);
@@ -176,7 +148,7 @@ function App() {
       cancelled = true;
       window.removeEventListener("message", handleMessage);
     };
-  }, [isEmbedded, isAuthenticated, previewEnabled, setAuth]);
+  }, [isEmbedded, isAuthenticated, setAuth]);
 
   if (isLoading) {
     return (
@@ -242,20 +214,7 @@ function App() {
   }
 
   return (
-    <AppShell
-      topNotice={
-        previewActive ? (
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-medium">
-              Preview Mode (no org connection) — using local metadata fixtures.
-            </span>
-            <span className="text-[11px] opacity-80">
-              Disable by unsetting <code className="font-mono">VITE_PREVIEW_MODE</code>
-            </span>
-          </div>
-        ) : null
-      }
-    >
+    <AppShell>
       <EditorWorkspacePage />
       <Toaster />
     </AppShell>

@@ -1,10 +1,5 @@
 import api from "@/services/api";
-import { isPreviewModeEnabled } from "@/utils/preview-mode";
-import {
-  getDataExtensionsPreview,
-  getFieldsPreview,
-  getFoldersPreview,
-} from "@/services/metadata.preview";
+import { getSystemDataViewFields } from "@/services/system-data-views";
 import type {
   DataExtensionFieldResponseDto,
   DataExtensionResponseDto,
@@ -17,10 +12,9 @@ export type {
   DataFolderResponseDto,
 };
 
-export async function getFolders(eid?: string): Promise<DataFolderResponseDto[]> {
-  if (isPreviewModeEnabled()) {
-    return getFoldersPreview();
-  }
+export async function getFolders(
+  eid?: string,
+): Promise<DataFolderResponseDto[]> {
   const { data } = await api.get<DataFolderResponseDto[]>("/metadata/folders", {
     params: eid ? { eid } : undefined,
   });
@@ -30,9 +24,6 @@ export async function getFolders(eid?: string): Promise<DataFolderResponseDto[]>
 export async function getDataExtensions(
   eid: string,
 ): Promise<DataExtensionResponseDto[]> {
-  if (isPreviewModeEnabled()) {
-    return getDataExtensionsPreview(eid);
-  }
   const { data } = await api.get<DataExtensionResponseDto[]>(
     "/metadata/data-extensions",
     { params: { eid } },
@@ -43,9 +34,12 @@ export async function getDataExtensions(
 export async function getFields(
   customerKey: string,
 ): Promise<DataExtensionFieldResponseDto[]> {
-  if (isPreviewModeEnabled()) {
-    return getFieldsPreview(customerKey);
+  // Check if this is a system data view first (always enabled for field lookups)
+  const systemFields = getSystemDataViewFields(customerKey);
+  if (systemFields.length > 0) {
+    return systemFields;
   }
+
   const { data } = await api.get<DataExtensionFieldResponseDto[]>(
     "/metadata/fields",
     { params: { key: customerKey } },

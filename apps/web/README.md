@@ -36,18 +36,23 @@ The API follows a controller/service/repository approach:
 For the canonical standard (and migration guidance for older code paths), see:
 `agent-os/standards/data-access.md`.
 
-## Preview Mode (Local UI without MCE login)
+## Preview Mode (Build-time fixture mode, no API required)
 
-When you don’t have access to an MCE org, the frontend can run in a dev-only preview mode that:
+Preview mode is a Vite `--mode preview` build/dev profile that:
 
-- Renders the editor workspace without an authenticated session
-- Uses local metadata fixtures for Data Extensions + Data Views
-- Does **not** change any backend auth/security behavior
+- Renders the editor workspace with a local sample tenant/session (no MCE login flow)
+- Uses the local sample catalog (folders, Data Extensions, fields, and rows)
+- Makes no `/api/*` calls (API does not need to be running)
+- Keeps preview-only imports/fixtures out of the normal production import graph via Vite alias swapping
 
 Run:
 
-`VITE_PREVIEW_MODE=1 pnpm --filter @qs-pro/web dev`
+`pnpm dev:preview`
 
 Disable:
 
-- Unset `VITE_PREVIEW_MODE` (or set it to something other than `1`)
+- Run the normal dev server: `pnpm --filter @qs-pro/web dev`
+
+Preview catalog:
+
+- Preview metadata is sourced from `apps/web/src/preview/fixtures/preview-catalog.json`.

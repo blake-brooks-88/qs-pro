@@ -54,7 +54,9 @@ describe("FeatureGate", () => {
     await waitFor(() => {
       expect(screen.getByText("Test Button")).toBeInTheDocument();
       // Badge should not be present when feature is enabled
-      expect(screen.queryByRole("button", { name: /feature/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /feature/i }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -76,7 +78,9 @@ describe("FeatureGate", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Test Button")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /pro feature/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /pro feature/i }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -121,7 +125,9 @@ describe("FeatureGate", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Team Snippets Content")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /enterprise feature/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /enterprise feature/i }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -143,7 +149,9 @@ describe("FeatureGate", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Audit Logs")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /enterprise feature/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /enterprise feature/i }),
+      ).toBeInTheDocument();
     });
   });
 });

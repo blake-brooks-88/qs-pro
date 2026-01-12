@@ -51,8 +51,10 @@ const FEATURE_CONFIG: Record<
   },
 };
 
-export interface FeatureGateProps
-  extends Pick<LockedOverlayProps, "variant" | "badgeSize" | "badgePosition"> {
+export interface FeatureGateProps extends Pick<
+  LockedOverlayProps,
+  "variant" | "badgeSize" | "badgePosition"
+> {
   feature: FeatureKey;
   children: ReactNode;
   onUpgradeClick?: () => void;

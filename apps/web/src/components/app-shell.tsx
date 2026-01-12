@@ -29,7 +29,9 @@ export function AppShell({ children, topNotice }: AppShellProps) {
           {topNotice}
         </div>
       ) : null}
-      <main className="flex-1 flex flex-col min-h-0 relative z-20">{children}</main>
+      <main className="flex-1 flex flex-col min-h-0 relative z-20">
+        {children}
+      </main>
     </div>
   );
 }
