@@ -2,7 +2,6 @@ import type { InlineSuggestionContext, InlineSuggestion } from "./types";
 import { joinKeywordRule } from "./rules/join-keyword-rule";
 import { aliasSuggestionRule } from "./rules/alias-suggestion-rule";
 import { onKeywordRule } from "./rules/on-keyword-rule";
-import { joinConditionRule } from "./rules/join-condition-rule";
 import {
   isInsideString,
   isInsideComment,
@@ -19,7 +18,6 @@ const RULES = [
   joinKeywordRule, // Priority 100: INNER → " JOIN"
   aliasSuggestionRule, // Priority 80: table → " AS alias"
   onKeywordRule, // Priority 70: alias → " ON "
-  joinConditionRule, // Priority 60: ON → "a.id = b.id"
 ];
 
 /**

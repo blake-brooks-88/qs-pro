@@ -32,8 +32,12 @@ describe("aliasSuggestionRule", () => {
   });
 
   test("matches_AfterFromTableNoAlias_ReturnsTrue", () => {
-    // Should suggest aliases after FROM tables too
     const ctx = buildContext("SELECT * FROM [Orders] ");
+    expect(aliasSuggestionRule.matches(ctx)).toBe(true);
+  });
+
+  test("matches_AfterUnbracketedTableName_ReturnsTrue", () => {
+    const ctx = buildContext("SELECT * FROM Orders");
     expect(aliasSuggestionRule.matches(ctx)).toBe(true);
   });
 
@@ -84,10 +88,23 @@ describe("aliasSuggestionRule", () => {
   });
 
   test("getSuggestion_AvoidsCollision_WithExistingAlias", async () => {
-    // "a" is already taken by first table
     const ctx = buildContext("SELECT * FROM [Alpha] a JOIN [Accounts] ");
     const suggestion = await aliasSuggestionRule.getSuggestion(ctx);
-    // Should not be "a" since it's taken, should be "acco" or "a2"
-    expect(suggestion?.text).not.toBe(" AS a");
+    expect(suggestion?.text).toBe(" AS acco");
+  });
+
+  test("getSuggestion_ReturnsNull_WhenNoMeaningfulAlias", async () => {
+    const ctx = buildContext("SELECT * FROM [Orders] o JOIN [Omega] ");
+    ctx.existingAliases.add("omeg");
+    const suggestion = await aliasSuggestionRule.getSuggestion(ctx);
+    expect(suggestion).toBeNull();
+  });
+
+  test("getSuggestion_CapsInitials_ForLongTableNames", async () => {
+    const ctx = buildContext(
+      "SELECT * FROM [IdMap_ContactKey_ContactID_Extended] ",
+    );
+    const suggestion = await aliasSuggestionRule.getSuggestion(ctx);
+    expect(suggestion?.text).toBe(" AS imc");
   });
 });
