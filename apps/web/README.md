@@ -36,3 +36,18 @@ The API follows a controller/service/repository approach:
 For the canonical standard (and migration guidance for older code paths), see:
 `agent-os/standards/data-access.md`.
 
+## Preview Mode (Local UI without MCE login)
+
+When you don’t have access to an MCE org, the frontend can run in a dev-only preview mode that:
+
+- Renders the editor workspace without an authenticated session
+- Uses local metadata fixtures for Data Extensions + Data Views
+- Does **not** change any backend auth/security behavior
+
+Run:
+
+`VITE_PREVIEW_MODE=1 pnpm --filter @qs-pro/web dev`
+
+Disable:
+
+- Unset `VITE_PREVIEW_MODE` (or set it to something other than `1`)

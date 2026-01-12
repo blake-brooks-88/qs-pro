@@ -1,26 +1,26 @@
 import api from "@/services/api";
+import { isPreviewModeEnabled } from "@/utils/preview-mode";
+import {
+  getDataExtensionsPreview,
+  getFieldsPreview,
+  getFoldersPreview,
+} from "@/services/metadata.preview";
+import type {
+  DataExtensionFieldResponseDto,
+  DataExtensionResponseDto,
+  DataFolderResponseDto,
+} from "@/services/metadata.types";
 
-export interface DataFolderResponseDto {
-  ID?: string | number;
-  Name?: string;
-  ParentFolder?: { ID?: string | number } | null;
-}
-
-export interface DataExtensionResponseDto {
-  CustomerKey?: string;
-  Name?: string;
-  CategoryID?: string | number;
-}
-
-export interface DataExtensionFieldResponseDto {
-  Name?: string;
-  FieldType?: string;
-  MaxLength?: number | string;
-  IsPrimaryKey?: boolean | string;
-  IsRequired?: boolean | string;
-}
+export type {
+  DataExtensionFieldResponseDto,
+  DataExtensionResponseDto,
+  DataFolderResponseDto,
+};
 
 export async function getFolders(eid?: string): Promise<DataFolderResponseDto[]> {
+  if (isPreviewModeEnabled()) {
+    return getFoldersPreview();
+  }
   const { data } = await api.get<DataFolderResponseDto[]>("/metadata/folders", {
     params: eid ? { eid } : undefined,
   });
@@ -30,6 +30,9 @@ export async function getFolders(eid?: string): Promise<DataFolderResponseDto[]>
 export async function getDataExtensions(
   eid: string,
 ): Promise<DataExtensionResponseDto[]> {
+  if (isPreviewModeEnabled()) {
+    return getDataExtensionsPreview(eid);
+  }
   const { data } = await api.get<DataExtensionResponseDto[]>(
     "/metadata/data-extensions",
     { params: { eid } },
@@ -40,10 +43,12 @@ export async function getDataExtensions(
 export async function getFields(
   customerKey: string,
 ): Promise<DataExtensionFieldResponseDto[]> {
+  if (isPreviewModeEnabled()) {
+    return getFieldsPreview(customerKey);
+  }
   const { data } = await api.get<DataExtensionFieldResponseDto[]>(
     "/metadata/fields",
     { params: { key: customerKey } },
   );
   return data;
 }
-
