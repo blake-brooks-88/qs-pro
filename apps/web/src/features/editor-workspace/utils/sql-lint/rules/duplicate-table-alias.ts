@@ -6,16 +6,17 @@ import { MC } from "@/constants/marketing-cloud";
 /**
  * Detects duplicate table aliases in FROM and JOIN clauses.
  */
-const getDuplicateTableAliasDiagnostics = (
-  sql: string,
-): SqlDiagnostic[] => {
+const getDuplicateTableAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
   const diagnostics: SqlDiagnostic[] = [];
   const references = extractTableReferences(sql).filter(
     (ref) => !ref.isSubquery && ref.alias,
   );
 
   // Track aliases we've seen and their positions
-  const aliasMap = new Map<string, { alias: string; startIndex: number; endIndex: number }[]>();
+  const aliasMap = new Map<
+    string,
+    { alias: string; startIndex: number; endIndex: number }[]
+  >();
 
   for (const ref of references) {
     if (!ref.alias) continue;
@@ -35,7 +36,7 @@ const getDuplicateTableAliasDiagnostics = (
   }
 
   // Report duplicates
-  for (const [_aliasLower, occurrences] of aliasMap) {
+  for (const occurrences of aliasMap.values()) {
     if (occurrences.length > 1) {
       // Mark all occurrences after the first as errors
       for (let i = 1; i < occurrences.length; i++) {

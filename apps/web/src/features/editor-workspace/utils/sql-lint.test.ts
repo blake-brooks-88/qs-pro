@@ -38,9 +38,11 @@ describe("sql lint", () => {
     const diagnostics = lintSql(sql);
 
     // Assert
-    expect(diagnostics.some((diag) => diag.message.includes("Common Table Expressions"))).toBe(
-      true,
-    );
+    expect(
+      diagnostics.some((diag) =>
+        diag.message.includes("Common Table Expressions"),
+      ),
+    ).toBe(true);
   });
 
   test("lintSql_WithTempTable_ReturnsWarningDiagnostic", () => {
@@ -169,7 +171,9 @@ describe("sql lint", () => {
 
     // Assert
     expect(
-      diagnostics.some((diag) => diag.message.includes("exists in multiple tables")),
+      diagnostics.some((diag) =>
+        diag.message.includes("exists in multiple tables"),
+      ),
     ).toBe(true);
   });
 
@@ -217,7 +221,9 @@ describe("sql lint", () => {
 
     // Assert
     expect(
-      diagnostics.some((diag) => diag.message.includes("exists in multiple tables")),
+      diagnostics.some((diag) =>
+        diag.message.includes("exists in multiple tables"),
+      ),
     ).toBe(false);
   });
 
@@ -275,7 +281,9 @@ describe("sql lint", () => {
 
     // Assert
     expect(
-      diagnostics.some((diag) => diag.message.includes("exists in multiple tables")),
+      diagnostics.some((diag) =>
+        diag.message.includes("exists in multiple tables"),
+      ),
     ).toBe(true);
   });
 
@@ -477,7 +485,8 @@ describe("sql lint", () => {
       diagnostics.some(
         (diag) =>
           diag.severity === "error" &&
-          (diag.message.includes("OFFSET requires") || diag.message.includes("ORDER BY")),
+          (diag.message.includes("OFFSET requires") ||
+            diag.message.includes("ORDER BY")),
       ),
     ).toBe(true);
   });
@@ -629,25 +638,26 @@ describe("sql lint", () => {
     // Act
     const diagnostics = lintSql(sql, { dataExtensions });
 
-    // Assert - Should detect multiple issues (all are errors now)
+    // Assert - Should detect multiple issues
     const errorDiagnostics = diagnostics.filter(
       (diag) => diag.severity === "error",
     );
+    const warningDiagnostics = diagnostics.filter(
+      (diag) => diag.severity === "warning",
+    );
 
-    // Unbracketed name error (My Data has spaces and is not bracketed) - now an error
-    expect(
-      errorDiagnostics.some((d) => d.message.includes("bracket")),
-    ).toBe(true);
+    // Unbracketed name warning (My Data has spaces and is not bracketed) - per MCE spec
+    expect(warningDiagnostics.some((d) => d.message.includes("bracket"))).toBe(
+      true,
+    );
     // Unsupported function error - now an error
     expect(
-      errorDiagnostics.some((d) =>
-        d.message.includes("not available in MCE"),
-      ),
+      errorDiagnostics.some((d) => d.message.includes("not available in MCE")),
     ).toBe(true);
     // Aggregate GROUP BY error
-    expect(
-      errorDiagnostics.some((d) => d.message.includes("GROUP BY")),
-    ).toBe(true);
+    expect(errorDiagnostics.some((d) => d.message.includes("GROUP BY"))).toBe(
+      true,
+    );
     // LIMIT error
     expect(
       errorDiagnostics.some((d) =>
@@ -656,8 +666,10 @@ describe("sql lint", () => {
     ).toBe(true);
     // OFFSET without ORDER BY error (new behavior)
     expect(
-      errorDiagnostics.some((d) =>
-        d.message.includes("OFFSET requires") || d.message.includes("ORDER BY"),
+      errorDiagnostics.some(
+        (d) =>
+          d.message.includes("OFFSET requires") ||
+          d.message.includes("ORDER BY"),
       ),
     ).toBe(true);
   });
@@ -863,9 +875,7 @@ describe("sql lint", () => {
     // Test prohibited keywords (CREATE)
     const sql1 = "CREATE TABLE temp (id INT)";
     const diag1 = lintSql(sql1);
-    expect(diag1.some((diag) => diag.message.includes("read-only"))).toBe(
-      true,
-    );
+    expect(diag1.some((diag) => diag.message.includes("read-only"))).toBe(true);
 
     // Test CTE detection
     const sql2 =
@@ -885,9 +895,7 @@ describe("sql lint", () => {
     // Test aggregate grouping
     const sql4 = "SELECT Region, COUNT(*) FROM [Data]";
     const diag4 = lintSql(sql4);
-    expect(diag4.some((diag) => diag.message.includes("GROUP BY"))).toBe(
-      true,
-    );
+    expect(diag4.some((diag) => diag.message.includes("GROUP BY"))).toBe(true);
 
     // Test LIMIT prohibition
     const sql5 = "SELECT * FROM [Data] LIMIT 100";
@@ -900,7 +908,11 @@ describe("sql lint", () => {
     const sql6 = "SELECT * FROM [Data] OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
     const diag6 = lintSql(sql6);
     expect(
-      diag6.some((diag) => diag.message.includes("OFFSET requires") || diag.message.includes("ORDER BY")),
+      diag6.some(
+        (diag) =>
+          diag.message.includes("OFFSET requires") ||
+          diag.message.includes("ORDER BY"),
+      ),
     ).toBe(true);
   });
 });

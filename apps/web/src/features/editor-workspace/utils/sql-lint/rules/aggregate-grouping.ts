@@ -1,6 +1,5 @@
 import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
-import { MC } from "@/constants/marketing-cloud";
 
 /**
  * SQL aggregate functions that require GROUP BY when mixed with non-aggregated columns.

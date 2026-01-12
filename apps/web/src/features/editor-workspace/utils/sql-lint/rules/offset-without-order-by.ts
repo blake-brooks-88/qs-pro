@@ -6,7 +6,10 @@ import { MC } from "@/constants/marketing-cloud";
  * Checks if there's an ORDER BY clause before the given position in the SQL.
  * This function looks backwards through the SQL to find an ORDER BY within the same query scope.
  */
-const hasOrderByBeforeOffset = (sql: string, offsetPosition: number): boolean => {
+const hasOrderByBeforeOffset = (
+  sql: string,
+  offsetPosition: number,
+): boolean => {
   let index = offsetPosition - 1;
   let inSingleQuote = false;
   let inDoubleQuote = false;
@@ -117,7 +120,7 @@ const hasOrderByBeforeOffset = (sql: string, offsetPosition: number): boolean =>
     // Only look for keywords at the same query level
     if (parenDepth === 0 && isWordChar(char)) {
       // Find the start of the word
-      let wordEnd = index + 1;
+      const wordEnd = index + 1;
       let wordStart = index;
       while (wordStart > 0 && isWordChar(sql[wordStart - 1])) {
         wordStart -= 1;

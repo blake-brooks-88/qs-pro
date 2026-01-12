@@ -1,6 +1,5 @@
 import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
-import { MC } from "@/constants/marketing-cloud";
 
 /**
  * Detects JOIN clauses without ON condition (except CROSS JOIN).
@@ -158,9 +157,12 @@ const getMissingJoinOnDiagnostics = (sql: string): SqlDiagnostic[] => {
             nextWord === "join" ||
             nextWord === "outer" ||
             (joinWords.includes("inner") && nextWord === "join") ||
-            (joinWords.includes("left") && (nextWord === "outer" || nextWord === "join")) ||
-            (joinWords.includes("right") && (nextWord === "outer" || nextWord === "join")) ||
-            (joinWords.includes("full") && (nextWord === "outer" || nextWord === "join")) ||
+            (joinWords.includes("left") &&
+              (nextWord === "outer" || nextWord === "join")) ||
+            (joinWords.includes("right") &&
+              (nextWord === "outer" || nextWord === "join")) ||
+            (joinWords.includes("full") &&
+              (nextWord === "outer" || nextWord === "join")) ||
             (joinWords.includes("cross") && nextWord === "join")
           ) {
             joinWords.push(nextWord);
@@ -202,7 +204,7 @@ const getMissingJoinOnDiagnostics = (sql: string): SqlDiagnostic[] => {
 
     // Look for ON keyword after the JOIN
     // We need to find the next table reference and then check for ON
-    let searchIndex = join.end;
+    const searchIndex = join.end;
     let foundOn = false;
     let foundNextJoin = false;
     let foundClauseEnd = false;
@@ -215,7 +217,12 @@ const getMissingJoinOnDiagnostics = (sql: string): SqlDiagnostic[] => {
     inLineComment = false;
     inBlockComment = false;
 
-    while (checkIndex < sql.length && !foundOn && !foundNextJoin && !foundClauseEnd) {
+    while (
+      checkIndex < sql.length &&
+      !foundOn &&
+      !foundNextJoin &&
+      !foundClauseEnd
+    ) {
       const char = sql[checkIndex];
       const nextChar = sql[checkIndex + 1];
 

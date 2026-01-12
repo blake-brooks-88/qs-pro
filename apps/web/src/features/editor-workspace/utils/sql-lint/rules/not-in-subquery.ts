@@ -107,7 +107,7 @@ const getNotInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
 
         // Check if followed by IN
         if (pos < sql.length && isWordChar(sql[pos])) {
-          let inWordStart = pos;
+          const inWordStart = pos;
           let inWordEnd = pos + 1;
           while (inWordEnd < sql.length && isWordChar(sql[inWordEnd])) {
             inWordEnd += 1;
@@ -131,7 +131,7 @@ const getNotInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
 
               // Check if it's a SELECT subquery
               if (selectPos < sql.length && isWordChar(sql[selectPos])) {
-                let selectWordStart = selectPos;
+                const selectWordStart = selectPos;
                 let selectWordEnd = selectPos + 1;
                 while (
                   selectWordEnd < sql.length &&

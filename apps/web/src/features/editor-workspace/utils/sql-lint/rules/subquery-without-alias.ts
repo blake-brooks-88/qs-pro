@@ -149,7 +149,11 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (char === ")") {
       // Check if this closes a subquery in FROM
       const currentSubquery = subqueryStack[subqueryStack.length - 1];
-      if (currentSubquery && currentSubquery.depth === parenDepth && currentSubquery.isInFrom) {
+      if (
+        currentSubquery &&
+        currentSubquery.depth === parenDepth &&
+        currentSubquery.isInFrom
+      ) {
         // Mark the closing paren position
         currentSubquery.closeParenPos = index;
 
@@ -175,7 +179,10 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
             while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
               lookAhead += 1;
             }
-            if (lookAhead < sql.length && (isWordChar(sql[lookAhead]) || sql[lookAhead] === "[")) {
+            if (
+              lookAhead < sql.length &&
+              (isWordChar(sql[lookAhead]) || sql[lookAhead] === "[")
+            ) {
               hasAlias = true;
             }
           } else if (

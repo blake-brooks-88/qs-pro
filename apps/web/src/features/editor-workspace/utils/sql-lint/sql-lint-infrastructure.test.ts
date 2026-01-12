@@ -53,9 +53,9 @@ describe("linter infrastructure", () => {
 
     // Assert
     expect(diagnostics.length).toBeGreaterThan(0);
-    expect(
-      diagnostics.some((diag) => diag.message.includes("read-only")),
-    ).toBe(true);
+    expect(diagnostics.some((diag) => diag.message.includes("read-only"))).toBe(
+      true,
+    );
   });
 
   test("LintContext_Construction_IncludesTokensAndDataExtensions", () => {

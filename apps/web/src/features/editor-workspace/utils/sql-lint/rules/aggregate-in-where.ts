@@ -1,14 +1,7 @@
 import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
-import { MC } from "@/constants/marketing-cloud";
 
-const AGGREGATE_FUNCTIONS = new Set([
-  "count",
-  "sum",
-  "avg",
-  "min",
-  "max",
-]);
+const AGGREGATE_FUNCTIONS = new Set(["count", "sum", "avg", "min", "max"]);
 
 /**
  * Detects aggregate functions (COUNT, SUM, AVG, MIN, MAX) in WHERE clause.

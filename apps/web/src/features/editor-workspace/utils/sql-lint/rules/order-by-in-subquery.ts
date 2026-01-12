@@ -197,7 +197,10 @@ const getOrderByInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
             const nextWord = sql.slice(lookAhead, lookAhead + 2).toLowerCase();
             if (nextWord === "by") {
               // Found ORDER BY in subquery
-              currentContext.orderByPositions.push({ start, end: lookAhead + 2 });
+              currentContext.orderByPositions.push({
+                start,
+                end: lookAhead + 2,
+              });
             }
           }
         }

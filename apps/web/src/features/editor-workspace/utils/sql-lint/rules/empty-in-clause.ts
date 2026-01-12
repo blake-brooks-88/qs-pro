@@ -119,7 +119,6 @@ const getEmptyInClauseDiagnostics = (sql: string): SqlDiagnostic[] => {
         if (parenIndex < sql.length && sql[parenIndex] === "(") {
           // Found opening paren, check if it's followed immediately by closing paren
           let closingIndex = parenIndex + 1;
-          let hasContent = false;
 
           // Skip whitespace inside parentheses
           while (closingIndex < sql.length && /\s/.test(sql[closingIndex])) {

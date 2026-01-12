@@ -1032,7 +1032,7 @@ export function isInsideFunctionParens(
 ): boolean {
   let inSingleQuote = false;
   let inDoubleQuote = false;
-  let parenStack: Array<{ isFunction: boolean }> = [];
+  const parenStack: Array<{ isFunction: boolean }> = [];
 
   for (let i = 0; i < cursorIndex && i < sql.length; i++) {
     const char = sql[i];

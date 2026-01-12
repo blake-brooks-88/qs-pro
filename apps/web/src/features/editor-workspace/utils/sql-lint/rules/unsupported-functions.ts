@@ -134,9 +134,7 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
           const message = alternative
             ? `${word.toUpperCase()}() is not available in ${MC.SHORT}. ${alternative}`
             : `${word.toUpperCase()}() is not available in ${MC.SHORT}. There is no direct equivalent.`;
-          diagnostics.push(
-            createDiagnostic(message, "error", start, end),
-          );
+          diagnostics.push(createDiagnostic(message, "error", start, end));
         }
       }
 

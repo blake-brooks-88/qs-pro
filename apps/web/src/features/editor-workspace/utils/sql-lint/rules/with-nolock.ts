@@ -116,7 +116,7 @@ const getWithNolockDiagnostics = (sql: string): SqlDiagnostic[] => {
 
           // Check for NOLOCK
           if (innerPos < sql.length && isWordChar(sql[innerPos])) {
-            let wordStart = innerPos;
+            const wordStart = innerPos;
             let wordEnd = innerPos + 1;
             while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
               wordEnd += 1;

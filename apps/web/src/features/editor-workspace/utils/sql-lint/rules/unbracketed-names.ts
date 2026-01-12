@@ -1,7 +1,6 @@
 import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic } from "../utils/helpers";
 import { extractTableReferences } from "../../sql-context";
-import { MC } from "@/constants/marketing-cloud";
 
 const getUnbracketedSpaceWarnings = (
   sql: string,
@@ -33,7 +32,7 @@ const getUnbracketedSpaceWarnings = (
     .map(({ reference }) =>
       createDiagnostic(
         "Data Extension names with spaces or hyphens must be wrapped in brackets. Example: `FROM [My Data Extension]` or `FROM [My-Data-Extension]`.",
-        "error",
+        "warning",
         reference.startIndex,
         reference.endIndex,
       ),

@@ -68,10 +68,13 @@ const extractColumnAliases = (sql: string): ColumnAlias[] => {
 
   // Find end of SELECT clause
   const afterSelect = cleanSql.slice(selectStart);
-  const clauseMatch = afterSelect.match(/\b(FROM|WHERE|ORDER|GROUP|HAVING|UNION|EXCEPT|INTERSECT)\b/i);
-  const selectEnd = clauseMatch && clauseMatch.index !== undefined
-    ? selectStart + clauseMatch.index
-    : cleanSql.length;
+  const clauseMatch = afterSelect.match(
+    /\b(FROM|WHERE|ORDER|GROUP|HAVING|UNION|EXCEPT|INTERSECT)\b/i,
+  );
+  const selectEnd =
+    clauseMatch && clauseMatch.index !== undefined
+      ? selectStart + clauseMatch.index
+      : cleanSql.length;
 
   const selectClause = cleanSql.slice(selectStart, selectEnd);
 
@@ -145,13 +148,28 @@ const extractTableAliases = (sql: string): Set<string> => {
 
   // Pattern: FROM [TableName] alias or FROM [TableName] AS alias
   // Also handles: JOIN [TableName] alias
-  const tableAliasPattern = /\b(?:FROM|JOIN)\s+(?:\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_]*)\s+(?:AS\s+)?([A-Za-z_][A-Za-z0-9_]*)\b/gi;
+  const tableAliasPattern =
+    /\b(?:FROM|JOIN)\s+(?:\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_]*)\s+(?:AS\s+)?([A-Za-z_][A-Za-z0-9_]*)\b/gi;
 
   let match: RegExpExecArray | null;
   while ((match = tableAliasPattern.exec(cleanSql)) !== null) {
     const alias = match[1].toLowerCase();
     // Skip keywords that might be matched
-    if (!["on", "where", "and", "or", "join", "left", "right", "inner", "outer", "cross", "full"].includes(alias)) {
+    if (
+      ![
+        "on",
+        "where",
+        "and",
+        "or",
+        "join",
+        "left",
+        "right",
+        "inner",
+        "outer",
+        "cross",
+        "full",
+      ].includes(alias)
+    ) {
       tableAliases.add(alias);
     }
   }

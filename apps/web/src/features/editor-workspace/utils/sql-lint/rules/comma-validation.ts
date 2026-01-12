@@ -1,6 +1,5 @@
 import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
-import { MC } from "@/constants/marketing-cloud";
 
 const CLAUSE_KEYWORDS = new Set([
   "from",
@@ -244,7 +243,9 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
         while (nextWordEnd < sql.length && isWordChar(sql[nextWordEnd])) {
           nextWordEnd += 1;
         }
-        const nextWord = sql.slice(nextWordStartActual, nextWordEnd).toLowerCase();
+        const nextWord = sql
+          .slice(nextWordStartActual, nextWordEnd)
+          .toLowerCase();
         if (nextWord === "by") {
           inSelectClause = false;
           inGroupByClause = true;
@@ -261,14 +262,21 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
         while (nextWordEnd < sql.length && isWordChar(sql[nextWordEnd])) {
           nextWordEnd += 1;
         }
-        const nextWord = sql.slice(nextWordStartActual, nextWordEnd).toLowerCase();
+        const nextWord = sql
+          .slice(nextWordStartActual, nextWordEnd)
+          .toLowerCase();
         if (nextWord === "by") {
           inSelectClause = false;
           inGroupByClause = false;
           inOrderByClause = true;
           lastCommaIndex = -1;
         }
-      } else if (word === "having" || word === "union" || word === "intersect" || word === "except") {
+      } else if (
+        word === "having" ||
+        word === "union" ||
+        word === "intersect" ||
+        word === "except"
+      ) {
         if (parenDepth === 0) {
           inSelectClause = false;
           inGroupByClause = false;

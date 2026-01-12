@@ -165,12 +165,16 @@ describe("commaValidationRule", () => {
     });
 
     test("lintSql_WithCommaInLineComment_IgnoresIt", () => {
-      const diagnostics = checkRule("SELECT a -- comment with , comma\n FROM [T]");
+      const diagnostics = checkRule(
+        "SELECT a -- comment with , comma\n FROM [T]",
+      );
       expect(diagnostics).toHaveLength(0);
     });
 
     test("lintSql_WithCommaInBlockComment_IgnoresIt", () => {
-      const diagnostics = checkRule("SELECT a /* comment with , comma */ FROM [T]");
+      const diagnostics = checkRule(
+        "SELECT a /* comment with , comma */ FROM [T]",
+      );
       expect(diagnostics).toHaveLength(0);
     });
 
@@ -180,7 +184,9 @@ describe("commaValidationRule", () => {
     });
 
     test("lintSql_WithCommaInSubquery_IgnoresIt", () => {
-      const diagnostics = checkRule("SELECT a FROM [T] WHERE x IN (SELECT y, z FROM [T2])");
+      const diagnostics = checkRule(
+        "SELECT a FROM [T] WHERE x IN (SELECT y, z FROM [T2])",
+      );
       expect(diagnostics).toHaveLength(0);
     });
 
@@ -196,8 +202,12 @@ describe("commaValidationRule", () => {
       const diagnostics = checkRule("SELECT a,, b, FROM [T]");
       expect(diagnostics.length).toBeGreaterThan(0);
       // Should detect both double comma and trailing comma before FROM
-      const hasDoubleComma = diagnostics.some((d) => d.message.includes("Double comma"));
-      const hasTrailingComma = diagnostics.some((d) => d.message.includes("Trailing comma"));
+      const hasDoubleComma = diagnostics.some((d) =>
+        d.message.includes("Double comma"),
+      );
+      const hasTrailingComma = diagnostics.some((d) =>
+        d.message.includes("Trailing comma"),
+      );
       expect(hasDoubleComma).toBe(true);
       expect(hasTrailingComma).toBe(true);
     });

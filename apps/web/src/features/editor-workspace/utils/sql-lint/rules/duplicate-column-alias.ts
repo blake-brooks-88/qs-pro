@@ -62,10 +62,13 @@ const extractColumnAliases = (sql: string): ColumnAlias[] => {
 
   // Find end of SELECT clause
   const afterSelect = cleanSql.slice(selectStart);
-  const clauseMatch = afterSelect.match(/\b(FROM|WHERE|ORDER|GROUP|HAVING|UNION|EXCEPT|INTERSECT)\b/i);
-  const selectEnd = clauseMatch && clauseMatch.index !== undefined
-    ? selectStart + clauseMatch.index
-    : cleanSql.length;
+  const clauseMatch = afterSelect.match(
+    /\b(FROM|WHERE|ORDER|GROUP|HAVING|UNION|EXCEPT|INTERSECT)\b/i,
+  );
+  const selectEnd =
+    clauseMatch && clauseMatch.index !== undefined
+      ? selectStart + clauseMatch.index
+      : cleanSql.length;
 
   const selectClause = cleanSql.slice(selectStart, selectEnd);
 

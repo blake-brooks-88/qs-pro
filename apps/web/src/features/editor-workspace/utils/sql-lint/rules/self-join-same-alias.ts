@@ -7,7 +7,10 @@ import { MC } from "@/constants/marketing-cloud";
  * Normalizes table names for comparison (removes brackets, lowercases).
  */
 const normalizeTableName = (name: string): string => {
-  return name.replace(/^\[|\]$/g, "").trim().toLowerCase();
+  return name
+    .replace(/^\[|\]$/g, "")
+    .trim()
+    .toLowerCase();
 };
 
 /**
@@ -22,12 +25,15 @@ const getSelfJoinSameAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
   if (references.length < 2) return diagnostics;
 
   // Track table names and their aliases
-  const tableOccurrences = new Map<string, Array<{
-    alias: string | undefined;
-    startIndex: number;
-    endIndex: number;
-    name: string;
-  }>>();
+  const tableOccurrences = new Map<
+    string,
+    Array<{
+      alias: string | undefined;
+      startIndex: number;
+      endIndex: number;
+      name: string;
+    }>
+  >();
 
   for (const ref of references) {
     const normalizedName = normalizeTableName(ref.name);
@@ -42,7 +48,7 @@ const getSelfJoinSameAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
   }
 
   // Check for self-joins
-  for (const [tableName, occurrences] of tableOccurrences) {
+  for (const occurrences of tableOccurrences.values()) {
     if (occurrences.length < 2) continue;
 
     // This is a self-join - check if aliases are distinct

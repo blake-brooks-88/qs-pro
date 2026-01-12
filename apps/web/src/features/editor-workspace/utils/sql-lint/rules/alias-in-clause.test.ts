@@ -42,7 +42,8 @@ describe("aliasInClauseRule", () => {
     });
 
     it("should detect alias in ORDER BY with ASC/DESC", () => {
-      const sql = "SELECT created_date AS created FROM [Events] ORDER BY created DESC";
+      const sql =
+        "SELECT created_date AS created FROM [Events] ORDER BY created DESC";
       const diagnostics = aliasInClauseRule.check(createContext(sql));
 
       expect(diagnostics).toHaveLength(1);
@@ -52,7 +53,8 @@ describe("aliasInClauseRule", () => {
 
   describe("detects alias in GROUP BY clause", () => {
     it("should detect alias used in GROUP BY", () => {
-      const sql = "SELECT category AS cat, COUNT(*) FROM [Products] GROUP BY cat";
+      const sql =
+        "SELECT category AS cat, COUNT(*) FROM [Products] GROUP BY cat";
       const diagnostics = aliasInClauseRule.check(createContext(sql));
 
       expect(diagnostics).toHaveLength(1);
@@ -63,7 +65,8 @@ describe("aliasInClauseRule", () => {
 
   describe("detects alias in HAVING clause", () => {
     it("should detect alias used in HAVING", () => {
-      const sql = "SELECT type, COUNT(*) AS cnt FROM [Items] GROUP BY type HAVING cnt > 5";
+      const sql =
+        "SELECT type, COUNT(*) AS cnt FROM [Items] GROUP BY type HAVING cnt > 5";
       const diagnostics = aliasInClauseRule.check(createContext(sql));
 
       expect(diagnostics).toHaveLength(1);
@@ -106,7 +109,8 @@ describe("aliasInClauseRule", () => {
     });
 
     it("should handle queries without aliases", () => {
-      const sql = "SELECT amount, status FROM [Orders] WHERE amount > 100 ORDER BY status";
+      const sql =
+        "SELECT amount, status FROM [Orders] WHERE amount > 100 ORDER BY status";
       const diagnostics = aliasInClauseRule.check(createContext(sql));
 
       expect(diagnostics).toHaveLength(0);
@@ -115,7 +119,8 @@ describe("aliasInClauseRule", () => {
 
   describe("handles bracketed aliases", () => {
     it("should detect bracketed alias in ORDER BY", () => {
-      const sql = "SELECT name AS [Full Name] FROM [Contacts] ORDER BY [Full Name]";
+      const sql =
+        "SELECT name AS [Full Name] FROM [Contacts] ORDER BY [Full Name]";
       const diagnostics = aliasInClauseRule.check(createContext(sql));
 
       expect(diagnostics).toHaveLength(1);
@@ -124,7 +129,8 @@ describe("aliasInClauseRule", () => {
     });
 
     it("should detect bracketed alias in WHERE", () => {
-      const sql = "SELECT price AS [Unit Price] FROM [Products] WHERE [Unit Price] > 50";
+      const sql =
+        "SELECT price AS [Unit Price] FROM [Products] WHERE [Unit Price] > 50";
       const diagnostics = aliasInClauseRule.check(createContext(sql));
 
       expect(diagnostics).toHaveLength(1);
@@ -202,7 +208,8 @@ describe("aliasInClauseRule", () => {
     });
 
     it("should not flag aliases in string literals", () => {
-      const sql = "SELECT name AS alias FROM [Table] WHERE description = 'alias is used'";
+      const sql =
+        "SELECT name AS alias FROM [Table] WHERE description = 'alias is used'";
       const diagnostics = aliasInClauseRule.check(createContext(sql));
 
       expect(diagnostics).toHaveLength(0);
