@@ -17,10 +17,7 @@ import {
   getEditorOptions,
   MONACO_THEME_NAME,
 } from "@/features/editor-workspace/utils/monaco-options";
-import {
-  IMMEDIATE_TRIGGER_CHARS,
-  MIN_TRIGGER_CHARS,
-} from "@/features/editor-workspace/constants/autocomplete-config";
+import { MIN_TRIGGER_CHARS } from "@/features/editor-workspace/constants/autocomplete-config";
 import {
   buildDataExtensionSuggestions,
   buildFieldSuggestions,
@@ -58,7 +55,6 @@ const SQL_KEYWORDS = [
   "GROUP BY",
   "ORDER BY",
   "HAVING",
-  "LIMIT",
   "DISTINCT",
   "TOP",
   "ASC",
@@ -266,7 +262,7 @@ export function MonacoQueryEditor({
       completionDisposableRef.current?.dispose();
       completionDisposableRef.current =
         monacoInstance.languages.registerCompletionItemProvider("sql", {
-          triggerCharacters: [".", "["],
+          triggerCharacters: [".", "[", "_"],
           provideCompletionItems: async (
             model,
             position,
@@ -390,13 +386,25 @@ export function MonacoQueryEditor({
             const triggerChar = completionContext.triggerCharacter;
             const currentWord = sqlContext.currentWord || "";
 
-            // For immediate trigger chars (. [ _), allow 1-char minimum
+            const hasSystemDataViewsLoaded = dataExtensionsRef.current.some(
+              (de) =>
+                (de.name?.startsWith("_") ?? false) ||
+                (de.customerKey?.startsWith("_") ?? false),
+            );
+
+            // Only treat "_" as an immediate trigger when system data views are available.
+            // This avoids noisy suggestions in tenants without data views enabled.
             const isImmediateContext =
-              triggerChar &&
-              IMMEDIATE_TRIGGER_CHARS.includes(triggerChar as never);
+              triggerChar === "." ||
+              triggerChar === "[" ||
+              (triggerChar === "_" && hasSystemDataViewsLoaded);
 
             // For general typing, require 2+ chars
-            if (!isImmediateContext && currentWord.length < MIN_TRIGGER_CHARS) {
+            if (
+              !isExplicitTrigger &&
+              !isImmediateContext &&
+              currentWord.length < MIN_TRIGGER_CHARS
+            ) {
               return { suggestions: [] };
             }
 
@@ -536,10 +544,19 @@ export function MonacoQueryEditor({
                         ? "Fields: —"
                         : `Fields: ${countResults[index]}`,
                     range,
-                    sortText: `2-${suggestion.label}`,
+                    // Prioritize tables/data views over keywords in FROM/JOIN context.
+                    sortText: `0-${suggestion.label}`,
                   };
                 });
-                return { suggestions: [...suggestions, ...keywordSuggestions] };
+                const adjustedKeywordSuggestions = keywordSuggestions.map(
+                  (keywordSuggestion) => ({
+                    ...keywordSuggestion,
+                    sortText: `9-${keywordSuggestion.label}`,
+                  }),
+                );
+                return {
+                  suggestions: [...suggestions, ...adjustedKeywordSuggestions],
+                };
               }
             }
 
@@ -673,10 +690,21 @@ export function MonacoQueryEditor({
           { open: "/*", close: "*/" },
         ],
         onEnterRules: [
-          // After SELECT/FROM/WHERE/JOIN - indent next line
           {
             beforeText:
-              /^\s*(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|FULL\s+JOIN|GROUP\s+BY|ORDER\s+BY|HAVING)\b.*$/i,
+              /^\s*SELECT(\s+DISTINCT)?(\s+TOP\s+\d+)?\s*$/i,
+            action: {
+              indentAction: monacoInstance.languages.IndentAction.Indent,
+            },
+          },
+          {
+            beforeText: /^\s*(FROM|WHERE|JOIN|ON|HAVING)\s*$/i,
+            action: {
+              indentAction: monacoInstance.languages.IndentAction.Indent,
+            },
+          },
+          {
+            beforeText: /^\s*(GROUP\s+BY|ORDER\s+BY)\s*$/i,
             action: {
               indentAction: monacoInstance.languages.IndentAction.Indent,
             },
@@ -728,24 +756,78 @@ export function MonacoQueryEditor({
           if (nextChar.startsWith("[")) return;
 
           autoBracketRef.current = true;
-          editorInstance.executeEdits("auto-bracket", [
-            {
-              range: {
-                startLineNumber: position.lineNumber,
-                startColumn: position.column,
-                endLineNumber: position.lineNumber,
-                endColumn: position.column,
-              },
-              text: "[]",
-            },
-          ]);
-          editorInstance.setPosition({
-            lineNumber: position.lineNumber,
-            column: position.column + 1,
-          });
+          editorInstance.trigger("keyboard", "type", { text: "[" });
           autoBracketRef.current = false;
         },
       );
+
+      editorInstance.onKeyDown((event) => {
+        if (event.keyCode !== monacoInstance.KeyCode.Tab) return;
+        if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
+          return;
+        }
+
+        const model = editorInstance.getModel();
+        const position = editorInstance.getPosition();
+        if (!model || !position) return;
+
+        const offset = model.getOffsetAt(position);
+        const wordInfo = model.getWordUntilPosition(position);
+        const currentWord = wordInfo.word ?? "";
+        const charBefore = model.getValueInRange({
+          startLineNumber: position.lineNumber,
+          startColumn: Math.max(1, position.column - 1),
+          endLineNumber: position.lineNumber,
+          endColumn: position.column,
+        });
+
+        // Only hijack Tab immediately after typing FROM/JOIN (no whitespace yet).
+        // This keeps Tab behavior normal in all other contexts.
+        if (/\s/.test(charBefore)) return;
+
+        // Match partial prefixes: f, fr, fro, from, j, jo, joi, join
+        const fromJoinMatch = currentWord.match(/^(f(r(om?)?)?|j(o(in?)?)?)$/i);
+        const isFromOrJoinPrefix =
+          wordInfo.endColumn === position.column && fromJoinMatch !== null;
+        if (!isFromOrJoinPrefix) return;
+
+        // Determine which keyword to expand to
+        const expandedKeyword = /^f/i.test(currentWord) ? 'FROM' : 'JOIN';
+
+        const sqlContext = getSqlCursorContext(model.getValue(), offset);
+        if (sqlContext.hasFromJoinTable) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        autoBracketRef.current = true;
+        const replacement = `${expandedKeyword} `;
+        editorInstance.executeEdits("auto-bracket-tab", [
+          {
+            range: {
+              startLineNumber: position.lineNumber,
+              startColumn: wordInfo.startColumn,
+              endLineNumber: position.lineNumber,
+              endColumn: wordInfo.endColumn,
+            },
+            text: replacement,
+          },
+        ]);
+        editorInstance.setPosition({
+          lineNumber: position.lineNumber,
+          column: wordInfo.startColumn + replacement.length,
+        });
+
+        const insertOpenBracket = () => {
+          editorInstance.trigger("keyboard", "type", { text: "[" });
+        };
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(insertOpenBracket);
+        } else {
+          setTimeout(insertOpenBracket, 0);
+        }
+
+        autoBracketRef.current = false;
+      });
 
       if (onSave) {
         editorInstance.addCommand(
