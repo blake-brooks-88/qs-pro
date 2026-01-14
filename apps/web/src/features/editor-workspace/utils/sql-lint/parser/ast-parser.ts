@@ -5,30 +5,21 @@
  * from AST analysis. It handles:
  *
  * 1. Syntax errors (parse failures with location info)
- * 2. Policy violations (prohibited statements, CTEs, LIMIT)
+ * 2. Policy violations (prohibited statements, CTEs, LIMIT, unsupported functions)
  * 3. Reserved for future: semantic analysis
  */
 
 import { Parser } from "node-sql-parser";
 import type { SqlDiagnostic } from "../types";
+import {
+  checkPolicyViolations,
+  checkUnsupportedFunctionsViaTokens,
+  type AstStatement,
+} from "./policy";
 
 // Create parser instance - use T-SQL / SQL Server dialect
 const parser = new Parser();
 const DIALECT = "transactsql";
-
-// Statement types that are allowed in MCE Query Studio
-const ALLOWED_STATEMENT_TYPES = new Set(["select"]);
-
-// Statement types that are explicitly prohibited
-const PROHIBITED_STATEMENT_TYPES: Record<string, string> = {
-  insert: "INSERT statements are not allowed in MCE Query Studio.",
-  update: "UPDATE statements are not allowed in MCE Query Studio.",
-  delete: "DELETE statements are not allowed in MCE Query Studio.",
-  create: "CREATE statements are not allowed in MCE Query Studio.",
-  alter: "ALTER statements are not allowed in MCE Query Studio.",
-  drop: "DROP statements are not allowed in MCE Query Studio.",
-  truncate: "TRUNCATE statements are not allowed in MCE Query Studio.",
-};
 
 /**
  * Result of parsing SQL with node-sql-parser
@@ -46,39 +37,16 @@ interface ParseResult {
 }
 
 /**
- * Shape of limit clause in the AST
- * Can be either:
- * - MySQL style: { seperator: '', value: [...] }
- * - T-SQL style: { offset: {...}, fetch: {...} }
- */
-interface LimitClause {
-  /** Present for MySQL LIMIT syntax */
-  value?: unknown[];
-  /** Present for T-SQL OFFSET/FETCH syntax */
-  offset?: unknown;
-  fetch?: unknown;
-  seperator?: string;
-}
-
-/**
- * Basic shape of an AST statement from node-sql-parser.
- * This is a minimal interface covering the properties we need for MCE policy checks.
- */
-interface AstStatement {
-  type: string;
-  with?: unknown[] | null;
-  limit?: LimitClause | null;
-  from?: unknown[] | null;
-}
-
-/**
  * Attempt to parse SQL and return structured result
  */
 function tryParse(sql: string): ParseResult {
   try {
     const ast = parser.astify(sql, { database: DIALECT });
     // Use unknown first to safely cast from node-sql-parser's AST type
-    return { success: true, ast: ast as unknown as AstStatement | AstStatement[] };
+    return {
+      success: true,
+      ast: ast as unknown as AstStatement | AstStatement[],
+    };
   } catch (err) {
     const error = err as Error & {
       location?: {
@@ -137,100 +105,6 @@ function formatParseError(errorMessage: string): string {
 }
 
 /**
- * Check if limit clause is MySQL LIMIT syntax (not T-SQL OFFSET/FETCH)
- */
-function isMySqlLimitClause(limit: LimitClause): boolean {
-  // MySQL LIMIT has 'value' array, T-SQL OFFSET/FETCH has 'offset'/'fetch'
-  return (
-    Array.isArray(limit.value) ||
-    (typeof limit.seperator === "string" && !limit.offset && !limit.fetch)
-  );
-}
-
-/**
- * Check for policy violations in the AST
- */
-function checkPolicyViolations(
-  statements: AstStatement[],
-  sql: string,
-): SqlDiagnostic[] {
-  const diagnostics: SqlDiagnostic[] = [];
-
-  for (const stmt of statements) {
-    // Check statement type
-    const stmtType = stmt.type?.toLowerCase();
-
-    // Prohibited statement types (INSERT, UPDATE, DELETE, etc.)
-    if (stmtType && PROHIBITED_STATEMENT_TYPES[stmtType]) {
-      diagnostics.push({
-        message: PROHIBITED_STATEMENT_TYPES[stmtType],
-        severity: "error",
-        startIndex: 0,
-        endIndex: sql.length,
-      });
-      // Don't check further if statement type is prohibited
-      continue;
-    }
-
-    // Unknown/unsupported statement type
-    if (stmtType && !ALLOWED_STATEMENT_TYPES.has(stmtType)) {
-      diagnostics.push({
-        message: `${stmtType.toUpperCase()} statements are not supported in MCE Query Studio.`,
-        severity: "error",
-        startIndex: 0,
-        endIndex: sql.length,
-      });
-      continue;
-    }
-
-    // Check for CTE (WITH clause)
-    if (stmt.with && Array.isArray(stmt.with) && stmt.with.length > 0) {
-      diagnostics.push({
-        message:
-          "Common Table Expressions (WITH clause) are not supported in MCE Query Studio.",
-        severity: "error",
-        startIndex: 0,
-        endIndex: findKeywordEndPosition(sql, "WITH") ?? sql.length,
-      });
-    }
-
-    // Check for MySQL LIMIT clause (not T-SQL OFFSET/FETCH)
-    // OFFSET/FETCH is valid in MCE, but LIMIT is not
-    if (stmt.limit && isMySqlLimitClause(stmt.limit)) {
-      const limitPos = findKeywordPosition(sql, "LIMIT");
-      diagnostics.push({
-        message:
-          "LIMIT clause is not supported in MCE. Use TOP or OFFSET/FETCH instead.",
-        severity: "error",
-        startIndex: limitPos ?? 0,
-        endIndex: sql.length,
-      });
-    }
-  }
-
-  return diagnostics;
-}
-
-/**
- * Find the start position of a keyword in SQL (case-insensitive, not in strings)
- */
-function findKeywordPosition(sql: string, keyword: string): number | null {
-  const upperSql = sql.toUpperCase();
-  const upperKeyword = keyword.toUpperCase();
-  const index = upperSql.indexOf(upperKeyword);
-  // TODO: More sophisticated check to ensure not in string literal
-  return index >= 0 ? index : null;
-}
-
-/**
- * Find the end position of a keyword in SQL
- */
-function findKeywordEndPosition(sql: string, keyword: string): number | null {
-  const pos = findKeywordPosition(sql, keyword);
-  return pos !== null ? pos + keyword.length : null;
-}
-
-/**
  * Parse SQL and return diagnostics from AST analysis.
  *
  * This is the main entry point for the AST-based linter.
@@ -245,7 +119,18 @@ export function parseAndLint(sql: string): SqlDiagnostic[] {
   const result = tryParse(sql);
 
   if (!result.success) {
-    // Parse failed - create syntax error diagnostic
+    // Parse failed - first check if it's due to unsupported functions
+    // Some functions like TRY_CAST, STRING_SPLIT, OPENJSON cause parse errors
+    // in node-sql-parser because they're not in its grammar
+    const tokenBasedFunctionErrors = checkUnsupportedFunctionsViaTokens(sql);
+
+    if (tokenBasedFunctionErrors.length > 0) {
+      // Found unsupported functions - return those errors instead of generic parse error
+      // This provides better UX by explaining WHY the parse failed
+      return tokenBasedFunctionErrors;
+    }
+
+    // No known unsupported functions - return the parse error
     const error = result.error!;
     const startIndex = error.location?.start?.offset ?? 0;
     const endIndex = error.location?.end?.offset ?? startIndex + 1;
@@ -257,7 +142,6 @@ export function parseAndLint(sql: string): SqlDiagnostic[] {
       endIndex: Math.max(endIndex, startIndex + 1),
     });
 
-    // Can't do policy checks on failed parse
     return diagnostics;
   }
 

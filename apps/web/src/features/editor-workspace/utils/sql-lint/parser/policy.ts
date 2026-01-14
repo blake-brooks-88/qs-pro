@@ -20,37 +20,16 @@ import { MC } from "@/constants/marketing-cloud";
 const ALLOWED_STATEMENT_TYPES = new Set(["select"]);
 
 // Statement types that are explicitly prohibited with specific messages
-const PROHIBITED_STATEMENT_TYPES = new Map<string, string>([
-  [
-    "insert",
-    `${MC.SHORT} SQL is read-only — INSERT statements are not allowed. To add data, use the Query Activity's data action or the ${MC.SHORT} UI.`,
-  ],
-  [
-    "update",
-    `${MC.SHORT} SQL is read-only — UPDATE statements are not allowed. To modify data, use the Query Activity's 'Update' data action.`,
-  ],
-  [
-    "delete",
-    `${MC.SHORT} SQL is read-only — DELETE statements are not allowed.`,
-  ],
-  [
-    "create",
-    `${MC.SHORT} SQL is read-only — CREATE statements (DDL) are not allowed.`,
-  ],
-  [
-    "alter",
-    `${MC.SHORT} SQL is read-only — ALTER statements (DDL) are not allowed.`,
-  ],
-  [
-    "drop",
-    `${MC.SHORT} SQL is read-only — DROP statements (DDL) are not allowed.`,
-  ],
-  [
-    "truncate",
-    `${MC.SHORT} SQL is read-only — TRUNCATE statements are not allowed.`,
-  ],
-  ["merge", `${MC.SHORT} SQL is read-only — MERGE statements are not allowed.`],
-]);
+const PROHIBITED_STATEMENT_TYPES: Record<string, string> = {
+  insert: `${MC.SHORT} SQL is read-only — INSERT statements are not allowed. To add data, use the Query Activity's data action or the ${MC.SHORT} UI.`,
+  update: `${MC.SHORT} SQL is read-only — UPDATE statements are not allowed. To modify data, use the Query Activity's 'Update' data action.`,
+  delete: `${MC.SHORT} SQL is read-only — DELETE statements are not allowed.`,
+  create: `${MC.SHORT} SQL is read-only — CREATE statements (DDL) are not allowed.`,
+  alter: `${MC.SHORT} SQL is read-only — ALTER statements (DDL) are not allowed.`,
+  drop: `${MC.SHORT} SQL is read-only — DROP statements (DDL) are not allowed.`,
+  truncate: `${MC.SHORT} SQL is read-only — TRUNCATE statements are not allowed.`,
+  merge: `${MC.SHORT} SQL is read-only — MERGE statements are not allowed.`,
+};
 
 /**
  * Shape of limit clause in the AST
@@ -186,7 +165,7 @@ function extractFunctionName(func: AstFunction): string | null {
     const nameArr = func.name.name;
     if (Array.isArray(nameArr) && nameArr.length > 0) {
       // Get the last part (function name without schema)
-      const lastPart = nameArr.at(-1);
+      const lastPart = nameArr[nameArr.length - 1];
       if (lastPart && typeof lastPart.value === "string") {
         return lastPart.value.toLowerCase();
       }
@@ -406,7 +385,7 @@ function checkUnsupportedFunctions(
 
   // Check each function against the unsupported list
   for (const func of detectedFunctions) {
-    const alternative = MCE_SQL_UNSUPPORTED_FUNCTIONS.get(func.name);
+    const alternative = MCE_SQL_UNSUPPORTED_FUNCTIONS[func.name];
     if (alternative !== undefined) {
       // Found an unsupported function
       const position = findPatternPosition(sql, func.searchPattern);
@@ -429,12 +408,6 @@ function checkUnsupportedFunctions(
 }
 
 /**
- * Escape special regex characters in a string
- */
-const escapeRegex = (str: string): string =>
-  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/**
  * Token-based fallback detection for unsupported functions that may cause parse errors.
  * This handles functions like TRY_CAST, STRING_SPLIT, OPENJSON which node-sql-parser
  * may not recognize in the T-SQL dialect.
@@ -445,11 +418,11 @@ export function checkUnsupportedFunctionsViaTokens(
   const diagnostics: SqlDiagnostic[] = [];
 
   // Check for each unsupported function using regex to match function call pattern
-  for (const [funcName, alternative] of MCE_SQL_UNSUPPORTED_FUNCTIONS) {
+  for (const [funcName, alternative] of Object.entries(
+    MCE_SQL_UNSUPPORTED_FUNCTIONS,
+  )) {
     // Match function name followed by opening parenthesis, allowing whitespace
-    const escapedFuncName = escapeRegex(funcName);
-    // eslint-disable-next-line security/detect-non-literal-regexp -- funcName from MCE_SQL_UNSUPPORTED_FUNCTIONS Map keys, not user input
-    const pattern = new RegExp(`\\b${escapedFuncName}\\s*\\(`, "gi");
+    const pattern = new RegExp(`\\b${funcName}\\s*\\(`, "gi");
     let match: RegExpExecArray | null;
 
     while ((match = pattern.exec(sql)) !== null) {
@@ -490,12 +463,9 @@ export function checkPolicyViolations(
     const stmtType = stmt.type?.toLowerCase();
 
     // Prohibited statement types (INSERT, UPDATE, DELETE, etc.)
-    const prohibitedMessage = stmtType
-      ? PROHIBITED_STATEMENT_TYPES.get(stmtType)
-      : undefined;
-    if (prohibitedMessage) {
+    if (stmtType && PROHIBITED_STATEMENT_TYPES[stmtType]) {
       diagnostics.push({
-        message: prohibitedMessage,
+        message: PROHIBITED_STATEMENT_TYPES[stmtType],
         severity: "error",
         startIndex: 0,
         endIndex: sql.length,
