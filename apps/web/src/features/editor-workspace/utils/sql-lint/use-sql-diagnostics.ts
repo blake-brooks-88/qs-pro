@@ -14,6 +14,16 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+
+// DEBUG: Enable/disable debug logging
+const DEBUG_DIAGNOSTICS = false;
+
+function debugLog(label: string, ...args: unknown[]) {
+  if (DEBUG_DIAGNOSTICS) {
+    // eslint-disable-next-line no-console
+    console.log(`[SQL-DIAG] ${label}`, ...args);
+  }
+}
 import type { DataExtension } from "@/features/editor-workspace/types";
 import type { SqlDiagnostic } from "./types";
 import { lintSql } from "./index";
@@ -123,6 +133,10 @@ export function useSqlDiagnostics(
     [],
   );
 
+  // State to trigger re-merge when worker results arrive
+  // This avoids stale closure issues - incrementing this causes the merge effect to re-run
+  const [workerVersion, setWorkerVersion] = useState(0);
+
   // Refs for worker management
   const workerRef = useRef<Worker | null>(null);
   const latestRequestIdRef = useRef<string | null>(null);
@@ -130,10 +144,18 @@ export function useSqlDiagnostics(
   const workerDiagnosticsRef = useRef<SqlDiagnostic[]>([]);
 
   // Run legacy linting synchronously - this is immediate feedback
-  const syncDiagnostics = useMemo(
-    () => lintSql(sql, { dataExtensions, cursorPosition }),
-    [sql, dataExtensions, cursorPosition],
-  );
+  const syncDiagnostics = useMemo(() => {
+    const result = lintSql(sql, { dataExtensions, cursorPosition });
+    debugLog("SYNC_LINT", {
+      sqlPreview: sql.substring(0, 50),
+      count: result.length,
+      diagnostics: result.map((d) => ({
+        severity: d.severity,
+        message: d.message.substring(0, 50),
+      })),
+    });
+    return result;
+  }, [sql, dataExtensions, cursorPosition]);
 
   // Check if we have prereq diagnostics (used to suppress worker parse errors)
   const hasPrereqDiagnostics = useMemo(
@@ -159,18 +181,25 @@ export function useSqlDiagnostics(
 
         case "lint-result":
           // Only apply result if it matches the latest request
+          debugLog("WORKER_RESPONSE", {
+            requestId: response.requestId,
+            latestRequestId: latestRequestIdRef.current,
+            isLatest: response.requestId === latestRequestIdRef.current,
+            workerDiagCount: response.diagnostics.length,
+            workerDiagnostics: response.diagnostics.map((d) => ({
+              severity: d.severity,
+              message: d.message.substring(0, 50),
+            })),
+          });
           if (response.requestId === latestRequestIdRef.current) {
             workerDiagnosticsRef.current = response.diagnostics;
-            // Trigger re-merge (will be handled in effect below)
-            setMergedDiagnostics((prev) => {
-              const merged = mergeDiagnostics(
-                syncDiagnostics,
-                response.diagnostics,
-                hasPrereqDiagnostics,
-              );
-              // Only update if changed
-              return diagnosticsEqual(prev, merged) ? prev : merged;
+            // Trigger re-merge via state update - the merge effect will run with CURRENT values
+            // This avoids the stale closure bug where captured values were used
+            debugLog("WORKER_TRIGGER_REMERGE", {
+              workerDiagCount: response.diagnostics.length,
+              note: "Incrementing workerVersion to trigger merge effect with current sync state",
             });
+            setWorkerVersion((v) => v + 1);
           }
           break;
 
@@ -266,18 +295,56 @@ export function useSqlDiagnostics(
     };
   }, [sql, requestWorkerLint]);
 
-  // Effect to merge diagnostics when sync diagnostics change
+  // Effect to merge diagnostics when sync diagnostics change OR when worker results arrive
+  // The workerVersion dependency ensures we re-merge with CURRENT sync state when worker responds
   useEffect(() => {
+    debugLog("MERGE_EFFECT", {
+      trigger: workerVersion > 0 ? "worker_or_sync" : "sync_only",
+      workerVersion,
+      syncCount: syncDiagnostics.length,
+      workerRefCount: workerDiagnosticsRef.current.length,
+      hasPrereq: hasPrereqDiagnostics,
+      syncDiagnostics: syncDiagnostics.map((d) => ({
+        severity: d.severity,
+        message: d.message.substring(0, 50),
+      })),
+      workerDiagnostics: workerDiagnosticsRef.current.map((d) => ({
+        severity: d.severity,
+        message: d.message.substring(0, 50),
+      })),
+    });
     const merged = mergeDiagnostics(
       syncDiagnostics,
       workerDiagnosticsRef.current,
       hasPrereqDiagnostics,
     );
 
+    debugLog("MERGE_EFFECT_RESULT", {
+      mergedCount: merged.length,
+      hasBlocking: merged.some(
+        (d) => d.severity === "error" || d.severity === "prereq",
+      ),
+      merged: merged.map((d) => ({
+        severity: d.severity,
+        message: d.message.substring(0, 50),
+      })),
+    });
+
     setMergedDiagnostics((prev) =>
       diagnosticsEqual(prev, merged) ? prev : merged,
     );
-  }, [syncDiagnostics, hasPrereqDiagnostics, mergeDiagnostics]);
+  }, [syncDiagnostics, hasPrereqDiagnostics, mergeDiagnostics, workerVersion]);
+
+  debugLog("HOOK_RETURN", {
+    mergedCount: mergedDiagnostics.length,
+    hasBlocking: mergedDiagnostics.some(
+      (d) => d.severity === "error" || d.severity === "prereq",
+    ),
+    diagnostics: mergedDiagnostics.map((d) => ({
+      severity: d.severity,
+      message: d.message.substring(0, 50),
+    })),
+  });
 
   return mergedDiagnostics;
 }
