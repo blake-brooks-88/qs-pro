@@ -158,17 +158,22 @@
 .animate-badge-pulse-enterprise {
   animation: badge-pulse-enterprise 2s ease-in-out infinite;
 }
-
-.monaco-de-name {
-  color: var(--syntax-table);
-  font-weight: 600;
 }
 
-.monaco-field-name {
-  color: var(--syntax-field);
+/* Monaco Editor Semantic Decorations - must override Monaco's inline token styles */
+.monaco-editor .monaco-de-name {
+  color: var(--syntax-table) !important;
 }
 
-.monaco-field-alias {
-  color: var(--syntax-alias);
+.monaco-editor .monaco-field-name {
+  color: var(--syntax-field) !important;
 }
+
+.monaco-editor .monaco-field-alias {
+  color: var(--syntax-alias) !important;
+}
+
+.monaco-editor .monaco-error-token {
+  color: var(--error) !important;
+  text-decoration: underline wavy var(--error);
 }

@@ -80,6 +80,12 @@ const SQL_KEYWORDS = [
 const MAX_DE_SUGGESTIONS = 50;
 const MAX_DE_COUNT_FETCH = 10;
 
+const ERROR_DECORATION_RULE_IDS = new Set([
+  "prohibited-keywords",
+  "unsupported-functions",
+  "cte-detection",
+]);
+
 interface MonacoQueryEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -116,9 +122,9 @@ export function MonacoQueryEditor({
   const cursorPositionDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const autoBracketRef = useRef(false);
   const onCursorPositionChangeRef = useRef(onCursorPositionChange);
+  const diagnosticsRef = useRef(diagnostics);
   const queryClient = useQueryClient();
 
-  // Debounce the value to prevent excessive decoration updates during rapid typing
   const debouncedValue = useDebouncedValue(value, 150);
 
   const sharedFolderIds = useMemo(() => getSharedFolderIds(folders), [folders]);
@@ -143,18 +149,15 @@ export function MonacoQueryEditor({
           tenantIdRef.current,
           customerKey,
         );
-        // Check if aborted before making the request
         if (signal?.aborted) {
           return [];
         }
         const result = await queryClient.fetchQuery(options);
-        // Check if aborted after request completes
         if (signal?.aborted) {
           return [];
         }
         return result;
       } catch {
-        // Return empty array if aborted or if there's an error
         if (signal?.aborted) {
           return [];
         }
@@ -250,12 +253,15 @@ export function MonacoQueryEditor({
     onCursorPositionChangeRef.current = onCursorPositionChange;
   }, [onCursorPositionChange]);
 
+  useEffect(() => {
+    diagnosticsRef.current = diagnostics;
+  }, [diagnostics]);
+
   const handleEditorMount: OnMount = useCallback(
     (editorInstance, monacoInstance) => {
       editorRef.current = editorInstance;
       monacoRef.current = monacoInstance;
 
-      // Focus the editor so user can start typing immediately
       editorInstance.focus();
 
       applyMonacoTheme(monacoInstance);
@@ -283,25 +289,20 @@ export function MonacoQueryEditor({
             const sqlContext = getSqlCursorContext(text, cursorIndex);
             const bracketRange = getBracketReplacementRange(model, position);
 
-            // Check if this is an explicit trigger (Ctrl+Space)
             const isExplicitTrigger =
               completionContext.triggerKind ===
               monacoInstance.languages.CompletionTriggerKind.Invoke;
 
-            // Check if cursor is on asterisk in SELECT clause
             const textBefore = text.slice(0, cursorIndex);
             const isOnAsterisk =
               /\bSELECT\s+\*$/i.test(textBefore) ||
               /\bSELECT\s+.*,\s*\*$/i.test(textBefore);
 
-            // Handle asterisk expansion when explicitly triggered
             if (isExplicitTrigger && isOnAsterisk) {
-              // Check for ambiguity: multiple tables without aliases
               const tablesWithoutAliases = sqlContext.tablesInScope.filter(
                 (t) => !t.alias,
               );
               if (tablesWithoutAliases.length > 1) {
-                // Return error as a special completion item
                 const wordInfo = model.getWordUntilPosition(position);
                 const wordRange = new monacoInstance.Range(
                   position.lineNumber,
@@ -325,7 +326,6 @@ export function MonacoQueryEditor({
                 };
               }
 
-              // Build column expansion
               const columnList: string[] = [];
 
               for (const table of sqlContext.tablesInScope) {
@@ -362,7 +362,6 @@ export function MonacoQueryEditor({
               if (columnList.length > 0) {
                 const expandedColumns = columnList.join(",\n  ");
 
-                // Find the asterisk position to replace it
                 const asteriskMatch = textBefore.match(/\*$/);
                 if (asteriskMatch) {
                   const asteriskOffset = textBefore.length - 1;
@@ -392,7 +391,6 @@ export function MonacoQueryEditor({
               }
             }
 
-            // Get the character that triggered completion
             const triggerChar = completionContext.triggerCharacter;
             const currentWord = sqlContext.currentWord || "";
 
@@ -402,14 +400,11 @@ export function MonacoQueryEditor({
                 (de.customerKey?.startsWith("_") ?? false),
             );
 
-            // Only treat "_" as an immediate trigger when system data views are available.
-            // This avoids noisy suggestions in tenants without data views enabled.
             const isImmediateContext =
               triggerChar === "." ||
               triggerChar === "[" ||
               (triggerChar === "_" && hasSystemDataViewsLoaded);
 
-            // For general typing, require 2+ chars
             if (
               !isExplicitTrigger &&
               !isImmediateContext &&
@@ -418,7 +413,6 @@ export function MonacoQueryEditor({
               return { suggestions: [] };
             }
 
-            // Compute word range for suggestions - Monaco uses this to replace the current word
             const wordInfo = model.getWordUntilPosition(position);
             const wordRange = new monacoInstance.Range(
               position.lineNumber,
@@ -427,14 +421,10 @@ export function MonacoQueryEditor({
               position.column,
             );
 
-            // Get contextual keywords for prioritization
             const contextualKeywords = new Set(
               getContextualKeywords(sqlContext.lastKeyword),
             );
 
-            // Build keyword suggestions with sortText prioritization
-            // Note: We don't filter by currentWord here - Monaco handles that internally
-            // This ensures keywords are always available as fallback suggestions
             const keywordsWithBrackets = new Set(["FROM", "JOIN"]);
             const keywordSuggestions = SQL_KEYWORDS.map((keyword) => {
               const needsBrackets = keywordsWithBrackets.has(keyword);
@@ -454,14 +444,11 @@ export function MonacoQueryEditor({
             });
 
             if (sqlContext.aliasBeforeDot) {
-              // Calculate field range explicitly from the dot position
-              // This prevents issues when Monaco's getWordUntilPosition returns wrong boundaries after deletion
               const lineContent = model.getLineContent(position.lineNumber);
               const textBeforeCursor = lineContent.slice(0, position.column - 1);
               const dotIndex = textBeforeCursor.lastIndexOf('.');
 
-              // The range should start right after the dot and end at cursor
-              const fieldStartColumn = dotIndex >= 0 ? dotIndex + 2 : wordInfo.startColumn; // +2 because columns are 1-indexed and we want after the dot
+              const fieldStartColumn = dotIndex >= 0 ? dotIndex + 2 : wordInfo.startColumn;
               const fieldRange = new monacoInstance.Range(
                 position.lineNumber,
                 fieldStartColumn,
@@ -568,7 +555,6 @@ export function MonacoQueryEditor({
                         ? "Fields: —"
                         : `Fields: ${countResults[index]}`,
                     range,
-                    // Prioritize tables/data views over keywords in FROM/JOIN context.
                     sortText: `0-${suggestion.label}`,
                   };
                 });
@@ -624,8 +610,6 @@ export function MonacoQueryEditor({
               };
             }
 
-            // Fallback: return all keywords - Monaco only calls this when triggered
-            // and handles filtering suggestions to match what the user typed
             return { suggestions: keywordSuggestions };
           },
         });
@@ -690,7 +674,6 @@ export function MonacoQueryEditor({
                   insertText: suggestion.text,
                   range: buildInlineRangeForInsertText(suggestion.text),
                 },
-                // Include alternatives if available
                 ...(suggestion.alternatives || []).map((alt) => ({
                   insertText: alt,
                   range: buildInlineRangeForInsertText(alt),
@@ -699,7 +682,6 @@ export function MonacoQueryEditor({
             };
           },
           freeInlineCompletions: () => {},
-          // Monaco 0.52+ may call this instead of freeInlineCompletions
           disposeInlineCompletions: () => {},
         } as Parameters<
           typeof monacoInstance.languages.registerInlineCompletionsProvider
@@ -838,17 +820,13 @@ export function MonacoQueryEditor({
           endColumn: position.column,
         });
 
-        // Only hijack Tab immediately after typing FROM/JOIN (no whitespace yet).
-        // This keeps Tab behavior normal in all other contexts.
         if (/\s/.test(charBefore)) return;
 
-        // Match partial prefixes: f, fr, fro, from, j, jo, joi, join
         const fromJoinMatch = currentWord.match(/^(f(r(om?)?)?|j(o(in?)?)?)$/i);
         const isFromOrJoinPrefix =
           wordInfo.endColumn === position.column && fromJoinMatch !== null;
         if (!isFromOrJoinPrefix) return;
 
-        // Determine which keyword to expand to
         const expandedKeyword = /^f/i.test(currentWord) ? 'FROM' : 'JOIN';
 
         const sqlContext = getSqlCursorContext(model.getValue(), offset);
@@ -972,7 +950,7 @@ export function MonacoQueryEditor({
       (reference) => !reference.isSubquery,
     );
 
-    const decorations = references.map((reference) => {
+    const tableDecorations = references.map((reference) => {
       const start = model.getPositionAt(reference.startIndex);
       const end = model.getPositionAt(reference.endIndex);
       return {
@@ -1007,7 +985,7 @@ export function MonacoQueryEditor({
     });
 
     decorationRef.current = editor.deltaDecorations(decorationRef.current, [
-      ...decorations,
+      ...tableDecorations,
       ...fieldDecorations,
     ]);
   }, [debouncedValue]);
