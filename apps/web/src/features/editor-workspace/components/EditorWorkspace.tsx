@@ -35,7 +35,11 @@ import {
   AltArrowUp,
 } from "@solar-icons/react";
 import { cn } from "@/lib/utils";
-import { lintSql } from "@/features/editor-workspace/utils/sql-lint";
+import {
+  lintSql,
+  hasBlockingDiagnostics as checkHasBlockingDiagnostics,
+  getFirstBlockingDiagnostic,
+} from "@/features/editor-workspace/utils/sql-lint";
 import { formatDiagnosticMessage } from "@/features/editor-workspace/utils/sql-diagnostics";
 import { FeatureGate } from "@/components/FeatureGate";
 
@@ -104,16 +108,21 @@ export function EditorWorkspace({
     () => lintSql(activeTab?.content ?? "", { dataExtensions, cursorPosition }),
     [activeTab?.content, dataExtensions, cursorPosition],
   );
-  const hasBlockingDiagnostics = sqlDiagnostics.length > 0;
-  const blockingDiagnostic = useMemo(() => {
-    if (sqlDiagnostics.length === 0) return null;
-    return (
-      sqlDiagnostics.find((diagnostic) => diagnostic.severity === "error") ??
-      sqlDiagnostics.find((diagnostic) => diagnostic.severity === "warning") ??
-      sqlDiagnostics.find((diagnostic) => diagnostic.severity === "prereq") ??
-      null
-    );
-  }, [sqlDiagnostics]);
+
+  // FIXED: Only "error" and "prereq" severities block execution.
+  // "warning" is advisory only and NEVER blocks execution.
+  const hasBlockingDiagnostics = useMemo(
+    () => checkHasBlockingDiagnostics(sqlDiagnostics),
+    [sqlDiagnostics],
+  );
+
+  // FIXED: Get blocking diagnostic with correct priority (error first, then prereq).
+  // Warnings are excluded from blocking diagnostics.
+  const blockingDiagnostic = useMemo(
+    () => getFirstBlockingDiagnostic(sqlDiagnostics),
+    [sqlDiagnostics],
+  );
+
   const runBlockMessage = useMemo(() => {
     if (!blockingDiagnostic) return null;
     return formatDiagnosticMessage(

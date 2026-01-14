@@ -40,6 +40,13 @@ export type {
   LintContext,
 } from "./types";
 
+export {
+  BLOCKING_SEVERITIES,
+  isBlockingDiagnostic,
+  getFirstBlockingDiagnostic,
+  hasBlockingDiagnostics,
+} from "./types";
+
 interface LintOptions {
   dataExtensions?: DataExtension[];
   cursorPosition?: number;
