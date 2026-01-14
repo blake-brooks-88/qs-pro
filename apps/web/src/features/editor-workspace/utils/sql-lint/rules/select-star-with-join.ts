@@ -251,7 +251,7 @@ const findUnqualifiedSelectStar = (sql: string): SqlDiagnostic[] => {
         diagnostics.push(
           createDiagnostic(
             `SELECT * with JOINs causes ambiguous column errors in ${MC.SHORT}. Specify columns explicitly or use table aliases: \`SELECT a.*, b.SpecificColumn FROM ...\`.`,
-            "warning",
+            "error",
             index,
             index + 1,
           ),

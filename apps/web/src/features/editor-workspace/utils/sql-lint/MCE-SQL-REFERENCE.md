@@ -185,16 +185,22 @@ SFMC SQL is based on SQL Server 2019 with significant restrictions. Marketing Cl
 | TRY_CAST | May not be available |
 | TRY_PARSE | May not be available |
 
-## Best Practice Warnings
+## Best Practices & Blocking Rules
 
-### Syntax Warnings
+### Syntax Rules (Block Execution)
 
-| Issue | Recommendation |
-|-------|----------------|
-| Semicolons (;) | Not required, may cause issues at end of query |
-| SELECT * with JOINs | Specify columns explicitly to avoid ambiguous field errors |
-| Unbracketed names with spaces/hyphens | Always bracket Data Extension names: `[My Data Extension]` |
-| WITH (NOLOCK) | Redundant in SFMC - queries already run in isolation |
+| Issue | Severity | Recommendation |
+|-------|----------|----------------|
+| Semicolons (;) | error | Remove trailing semicolons - MCE often errors on them |
+| SELECT * with JOINs | error | Specify columns explicitly to avoid ambiguous field errors |
+| Unbracketed names with spaces/hyphens | error | Always bracket Data Extension names: `[My Data Extension]` |
+
+### Syntax Warnings (Allow Execution)
+
+| Issue | Severity | Recommendation |
+|-------|----------|----------------|
+| WITH (NOLOCK) | warning | Redundant in SFMC - queries already run in isolation |
+| != operator | warning | Use <> for SQL standard compliance |
 
 ### Performance Considerations
 
@@ -219,6 +225,8 @@ SFMC SQL is based on SQL Server 2019 with significant restrictions. Marketing Cl
 | aggregate-grouping | error | Validates GROUP BY requirements for aggregates |
 | comma-validation | error | Detects invalid comma usage (trailing, leading, double) |
 | alias-in-clause | error | Detects column aliases used in WHERE/HAVING/ORDER BY/GROUP BY |
+| trailing-semicolon | error | Blocks trailing semicolons (MCE often errors on them) |
+| select-star-with-join | error | Blocks SELECT * with JOINs (causes ambiguous column errors) |
 
 ## References
 

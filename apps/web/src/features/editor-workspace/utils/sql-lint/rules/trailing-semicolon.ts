@@ -11,7 +11,7 @@ const getTrailingSemicolonDiagnostics = (sql: string): SqlDiagnostic[] => {
     diagnostics.push(
       createDiagnostic(
         `Trailing semicolon detected. ${MC.SHORT} often errors on trailing semicolons. Remove the semicolon at the end of the query.`,
-        "warning",
+        "error",
         semicolonIndex,
         semicolonIndex + 1,
       ),
