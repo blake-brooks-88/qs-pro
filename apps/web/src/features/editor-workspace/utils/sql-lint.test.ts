@@ -646,8 +646,8 @@ describe("sql lint", () => {
       (diag) => diag.severity === "warning",
     );
 
-    // Unbracketed name warning (My Data has spaces and is not bracketed) - per MCE spec
-    expect(warningDiagnostics.some((d) => d.message.includes("bracket"))).toBe(
+    // Unbracketed name error (My Data has spaces and is not bracketed) - upgraded to error
+    expect(errorDiagnostics.some((d) => d.message.includes("bracket"))).toBe(
       true,
     );
     // Unsupported function error - now an error

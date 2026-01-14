@@ -244,4 +244,63 @@ describe("AST Parser", () => {
       expect(diagnostics[0].message).toContain("comma");
     });
   });
+
+  describe("parseAndLint - Unbracketed DE Name Recovery", () => {
+    test("multi_word_de_name_returns_bracket_guidance", () => {
+      const sql = "SELECT * FROM My Data Extension";
+      const diagnostics = parseAndLint(sql);
+
+      expect(diagnostics.length).toBe(1);
+      expect(diagnostics[0].severity).toBe("error");
+      expect(diagnostics[0].message).toContain("brackets");
+      expect(diagnostics[0].message).toContain("[My Data Extension]");
+    });
+
+    test("four_word_de_name_returns_bracket_guidance", () => {
+      // Multi-word names consistently cause parse errors that we can recover from
+      const sql = "SELECT * FROM My Very Long Name";
+      const diagnostics = parseAndLint(sql);
+
+      expect(diagnostics.length).toBe(1);
+      expect(diagnostics[0].severity).toBe("error");
+      expect(diagnostics[0].message).toContain("brackets");
+    });
+
+    test("ent_prefix_multi_word_returns_bracket_guidance", () => {
+      const sql = "SELECT * FROM ENT.My Data Extension";
+      const diagnostics = parseAndLint(sql);
+
+      expect(diagnostics.length).toBe(1);
+      expect(diagnostics[0].severity).toBe("error");
+      expect(diagnostics[0].message).toContain("ENT.[My Data Extension]");
+    });
+
+    test("regular_syntax_error_still_returns_generic_message", () => {
+      // This should NOT trigger bracket recovery - it's just a syntax error
+      const sql = "SELECT , FROM Contacts";
+      const diagnostics = parseAndLint(sql);
+
+      expect(diagnostics.length).toBe(1);
+      expect(diagnostics[0].severity).toBe("error");
+      // Should be generic parse error, not bracket guidance
+      expect(diagnostics[0].message).not.toContain("brackets");
+    });
+
+    test("two_word_table_alias_does_not_trigger_recovery", () => {
+      // "Contacts c" looks like table + alias, not multi-word DE name
+      // The parser should handle this without bracket recovery
+      const sql = "SELECT * FROM Contacts c WHERE c.ID > 0";
+      const diagnostics = parseAndLint(sql);
+
+      // Should parse successfully (no errors) - Contacts c is valid
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    test("bracketed_name_parses_successfully", () => {
+      const sql = "SELECT * FROM [My Data Extension]";
+      const diagnostics = parseAndLint(sql);
+
+      expect(diagnostics).toHaveLength(0);
+    });
+  });
 });

@@ -16,6 +16,7 @@ import {
   checkUnsupportedFunctionsViaTokens,
   type AstStatement,
 } from "./policy";
+import { tryRecoverUnbracketedDE } from "./unbracketed-de-recovery";
 
 // Create parser instance - use T-SQL / SQL Server dialect
 const parser = new Parser();
@@ -130,8 +131,17 @@ export function parseAndLint(sql: string): SqlDiagnostic[] {
       return tokenBasedFunctionErrors;
     }
 
-    // No known unsupported functions - return the parse error
+    // Check if parse failure is due to unbracketed Data Extension name
     const error = result.error!;
+    const errorOffset = error.location?.start?.offset;
+    const unbracketedRecovery = tryRecoverUnbracketedDE(sql, errorOffset);
+
+    if (unbracketedRecovery.length > 0) {
+      // Found unbracketed DE name - return actionable guidance instead of generic error
+      return unbracketedRecovery;
+    }
+
+    // No known recovery - return the parse error
     const startIndex = error.location?.start?.offset ?? 0;
     const endIndex = error.location?.end?.offset ?? startIndex + 1;
 
