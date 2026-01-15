@@ -15,14 +15,29 @@ export type {
 type PreviewCatalog = {
   folders: DataFolderResponseDto[];
   dataExtensions: DataExtensionResponseDto[];
-  fieldsByKey: Record<string, DataExtensionFieldResponseDto[]>;
+  fieldsByKey: Map<string, DataExtensionFieldResponseDto[]>;
 };
 
-function asPreviewCatalog(value: unknown): PreviewCatalog {
-  return value as PreviewCatalog;
+function parsePreviewCatalog(json: unknown): PreviewCatalog {
+  const data = json as {
+    folders?: DataFolderResponseDto[];
+    dataExtensions?: DataExtensionResponseDto[];
+    fieldsByKey?: Record<string, DataExtensionFieldResponseDto[]>;
+  };
+  const fieldsByKey = new Map<string, DataExtensionFieldResponseDto[]>();
+  if (data.fieldsByKey) {
+    for (const [key, fields] of Object.entries(data.fieldsByKey)) {
+      fieldsByKey.set(key, fields);
+    }
+  }
+  return {
+    folders: data.folders ?? [],
+    dataExtensions: data.dataExtensions ?? [],
+    fieldsByKey,
+  };
 }
 
-const catalog = asPreviewCatalog(previewCatalog);
+const catalog = parsePreviewCatalog(previewCatalog);
 
 export async function getFolders(
   _eid?: string,
@@ -44,5 +59,5 @@ export async function getFields(
   if (systemFields.length > 0) {
     return systemFields;
   }
-  return catalog.fieldsByKey[customerKey] ?? [];
+  return catalog.fieldsByKey.get(customerKey) ?? [];
 }

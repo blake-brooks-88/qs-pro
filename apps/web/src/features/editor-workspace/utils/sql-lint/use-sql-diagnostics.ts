@@ -48,11 +48,11 @@ interface UseSqlDiagnosticsOptions {
 /**
  * Severity priority for sorting (lower is higher priority)
  */
-const SEVERITY_PRIORITY: Record<string, number> = {
-  error: 0,
-  warning: 1,
-  prereq: 2,
-};
+const SEVERITY_PRIORITY = new Map<string, number>([
+  ["error", 0],
+  ["warning", 1],
+  ["prereq", 2],
+]);
 
 /**
  * Create a stable dedupe key for a diagnostic
@@ -87,8 +87,8 @@ function dedupeAndSortDiagnostics(
     }
 
     // 2. severity priority (error > warning > prereq)
-    const aPriority = SEVERITY_PRIORITY[a.severity] ?? 3;
-    const bPriority = SEVERITY_PRIORITY[b.severity] ?? 3;
+    const aPriority = SEVERITY_PRIORITY.get(a.severity) ?? 3;
+    const bPriority = SEVERITY_PRIORITY.get(b.severity) ?? 3;
     if (aPriority !== bPriority) {
       return aPriority - bPriority;
     }
@@ -105,7 +105,9 @@ function diagnosticsEqual(a: SqlDiagnostic[], b: SqlDiagnostic[]): boolean {
   if (a.length !== b.length) return false;
 
   for (let i = 0; i < a.length; i++) {
-    if (createDedupeKey(a[i]) !== createDedupeKey(b[i])) {
+    const itemA = a.at(i);
+    const itemB = b.at(i);
+    if (!itemA || !itemB || createDedupeKey(itemA) !== createDedupeKey(itemB)) {
       return false;
     }
   }

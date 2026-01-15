@@ -13,7 +13,7 @@ export type JoinSuggestionOverride = (options: {
   rightFields: DataExtensionField[];
 }) => JoinSuggestion[];
 
-export type JoinSuggestionOverrides = Record<string, JoinSuggestionOverride>;
+export type JoinSuggestionOverrides = Map<string, JoinSuggestionOverride>;
 
 const normalizeField = (name: string) =>
   name.replace(/[^a-z0-9]/gi, "").toLowerCase();
@@ -29,9 +29,9 @@ const resolveOverrides = (
 ) => {
   const key = getOverrideKey(left, right);
   return (
-    overrides[key] ||
-    overrides[right.qualifiedName.toLowerCase()] ||
-    overrides[left.qualifiedName.toLowerCase()]
+    overrides.get(key) ||
+    overrides.get(right.qualifiedName.toLowerCase()) ||
+    overrides.get(left.qualifiedName.toLowerCase())
   );
 };
 
@@ -65,7 +65,9 @@ const buildFuzzyJoinSuggestions = (
 /**
  * Returns join suggestions for two tables using overrides or fuzzy field matching.
  */
-export const useJoinSuggestions = (overrides: JoinSuggestionOverrides = {}) => {
+export const useJoinSuggestions = (
+  overrides: JoinSuggestionOverrides = new Map(),
+) => {
   return useCallback(
     (options: {
       leftTable: SqlTableReference;

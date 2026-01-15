@@ -20,16 +20,37 @@ import { MC } from "@/constants/marketing-cloud";
 const ALLOWED_STATEMENT_TYPES = new Set(["select"]);
 
 // Statement types that are explicitly prohibited with specific messages
-const PROHIBITED_STATEMENT_TYPES: Record<string, string> = {
-  insert: `${MC.SHORT} SQL is read-only — INSERT statements are not allowed. To add data, use the Query Activity's data action or the ${MC.SHORT} UI.`,
-  update: `${MC.SHORT} SQL is read-only — UPDATE statements are not allowed. To modify data, use the Query Activity's 'Update' data action.`,
-  delete: `${MC.SHORT} SQL is read-only — DELETE statements are not allowed.`,
-  create: `${MC.SHORT} SQL is read-only — CREATE statements (DDL) are not allowed.`,
-  alter: `${MC.SHORT} SQL is read-only — ALTER statements (DDL) are not allowed.`,
-  drop: `${MC.SHORT} SQL is read-only — DROP statements (DDL) are not allowed.`,
-  truncate: `${MC.SHORT} SQL is read-only — TRUNCATE statements are not allowed.`,
-  merge: `${MC.SHORT} SQL is read-only — MERGE statements are not allowed.`,
-};
+const PROHIBITED_STATEMENT_TYPES = new Map<string, string>([
+  [
+    "insert",
+    `${MC.SHORT} SQL is read-only — INSERT statements are not allowed. To add data, use the Query Activity's data action or the ${MC.SHORT} UI.`,
+  ],
+  [
+    "update",
+    `${MC.SHORT} SQL is read-only — UPDATE statements are not allowed. To modify data, use the Query Activity's 'Update' data action.`,
+  ],
+  [
+    "delete",
+    `${MC.SHORT} SQL is read-only — DELETE statements are not allowed.`,
+  ],
+  [
+    "create",
+    `${MC.SHORT} SQL is read-only — CREATE statements (DDL) are not allowed.`,
+  ],
+  [
+    "alter",
+    `${MC.SHORT} SQL is read-only — ALTER statements (DDL) are not allowed.`,
+  ],
+  [
+    "drop",
+    `${MC.SHORT} SQL is read-only — DROP statements (DDL) are not allowed.`,
+  ],
+  [
+    "truncate",
+    `${MC.SHORT} SQL is read-only — TRUNCATE statements are not allowed.`,
+  ],
+  ["merge", `${MC.SHORT} SQL is read-only — MERGE statements are not allowed.`],
+]);
 
 /**
  * Shape of limit clause in the AST
@@ -165,7 +186,7 @@ function extractFunctionName(func: AstFunction): string | null {
     const nameArr = func.name.name;
     if (Array.isArray(nameArr) && nameArr.length > 0) {
       // Get the last part (function name without schema)
-      const lastPart = nameArr[nameArr.length - 1];
+      const lastPart = nameArr.at(-1);
       if (lastPart && typeof lastPart.value === "string") {
         return lastPart.value.toLowerCase();
       }
@@ -469,9 +490,12 @@ export function checkPolicyViolations(
     const stmtType = stmt.type?.toLowerCase();
 
     // Prohibited statement types (INSERT, UPDATE, DELETE, etc.)
-    if (stmtType && Object.hasOwn(PROHIBITED_STATEMENT_TYPES, stmtType)) {
+    const prohibitedMessage = stmtType
+      ? PROHIBITED_STATEMENT_TYPES.get(stmtType)
+      : undefined;
+    if (prohibitedMessage) {
       diagnostics.push({
-        message: PROHIBITED_STATEMENT_TYPES[stmtType],
+        message: prohibitedMessage,
         severity: "error",
         startIndex: 0,
         endIndex: sql.length,

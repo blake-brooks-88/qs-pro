@@ -102,20 +102,21 @@ const parseBoolean = (value?: boolean | string) => {
   return false;
 };
 
+const FIELD_TYPE_MAP = new Map<string, SFMCFieldType>([
+  ["Text", "Text"],
+  ["Number", "Number"],
+  ["Date", "Date"],
+  ["Boolean", "Boolean"],
+  ["Email", "Email"],
+  ["EmailAddress", "Email"],
+  ["Phone", "Phone"],
+  ["Decimal", "Decimal"],
+]);
+
 const mapFieldType = (value?: string): SFMCFieldType => {
   if (!value) return "Text";
   const normalized = value.trim();
-  const fieldTypeMap: Record<string, SFMCFieldType> = {
-    Text: "Text",
-    Number: "Number",
-    Date: "Date",
-    Boolean: "Boolean",
-    Email: "Email",
-    EmailAddress: "Email",
-    Phone: "Phone",
-    Decimal: "Decimal",
-  };
-  return fieldTypeMap[normalized] ?? "Text";
+  return FIELD_TYPE_MAP.get(normalized) ?? "Text";
 };
 
 const mapFolders = (raw: DataFolderResponse[]): Folder[] => {
@@ -218,8 +219,8 @@ const buildMetadataError = (
 ): MetadataLoadError => {
   const title =
     kind === "folders"
-      ? "Couldn’t load Data Extension folders"
-      : "Couldn’t load Data Extensions";
+      ? "Couldn't load Data Extension folders"
+      : "Couldn't load Data Extensions";
 
   if (!axios.isAxiosError(error)) {
     return { kind, title, description: formatErrorDescription(error) };

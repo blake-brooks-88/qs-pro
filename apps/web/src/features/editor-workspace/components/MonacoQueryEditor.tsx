@@ -546,14 +546,16 @@ export function MonacoQueryEditor({
                       })()
                     : wordRange;
 
+                  const fieldCount = countResults.at(index);
+
                   return {
                     label: suggestion.label,
                     insertText,
                     kind: monacoInstance.languages.CompletionItemKind.Struct,
                     detail:
-                      countResults[index] === null
+                      fieldCount === null
                         ? "Fields: —"
-                        : `Fields: ${countResults[index]}`,
+                        : `Fields: ${fieldCount}`,
                     range,
                     sortText: `0-${suggestion.label}`,
                   };

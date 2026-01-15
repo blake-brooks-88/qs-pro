@@ -28,7 +28,7 @@ export const fuzzyMatch = (term: string, candidate: string) => {
   let termIndex = 0;
 
   for (let i = 0; i < normalizedCandidate.length; i += 1) {
-    if (normalizedCandidate[i] === normalizedTerm[termIndex]) {
+    if (normalizedCandidate.charAt(i) === normalizedTerm.charAt(termIndex)) {
       termIndex += 1;
       if (termIndex >= normalizedTerm.length) return true;
     }
@@ -161,5 +161,5 @@ export const resolveTableForAlias = (
 export const getPrimaryTable = (tables: SqlTableReference[]) => {
   if (tables.length === 0) return null;
   const direct = tables.find((table) => !table.isSubquery);
-  return direct ?? tables[0] ?? null;
+  return direct ?? tables.at(0) ?? null;
 };

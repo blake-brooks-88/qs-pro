@@ -245,7 +245,8 @@ const findUnqualifiedSelectStar = (sql: string): SqlDiagnostic[] => {
         lookBack--;
       }
 
-      const isQualified = lookBack >= selectStart && sql.charAt(lookBack) === ".";
+      const isQualified =
+        lookBack >= selectStart && sql.charAt(lookBack) === ".";
 
       if (!isQualified) {
         diagnostics.push(

@@ -26,7 +26,8 @@ function createMockContext(
     existingAliases: new Set(options.existingAliases || []),
     getFieldsForTable: vi.fn(async (table) => {
       const tableName = table.qualifiedName;
-      return options.fieldData?.[tableName] || [];
+      const fieldDataMap = new Map(Object.entries(options.fieldData || {}));
+      return fieldDataMap.get(tableName) || [];
     }),
   };
 }

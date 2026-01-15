@@ -10,10 +10,23 @@ import { useAuthStore } from "@/store/auth-store";
 import previewCatalogJson from "@/preview/fixtures/preview-catalog.json";
 
 type PreviewCatalog = {
-  rowsByKey: Record<string, Record<string, ExecutionCell>[]>;
+  rowsByKey: Map<string, Record<string, ExecutionCell>[]>;
 };
 
-const previewCatalog = previewCatalogJson as unknown as PreviewCatalog;
+function parsePreviewCatalog(json: unknown): PreviewCatalog {
+  const data = json as {
+    rowsByKey?: Record<string, Record<string, ExecutionCell>[]>;
+  };
+  const rowsByKey = new Map<string, Record<string, ExecutionCell>[]>();
+  if (data.rowsByKey) {
+    for (const [key, rows] of Object.entries(data.rowsByKey)) {
+      rowsByKey.set(key, rows);
+    }
+  }
+  return { rowsByKey };
+}
+
+const previewCatalog = parsePreviewCatalog(previewCatalogJson);
 
 const emptyExecutionResult: ExecutionResult = {
   status: "idle",
@@ -26,7 +39,7 @@ const emptyExecutionResult: ExecutionResult = {
 };
 
 function buildColumns(rows: Record<string, ExecutionCell>[]): string[] {
-  const firstRow = rows[0];
+  const firstRow = rows.at(0);
   return firstRow ? Object.keys(firstRow) : [];
 }
 
@@ -44,9 +57,11 @@ function pickDefaultRows(): {
   customerKey: string | null;
   rows: Record<string, ExecutionCell>[];
 } {
-  const keys = Object.keys(previewCatalog.rowsByKey ?? {});
-  const customerKey = keys[0] ?? null;
-  const rows = customerKey ? (previewCatalog.rowsByKey[customerKey] ?? []) : [];
+  const keys = [...previewCatalog.rowsByKey.keys()];
+  const customerKey = keys.at(0) ?? null;
+  const rows = customerKey
+    ? (previewCatalog.rowsByKey.get(customerKey) ?? [])
+    : [];
   return { customerKey, rows };
 }
 

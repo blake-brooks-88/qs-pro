@@ -880,8 +880,8 @@ describe("node-sql-parser Feasibility Spike", () => {
           // Need line-start table to convert
           const lines = sql.split("\n");
           let calculatedOffset = 0;
-          for (let i = 0; i < line - 1; i++) {
-            calculatedOffset += lines[i].length + 1; // +1 for newline
+          for (const lineContent of lines.slice(0, line - 1)) {
+            calculatedOffset += lineContent.length + 1;
           }
           calculatedOffset += column - 1;
           // eslint-disable-next-line no-console
