@@ -8,40 +8,44 @@ import { ShellQueryService } from '../src/shell-query/shell-query.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionGuard } from '../src/auth/session.guard';
-import { RlsContextService } from '../src/database/rls-context.service';
 import { MceBridgeService } from '../src/mce/mce-bridge.service';
 import { createMockShellQueryContext } from './factories';
 import {
-  createDbStub,
   createQueueStub,
-  createRlsContextStub,
   createTenantRepoStub,
   createMceBridgeStub,
   createSessionGuardMock,
+  createShellQueryRunRepoStub,
+  createShellQuerySseServiceStub,
 } from './stubs';
+import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
 
-// Mock dependencies
-const mockQueue = createQueueStub();
-const mockDb = createDbStub();
-const mockRlsContext = createRlsContextStub();
-const mockTenantRepo = createTenantRepoStub();
-const mockMceBridge = createMceBridgeStub();
+let mockQueue: ReturnType<typeof createQueueStub>;
+let mockTenantRepo: ReturnType<typeof createTenantRepoStub>;
+let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+let mockRunRepo: ReturnType<typeof createShellQueryRunRepoStub>;
+let mockSseService: ReturnType<typeof createShellQuerySseServiceStub>;
 
 describe('Shell Query Producer (e2e)', () => {
   let app: NestFastifyApplication;
   let service: ShellQueryService;
 
   beforeEach(async () => {
+    mockQueue = createQueueStub();
+    mockTenantRepo = createTenantRepoStub();
+    mockMceBridge = createMceBridgeStub();
+    mockRunRepo = createShellQueryRunRepoStub();
+    mockSseService = createShellQuerySseServiceStub();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [ShellQueryController],
       providers: [
         ShellQueryService,
         { provide: getQueueToken('shell-query'), useValue: mockQueue },
-        { provide: 'DATABASE', useValue: mockDb },
-        { provide: RlsContextService, useValue: mockRlsContext },
         { provide: 'TENANT_REPOSITORY', useValue: mockTenantRepo },
-        { provide: 'REDIS_CLIENT', useValue: {} },
         { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: 'SHELL_QUERY_RUN_REPOSITORY', useValue: mockRunRepo },
+        { provide: ShellQuerySseService, useValue: mockSseService },
       ],
     })
       .overrideGuard(SessionGuard)
@@ -67,8 +71,7 @@ describe('Shell Query Producer (e2e)', () => {
 
   describe('createRun', () => {
     it('should add a job to the queue with correct payload', async () => {
-      // Mock active runs count to 0
-      mockDb.setWhereResult([{ count: 0 }]);
+      mockRunRepo.countActiveRuns.mockResolvedValue(0);
 
       const context = createMockShellQueryContext();
       const sqlText = 'SELECT * FROM _Subscribers';
@@ -90,13 +93,11 @@ describe('Shell Query Producer (e2e)', () => {
         expect.any(Object),
       );
 
-      // Verify DB insert was called
-      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockRunRepo.createRun).toHaveBeenCalled();
     });
 
     it('should throw if rate limit exceeded', async () => {
-      // Mock active runs count to 10
-      mockDb.setWhereResult([{ count: 10 }]);
+      mockRunRepo.countActiveRuns.mockResolvedValue(10);
 
       const context = createMockShellQueryContext();
       const sqlText = 'SELECT 1';
@@ -109,7 +110,7 @@ describe('Shell Query Producer (e2e)', () => {
     });
 
     it('should generate a unique runId', async () => {
-      mockDb.setWhereResult([{ count: 0 }]); // Reset for each call
+      mockRunRepo.countActiveRuns.mockResolvedValue(0);
       const context = createMockShellQueryContext({
         tenantId: 't1',
         userId: 'u1',
@@ -125,7 +126,7 @@ describe('Shell Query Producer (e2e)', () => {
 
   describe('POST /runs', () => {
     it('should return 201 and runId on success', async () => {
-      mockDb.setWhereResult([{ count: 0 }]);
+      mockRunRepo.countActiveRuns.mockResolvedValue(0);
 
       const res = await app.inject({
         method: 'POST',
@@ -136,12 +137,15 @@ describe('Shell Query Producer (e2e)', () => {
 
       expect(res.statusCode).toBe(201);
       expect(res.json()).toEqual(
-        expect.objectContaining({ runId: expect.any(String), status: 'queued' }),
+        expect.objectContaining({
+          runId: expect.any(String),
+          status: 'queued',
+        }),
       );
     });
 
     it('should return 429 when rate limit exceeded', async () => {
-      mockDb.setWhereResult([{ count: 10 }]);
+      mockRunRepo.countActiveRuns.mockResolvedValue(10);
 
       const res = await app.inject({
         method: 'POST',

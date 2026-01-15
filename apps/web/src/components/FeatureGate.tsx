@@ -69,6 +69,22 @@ export function FeatureGate({
   onUpgradeClick,
 }: FeatureGateProps) {
   const isEnabled = useFeature(feature);
+  /**
+   * ESLINT-DISABLE JUSTIFICATION:
+   * This eslint-disable is an exception to project standards, not a pattern to follow.
+   *
+   * Why this is safe: `feature` is typed as `FeatureKey`, which is a Zod enum defined
+   * in packages/shared-types/src/features.ts with compile-time constant values. The
+   * FEATURE_CONFIG object keys are string literals matching the FeatureKey values.
+   * TypeScript enforces that only valid FeatureKey values can be passed as the `feature`
+   * prop. User input cannot reach this code path because the prop must satisfy the
+   * FeatureKey type at compile time.
+   *
+   * Why not refactor: Converting FEATURE_CONFIG to a Map would add unnecessary
+   * complexity for a simple static lookup table. The fallback value handles any
+   * missing keys gracefully, and the typed prop ensures only valid keys are used.
+   */
+  // eslint-disable-next-line security/detect-object-injection
   const config = FEATURE_CONFIG[feature] ?? {
     title: "Premium Feature",
     description: "Upgrade to unlock this feature.",

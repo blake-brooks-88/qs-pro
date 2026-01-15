@@ -16,29 +16,45 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
   ) {}
 
   async createRun(params: CreateShellQueryRunParams): Promise<void> {
-    await this.rlsContext.runWithTenantContext(params.tenantId, params.mid, async () => {
-      await this.db.insert(shellQueryRuns).values({
-        id: params.id,
-        tenantId: params.tenantId,
-        userId: params.userId,
-        mid: params.mid,
-        snippetName: params.snippetName,
-        sqlTextHash: params.sqlTextHash,
-        status: params.status,
-      });
-    });
+    await this.rlsContext.runWithTenantContext(
+      params.tenantId,
+      params.mid,
+      async () => {
+        await this.db.insert(shellQueryRuns).values({
+          id: params.id,
+          tenantId: params.tenantId,
+          userId: params.userId,
+          mid: params.mid,
+          snippetName: params.snippetName,
+          sqlTextHash: params.sqlTextHash,
+          status: params.status,
+        });
+      },
+    );
   }
 
-  async findRun(runId: string, tenantId: string): Promise<ShellQueryRun | null> {
+  async findRun(
+    runId: string,
+    tenantId: string,
+  ): Promise<ShellQueryRun | null> {
     const results = await this.db
       .select()
       .from(shellQueryRuns)
-      .where(and(eq(shellQueryRuns.id, runId), eq(shellQueryRuns.tenantId, tenantId)));
+      .where(
+        and(
+          eq(shellQueryRuns.id, runId),
+          eq(shellQueryRuns.tenantId, tenantId),
+        ),
+      );
 
     return results[0] ?? null;
   }
 
-  async markCanceled(runId: string, tenantId: string, mid: string): Promise<void> {
+  async markCanceled(
+    runId: string,
+    tenantId: string,
+    mid: string,
+  ): Promise<void> {
     await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
       await this.db
         .update(shellQueryRuns)
@@ -61,4 +77,3 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
     return result[0]?.count ?? 0;
   }
 }
-

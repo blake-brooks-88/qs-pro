@@ -19,8 +19,8 @@ const hasOrderByBeforeOffset = (
   let parenDepth = 0;
 
   while (index >= 0) {
-    const char = sql[index];
-    const prevChar = index > 0 ? sql[index - 1] : "";
+    const char = sql.charAt(index);
+    const prevChar = index > 0 ? sql.charAt(index - 1) : "";
 
     // Handle comments (backwards)
     if (inLineComment) {
@@ -122,7 +122,7 @@ const hasOrderByBeforeOffset = (
       // Find the start of the word
       const wordEnd = index + 1;
       let wordStart = index;
-      while (wordStart > 0 && isWordChar(sql[wordStart - 1])) {
+      while (wordStart > 0 && isWordChar(sql.charAt(wordStart - 1))) {
         wordStart -= 1;
       }
       const word = sql.slice(wordStart, wordEnd).toLowerCase();
@@ -131,7 +131,7 @@ const hasOrderByBeforeOffset = (
       if (word === "by") {
         // Look backwards for ORDER
         let checkIndex = wordStart - 1;
-        while (checkIndex >= 0 && /\s/.test(sql[checkIndex])) {
+        while (checkIndex >= 0 && /\s/.test(sql.charAt(checkIndex))) {
           checkIndex -= 1;
         }
         if (checkIndex >= 4) {
@@ -169,8 +169,8 @@ const getOffsetWithoutOrderByDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -251,7 +251,7 @@ const getOffsetWithoutOrderByDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();

@@ -2,6 +2,145 @@ import type { LintRule, LintContext, SqlDiagnostic } from "../types";
 import { createDiagnostic, isWordChar } from "../utils/helpers";
 import { MC } from "@/constants/marketing-cloud";
 
+const skipWhitespace = (sql: string, index: number): number => {
+  let i = index;
+  while (i < sql.length && /\s/.test(sql.charAt(i))) {
+    i += 1;
+  }
+  return i;
+};
+
+const consumeWord = (
+  sql: string,
+  index: number,
+): { value: string; end: number } | null => {
+  if (index >= sql.length) return null;
+  if (!isWordChar(sql.charAt(index))) return null;
+  const start = index;
+  let end = index + 1;
+  while (end < sql.length && isWordChar(sql.charAt(end))) {
+    end += 1;
+  }
+  return { value: sql.slice(start, end), end };
+};
+
+const consumeBracketIdentifier = (
+  sql: string,
+  index: number,
+): { end: number } | null => {
+  if (sql.charAt(index) !== "[") return null;
+  let i = index + 1;
+  while (i < sql.length) {
+    const char = sql.charAt(i);
+    const nextChar = sql.charAt(i + 1);
+    if (char === "]") {
+      if (nextChar === "]") {
+        i += 2;
+        continue;
+      }
+      return { end: i + 1 };
+    }
+    i += 1;
+  }
+  return null;
+};
+
+const consumeIdentifier = (
+  sql: string,
+  index: number,
+): { end: number } | null => {
+  if (sql.charAt(index) === "[") return consumeBracketIdentifier(sql, index);
+  const word = consumeWord(sql, index);
+  if (!word) return null;
+  return { end: word.end };
+};
+
+const consumeColumnList = (
+  sql: string,
+  index: number,
+): { end: number } | null => {
+  if (sql.charAt(index) !== "(") return null;
+  let i = index + 1;
+  let inBracket = false;
+  let inDoubleQuote = false;
+
+  while (i < sql.length) {
+    const char = sql.charAt(i);
+    const nextChar = sql.charAt(i + 1);
+
+    if (inBracket) {
+      if (char === "]") {
+        if (nextChar === "]") {
+          i += 2;
+          continue;
+        }
+        inBracket = false;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (inDoubleQuote) {
+      if (char === '"') {
+        inDoubleQuote = false;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (char === "[") {
+      inBracket = true;
+      i += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inDoubleQuote = true;
+      i += 1;
+      continue;
+    }
+
+    if (char === ")") {
+      return { end: i + 1 };
+    }
+
+    i += 1;
+  }
+
+  return null;
+};
+
+const consumeKeyword = (
+  sql: string,
+  index: number,
+  keywordLower: string,
+): { end: number } | null => {
+  const slice = sql.slice(index, index + keywordLower.length);
+  if (slice.toLowerCase() !== keywordLower) return null;
+  const nextChar = sql.charAt(index + keywordLower.length);
+  if (nextChar && isWordChar(nextChar)) return null;
+  return { end: index + keywordLower.length };
+};
+
+const looksLikeCte = (sql: string, withKeywordEnd: number): boolean => {
+  let i = skipWhitespace(sql, withKeywordEnd);
+
+  const cteName = consumeIdentifier(sql, i);
+  if (!cteName) return false;
+  i = skipWhitespace(sql, cteName.end);
+
+  const columnList = consumeColumnList(sql, i);
+  if (columnList) {
+    i = skipWhitespace(sql, columnList.end);
+  }
+
+  const asKeyword = consumeKeyword(sql, i, "as");
+  if (!asKeyword) return false;
+  i = skipWhitespace(sql, asKeyword.end);
+
+  return sql.charAt(i) === "(";
+};
+
 const getCteDetectionDiagnostics = (sql: string): SqlDiagnostic[] => {
   const diagnostics: SqlDiagnostic[] = [];
   let index = 0;
@@ -12,8 +151,8 @@ const getCteDetectionDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -94,18 +233,13 @@ const getCteDetectionDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
 
       if (word === "with") {
-        const rest = sql.slice(end);
-        // Improved regex to catch:
-        // 1. WITH cte AS (...)
-        // 2. WITH cte (col1, col2) AS (...)
-        // 3. WITH cte1 AS (...), cte2 AS (...)
-        if (/\s*\w+\s*(\([^)]*\))?\s*AS\s*\(/i.test(rest)) {
+        if (looksLikeCte(sql, end)) {
           diagnostics.push(
             createDiagnostic(
               `WITH (Common Table Expressions) is not supported in ${MC.SHORT}. Use a subquery instead. Example: \`SELECT * FROM (SELECT ... ) AS sub\` instead of \`WITH sub AS (SELECT ...) SELECT * FROM sub\`.`,

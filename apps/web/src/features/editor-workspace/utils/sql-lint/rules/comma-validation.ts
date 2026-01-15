@@ -38,8 +38,8 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
   let clauseStartIndex = -1;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {
@@ -146,7 +146,7 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (lastCommaIndex !== -1) {
         let hasOnlyWhitespace = true;
         for (let i = lastCommaIndex + 1; i < index; i++) {
-          const c = sql[i];
+          const c = sql.charAt(i);
           if (c !== " " && c !== "\t" && c !== "\n" && c !== "\r") {
             hasOnlyWhitespace = false;
             break;
@@ -168,7 +168,7 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (inSelectClause && lastCommaIndex === -1 && clauseStartIndex !== -1) {
         let hasOnlyWhitespace = true;
         for (let i = clauseStartIndex; i < index; i++) {
-          const c = sql[i];
+          const c = sql.charAt(i);
           if (c !== " " && c !== "\t" && c !== "\n" && c !== "\r") {
             hasOnlyWhitespace = false;
             break;
@@ -195,7 +195,7 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -204,7 +204,7 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (CLAUSE_KEYWORDS.has(word) && lastCommaIndex !== -1) {
         let hasOnlyWhitespace = true;
         for (let i = lastCommaIndex + 1; i < start; i++) {
-          const c = sql[i];
+          const c = sql.charAt(i);
           if (c !== " " && c !== "\t" && c !== "\n" && c !== "\r") {
             hasOnlyWhitespace = false;
             break;
@@ -236,11 +236,14 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
       } else if (word === "group" && parenDepth === 0) {
         const nextWordStart = end;
         let nextWordEnd = nextWordStart;
-        while (nextWordEnd < sql.length && /\s/.test(sql[nextWordEnd])) {
+        while (nextWordEnd < sql.length && /\s/.test(sql.charAt(nextWordEnd))) {
           nextWordEnd += 1;
         }
         const nextWordStartActual = nextWordEnd;
-        while (nextWordEnd < sql.length && isWordChar(sql[nextWordEnd])) {
+        while (
+          nextWordEnd < sql.length &&
+          isWordChar(sql.charAt(nextWordEnd))
+        ) {
           nextWordEnd += 1;
         }
         const nextWord = sql
@@ -255,11 +258,14 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
       } else if (word === "order" && parenDepth === 0) {
         const nextWordStart = end;
         let nextWordEnd = nextWordStart;
-        while (nextWordEnd < sql.length && /\s/.test(sql[nextWordEnd])) {
+        while (nextWordEnd < sql.length && /\s/.test(sql.charAt(nextWordEnd))) {
           nextWordEnd += 1;
         }
         const nextWordStartActual = nextWordEnd;
-        while (nextWordEnd < sql.length && isWordChar(sql[nextWordEnd])) {
+        while (
+          nextWordEnd < sql.length &&
+          isWordChar(sql.charAt(nextWordEnd))
+        ) {
           nextWordEnd += 1;
         }
         const nextWord = sql
@@ -296,7 +302,7 @@ const getCommaValidationDiagnostics = (sql: string): SqlDiagnostic[] => {
   if (lastCommaIndex !== -1 && (inGroupByClause || inOrderByClause)) {
     let hasOnlyWhitespaceAfter = true;
     for (let i = lastCommaIndex + 1; i < sql.length; i++) {
-      const c = sql[i];
+      const c = sql.charAt(i);
       if (c !== " " && c !== "\t" && c !== "\n" && c !== "\r") {
         hasOnlyWhitespaceAfter = false;
         break;

@@ -138,6 +138,32 @@ function DataExtensionNode({
   );
 }
 
+/**
+ * Helper function to toggle expanded state for a DataExtension ID.
+ *
+ * ESLINT-DISABLE JUSTIFICATION:
+ * This eslint-disable is an exception to project standards, not a pattern to follow.
+ *
+ * Why this is safe: `id` is the DataExtension.id property passed from the
+ * DataExtensionNode component's onToggle callback. The DataExtension interface
+ * (defined in types.ts) types `id` as a string. This value originates from
+ * MCE API responses and is used as a key in the expandedDeIds state object
+ * (Record<string, boolean>). User input cannot inject arbitrary values because
+ * the id comes from iterating over typed DataExtension objects.
+ *
+ * Why not refactor: Converting to Map would break React's state update pattern
+ * for object spreading. The Record<string, boolean> pattern is idiomatic for
+ * tracking expanded/collapsed state in tree components.
+ */
+function toggleExpandedDeId(
+  prev: Record<string, boolean>,
+  id: string,
+): Record<string, boolean> {
+  /* eslint-disable security/detect-object-injection */
+  return { ...prev, [id]: !prev[id] };
+  /* eslint-enable security/detect-object-injection */
+}
+
 export function WorkspaceSidebar({
   tenantId,
   folders,
@@ -349,6 +375,22 @@ export function WorkspaceSidebar({
       );
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
+      /**
+       * ESLINT-DISABLE JUSTIFICATION:
+       * This eslint-disable is an exception to project standards, not a pattern to follow.
+       *
+       * Why this is safe: `activeIndex` is a numeric state variable that is only modified
+       * through controlled setActiveIndex calls. The condition `activeIndex >= 0` on line 350
+       * ensures the index is non-negative, and `searchResults.length === 0` check on line 340
+       * ensures the array is not empty. The modulo operations in ArrowUp/ArrowDown handlers
+       * (lines 344, 347-348) bound the index to valid array positions. User keyboard input
+       * only triggers state updates through these controlled handlers.
+       *
+       * Why not refactor: Using Array.at() would require additional null checks and wouldn't
+       * improve safety since the index is already bounds-checked. This is a standard React
+       * pattern for keyboard-navigable lists where the index state is controlled.
+       */
+      // eslint-disable-next-line security/detect-object-injection
       const result = searchResults[activeIndex];
       handleSelectResult(result.id, result.type);
     } else if (e.key === "Escape") {
@@ -511,10 +553,7 @@ export function WorkspaceSidebar({
                   isExpanded={Boolean(expandedDeIds[dataExtension.id])}
                   isSelected={focusedItemId === dataExtension.id}
                   onToggle={(id) =>
-                    setExpandedDeIds((prev) => ({
-                      ...prev,
-                      [id]: !prev[id],
-                    }))
+                    setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
                   }
                   onSelectDE={onSelectDE}
                   tenantId={tenantId}
@@ -720,10 +759,7 @@ export function WorkspaceSidebar({
                     isExpanded={Boolean(expandedDeIds[dataExtension.id])}
                     isSelected={focusedItemId === dataExtension.id}
                     onToggle={(id) =>
-                      setExpandedDeIds((prev) => ({
-                        ...prev,
-                        [id]: !prev[id],
-                      }))
+                      setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
                     }
                     onSelectDE={onSelectDE}
                     tenantId={tenantId}

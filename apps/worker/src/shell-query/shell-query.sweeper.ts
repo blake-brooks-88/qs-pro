@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { MceBridgeService } from "@qs-pro/backend-shared";
 import { credentials } from "@qs-pro/database";
+import { SoapRetrieveResponse } from "./shell-query.types";
 
 @Injectable()
 export class ShellQuerySweeper {
@@ -55,13 +56,14 @@ export class ShellQuerySweeper {
          </RetrieveRequest>
       </RetrieveRequestMsg>`;
 
-    const searchResponse = await this.mceBridge.soapRequest(
-      tenantId,
-      userId,
-      mid,
-      searchSoap,
-      "Retrieve",
-    );
+    const searchResponse =
+      await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+        tenantId,
+        userId,
+        mid,
+        searchSoap,
+        "Retrieve",
+      );
     const folder = searchResponse.Body?.RetrieveResponseMsg?.Results;
     if (!folder) return;
 
@@ -95,17 +97,19 @@ export class ShellQuerySweeper {
     // NOTE: ComplexFilterPart structure above might need XML correction if it's too nested or wrong namespaces.
     // For now I'll assume standard PartnerAPI.
 
-    const queriesResponse = await this.mceBridge.soapRequest(
-      tenantId,
-      userId,
-      mid,
-      querySoap,
-      "Retrieve",
-    );
+    const queriesResponse =
+      await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+        tenantId,
+        userId,
+        mid,
+        querySoap,
+        "Retrieve",
+      );
     const queries = queriesResponse.Body?.RetrieveResponseMsg?.Results;
 
     if (queries && Array.isArray(queries)) {
       for (const q of queries) {
+        if (!q.CustomerKey) continue;
         await this.deleteAsset(
           tenantId,
           userId,

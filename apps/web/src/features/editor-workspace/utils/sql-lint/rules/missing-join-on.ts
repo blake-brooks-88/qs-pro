@@ -29,7 +29,8 @@ const isCursorAtEndOfIncompleteJoin = (
 
   // Check if remaining text starts with a clause keyword (WHERE, GROUP, etc.)
   // If so, user has moved on and we should show the error
-  const clauseKeywords = /^(where|group|having|order|union|except|intersect|join|inner|left|right|full|cross|on)\b/i;
+  const clauseKeywords =
+    /^(where|group|having|order|union|except|intersect|join|inner|left|right|full|cross|on)\b/i;
   if (clauseKeywords.test(remainingText)) return false;
 
   // User is still in the "typing zone" - suppress the error
@@ -57,8 +58,8 @@ const getMissingJoinOnDiagnostics = (
   }> = [];
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {
@@ -150,7 +151,7 @@ const getMissingJoinOnDiagnostics = (
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -171,16 +172,17 @@ const getMissingJoinOnDiagnostics = (
 
         while (lookAhead < sql.length) {
           // Skip whitespace
-          while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
+          while (lookAhead < sql.length && /\s/.test(sql.charAt(lookAhead))) {
             lookAhead += 1;
           }
 
-          if (lookAhead >= sql.length || !isWordChar(sql[lookAhead])) break;
+          if (lookAhead >= sql.length || !isWordChar(sql.charAt(lookAhead)))
+            break;
 
           // Read next word
           const wordStart = lookAhead;
           let wordEnd = lookAhead + 1;
-          while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
+          while (wordEnd < sql.length && isWordChar(sql.charAt(wordEnd))) {
             wordEnd += 1;
           }
           const nextWord = sql.slice(wordStart, wordEnd).toLowerCase();
@@ -229,9 +231,7 @@ const getMissingJoinOnDiagnostics = (
   }
 
   // Now check each JOIN to see if it has an ON clause
-  for (let i = 0; i < joinPositions.length; i++) {
-    const join = joinPositions[i];
-
+  for (const join of joinPositions) {
     // CROSS JOIN doesn't require ON
     if (join.isCross) continue;
 
@@ -256,8 +256,8 @@ const getMissingJoinOnDiagnostics = (
       !foundNextJoin &&
       !foundClauseEnd
     ) {
-      const char = sql[checkIndex];
-      const nextChar = sql[checkIndex + 1];
+      const char = sql.charAt(checkIndex);
+      const nextChar = sql.charAt(checkIndex + 1);
 
       // Handle comments and quotes
       if (inLineComment) {
@@ -325,7 +325,7 @@ const getMissingJoinOnDiagnostics = (
       if (isWordChar(char)) {
         const wordStart = checkIndex;
         let wordEnd = checkIndex + 1;
-        while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
+        while (wordEnd < sql.length && isWordChar(sql.charAt(wordEnd))) {
           wordEnd += 1;
         }
         const word = sql.slice(wordStart, wordEnd).toLowerCase();
@@ -363,7 +363,12 @@ const getMissingJoinOnDiagnostics = (
     if (!foundOn) {
       const shouldSuppress =
         cursorPosition !== undefined &&
-        isCursorAtEndOfIncompleteJoin(sql, cursorPosition, join.end, checkIndex);
+        isCursorAtEndOfIncompleteJoin(
+          sql,
+          cursorPosition,
+          join.end,
+          checkIndex,
+        );
 
       if (!shouldSuppress) {
         diagnostics.push(

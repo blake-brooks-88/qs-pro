@@ -101,19 +101,19 @@ describe("MCE SQL Constants", () => {
 
   describe("MCE_SQL_UNSUPPORTED_FUNCTIONS", () => {
     test("includes known unsupported functions", () => {
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["string_agg"]).toBe(null);
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["openjson"]).toBe(null);
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["try_convert"]).toBe(
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("openjson")).toBe(null);
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("try_convert")).toBe(
         "Use CONVERT() instead",
       );
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["try_cast"]).toBe(
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("try_cast")).toBe(
         "Use CAST() instead",
       );
     });
 
     test("does not include supported functions", () => {
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["json_value"]).toBeUndefined();
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["concat"]).toBeUndefined();
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("json_value")).toBeUndefined();
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("concat")).toBeUndefined();
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("string_agg")).toBeUndefined();
     });
   });
 

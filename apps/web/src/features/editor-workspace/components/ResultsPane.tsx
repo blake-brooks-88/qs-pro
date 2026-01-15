@@ -93,6 +93,21 @@ export function ResultsPane({
                     key={col}
                     className="p-2.5 border-r border-border/50 text-foreground/80 group-hover:text-foreground"
                   >
+                    {/**
+                     * ESLINT-DISABLE JUSTIFICATION:
+                     * This eslint-disable is an exception to project standards, not a pattern to follow.
+                     *
+                     * Why this is safe: `col` is derived from iterating over the `columns` array
+                     * (line 27), which contains only string values from `result.columns`. The `row`
+                     * object is typed as `Record<string, unknown>` from ExecutionResult. The `col`
+                     * key is guaranteed to exist because both the header cells and data cells iterate
+                     * over the same `columns` array. User input cannot inject arbitrary keys.
+                     *
+                     * Why not refactor: Using Map.get() would require transforming row data on every
+                     * render cycle. The current pattern is idiomatic for rendering tabular data where
+                     * columns define the access keys. This is a standard React table rendering pattern.
+                     */}
+                    {/* eslint-disable-next-line security/detect-object-injection */}
                     {row[col]}
                   </td>
                 ))}

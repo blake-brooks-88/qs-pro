@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Job, UnrecoverableError } from "bullmq";
 import { Logger, Inject } from "@nestjs/common";
-import { ShellQueryJob } from "./shell-query.types";
+import { ShellQueryJob, SoapAsyncStatusResponse } from "./shell-query.types";
 import { RunToTempFlow } from "./strategies/run-to-temp.strategy";
 import { RlsContextService, MceBridgeService } from "@qs-pro/backend-shared";
 import { shellQueryRuns, eq } from "@qs-pro/database";
@@ -196,13 +196,14 @@ export class ShellQueryProcessor extends WorkerHost {
         </RetrieveRequestMsg>`;
 
       try {
-        const response = await this.mceBridge.soapRequest(
-          tenantId,
-          userId,
-          mid,
-          soap,
-          "Retrieve",
-        );
+        const response =
+          await this.mceBridge.soapRequest<SoapAsyncStatusResponse>(
+            tenantId,
+            userId,
+            mid,
+            soap,
+            "Retrieve",
+          );
         const result = response.Body?.RetrieveResponseMsg?.Results;
         const status = result?.Status;
 

@@ -68,10 +68,7 @@ export class AuthController {
 
   @Post('login')
   @Redirect()
-  async loginPost(
-    @Body() body: LoginPostBody,
-    @Req() req: SessionRequest,
-  ) {
+  async loginPost(@Body() body: LoginPostBody, @Req() req: SessionRequest) {
     const jwt = this.extractJwt(body);
 
     if (!jwt) {

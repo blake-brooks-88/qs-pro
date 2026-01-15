@@ -14,19 +14,25 @@ import {
   createTenantRepoStub,
   createSessionGuardMock,
 } from './stubs';
+import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
 
-const mockRedis = createRedisStub();
-const mockShellQueryService = createShellQueryServiceStub();
-const mockTenantRepo = createTenantRepoStub();
+let mockRedis: ReturnType<typeof createRedisStub>;
+let mockShellQueryService: ReturnType<typeof createShellQueryServiceStub>;
+let mockTenantRepo: ReturnType<typeof createTenantRepoStub>;
 
 describe('Shell Query Notifications & Results (e2e)', () => {
   let app: NestFastifyApplication;
 
   beforeEach(async () => {
+    mockRedis = createRedisStub();
+    mockShellQueryService = createShellQueryServiceStub();
+    mockTenantRepo = createTenantRepoStub();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [ShellQueryController],
       providers: [
         { provide: ShellQueryService, useValue: mockShellQueryService },
+        ShellQuerySseService,
         { provide: 'REDIS_CLIENT', useValue: mockRedis },
         { provide: 'TENANT_REPOSITORY', useValue: mockTenantRepo },
       ],
@@ -83,7 +89,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=51',
       });
       expect(res.statusCode).toBe(400);
-      expect(String((res.json() as { message?: unknown }).message)).toContain(
+      expect(String(res.json().message)).toContain(
         'Page number exceeds maximum of 50',
       );
     });
@@ -98,9 +104,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=1',
       });
       expect(res.statusCode).toBe(409);
-      expect(String((res.json() as { message?: unknown }).message)).toContain(
-        'Run is still running',
-      );
+      expect(String(res.json().message)).toContain('Run is still running');
     });
 
     it('should return 404 when run not found', async () => {
@@ -113,9 +117,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=1',
       });
       expect(res.statusCode).toBe(404);
-      expect(String((res.json() as { message?: unknown }).message)).toContain(
-        'Run not found',
-      );
+      expect(String(res.json().message)).toContain('Run not found');
     });
 
     it('should return 409 when job failed', async () => {
@@ -131,9 +133,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=1',
       });
       expect(res.statusCode).toBe(409);
-      expect(String((res.json() as { message?: unknown }).message)).toContain(
-        'Run failed',
-      );
+      expect(String(res.json().message)).toContain('Run failed');
     });
   });
 
@@ -149,8 +149,8 @@ describe('Shell Query Notifications & Results (e2e)', () => {
     });
 
     it('should enforce rate limiting', async () => {
-      mockShellQueryService.getRun.mockResolvedValue({ id: 'run-1' });
-      mockRedis.incr.mockResolvedValue(6); // Exceed limit
+      mockShellQueryService.getRun.mockResolvedValueOnce({ id: 'run-1' });
+      mockRedis.incr.mockResolvedValueOnce(6);
 
       const res = await app.inject({
         method: 'GET',

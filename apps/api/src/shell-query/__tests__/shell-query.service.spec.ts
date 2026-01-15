@@ -1,7 +1,10 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getQueueToken } from '@nestjs/bullmq';
-import { ShellQueryService, type ShellQueryContext } from '../shell-query.service';
+import {
+  ShellQueryService,
+  type ShellQueryContext,
+} from '../shell-query.service';
 import type { ShellQueryRunRepository } from '../shell-query-run.repository';
 import { MceBridgeService } from '../../mce/mce-bridge.service';
 import * as crypto from 'node:crypto';
@@ -55,7 +58,10 @@ describe('ShellQueryService', () => {
     vi.mocked(queue.add).mockResolvedValue(undefined);
 
     const sqlText = 'select * from foo';
-    const expectedHash = crypto.createHash('sha256').update(sqlText).digest('hex');
+    const expectedHash = crypto
+      .createHash('sha256')
+      .update(sqlText)
+      .digest('hex');
 
     // Act
     const runId = await service.createRun(context, sqlText, 'Snippet One');
@@ -114,4 +120,3 @@ describe('ShellQueryService', () => {
     expect(queue.add).not.toHaveBeenCalled();
   });
 });
-

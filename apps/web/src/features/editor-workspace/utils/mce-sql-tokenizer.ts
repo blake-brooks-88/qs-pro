@@ -34,9 +34,7 @@ export const mceSqlTokenizerDef: languages.IMonarchLanguage = {
     "||",
   ],
 
-  brackets: [
-    { open: "(", close: ")", token: "delimiter.parenthesis" },
-  ],
+  brackets: [{ open: "(", close: ")", token: "delimiter.parenthesis" }],
 
   tokenizer: {
     root: [
@@ -59,7 +57,8 @@ export const mceSqlTokenizerDef: languages.IMonarchLanguage = {
       [/\[/, "identifier.bracket", "@bracketIdentifier"],
 
       // Numbers
-      [/\d+(\.\d+)?/, "number"],
+      [/\d+\.\d+/, "number"],
+      [/\d+/, "number"],
       [/\.\d+/, "number"],
 
       // Operators

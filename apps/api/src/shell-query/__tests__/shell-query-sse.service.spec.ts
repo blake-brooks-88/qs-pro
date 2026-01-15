@@ -55,7 +55,11 @@ describe('ShellQuerySseService', () => {
       messages.push(event.data);
     });
 
-    subscriber.emit('message', 'run-status:run-1', JSON.stringify({ status: 'queued' }));
+    subscriber.emit(
+      'message',
+      'run-status:run-1',
+      JSON.stringify({ status: 'queued' }),
+    );
     await Promise.resolve();
 
     subscription.unsubscribe();
@@ -76,16 +80,18 @@ describe('ShellQuerySseService', () => {
     redis.incr.mockResolvedValueOnce(6);
 
     // Act / Assert
-    await expect(service.streamRunEvents('run-1', 'user-1')).rejects.toBeInstanceOf(
-      HttpException,
-    );
+    await expect(
+      service.streamRunEvents('run-1', 'user-1'),
+    ).rejects.toBeInstanceOf(HttpException);
     expect(redis.decr).toHaveBeenCalledWith('sse-limit:user-1');
     expect(redis.duplicate).not.toHaveBeenCalled();
   });
 
   it('decrements on subscribe error', async () => {
     // Arrange
-    vi.mocked(subscriber.subscribe).mockRejectedValueOnce(new Error('subscribe failed'));
+    vi.mocked(subscriber.subscribe).mockRejectedValueOnce(
+      new Error('subscribe failed'),
+    );
 
     // Act / Assert
     await expect(service.streamRunEvents('run-1', 'user-1')).rejects.toThrow(
@@ -95,4 +101,3 @@ describe('ShellQuerySseService', () => {
     expect(subscriber.quit).toHaveBeenCalledTimes(1);
   });
 });
-

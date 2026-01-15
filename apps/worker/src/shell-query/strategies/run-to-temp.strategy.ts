@@ -2,7 +2,14 @@ import { Injectable, Logger, Inject } from "@nestjs/common";
 import { MceBridgeService } from "@qs-pro/backend-shared";
 import { RlsContextService } from "@qs-pro/backend-shared";
 import { tenantSettings, eq, and } from "@qs-pro/database";
-import { ShellQueryJob, FlowResult, IFlowStrategy } from "../shell-query.types";
+import {
+  ShellQueryJob,
+  FlowResult,
+  IFlowStrategy,
+  SoapRetrieveResponse,
+  SoapCreateResponse,
+  SoapPerformResponse,
+} from "../shell-query.types";
 
 @Injectable()
 export class RunToTempFlow implements IFlowStrategy {
@@ -78,19 +85,23 @@ export class RunToTempFlow implements IFlowStrategy {
          </RetrieveRequest>
       </RetrieveRequestMsg>`;
 
-    const searchResponse = await this.mceBridge.soapRequest(
-      tenantId,
-      userId,
-      mid,
-      searchSoap,
-      "Retrieve",
-    );
+    const searchResponse =
+      await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+        tenantId,
+        userId,
+        mid,
+        searchSoap,
+        "Retrieve",
+      );
     const results = searchResponse.Body?.RetrieveResponseMsg?.Results;
 
     let folderId: number;
 
     if (results && (Array.isArray(results) ? results.length > 0 : true)) {
       const folder = Array.isArray(results) ? results[0] : results;
+      if (!folder.ID) {
+        throw new Error("Folder ID not found in retrieve response");
+      }
       folderId = parseInt(folder.ID, 10);
     } else {
       // Create Folder
@@ -107,18 +118,22 @@ export class RunToTempFlow implements IFlowStrategy {
            </Objects>
         </CreateRequest>`;
 
-      const createResponse = await this.mceBridge.soapRequest(
-        tenantId,
-        userId,
-        mid,
-        createSoap,
-        "Create",
-      );
+      const createResponse =
+        await this.mceBridge.soapRequest<SoapCreateResponse>(
+          tenantId,
+          userId,
+          mid,
+          createSoap,
+          "Create",
+        );
       const createResult = createResponse.Body?.CreateResponse?.Results;
       if (!createResult || createResult.StatusCode !== "OK") {
         throw new Error(
           `Failed to create results folder: ${createResult?.StatusMessage || "Unknown error"}`,
         );
+      }
+      if (!createResult.NewID) {
+        throw new Error("NewID not returned from folder creation");
       }
       folderId = parseInt(createResult.NewID, 10);
     }
@@ -206,7 +221,7 @@ export class RunToTempFlow implements IFlowStrategy {
     // I'll proceed with a simple one for the sake of the task,
     // but in reality, this is the hardest part of Shell Queries.
 
-    const response = await this.mceBridge.soapRequest(
+    const response = await this.mceBridge.soapRequest<SoapCreateResponse>(
       tenantId,
       userId,
       mid,
@@ -245,7 +260,7 @@ export class RunToTempFlow implements IFlowStrategy {
          </Objects>
       </CreateRequest>`;
 
-    const response = await this.mceBridge.soapRequest(
+    const response = await this.mceBridge.soapRequest<SoapCreateResponse>(
       tenantId,
       userId,
       mid,
@@ -272,7 +287,7 @@ export class RunToTempFlow implements IFlowStrategy {
          </Definitions>
       </PerformRequestMsg>`;
 
-    const response = await this.mceBridge.soapRequest(
+    const response = await this.mceBridge.soapRequest<SoapPerformResponse>(
       tenantId,
       userId,
       mid,
@@ -285,6 +300,10 @@ export class RunToTempFlow implements IFlowStrategy {
       throw new Error(
         `Failed to start query: ${result?.StatusMessage || "Unknown error"}`,
       );
+    }
+
+    if (!result.TaskID) {
+      throw new Error("TaskID not returned from query execution");
     }
 
     return result.TaskID;

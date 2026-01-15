@@ -28,9 +28,11 @@ export const SFMC_IDENTITY_FIELDS = [
  * Regular expressions for case-insensitive matching of identity fields.
  * Used to detect identity fields in SQL queries regardless of casing.
  */
+/* eslint-disable security/detect-non-literal-regexp -- SFMC_IDENTITY_FIELDS is compile-time constant */
 export const IDENTITY_FIELD_PATTERNS = SFMC_IDENTITY_FIELDS.map(
   (field) => new RegExp(`^${field}$`, "i"),
 );
+/* eslint-enable security/detect-non-literal-regexp */
 
 /**
  * Immediate Trigger Characters

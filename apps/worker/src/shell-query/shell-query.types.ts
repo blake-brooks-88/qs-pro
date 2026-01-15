@@ -1,3 +1,64 @@
+/**
+ * SOAP response types for MCE API calls
+ */
+
+/** Generic retrieve response result structure */
+interface RetrieveResult {
+  ID?: string;
+  Status?: string;
+  ErrorMsg?: string;
+  CustomerKey?: string;
+  Name?: string;
+  [key: string]: unknown;
+}
+
+/** Response for retrieve operations that return single or multiple results */
+export interface SoapRetrieveResponse {
+  Body?: {
+    RetrieveResponseMsg?: {
+      Results?: RetrieveResult | RetrieveResult[];
+    };
+  };
+}
+
+/** Response for AsyncActivityStatus queries (always single result) */
+export interface SoapAsyncStatusResponse {
+  Body?: {
+    RetrieveResponseMsg?: {
+      Results?: RetrieveResult;
+    };
+  };
+}
+
+export interface SoapCreateResponse {
+  Body?: {
+    CreateResponse?: {
+      Results?: {
+        StatusCode?: string;
+        StatusMessage?: string;
+        NewID?: string;
+        ErrorCode?: string;
+        [key: string]: unknown;
+      };
+    };
+  };
+}
+
+export interface SoapPerformResponse {
+  Body?: {
+    PerformResponseMsg?: {
+      Results?: {
+        Result?: {
+          StatusCode?: string;
+          StatusMessage?: string;
+          TaskID?: string;
+          [key: string]: unknown;
+        };
+      };
+    };
+  };
+}
+
 export interface ShellQueryJob {
   runId: string;
   tenantId: string;

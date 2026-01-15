@@ -28,7 +28,7 @@ export const aliasSuggestionRule: InlineSuggestionRule = {
       return false;
     }
 
-    const lastTable = ctx.tablesInScope[ctx.tablesInScope.length - 1];
+    const lastTable = ctx.tablesInScope.at(-1);
     if (!lastTable || lastTable.alias) {
       return false;
     }
@@ -59,18 +59,18 @@ export const aliasSuggestionRule: InlineSuggestionRule = {
     if (isInsideBracket) {
       let openBracketIndex = -1;
       for (let i = cursorIndex - 1; i >= 0; i--) {
-        if (sql[i] === "[") {
+        if (sql.charAt(i) === "[") {
           openBracketIndex = i;
           break;
         }
-        if (sql[i] === "]") {
+        if (sql.charAt(i) === "]") {
           break;
         }
       }
       if (openBracketIndex === -1) return null;
       tableName = sql.slice(openBracketIndex + 1, cursorIndex).trim();
     } else {
-      const lastTable = ctx.tablesInScope[ctx.tablesInScope.length - 1];
+      const lastTable = ctx.tablesInScope.at(-1);
       if (!lastTable) return null;
       tableName = lastTable.name;
     }

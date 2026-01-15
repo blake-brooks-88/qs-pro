@@ -30,9 +30,9 @@ describe("join suggestions", () => {
     const left = makeTable("Left", "l");
     const right = makeTable("Right", "r");
     const { result } = renderHook(() =>
-      useJoinSuggestions({
-        "left|right": () => [{ text: "l.Id = r.Id" }],
-      }),
+      useJoinSuggestions(
+        new Map([["left|right", () => [{ text: "l.Id = r.Id" }]]]),
+      ),
     );
     const getSuggestions = result.current;
 

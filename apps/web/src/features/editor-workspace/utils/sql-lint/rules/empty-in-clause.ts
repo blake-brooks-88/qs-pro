@@ -11,8 +11,8 @@ const getEmptyInClauseDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {
@@ -104,7 +104,7 @@ const getEmptyInClauseDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -112,20 +112,23 @@ const getEmptyInClauseDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (word === "in") {
         // Look for opening parenthesis after IN
         let parenIndex = end;
-        while (parenIndex < sql.length && /\s/.test(sql[parenIndex])) {
+        while (parenIndex < sql.length && /\s/.test(sql.charAt(parenIndex))) {
           parenIndex += 1;
         }
 
-        if (parenIndex < sql.length && sql[parenIndex] === "(") {
+        if (parenIndex < sql.length && sql.charAt(parenIndex) === "(") {
           // Found opening paren, check if it's followed immediately by closing paren
           let closingIndex = parenIndex + 1;
 
           // Skip whitespace inside parentheses
-          while (closingIndex < sql.length && /\s/.test(sql[closingIndex])) {
+          while (
+            closingIndex < sql.length &&
+            /\s/.test(sql.charAt(closingIndex))
+          ) {
             closingIndex += 1;
           }
 
-          if (closingIndex < sql.length && sql[closingIndex] === ")") {
+          if (closingIndex < sql.length && sql.charAt(closingIndex) === ")") {
             // Empty IN clause detected
             diagnostics.push(
               createDiagnostic(

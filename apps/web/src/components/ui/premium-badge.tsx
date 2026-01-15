@@ -61,15 +61,15 @@ export interface PremiumBadgeProps extends VariantProps<
   className?: string;
 }
 
-/** Visual badge only - no popover */
 const PremiumBadgeIcon = React.forwardRef<
-  HTMLSpanElement,
+  HTMLButtonElement,
   Omit<PremiumBadgeProps, "title" | "description" | "ctaLabel" | "onCtaClick">
 >(({ tier = "pro", size, position, className }, ref) => {
   const tierLabel = tier === "enterprise" ? "Enterprise" : "Pro";
 
   return (
-    <span
+    <button
+      type="button"
       ref={ref}
       className={cn(premiumBadgeVariants({ tier, size, position }), className)}
       aria-label={`${tierLabel} feature`}
@@ -83,7 +83,7 @@ const PremiumBadgeIcon = React.forwardRef<
           {tierLabel}
         </span>
       )}
-    </span>
+    </button>
   );
 });
 PremiumBadgeIcon.displayName = "PremiumBadgeIcon";

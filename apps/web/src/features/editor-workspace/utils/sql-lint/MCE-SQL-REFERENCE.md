@@ -176,7 +176,6 @@ SFMC SQL is based on SQL Server 2019 with significant restrictions. Marketing Cl
 ### Functions That May Fail
 | Function | Reason |
 |----------|--------|
-| STRING_AGG | Not available in SFMC SQL |
 | STRING_SPLIT | Not available in SFMC SQL |
 | JSON_MODIFY | JSON functions not supported |
 | OPENJSON | JSON functions not supported |
@@ -185,16 +184,22 @@ SFMC SQL is based on SQL Server 2019 with significant restrictions. Marketing Cl
 | TRY_CAST | May not be available |
 | TRY_PARSE | May not be available |
 
-## Best Practice Warnings
+## Best Practices & Blocking Rules
 
-### Syntax Warnings
+### Syntax Rules (Block Execution)
 
-| Issue | Recommendation |
-|-------|----------------|
-| Semicolons (;) | Not required, may cause issues at end of query |
-| SELECT * with JOINs | Specify columns explicitly to avoid ambiguous field errors |
-| Unbracketed names with spaces/hyphens | Always bracket Data Extension names: `[My Data Extension]` |
-| WITH (NOLOCK) | Redundant in SFMC - queries already run in isolation |
+| Issue | Severity | Recommendation |
+|-------|----------|----------------|
+| Semicolons (;) | error | Remove trailing semicolons - MCE often errors on them |
+| SELECT * with JOINs | error | Specify columns explicitly to avoid ambiguous field errors |
+| Unbracketed names with spaces/hyphens | error | Always bracket Data Extension names: `[My Data Extension]` |
+
+### Syntax Warnings (Allow Execution)
+
+| Issue | Severity | Recommendation |
+|-------|----------|----------------|
+| WITH (NOLOCK) | warning | Redundant in SFMC - queries already run in isolation |
+| != operator | warning | Use <> for SQL standard compliance |
 
 ### Performance Considerations
 
@@ -215,10 +220,12 @@ SFMC SQL is based on SQL Server 2019 with significant restrictions. Marketing Cl
 | limit-prohibition | error | Blocks LIMIT keyword (use TOP instead) |
 | offset-without-order-by | error | OFFSET/FETCH requires ORDER BY clause |
 | order-by-in-subquery | error | ORDER BY in subquery requires TOP or OFFSET |
-| unsupported-functions | warning | Warns about potentially unsupported functions |
+| unsupported-functions | error | Blocks unsupported functions (OPENJSON, TRY_CONVERT, STRING_SPLIT, etc.) |
 | aggregate-grouping | error | Validates GROUP BY requirements for aggregates |
 | comma-validation | error | Detects invalid comma usage (trailing, leading, double) |
 | alias-in-clause | error | Detects column aliases used in WHERE/HAVING/ORDER BY/GROUP BY |
+| trailing-semicolon | error | Blocks trailing semicolons (MCE often errors on them) |
+| select-star-with-join | error | Blocks SELECT * with JOINs (causes ambiguous column errors) |
 
 ## References
 

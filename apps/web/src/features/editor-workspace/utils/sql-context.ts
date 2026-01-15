@@ -59,17 +59,21 @@ const extractAliasFromTokens = (
   let index = startIndex;
 
   // Skip symbol tokens (commas, dots, etc.)
-  while (tokens[index] && tokens[index].type === "symbol") {
+  let currentToken = tokens.at(index);
+  while (currentToken && currentToken.type === "symbol") {
     index += 1;
+    currentToken = tokens.at(index);
   }
 
   // Handle optional AS keyword
-  if (tokens[index]?.value.toLowerCase() === "as") {
+  const tokenAtIndex = tokens.at(index);
+  if (tokenAtIndex?.value.toLowerCase() === "as") {
     index += 1;
   }
 
   // Return alias if valid
-  return isAliasToken(tokens[index]) ? tokens[index].value : undefined;
+  const aliasToken = tokens.at(index);
+  return isAliasToken(aliasToken) ? aliasToken?.value : undefined;
 };
 
 const isWhitespace = (value: string) => /\s/.test(value);
@@ -77,7 +81,7 @@ const isWhitespace = (value: string) => /\s/.test(value);
 const scanUntil = (sql: string, startIndex: number, endChar: string) => {
   let index = startIndex;
   while (index < sql.length) {
-    const char = sql[index];
+    const char = sql.charAt(index);
     if (char === endChar) return index;
     index += 1;
   }
@@ -95,8 +99,8 @@ export const tokenizeSql = (sql: string): SqlToken[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -228,7 +232,7 @@ export const tokenizeSql = (sql: string): SqlToken[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       tokens.push({
@@ -256,8 +260,8 @@ const findClosingParenIndex = (sql: string, startIndex: number) => {
   let inBracket = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inSingleQuote) {
       if (char === "'") {
@@ -346,7 +350,8 @@ const extractSelectFields = (sql: string): string[] => {
     );
     const pickToken = (tokensToScan: SqlToken[]) => {
       for (let i = tokensToScan.length - 1; i >= 0; i -= 1) {
-        const token = tokensToScan[i];
+        const token = tokensToScan.at(i);
+        if (!token) continue;
         if (token.type === "word" || token.type === "bracket") return token;
       }
       return undefined;
@@ -383,22 +388,25 @@ export const extractTableReferences = (sql: string): SqlTableReference[] => {
   const references: SqlTableReference[] = [];
 
   for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
+    const token = tokens.at(index);
+    if (!token) continue;
     if (token.type !== "word") continue;
 
     const keyword = token.value.toLowerCase();
     if (keyword !== "from" && keyword !== "join") continue;
 
     let nextIndex = index + 1;
+    let nextTokenCheck = tokens.at(nextIndex);
     while (
-      tokens[nextIndex] &&
-      tokens[nextIndex].type === "symbol" &&
-      tokens[nextIndex].value === ","
+      nextTokenCheck &&
+      nextTokenCheck.type === "symbol" &&
+      nextTokenCheck.value === ","
     ) {
       nextIndex += 1;
+      nextTokenCheck = tokens.at(nextIndex);
     }
 
-    const nextToken = tokens[nextIndex];
+    const nextToken = tokens.at(nextIndex);
     if (!nextToken) continue;
 
     if (nextToken.type === "symbol" && nextToken.value === "(") {
@@ -436,8 +444,8 @@ export const extractTableReferences = (sql: string): SqlTableReference[] => {
     let isBracketed = tableToken.type === "bracket";
 
     const entToken = tableToken.type === "word" ? tableToken : undefined;
-    const dotToken = tokens[nextIndex + 1];
-    const entNameToken = tokens[nextIndex + 2];
+    const dotToken = tokens.at(nextIndex + 1);
+    const entNameToken = tokens.at(nextIndex + 2);
 
     if (
       entToken &&
@@ -484,8 +492,8 @@ const getCursorDepth = (sql: string, cursorIndex: number) => {
   let inBracket = false;
 
   while (index < cursorIndex) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inSingleQuote) {
       if (char === "'") {
@@ -570,8 +578,8 @@ const getAliasBeforeDot = (sql: string, cursorIndex: number) => {
   let dotIndex = -1;
 
   for (let i = cursorIndex - 1; i >= 0; i -= 1) {
-    const char = sql[i];
-    const prevChar = i > 0 ? sql[i - 1] : "";
+    const char = sql.charAt(i);
+    const prevChar = i > 0 ? sql.charAt(i - 1) : "";
 
     // Skip if inside quotes (scanning backwards)
     if (!inDoubleQuote && char === "'" && prevChar !== "'") {
@@ -610,13 +618,13 @@ const getAliasBeforeDot = (sql: string, cursorIndex: number) => {
   if (dotIndex === -1) return null;
 
   let alias: string | null = null;
-  if (dotIndex > 0 && sql[dotIndex - 1] === "]") {
+  if (dotIndex > 0 && sql.charAt(dotIndex - 1) === "]") {
     const openIndex = sql.lastIndexOf("[", dotIndex - 1);
     if (openIndex === -1) return null;
     alias = sql.slice(openIndex + 1, dotIndex - 1).trim() || null;
   } else {
     let start = dotIndex - 1;
-    while (start >= 0 && /[A-Za-z0-9_]/.test(sql[start] ?? "")) {
+    while (start >= 0 && /[A-Za-z0-9_]/.test(sql.charAt(start))) {
       start -= 1;
     }
     alias = sql.slice(start + 1, dotIndex) || null;
@@ -634,7 +642,8 @@ const getLastKeyword = (
   depth: number,
 ) => {
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
-    const token = tokens[index];
+    const token = tokens.at(index);
+    if (!token) continue;
     if (token.startIndex >= cursorIndex) continue;
     if (token.depth !== depth) continue;
     if (token.type !== "word") continue;
@@ -650,7 +659,8 @@ const getLastFromJoinToken = (
   depth: number,
 ) => {
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
-    const token = tokens[index];
+    const token = tokens.at(index);
+    if (!token) continue;
     if (token.startIndex >= cursorIndex) continue;
     if (token.depth !== depth) continue;
     if (token.type !== "word") continue;
@@ -751,12 +761,13 @@ export const extractSelectFieldRanges = (
     (token) => token.type === "word" && token.value.toLowerCase() === "select",
   );
   if (selectIndex === -1) return [];
+  const selectToken = tokens.at(selectIndex);
   const fromIndex = tokens.findIndex(
     (token, index) =>
       index > selectIndex &&
       token.type === "word" &&
       token.value.toLowerCase() === "from" &&
-      token.depth === tokens[selectIndex]?.depth,
+      token.depth === selectToken?.depth,
   );
 
   const endIndex = fromIndex === -1 ? tokens.length : fromIndex;
@@ -788,15 +799,15 @@ export const extractSelectFieldRanges = (
     if (asIndex !== -1) {
       aliasToken = segment.slice(asIndex + 1).find(isIdentifierToken);
     } else if (identifiers.length > 1) {
-      aliasToken = identifiers[identifiers.length - 1];
+      aliasToken = identifiers.at(identifiers.length - 1);
     }
 
     const fieldToken =
       asIndex !== -1
         ? [...segment.slice(0, asIndex)].reverse().find(isIdentifierToken)
-        : identifiers[
-            aliasToken ? identifiers.length - 2 : identifiers.length - 1
-          ];
+        : identifiers.at(
+            aliasToken ? identifiers.length - 2 : identifiers.length - 1,
+          );
 
     if (fieldToken) {
       ranges.push({
@@ -858,8 +869,8 @@ export function isInsideString(sql: string, cursorIndex: number): boolean {
   let inDoubleQuote = false;
 
   for (let i = 0; i < cursorIndex && i < sql.length; i++) {
-    const char = sql[i];
-    const nextChar = i + 1 < sql.length ? sql[i + 1] : "";
+    const char = sql.charAt(i);
+    const nextChar = i + 1 < sql.length ? sql.charAt(i + 1) : "";
 
     if (inSingleQuote) {
       if (char === "'") {
@@ -904,8 +915,8 @@ export function isInsideComment(sql: string, cursorIndex: number): boolean {
   let inBlockComment = false;
 
   for (let i = 0; i < cursorIndex && i < sql.length; i++) {
-    const char = sql[i];
-    const nextChar = i + 1 < sql.length ? sql[i + 1] : "";
+    const char = sql.charAt(i);
+    const nextChar = i + 1 < sql.length ? sql.charAt(i + 1) : "";
 
     // Skip string content
     if (inSingleQuote) {
@@ -981,8 +992,8 @@ export function isInsideBrackets(sql: string, cursorIndex: number): boolean {
   let bracketDepth = 0;
 
   for (let i = 0; i < cursorIndex && i < sql.length; i++) {
-    const char = sql[i];
-    const nextChar = i + 1 < sql.length ? sql[i + 1] : "";
+    const char = sql.charAt(i);
+    const nextChar = i + 1 < sql.length ? sql.charAt(i + 1) : "";
 
     // Skip string content
     if (inSingleQuote) {
@@ -1050,7 +1061,7 @@ export function isAfterComparisonOperator(
   }
 
   // Check for single-character operators: =, <, >
-  const lastChar = textBefore[textBefore.length - 1];
+  const lastChar = textBefore.charAt(textBefore.length - 1);
   return ["=", "<", ">"].includes(lastChar);
 }
 
@@ -1092,8 +1103,8 @@ export function isInsideFunctionParens(
   const parenStack: Array<{ isFunction: boolean }> = [];
 
   for (let i = 0; i < cursorIndex && i < sql.length; i++) {
-    const char = sql[i];
-    const nextChar = i + 1 < sql.length ? sql[i + 1] : "";
+    const char = sql.charAt(i);
+    const nextChar = i + 1 < sql.length ? sql.charAt(i + 1) : "";
 
     // Skip string content
     if (inSingleQuote) {
@@ -1123,7 +1134,7 @@ export function isInsideFunctionParens(
 
       // Find the last non-whitespace character before the paren
       for (let j = i - 1; j >= 0; j--) {
-        if (!/\s/.test(sql[j])) {
+        if (!/\s/.test(sql.charAt(j))) {
           wordEnd = j + 1;
           break;
         }
@@ -1132,7 +1143,7 @@ export function isInsideFunctionParens(
       // If we found a non-whitespace char, find where the word starts
       if (wordEnd !== -1) {
         for (let j = wordEnd - 1; j >= 0; j--) {
-          if (!/[A-Za-z0-9_]/.test(sql[j])) {
+          if (!/[A-Za-z0-9_]/.test(sql.charAt(j))) {
             wordStart = j + 1;
             break;
           }
@@ -1183,8 +1194,8 @@ export function isAtEndOfBracketedTableInFromJoin(
 
   // Scan backwards from cursor to find the opening bracket
   for (let i = cursorIndex - 1; i >= 0; i--) {
-    const char = sql[i];
-    const prevChar = i > 0 ? sql[i - 1] : "";
+    const char = sql.charAt(i);
+    const prevChar = i > 0 ? sql.charAt(i - 1) : "";
 
     // Skip if inside quotes (scanning backwards)
     if (char === "'" && prevChar !== "'") {
@@ -1222,7 +1233,8 @@ export function isAtEndOfBracketedTableInFromJoin(
   const tokens = tokenizeSql(textBeforeBracket);
 
   for (let i = tokens.length - 1; i >= 0; i--) {
-    const token = tokens[i];
+    const token = tokens.at(i);
+    if (!token) continue;
     if (token.type !== "word") continue;
     const value = token.value.toLowerCase();
 

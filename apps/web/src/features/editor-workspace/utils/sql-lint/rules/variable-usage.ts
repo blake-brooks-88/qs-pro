@@ -12,8 +12,8 @@ const getVariableUsageDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {
@@ -107,9 +107,9 @@ const getVariableUsageDiagnostics = (sql: string): SqlDiagnostic[] => {
       let end = index + 1;
 
       // Check if it's a variable (@ followed by word characters)
-      if (end < sql.length && isWordChar(sql[end])) {
+      if (end < sql.length && isWordChar(sql.charAt(end))) {
         // Consume the variable name
-        while (end < sql.length && isWordChar(sql[end])) {
+        while (end < sql.length && isWordChar(sql.charAt(end))) {
           end += 1;
         }
 

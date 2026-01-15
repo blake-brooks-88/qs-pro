@@ -30,7 +30,8 @@ const buildContext = (
     ),
     getFieldsForTable: async (table) => {
       const alias = table.alias?.toLowerCase() || table.name.toLowerCase();
-      return makeFields(fieldsByAlias[alias] || []);
+      const fieldsMap = new Map(Object.entries(fieldsByAlias));
+      return makeFields(fieldsMap.get(alias) || []);
     },
   };
 };

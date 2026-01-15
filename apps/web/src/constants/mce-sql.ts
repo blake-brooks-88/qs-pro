@@ -119,16 +119,15 @@ export const MCE_SQL_ALL_PROHIBITED = new Set([
   ...MCE_SQL_PROHIBITED_PROCEDURAL,
 ]);
 
-export const MCE_SQL_UNSUPPORTED_FUNCTIONS: Record<string, string | null> = {
-  string_agg: null,
-  string_split: null,
-  json_modify: null,
-  openjson: null,
-  isjson: null,
-  try_convert: "Use CONVERT() instead",
-  try_cast: "Use CAST() instead",
-  try_parse: null,
-};
+export const MCE_SQL_UNSUPPORTED_FUNCTIONS = new Map<string, string | null>([
+  ["string_split", null],
+  ["json_modify", null],
+  ["openjson", null],
+  ["isjson", null],
+  ["try_convert", "Use CONVERT() instead"],
+  ["try_cast", "Use CAST() instead"],
+  ["try_parse", null],
+]);
 
 export const MCE_SQL_SUPPORTED_FUNCTIONS = new Set([
   // String functions
@@ -181,6 +180,7 @@ export const MCE_SQL_SUPPORTED_FUNCTIONS = new Set([
   "avg",
   "sum",
   "count",
+  "string_agg",
   "abs",
   "ceiling",
   "floor",

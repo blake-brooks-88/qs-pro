@@ -26,8 +26,8 @@ const tokenizeSqlForAggregates = (sql: string): Token[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle comments
     if (inLineComment) {
@@ -115,7 +115,7 @@ const tokenizeSqlForAggregates = (sql: string): Token[] => {
     if (/\s/.test(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && /\s/.test(sql[end])) {
+      while (end < sql.length && /\s/.test(sql.charAt(end))) {
         end += 1;
       }
       tokens.push({
@@ -132,7 +132,7 @@ const tokenizeSqlForAggregates = (sql: string): Token[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       tokens.push({
@@ -170,7 +170,8 @@ const extractSelectClause = (tokens: Token[]): Token[] => {
   const endKeywords = ["from", "where", "group", "order", "having", "union"];
   let endIndex = tokens.length;
   for (let i = selectIndex + 1; i < tokens.length; i += 1) {
-    const token = tokens[i];
+    const token = tokens.at(i);
+    if (!token) continue;
     if (
       token.type === "word" &&
       endKeywords.includes(token.value.toLowerCase())
@@ -188,23 +189,26 @@ const extractSelectClause = (tokens: Token[]): Token[] => {
  */
 const hasGroupByClause = (tokens: Token[]): boolean => {
   for (let i = 0; i < tokens.length - 1; i += 1) {
+    const currentToken = tokens.at(i);
+    if (!currentToken) continue;
     if (
-      tokens[i].type === "word" &&
-      tokens[i].value.toLowerCase() === "group" &&
+      currentToken.type === "word" &&
+      currentToken.value.toLowerCase() === "group" &&
       i + 1 < tokens.length
     ) {
       // Skip whitespace
       let nextIndex = i + 1;
-      while (
-        nextIndex < tokens.length &&
-        tokens[nextIndex].type === "whitespace"
-      ) {
+      while (nextIndex < tokens.length) {
+        const nextToken = tokens.at(nextIndex);
+        if (!nextToken) break;
+        if (nextToken.type !== "whitespace") break;
         nextIndex += 1;
       }
+      const byToken = tokens.at(nextIndex);
       if (
-        nextIndex < tokens.length &&
-        tokens[nextIndex].type === "word" &&
-        tokens[nextIndex].value.toLowerCase() === "by"
+        byToken &&
+        byToken.type === "word" &&
+        byToken.value.toLowerCase() === "by"
       ) {
         return true;
       }
@@ -220,24 +224,31 @@ const extractGroupByColumns = (tokens: Token[]): Set<string> => {
   const groupedColumns = new Set<string>();
 
   for (let i = 0; i < tokens.length - 1; i += 1) {
+    const currentToken = tokens.at(i);
+    if (!currentToken) continue;
     if (
-      tokens[i].type === "word" &&
-      tokens[i].value.toLowerCase() === "group"
+      currentToken.type === "word" &&
+      currentToken.value.toLowerCase() === "group"
     ) {
       // Skip to BY
       let byIndex = i + 1;
-      while (byIndex < tokens.length && tokens[byIndex].type === "whitespace") {
+      while (byIndex < tokens.length) {
+        const byToken = tokens.at(byIndex);
+        if (!byToken) break;
+        if (byToken.type !== "whitespace") break;
         byIndex += 1;
       }
+      const byToken = tokens.at(byIndex);
       if (
-        byIndex < tokens.length &&
-        tokens[byIndex].type === "word" &&
-        tokens[byIndex].value.toLowerCase() === "by"
+        byToken &&
+        byToken.type === "word" &&
+        byToken.value.toLowerCase() === "by"
       ) {
         // Extract columns after BY
         let currentIndex = byIndex + 1;
         while (currentIndex < tokens.length) {
-          const token = tokens[currentIndex];
+          const token = tokens.at(currentIndex);
+          if (!token) break;
 
           // Stop at next major keyword
           if (
@@ -253,13 +264,14 @@ const extractGroupByColumns = (tokens: Token[]): Set<string> => {
           if (token.type === "word") {
             // Skip table qualifiers (e.g., "t." in "t.column")
             const nextNonWhitespace = currentIndex + 1;
+            const nextToken = tokens.at(nextNonWhitespace);
             if (
-              nextNonWhitespace < tokens.length &&
-              tokens[nextNonWhitespace].type === "symbol" &&
-              tokens[nextNonWhitespace].value === "."
+              nextToken &&
+              nextToken.type === "symbol" &&
+              nextToken.value === "."
             ) {
               // This is a table qualifier, skip it
-              currentIndex += 2; // Skip qualifier and dot
+              currentIndex += 2;
               continue;
             }
 
@@ -301,7 +313,11 @@ const analyzeSelectExpressions = (
   let currentExpression: Token[] = [];
 
   while (i < selectTokens.length) {
-    const token = selectTokens[i];
+    const token = selectTokens.at(i);
+    if (!token) {
+      i += 1;
+      continue;
+    }
 
     // Track parenthesis depth
     if (token.type === "symbol" && token.value === "(") {
@@ -338,7 +354,8 @@ const analyzeSelectExpressions = (
     let isStar = false;
 
     for (let j = 0; j < exprTokens.length; j += 1) {
-      const t = exprTokens[j];
+      const t = exprTokens.at(j);
+      if (!t) continue;
 
       if (t.type === "word") {
         const lowerValue = t.value.toLowerCase();
@@ -347,16 +364,17 @@ const analyzeSelectExpressions = (
         if (AGGREGATE_FUNCTIONS.has(lowerValue)) {
           // Look ahead for opening parenthesis
           let nextIndex = j + 1;
-          while (
-            nextIndex < exprTokens.length &&
-            exprTokens[nextIndex].type === "whitespace"
-          ) {
+          while (nextIndex < exprTokens.length) {
+            const nextToken = exprTokens.at(nextIndex);
+            if (!nextToken) break;
+            if (nextToken.type !== "whitespace") break;
             nextIndex += 1;
           }
+          const parenToken = exprTokens.at(nextIndex);
           if (
-            nextIndex < exprTokens.length &&
-            exprTokens[nextIndex].type === "symbol" &&
-            exprTokens[nextIndex].value === "("
+            parenToken &&
+            parenToken.type === "symbol" &&
+            parenToken.value === "("
           ) {
             hasAggregates = true;
             isAggregated = true;
@@ -373,11 +391,16 @@ const analyzeSelectExpressions = (
       (t) => t.type !== "whitespace",
     );
     if (nonWhitespaceTokens.length > 0) {
-      const firstToken = nonWhitespaceTokens[0];
-      if (firstToken.type === "symbol" && firstToken.value === "'") {
-        isLiteral = true;
-      } else if (firstToken.type === "word" && /^\d+$/.test(firstToken.value)) {
-        isLiteral = true;
+      const firstToken = nonWhitespaceTokens.at(0);
+      if (firstToken) {
+        if (firstToken.type === "symbol" && firstToken.value === "'") {
+          isLiteral = true;
+        } else if (
+          firstToken.type === "word" &&
+          /^\d+$/.test(firstToken.value)
+        ) {
+          isLiteral = true;
+        }
       }
     }
 
@@ -401,11 +424,15 @@ const analyzeSelectExpressions = (
 
       // Special handling for SELECT *
       if (isStar) {
-        nonAggregatedColumns.push({
-          name: "*",
-          startIndex: exprTokens[0].startIndex,
-          endIndex: exprTokens[exprTokens.length - 1].endIndex,
-        });
+        const firstToken = exprTokens.at(0);
+        const lastToken = exprTokens.at(exprTokens.length - 1);
+        if (firstToken && lastToken) {
+          nonAggregatedColumns.push({
+            name: "*",
+            startIndex: firstToken.startIndex,
+            endIndex: lastToken.endIndex,
+          });
+        }
       }
     }
   }

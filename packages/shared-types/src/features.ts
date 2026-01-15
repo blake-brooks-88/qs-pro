@@ -71,6 +71,20 @@ export function isTierFeature(
   tier: SubscriptionTier,
   feature: FeatureKey,
 ): boolean {
+  /**
+   * ESLINT-DISABLE JUSTIFICATION:
+   * This eslint-disable is an exception to project standards, not a pattern to follow.
+   *
+   * Why this is safe: The `tier` parameter is typed as `SubscriptionTier`, a Zod enum
+   * with only three possible values ("free" | "pro" | "enterprise"). The `TIER_FEATURES`
+   * object is typed as `Record<SubscriptionTier, ...>`, guaranteeing that all valid
+   * tier values have corresponding keys. TypeScript enforces this at compile time.
+   *
+   * Why not refactor: Using a Map would require converting the existing Record constant
+   * and all its type declarations, adding runtime overhead and reducing readability
+   * for a pattern that is already provably safe via TypeScript's type system.
+   */
+  // eslint-disable-next-line security/detect-object-injection
   return TIER_FEATURES[tier].includes(feature);
 }
 
@@ -80,6 +94,21 @@ export function isTierFeature(
 export function getTierFeatures(tier: SubscriptionTier): TenantFeatures {
   const features: Partial<TenantFeatures> = {};
   for (const key of ALL_FEATURE_KEYS) {
+    /**
+     * ESLINT-DISABLE JUSTIFICATION:
+     * This eslint-disable is an exception to project standards, not a pattern to follow.
+     *
+     * Why this is safe: Two typed lookups occur here:
+     * 1. `features[key]` - `key` comes from `ALL_FEATURE_KEYS` (Zod enum options array),
+     *    and `features` is typed as `Partial<TenantFeatures>` keyed by `FeatureKey`.
+     * 2. `TIER_FEATURES[tier]` - `tier` is typed as `SubscriptionTier`, and `TIER_FEATURES`
+     *    is a `Record<SubscriptionTier, ...>` with compile-time guaranteed keys.
+     *
+     * Why not refactor: Both lookups use TypeScript's enum/Record pattern which provides
+     * compile-time safety. Switching to Map would require significant refactoring of the
+     * type system and reduce the clarity of the feature configuration structure.
+     */
+    // eslint-disable-next-line security/detect-object-injection
     features[key] = TIER_FEATURES[tier].includes(key);
   }
   return features as TenantFeatures;

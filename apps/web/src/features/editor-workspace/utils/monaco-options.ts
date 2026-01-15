@@ -62,10 +62,16 @@ export const applyMonacoTheme = (monaco: typeof import("monaco-editor")) => {
 
   const syntaxKeyword = getCssVarValue("--syntax-keyword", "--primary");
   const syntaxFunction = getCssVarValue("--syntax-function", "--warning");
-  const syntaxOperator = getCssVarValue("--syntax-operator", "--muted-foreground");
+  const syntaxOperator = getCssVarValue(
+    "--syntax-operator",
+    "--muted-foreground",
+  );
   const syntaxString = getCssVarValue("--syntax-string", "--success");
   const syntaxNumber = getCssVarValue("--syntax-number", "--success");
-  const syntaxComment = getCssVarValue("--syntax-comment", "--muted-foreground");
+  const syntaxComment = getCssVarValue(
+    "--syntax-comment",
+    "--muted-foreground",
+  );
   const syntaxType = getCssVarValue("--syntax-number", "--success");
 
   const toToken = (value: string) => value.replace("#", "");
@@ -116,8 +122,16 @@ export const applyMonacoTheme = (monaco: typeof import("monaco-editor")) => {
       { token: "number.sql", foreground: toToken(syntaxNumber) },
 
       // Comments
-      { token: "comment", foreground: toToken(syntaxComment), fontStyle: "italic" },
-      { token: "comment.sql", foreground: toToken(syntaxComment), fontStyle: "italic" },
+      {
+        token: "comment",
+        foreground: toToken(syntaxComment),
+        fontStyle: "italic",
+      },
+      {
+        token: "comment.sql",
+        foreground: toToken(syntaxComment),
+        fontStyle: "italic",
+      },
 
       // Identifiers (neutral - will be overridden by semantic decorations)
       { token: "identifier", foreground: toToken(foreground) },
@@ -129,7 +143,10 @@ export const applyMonacoTheme = (monaco: typeof import("monaco-editor")) => {
       { token: "identifier.bracket", foreground: toToken(foreground) },
       { token: "identifier.bracket.sql", foreground: toToken(foreground) },
       { token: "identifier.bracket.escape", foreground: toToken(foreground) },
-      { token: "identifier.bracket.escape.sql", foreground: toToken(foreground) },
+      {
+        token: "identifier.bracket.escape.sql",
+        foreground: toToken(foreground),
+      },
 
       // Delimiters and punctuation
       { token: "delimiter", foreground: toToken(foreground) },

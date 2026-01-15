@@ -1,7 +1,8 @@
 import type { shellQueryRuns } from '@qs-pro/database';
 
 export type ShellQueryRun = typeof shellQueryRuns.$inferSelect;
-export type ShellQueryRunStatus = typeof shellQueryRuns.$inferInsert['status'];
+export type ShellQueryRunStatus =
+  (typeof shellQueryRuns.$inferInsert)['status'];
 
 export interface CreateShellQueryRunParams {
   id: string;

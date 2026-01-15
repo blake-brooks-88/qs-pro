@@ -1,16 +1,17 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  Inject,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Inject } from '@nestjs/common';
 import { Observable, filter, finalize, fromEventPattern, map } from 'rxjs';
 
 type RedisSubscriber = {
   subscribe(channel: string): Promise<unknown>;
   quit(): Promise<unknown>;
-  on(event: 'message', listener: (channel: string, message: string) => void): unknown;
-  off(event: 'message', listener: (channel: string, message: string) => void): unknown;
+  on(
+    event: 'message',
+    listener: (channel: string, message: string) => void,
+  ): unknown;
+  off(
+    event: 'message',
+    listener: (channel: string, message: string) => void,
+  ): unknown;
 };
 
 type RedisClient = {

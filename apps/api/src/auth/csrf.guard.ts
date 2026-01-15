@@ -6,18 +6,10 @@ import {
 } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
 
-type SecureSession = {
-  get(key: string): unknown;
-};
-
 @Injectable()
 export class CsrfGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest() as {
-      method?: unknown;
-      headers?: Record<string, unknown>;
-      session?: SecureSession;
-    };
+    const request = context.switchToHttp().getRequest();
 
     const method = String(request.method ?? '').toUpperCase();
     if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
@@ -62,4 +54,3 @@ export class CsrfGuard implements CanActivate {
     return true;
   }
 }
-

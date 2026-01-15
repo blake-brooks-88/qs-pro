@@ -55,3 +55,4 @@ tmp/
 
 # Local dev tools
 .dev/
+.playwright-mcp/

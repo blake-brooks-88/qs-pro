@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "@/test/mocks/server";
 import { FeatureGate } from "@/components/FeatureGate";
 
 const createWrapper = (queryClient: QueryClient) => {
@@ -32,17 +34,17 @@ const mockFeatures = {
 
 describe("FeatureGate", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    server.resetHandlers();
+    server.use(
+      http.get("/api/features", () => {
+        return HttpResponse.json(mockFeatures);
+      }),
+    );
   });
 
   it("renders children without badge when feature enabled", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockFeatures,
-    });
-    vi.stubGlobal("fetch", fetchMock);
 
     render(
       <FeatureGate feature="basicLinting" variant="button">
@@ -53,7 +55,6 @@ describe("FeatureGate", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Test Button")).toBeInTheDocument();
-      // Badge should not be present when feature is enabled
       expect(
         screen.queryByRole("button", { name: /feature/i }),
       ).not.toBeInTheDocument();
@@ -63,11 +64,6 @@ describe("FeatureGate", () => {
   it("renders children with premium badge when feature disabled", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockFeatures,
-    });
-    vi.stubGlobal("fetch", fetchMock);
 
     render(
       <FeatureGate feature="quickFixes" variant="button">
@@ -87,11 +83,6 @@ describe("FeatureGate", () => {
   it("renders locked button variant with disabled styling", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockFeatures,
-    });
-    vi.stubGlobal("fetch", fetchMock);
 
     render(
       <FeatureGate feature="quickFixes" variant="button">
@@ -110,11 +101,6 @@ describe("FeatureGate", () => {
   it("renders locked panel variant with backdrop", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockFeatures,
-    });
-    vi.stubGlobal("fetch", fetchMock);
 
     render(
       <FeatureGate feature="teamSnippets" variant="panel">
@@ -134,11 +120,6 @@ describe("FeatureGate", () => {
   it("renders locked menuItem variant", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockFeatures,
-    });
-    vi.stubGlobal("fetch", fetchMock);
 
     render(
       <FeatureGate feature="auditLogs" variant="menuItem">

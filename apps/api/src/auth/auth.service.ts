@@ -402,13 +402,21 @@ export class AuthService {
       this.coerceId(info.user?.member_id) ||
       this.coerceId(info.organization?.member_id) ||
       this.extractIdFromObject(info.user, ['mid', 'member_id', 'memberId']) ||
-      this.extractIdFromObject(info.organization, ['mid', 'member_id', 'memberId']);
+      this.extractIdFromObject(info.organization, [
+        'mid',
+        'member_id',
+        'memberId',
+      ]);
 
     const providedSfUserId = this.coerceId(sfUserId);
     const providedEid = this.coerceId(eid) || this.coerceId(embeddedEid);
     const providedMid = this.coerceId(mid);
 
-    if (providedSfUserId && derivedSfUserId && providedSfUserId !== derivedSfUserId) {
+    if (
+      providedSfUserId &&
+      derivedSfUserId &&
+      providedSfUserId !== derivedSfUserId
+    ) {
       throw new UnauthorizedException('OAuth identity mismatch');
     }
     if (providedEid && derivedEid && providedEid !== derivedEid) {

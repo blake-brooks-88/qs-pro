@@ -230,13 +230,17 @@ const SYSTEM_DATA_VIEW_ALIASES: DataExtensionResponseDto[] = [
 // FIELD DEFINITIONS
 // =============================================================================
 
-const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
-  {
-    // =========================================================================
-    // EMAIL DATA VIEWS
-    // =========================================================================
+const SYSTEM_DATA_VIEW_FIELDS = new Map<
+  string,
+  DataExtensionFieldResponseDto[]
+>([
+  // =========================================================================
+  // EMAIL DATA VIEWS
+  // =========================================================================
 
-    _Sent: [
+  [
+    "_Sent",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -257,8 +261,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
         MaxLength: 36,
       },
     ],
+  ],
 
-    _Open: [
+  [
+    "_Open",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -280,8 +287,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
         MaxLength: 36,
       },
     ],
+  ],
 
-    _Click: [
+  [
+    "_Click",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -306,8 +316,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
         MaxLength: 36,
       },
     ],
+  ],
 
-    _Bounce: [
+  [
+    "_Bounce",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -338,8 +351,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
         MaxLength: 36,
       },
     ],
+  ],
 
-    _Unsubscribe: [
+  [
+    "_Unsubscribe",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -351,8 +367,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "IsUnique", FieldType: "Boolean" },
       { Name: "Domain", FieldType: "Text", MaxLength: 128 },
     ],
+  ],
 
-    _Complaint: [
+  [
+    "_Complaint",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -364,8 +383,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "IsUnique", FieldType: "Boolean" },
       { Name: "Domain", FieldType: "Text", MaxLength: 128 },
     ],
+  ],
 
-    _FTAF: [
+  [
+    "_FTAF",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -379,16 +401,22 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "TriggererSendDefinitionObjectID", FieldType: "Text" },
       { Name: "TriggeredSendCustomerKey", FieldType: "Text", MaxLength: 36 },
     ],
+  ],
 
-    _BusinessUnitUnsubscribes: [
+  [
+    "_BusinessUnitUnsubscribes",
+    [
       { Name: "BusinessUnitID", FieldType: "Number" },
       { Name: "UnsubDateUTC", FieldType: "Date" },
       { Name: "UnsubReason", FieldType: "Text", MaxLength: 100 },
       { Name: "SubscriberID", FieldType: "Number" },
       { Name: "SubscriberKey", FieldType: "Text", MaxLength: 254 },
     ],
+  ],
 
-    _Job: [
+  [
+    "_Job",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "AccountUserID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -435,8 +463,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "EmailSendDefinition", FieldType: "Text", MaxLength: 36 },
       { Name: "DeduplicateByEmail", FieldType: "Boolean" },
     ],
+  ],
 
-    _SurveyResponse: [
+  [
+    "_SurveyResponse",
+    [
       { Name: "AccountID", FieldType: "Number" },
       { Name: "OYBAccountID", FieldType: "Number" },
       { Name: "JobID", FieldType: "Number" },
@@ -457,8 +488,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "Answer", FieldType: "Text" },
       { Name: "AnswerData", FieldType: "Text" },
     ],
+  ],
 
-    _SocialNetworkImpressions: [
+  [
+    "_SocialNetworkImpressions",
+    [
       { Name: "JobID", FieldType: "Number" },
       { Name: "ListID", FieldType: "Number" },
       { Name: "RegionTitle", FieldType: "Text" },
@@ -475,8 +509,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "ShortCode", FieldType: "Text" },
       { Name: "PublishTime", FieldType: "Date" },
     ],
+  ],
 
-    _SocialNetworkTracking: [
+  [
+    "_SocialNetworkTracking",
+    [
       { Name: "SubscriberID", FieldType: "Number" },
       { Name: "SubscriberKey", FieldType: "Email" },
       { Name: "ListID", FieldType: "Number" },
@@ -497,22 +534,28 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "ShortCode", FieldType: "Text" },
       { Name: "PublishTime", FieldType: "Date" },
     ],
+  ],
 
-    _Coupon: [
+  [
+    "_Coupon",
+    [
       { Name: "Name", FieldType: "Text" },
       { Name: "ExternalKey", FieldType: "Text" },
       { Name: "Description", FieldType: "Text" },
       { Name: "BeginDate", FieldType: "Date" },
       { Name: "ExpirationDate", FieldType: "Date" },
     ],
+  ],
 
-    // =========================================================================
-    // SUBSCRIBERS DATA VIEWS
-    // =========================================================================
+  // =========================================================================
+  // SUBSCRIBERS DATA VIEWS
+  // =========================================================================
 
-    _EnterpriseAttribute: [{ Name: "_SubscriberID", FieldType: "Number" }],
+  ["_EnterpriseAttribute", [{ Name: "_SubscriberID", FieldType: "Number" }]],
 
-    _Subscribers: [
+  [
+    "_Subscribers",
+    [
       { Name: "SubscriberID", FieldType: "Number" },
       { Name: "SubscriberKey", FieldType: "Text", MaxLength: 254 },
       { Name: "DateUndeliverable", FieldType: "Date" },
@@ -525,8 +568,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "Status", FieldType: "Text", MaxLength: 12 },
       { Name: "Locale", FieldType: "Text" },
     ],
+  ],
 
-    _ListSubscribers: [
+  [
+    "_ListSubscribers",
+    [
       { Name: "SubscriberID", FieldType: "Number" },
       { Name: "SubscriberKey", FieldType: "Text", MaxLength: 254 },
       { Name: "AddedBy", FieldType: "Number" },
@@ -540,12 +586,15 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "Status", FieldType: "Text", MaxLength: 12 },
       { Name: "SubscriberType", FieldType: "Text", MaxLength: 100 },
     ],
+  ],
 
-    // =========================================================================
-    // JOURNEY BUILDER DATA VIEWS
-    // =========================================================================
+  // =========================================================================
+  // JOURNEY BUILDER DATA VIEWS
+  // =========================================================================
 
-    _Journey: [
+  [
+    "_Journey",
+    [
       { Name: "VersionID", FieldType: "Text", MaxLength: 36 },
       { Name: "JourneyID", FieldType: "Text", MaxLength: 36 },
       { Name: "JourneyName", FieldType: "Text", MaxLength: 200 },
@@ -555,8 +604,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "ModifiedDate", FieldType: "Date" },
       { Name: "JourneyStatus", FieldType: "Text", MaxLength: 100 },
     ],
+  ],
 
-    _JourneyActivity: [
+  [
+    "_JourneyActivity",
+    [
       { Name: "VersionID", FieldType: "Text", MaxLength: 36 },
       { Name: "ActivityID", FieldType: "Text", MaxLength: 36 },
       { Name: "ActivityName", FieldType: "Text", MaxLength: 200 },
@@ -564,12 +616,15 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "JourneyActivityObjectID", FieldType: "Text", MaxLength: 36 },
       { Name: "ActivityType", FieldType: "Text", MaxLength: 512 },
     ],
+  ],
 
-    // =========================================================================
-    // AUTOMATION STUDIO DATA VIEWS
-    // =========================================================================
+  // =========================================================================
+  // AUTOMATION STUDIO DATA VIEWS
+  // =========================================================================
 
-    _AutomationInstance: [
+  [
+    "_AutomationInstance",
+    [
       { Name: "MemberID", FieldType: "Number" },
       { Name: "AutomationName", FieldType: "Text", MaxLength: 400 },
       { Name: "AutomationCustomerKey", FieldType: "Text" },
@@ -604,8 +659,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
         MaxLength: 4000,
       },
     ],
+  ],
 
-    _AutomationActivityInstance: [
+  [
+    "_AutomationActivityInstance",
+    [
       { Name: "MemberID", FieldType: "Number" },
       { Name: "AutomationName", FieldType: "Text", MaxLength: 400 },
       { Name: "AutomationCustomerKey", FieldType: "Text", MaxLength: 400 },
@@ -625,12 +683,15 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
         MaxLength: 4000,
       },
     ],
+  ],
 
-    // =========================================================================
-    // MOBILE CONNECT DATA VIEWS
-    // =========================================================================
+  // =========================================================================
+  // MOBILE CONNECT DATA VIEWS
+  // =========================================================================
 
-    _SMSMessageTracking: [
+  [
+    "_SMSMessageTracking",
+    [
       { Name: "Mobile", FieldType: "Phone" },
       { Name: "SubscriberKey", FieldType: "Text" },
       { Name: "SubscriberID", FieldType: "Number" },
@@ -674,8 +735,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "SMSJobID", FieldType: "Text" },
       { Name: "SMSBatchID", FieldType: "Number" },
     ],
+  ],
 
-    _SMSSubscriptionLog: [
+  [
+    "_SMSSubscriptionLog",
+    [
       { Name: "MobileNumber", FieldType: "Phone" },
       { Name: "SubscriberKey", FieldType: "Text" },
       { Name: "LogDate", FieldType: "Date" },
@@ -691,16 +755,22 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "CreatedDate", FieldType: "Date" },
       { Name: "ModifiedDate", FieldType: "Date" },
     ],
+  ],
 
-    _UndeliverableSms: [
+  [
+    "_UndeliverableSms",
+    [
       { Name: "MobileNumber", FieldType: "Phone" },
       { Name: "Undeliverable", FieldType: "Boolean" },
       { Name: "BounceCount", FieldType: "Number" },
       { Name: "FirstBounceDate", FieldType: "Date" },
       { Name: "HoldDate", FieldType: "Date" },
     ],
+  ],
 
-    _MobileAddress: [
+  [
+    "_MobileAddress",
+    [
       { Name: "_MobileNumber", FieldType: "Text", MaxLength: 15 },
       { Name: "_ContactID", FieldType: "Text" },
       { Name: "_Status", FieldType: "Text" },
@@ -722,8 +792,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "_UTCOffset", FieldType: "Number" },
       { Name: "_IsHonorDST", FieldType: "Boolean" },
     ],
+  ],
 
-    _MobileSubscription: [
+  [
+    "_MobileSubscription",
+    [
       { Name: "_MobileNumber", FieldType: "Text", MaxLength: 15 },
       { Name: "_SubscriptionDefinitionID", FieldType: "Text", MaxLength: 200 },
       { Name: "_OptOutStatusID", FieldType: "Text" },
@@ -739,8 +812,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "_ModifiedDate", FieldType: "Date" },
       { Name: "_ModifiedBy", FieldType: "Text" },
     ],
+  ],
 
-    _ChatMessagingSubscription: [
+  [
+    "_ChatMessagingSubscription",
+    [
       { Name: "_MobileNumber", FieldType: "Text", MaxLength: 254 },
       { Name: "_ChannelId", FieldType: "Text", MaxLength: 50 },
       { Name: "_ChannelType", FieldType: "Text", MaxLength: 20 },
@@ -757,12 +833,15 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "_ModifiedDate", FieldType: "Date" },
       { Name: "_ModifiedBy", FieldType: "Text" },
     ],
+  ],
 
-    // =========================================================================
-    // MOBILE PUSH DATA VIEWS
-    // =========================================================================
+  // =========================================================================
+  // MOBILE PUSH DATA VIEWS
+  // =========================================================================
 
-    _PushAddress: [
+  [
+    "_PushAddress",
+    [
       { Name: "_DeviceID", FieldType: "Text", MaxLength: 200 },
       { Name: "_ContactID", FieldType: "Text" },
       { Name: "_APID", FieldType: "Text", MaxLength: 38 },
@@ -799,8 +878,11 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "_HardwareId", FieldType: "Text", MaxLength: 100 },
       { Name: "_DeviceType", FieldType: "Text", MaxLength: 20 },
     ],
+  ],
 
-    _PushTag: [
+  [
+    "_PushTag",
+    [
       { Name: "_DeviceID", FieldType: "Text", MaxLength: 200 },
       { Name: "_APID", FieldType: "Text", MaxLength: 38 },
       { Name: "_Value", FieldType: "Text", MaxLength: 128 },
@@ -809,12 +891,15 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "_ModifiedDate", FieldType: "Date" },
       { Name: "_ModifiedBy", FieldType: "Text" },
     ],
+  ],
 
-    // =========================================================================
-    // GROUP CONNECT DATA VIEWS
-    // =========================================================================
+  // =========================================================================
+  // GROUP CONNECT DATA VIEWS
+  // =========================================================================
 
-    _MobileLineAddressContactSubscriptionView: [
+  [
+    "_MobileLineAddressContactSubscriptionView",
+    [
       { Name: "ContactID", FieldType: "Number" },
       { Name: "ContactKey", FieldType: "Text" },
       { Name: "ChannelID", FieldType: "Text" },
@@ -823,20 +908,34 @@ const SYSTEM_DATA_VIEW_FIELDS: Record<string, DataExtensionFieldResponseDto[]> =
       { Name: "CreatedDate", FieldType: "Date" },
       { Name: "ModifiedDate", FieldType: "Date" },
     ],
+  ],
 
-    _MobileLineOrphanContactView: [
+  [
+    "_MobileLineOrphanContactView",
+    [
       { Name: "ContactID", FieldType: "Number" },
       { Name: "ContactKey", FieldType: "Text" },
       { Name: "AddressID", FieldType: "Text" },
       { Name: "CreatedDate", FieldType: "Date" },
     ],
-  };
+  ],
+]);
 
 // ENT. aliases share field definitions with their base versions
-SYSTEM_DATA_VIEW_FIELDS["ENT._Subscribers"] =
-  SYSTEM_DATA_VIEW_FIELDS._Subscribers;
-SYSTEM_DATA_VIEW_FIELDS["ENT._EnterpriseAttribute"] =
-  SYSTEM_DATA_VIEW_FIELDS._EnterpriseAttribute;
+const subscribersFields = SYSTEM_DATA_VIEW_FIELDS.get("_Subscribers");
+if (subscribersFields) {
+  SYSTEM_DATA_VIEW_FIELDS.set("ENT._Subscribers", subscribersFields);
+}
+
+const enterpriseAttributeFields = SYSTEM_DATA_VIEW_FIELDS.get(
+  "_EnterpriseAttribute",
+);
+if (enterpriseAttributeFields) {
+  SYSTEM_DATA_VIEW_FIELDS.set(
+    "ENT._EnterpriseAttribute",
+    enterpriseAttributeFields,
+  );
+}
 
 // =============================================================================
 // PUBLIC API
@@ -874,7 +973,7 @@ export function getAllSystemDataViews(): DataExtensionResponseDto[] {
  * Check if a customerKey is a system data view
  */
 export function isSystemDataView(customerKey: string): boolean {
-  return Object.hasOwn(SYSTEM_DATA_VIEW_FIELDS, customerKey);
+  return SYSTEM_DATA_VIEW_FIELDS.has(customerKey);
 }
 
 /**
@@ -884,8 +983,5 @@ export function isSystemDataView(customerKey: string): boolean {
 export function getSystemDataViewFields(
   customerKey: string,
 ): DataExtensionFieldResponseDto[] {
-  if (!isSystemDataView(customerKey)) {
-    return [];
-  }
-  return SYSTEM_DATA_VIEW_FIELDS[customerKey];
+  return SYSTEM_DATA_VIEW_FIELDS.get(customerKey) ?? [];
 }

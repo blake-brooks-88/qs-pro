@@ -1,0 +1,34 @@
+{
+  "results": {
+    "scenario1": {
+      "name": "Basic Editor Loading",
+      "passed": true,
+      "notes": "Monaco editor loaded successfully"
+    },
+    "scenario2": {
+      "name": "Warning Does NOT Block Execution",
+      "passed": false,
+      "notes": "RUN button is DISABLED (warning is incorrectly blocking)"
+    },
+    "scenario3": {
+      "name": "Error DOES Block Execution",
+      "passed": true,
+      "notes": "RUN button is DISABLED (error correctly blocks)"
+    },
+    "scenario4": {
+      "name": "Empty Query (Prereq) Blocks Execution",
+      "passed": true,
+      "notes": "RUN button is DISABLED (empty query correctly blocks)"
+    },
+    "scenario5": {
+      "name": "Valid Query Allows Execution",
+      "passed": false,
+      "notes": "RUN button is DISABLED (valid query is incorrectly blocked)"
+    }
+  },
+  "summary": {
+    "allPassed": false,
+    "passedCount": 3,
+    "totalCount": 5
+  }
+}

@@ -25,8 +25,8 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
   }> = [];
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {
@@ -121,13 +121,13 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
       // Check if this starts a SELECT subquery in FROM clause
       if (inFromClause) {
         let lookAhead = index + 1;
-        while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
+        while (lookAhead < sql.length && /\s/.test(sql.charAt(lookAhead))) {
           lookAhead += 1;
         }
         // Check if next word is SELECT
-        if (lookAhead < sql.length && isWordChar(sql[lookAhead])) {
+        if (lookAhead < sql.length && isWordChar(sql.charAt(lookAhead))) {
           let wordEnd = lookAhead + 1;
-          while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
+          while (wordEnd < sql.length && isWordChar(sql.charAt(wordEnd))) {
             wordEnd += 1;
           }
           const word = sql.slice(lookAhead, wordEnd).toLowerCase();
@@ -148,7 +148,7 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
 
     if (char === ")") {
       // Check if this closes a subquery in FROM
-      const currentSubquery = subqueryStack[subqueryStack.length - 1];
+      const currentSubquery = subqueryStack.at(subqueryStack.length - 1);
       if (
         currentSubquery &&
         currentSubquery.depth === parenDepth &&
@@ -159,16 +159,16 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
 
         // Now check if there's an alias after the closing paren
         let lookAhead = index + 1;
-        while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
+        while (lookAhead < sql.length && /\s/.test(sql.charAt(lookAhead))) {
           lookAhead += 1;
         }
 
         let hasAlias = false;
 
         // Check for AS keyword or direct identifier
-        if (lookAhead < sql.length && isWordChar(sql[lookAhead])) {
+        if (lookAhead < sql.length && isWordChar(sql.charAt(lookAhead))) {
           let wordEnd = lookAhead + 1;
-          while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
+          while (wordEnd < sql.length && isWordChar(sql.charAt(wordEnd))) {
             wordEnd += 1;
           }
           const word = sql.slice(lookAhead, wordEnd).toLowerCase();
@@ -176,12 +176,13 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
           if (word === "as") {
             // AS keyword found, there should be an alias after
             lookAhead = wordEnd;
-            while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
+            while (lookAhead < sql.length && /\s/.test(sql.charAt(lookAhead))) {
               lookAhead += 1;
             }
             if (
               lookAhead < sql.length &&
-              (isWordChar(sql[lookAhead]) || sql[lookAhead] === "[")
+              (isWordChar(sql.charAt(lookAhead)) ||
+                sql.charAt(lookAhead) === "[")
             ) {
               hasAlias = true;
             }
@@ -207,7 +208,7 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
             // This is likely an alias
             hasAlias = true;
           }
-        } else if (lookAhead < sql.length && sql[lookAhead] === "[") {
+        } else if (lookAhead < sql.length && sql.charAt(lookAhead) === "[") {
           // Bracketed alias
           hasAlias = true;
         }
@@ -236,7 +237,7 @@ const getSubqueryWithoutAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();

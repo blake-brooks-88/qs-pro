@@ -29,4 +29,3 @@ describe("getInlineCompletionReplacementEndOffset", () => {
     ).toBe(cursorIndex);
   });
 });
-

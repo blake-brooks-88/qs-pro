@@ -135,10 +135,13 @@ async function bootstrap() {
 
   adapter
     .getInstance()
-    .addHook('onSend', (req: FastifyRequest, reply: FastifyReply, _payload, done) => {
-      setSecurityHeaders(reply, cookieSecure);
-      done();
-    });
+    .addHook(
+      'onSend',
+      (req: FastifyRequest, reply: FastifyReply, _payload, done) => {
+        setSecurityHeaders(reply, cookieSecure);
+        done();
+      },
+    );
 
   await app.register(secureSession, {
     secret: sessionSecret,

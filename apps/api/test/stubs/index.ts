@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { EMPTY } from 'rxjs';
 import { ExecutionContext } from '@nestjs/common';
 import { createMockUserSession } from '../factories';
 
@@ -47,7 +48,12 @@ export function createRedisStub() {
   return {
     publish: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn().mockResolvedValue(undefined),
-    duplicate: vi.fn().mockReturnThis(),
+    duplicate: vi.fn().mockReturnValue({
+      subscribe: vi.fn().mockResolvedValue(undefined),
+      quit: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
+      off: vi.fn(),
+    }),
     on: vi.fn(),
     quit: vi.fn().mockResolvedValue(undefined),
     incr: vi.fn().mockResolvedValue(1),
@@ -85,6 +91,23 @@ export function createShellQueryServiceStub() {
     getRun: vi.fn(),
     getResults: vi.fn().mockResolvedValue({ items: [] }),
     cancelRun: vi.fn().mockResolvedValue({ status: 'canceled' }),
+  };
+}
+
+// Shell Query Run Repository stub
+export function createShellQueryRunRepoStub() {
+  return {
+    createRun: vi.fn().mockResolvedValue(undefined),
+    findRun: vi.fn().mockResolvedValue(null),
+    markCanceled: vi.fn().mockResolvedValue(undefined),
+    countActiveRuns: vi.fn().mockResolvedValue(0),
+  };
+}
+
+// Shell Query SSE Service stub
+export function createShellQuerySseServiceStub() {
+  return {
+    streamRunEvents: vi.fn().mockResolvedValue(EMPTY),
   };
 }
 

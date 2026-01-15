@@ -11,8 +11,8 @@ const splitSelectExpressions = (clause: string) => {
   let inBracket = false;
 
   for (let index = 0; index < clause.length; index += 1) {
-    const char = clause[index];
-    const nextChar = clause[index + 1];
+    const char = clause.charAt(index);
+    const nextChar = clause.charAt(index + 1);
 
     if (inSingleQuote) {
       current += char;
@@ -82,10 +82,157 @@ const splitSelectExpressions = (clause: string) => {
   return expressions;
 };
 
+const skipWhitespace = (value: string, index: number): number => {
+  let i = index;
+  while (i < value.length && /\s/.test(value.charAt(i))) {
+    i += 1;
+  }
+  return i;
+};
+
+const isIdentifierChar = (char: string): boolean => {
+  return /[A-Za-z0-9_]/.test(char);
+};
+
+const parseBracketedIdentifierEnd = (
+  value: string,
+  index: number,
+): number | null => {
+  if (value.charAt(index) !== "[") return null;
+  let i = index + 1;
+  while (i < value.length) {
+    const char = value.charAt(i);
+    const nextChar = value.charAt(i + 1);
+    if (char === "]") {
+      if (nextChar === "]") {
+        i += 2;
+        continue;
+      }
+      return i + 1;
+    }
+    i += 1;
+  }
+  return null;
+};
+
+const parseUnbracketedIdentifierEnd = (
+  value: string,
+  index: number,
+): number | null => {
+  if (!isIdentifierChar(value.charAt(index))) return null;
+  let i = index + 1;
+  while (i < value.length && isIdentifierChar(value.charAt(i))) {
+    i += 1;
+  }
+  return i;
+};
+
+const parseAliasSuffix = (value: string, index: number): boolean => {
+  let i = skipWhitespace(value, index);
+  if (i >= value.length) return true;
+
+  const tryParseAlias = (start: number): number | null => {
+    const bracketEnd = parseBracketedIdentifierEnd(value, start);
+    if (bracketEnd !== null) return bracketEnd;
+    return parseUnbracketedIdentifierEnd(value, start);
+  };
+
+  const wordEnd = parseUnbracketedIdentifierEnd(value, i);
+  if (wordEnd !== null) {
+    const firstWord = value.slice(i, wordEnd).toLowerCase();
+    if (firstWord === "as") {
+      i = skipWhitespace(value, wordEnd);
+      const aliasEnd = tryParseAlias(i);
+      if (aliasEnd === null) return false;
+      return skipWhitespace(value, aliasEnd) >= value.length;
+    }
+
+    const aliasEnd = wordEnd;
+    return skipWhitespace(value, aliasEnd) >= value.length;
+  }
+
+  const aliasEnd = tryParseAlias(i);
+  if (aliasEnd === null) return false;
+  return skipWhitespace(value, aliasEnd) >= value.length;
+};
+
+const parseStringLiteralEnd = (value: string, index: number): number | null => {
+  if (value.charAt(index) !== "'") return null;
+  let i = index + 1;
+  while (i < value.length) {
+    const char = value.charAt(i);
+    const nextChar = value.charAt(i + 1);
+    if (char === "'") {
+      if (nextChar === "'") {
+        i += 2;
+        continue;
+      }
+      return i + 1;
+    }
+    i += 1;
+  }
+  return null;
+};
+
+const parseNumberLiteralEnd = (value: string, index: number): number | null => {
+  const firstChar = value.charAt(index);
+  if (firstChar < "0" || firstChar > "9") return null;
+
+  let i = index;
+  while (i < value.length) {
+    const char = value.charAt(i);
+    if (char < "0" || char > "9") break;
+    i += 1;
+  }
+
+  if (value.charAt(i) === ".") {
+    const decimalStart = i + 1;
+    const decimalFirst = value.charAt(decimalStart);
+    if (decimalFirst < "0" || decimalFirst > "9") return null;
+
+    i = decimalStart + 1;
+    while (i < value.length) {
+      const char = value.charAt(i);
+      if (char < "0" || char > "9") break;
+      i += 1;
+    }
+  }
+
+  return i;
+};
+
+const parseKeywordLiteralEnd = (
+  value: string,
+  index: number,
+): number | null => {
+  const remaining = value.slice(index).toLowerCase();
+  const keywords = ["true", "false", "null"] as const;
+
+  for (const keyword of keywords) {
+    if (!remaining.startsWith(keyword)) continue;
+    const end = index + keyword.length;
+    const nextChar = value.charAt(end);
+    if (nextChar && isIdentifierChar(nextChar)) return null;
+    return end;
+  }
+
+  return null;
+};
+
 const isLiteralExpression = (expression: string) => {
-  return /^\s*('([^']|'')*'|\d+(\.\d+)?|true|false|null)\s*(as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i.test(
-    expression,
-  );
+  const start = skipWhitespace(expression, 0);
+  if (start >= expression.length) return false;
+
+  const stringEnd = parseStringLiteralEnd(expression, start);
+  if (stringEnd !== null) return parseAliasSuffix(expression, stringEnd);
+
+  const numberEnd = parseNumberLiteralEnd(expression, start);
+  if (numberEnd !== null) return parseAliasSuffix(expression, numberEnd);
+
+  const keywordEnd = parseKeywordLiteralEnd(expression, start);
+  if (keywordEnd !== null) return parseAliasSuffix(expression, keywordEnd);
+
+  return false;
 };
 
 const hasAlias = (expression: string) => {

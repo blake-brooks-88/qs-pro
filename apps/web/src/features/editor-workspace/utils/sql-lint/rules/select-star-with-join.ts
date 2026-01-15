@@ -14,8 +14,8 @@ const hasJoinClause = (sql: string): boolean => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -97,7 +97,7 @@ const hasJoinClause = (sql: string): boolean => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -131,8 +131,8 @@ const findUnqualifiedSelectStar = (sql: string): SqlDiagnostic[] => {
   let selectStart = -1;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -214,7 +214,7 @@ const findUnqualifiedSelectStar = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -241,11 +241,12 @@ const findUnqualifiedSelectStar = (sql: string): SqlDiagnostic[] => {
       // Check if this is table.* (qualified) or just * (unqualified)
       // Look back to see if there's a dot before the star
       let lookBack = index - 1;
-      while (lookBack >= selectStart && /\s/.test(sql[lookBack])) {
+      while (lookBack >= selectStart && /\s/.test(sql.charAt(lookBack))) {
         lookBack--;
       }
 
-      const isQualified = lookBack >= selectStart && sql[lookBack] === ".";
+      const isQualified =
+        lookBack >= selectStart && sql.charAt(lookBack) === ".";
 
       if (!isQualified) {
         diagnostics.push(

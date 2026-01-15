@@ -16,7 +16,8 @@ const getSelectClauseTokens = (sql: string, tokens: SqlToken[]) => {
     (token) => token.type === "word" && token.value.toLowerCase() === "select",
   );
   if (selectIndex === -1) return [];
-  const selectToken = tokens[selectIndex];
+  const selectToken = tokens.at(selectIndex);
+  if (!selectToken) return [];
   const fromIndex = tokens.findIndex(
     (token, index) =>
       index > selectIndex &&
@@ -39,8 +40,8 @@ const getUnqualifiedFieldTokens = (sql: string, tokens: SqlToken[]) => {
     if (["select", "from", "where", "group", "order", "having"].includes(value))
       return;
 
-    const prev = selectClauseTokens[index - 1];
-    const next = selectClauseTokens[index + 1];
+    const prev = selectClauseTokens.at(index - 1);
+    const next = selectClauseTokens.at(index + 1);
     if (prev?.type === "symbol" && prev.value === ".") return;
     if (next?.type === "symbol" && next.value === ".") return;
     if (prev?.type === "word" && prev.value.toLowerCase() === "as") return;
@@ -87,7 +88,7 @@ const getAmbiguousFieldDiagnostics = (
 
   const ambiguousFields = new Set<string>();
   const fieldTokens = getUnqualifiedFieldTokens(sql, tokens);
-  fieldTokens.forEach((token) => {
+  for (const token of fieldTokens) {
     const fieldName = normalizeIdentifier(token.value);
     const matches = referenceFields.filter((entry) =>
       entry.fields.has(fieldName),
@@ -95,7 +96,7 @@ const getAmbiguousFieldDiagnostics = (
     if (matches.length >= 2) {
       ambiguousFields.add(fieldName);
     }
-  });
+  }
 
   if (ambiguousFields.size === 0) return [];
 
