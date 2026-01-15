@@ -64,7 +64,12 @@ pnpm typecheck                     # Type check all packages
 
 **Imports:** Use `@` alias for src imports (e.g., `import { Button } from '@/components/ui/Button'`).
 
-**TypeScript:** Strict mode. No `any`, no `console`. Prefix unused args with `_`.
+**TypeScript:** Strict mode. No `any`. Prefix unused args with `_`. Console limited to `warn`/`error` only.
+
+**Comments:** Comments are the exception, not the rule. Code should be self-documenting. Only use comments for:
+- Explaining *why* behind a non-obvious decision or exception
+- JSDoc for public APIs that external consumers will use
+- Never for "fix for X" or describing what the code does (the code shows that)
 
 **State Management (Frontend):**
 1. Local state: `useState` for form inputs, UI toggles

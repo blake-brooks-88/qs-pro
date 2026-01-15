@@ -22,11 +22,22 @@
 - `pnpm db:generate` / `pnpm db:migrate`: generate/migrate DB schema via `packages/database`.
 
 ## Coding Style & Naming Conventions
-- Code should be self-documenting. Comments should be minimal and only explain "why" not "what".
 - TypeScript across apps/packages; use ESLint from `packages/eslint-config`.
-- Key rules: no `console`, no `any`, unused args should be prefixed with `_`.
+- Key rules: no `any`, unused args prefixed with `_`, console limited to `warn`/`error` only.
 - API formatting uses Prettier (`apps/api` has a `format` script).
 - Prefer configured path aliases (`@` imports) over deep relative paths.
+
+## Comments Policy
+Comments are the **exception**, not the rule. Code should be self-documenting.
+
+**Acceptable comments:**
+- Explaining *why* behind a non-obvious decision or exception
+- JSDoc for public APIs that external consumers will use
+
+**Unacceptable comments:**
+- "Fix for X" or changelog-style notes (that's what git history is for)
+- Describing what the code does (the code shows that)
+- Commented-out code (delete it; git has history)
 
 ## Testing Guidelines
 - Vitest is used in `apps/api`, `apps/web`, and `packages/database`.
