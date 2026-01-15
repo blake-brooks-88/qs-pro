@@ -290,6 +290,12 @@ export class AuthController {
     return { ok: true };
   }
 
+  @Get('logout')
+  logout(@Req() req: SessionRequest) {
+    req.session?.delete();
+    return { ok: true };
+  }
+
   private resolveAuthTssd(explicitTssd?: string): string | undefined {
     if (explicitTssd) return this.normalizeTssd(explicitTssd);
 
