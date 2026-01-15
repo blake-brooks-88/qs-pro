@@ -409,6 +409,22 @@ export class AuthService {
     if (!obj) return undefined;
 
     for (const key of keys) {
+      /**
+       * ESLINT-DISABLE JUSTIFICATION:
+       * This eslint-disable is an exception to project standards, not a pattern to follow.
+       *
+       * Why this is safe: The `keys` parameter is a string array passed from call sites
+       * with compile-time literal strings representing known OAuth/OIDC claim names
+       * (e.g., ["userId", "userID", "memberId"]). The `obj` parameter comes from MCE's
+       * userinfo endpoint response after successful OAuth token exchange, which is a
+       * verified authenticated response from Salesforce Marketing Cloud.
+       *
+       * Why not refactor: This method intentionally iterates over multiple possible claim
+       * names because MCE's userinfo response structure varies across API versions and
+       * account configurations. Using a Map would require pre-populating all possible
+       * claim variations, defeating the purpose of this flexible extraction pattern.
+       */
+      // eslint-disable-next-line security/detect-object-injection
       const value = obj[key];
       const direct = this.coerceId(value);
       if (direct) return direct;
