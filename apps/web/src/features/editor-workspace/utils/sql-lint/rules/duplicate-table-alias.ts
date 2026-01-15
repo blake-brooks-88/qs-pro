@@ -40,7 +40,8 @@ const getDuplicateTableAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (occurrences.length > 1) {
       // Mark all occurrences after the first as errors
       for (let i = 1; i < occurrences.length; i++) {
-        const occurrence = occurrences[i];
+        const occurrence = occurrences.at(i);
+        if (!occurrence) continue;
         diagnostics.push(
           createDiagnostic(
             `Duplicate table alias "${occurrence.alias}" — each table must have a unique alias. ${MC.SHORT} requires distinct aliases in JOINs.`,

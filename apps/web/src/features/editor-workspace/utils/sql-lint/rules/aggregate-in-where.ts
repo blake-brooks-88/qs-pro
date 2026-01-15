@@ -25,8 +25,8 @@ const getAggregateInWhereDiagnostics = (sql: string): SqlDiagnostic[] => {
 
   // First pass: find WHERE clause boundaries at the top level
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {
@@ -131,7 +131,7 @@ const getAggregateInWhereDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (parenDepth === 0 && isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -176,8 +176,8 @@ const getAggregateInWhereDiagnostics = (sql: string): SqlDiagnostic[] => {
     inBlockComment = false;
 
     while (clauseIndex < whereClause.end) {
-      const char = sql[clauseIndex];
-      const nextChar = sql[clauseIndex + 1];
+      const char = sql.charAt(clauseIndex);
+      const nextChar = sql.charAt(clauseIndex + 1);
 
       // Handle line comments
       if (inLineComment) {
@@ -282,7 +282,7 @@ const getAggregateInWhereDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (clauseParenDepth === 0 && isWordChar(char)) {
         const start = clauseIndex;
         let end = clauseIndex + 1;
-        while (end < sql.length && isWordChar(sql[end])) {
+        while (end < sql.length && isWordChar(sql.charAt(end))) {
           end += 1;
         }
         const word = sql.slice(start, end).toLowerCase();
@@ -291,10 +291,10 @@ const getAggregateInWhereDiagnostics = (sql: string): SqlDiagnostic[] => {
         if (AGGREGATE_FUNCTIONS.has(word)) {
           // Check if followed by opening parenthesis (it's a function call)
           let lookAhead = end;
-          while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
+          while (lookAhead < sql.length && /\s/.test(sql.charAt(lookAhead))) {
             lookAhead += 1;
           }
-          if (lookAhead < sql.length && sql[lookAhead] === "(") {
+          if (lookAhead < sql.length && sql.charAt(lookAhead) === "(") {
             // This is an aggregate function call in WHERE clause
             diagnostics.push(
               createDiagnostic(

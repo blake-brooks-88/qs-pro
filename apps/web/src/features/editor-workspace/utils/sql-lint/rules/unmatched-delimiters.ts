@@ -16,8 +16,8 @@ const getUnmatchedDelimitersDiagnostics = (sql: string): SqlDiagnostic[] => {
   let unclosedQuoteIndex = -1;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {

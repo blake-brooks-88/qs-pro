@@ -25,8 +25,8 @@ const getOrderByInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
   }> = [];
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     // Handle line comments
     if (inLineComment) {
@@ -119,13 +119,13 @@ const getOrderByInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
       parenDepth += 1;
       // Check if this starts a SELECT subquery
       let lookAhead = index + 1;
-      while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
+      while (lookAhead < sql.length && /\s/.test(sql.charAt(lookAhead))) {
         lookAhead += 1;
       }
       // Check if next word is SELECT
-      if (lookAhead < sql.length && isWordChar(sql[lookAhead])) {
+      if (lookAhead < sql.length && isWordChar(sql.charAt(lookAhead))) {
         let wordEnd = lookAhead + 1;
-        while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
+        while (wordEnd < sql.length && isWordChar(sql.charAt(wordEnd))) {
           wordEnd += 1;
         }
         const word = sql.slice(lookAhead, wordEnd).toLowerCase();
@@ -145,7 +145,7 @@ const getOrderByInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
 
     if (char === ")") {
       // Check if we're closing a subquery context
-      const currentContext = subqueryStack[subqueryStack.length - 1];
+      const currentContext = subqueryStack.at(subqueryStack.length - 1);
       if (currentContext && currentContext.depth === parenDepth) {
         // This closes a subquery - check if it has ORDER BY without TOP/OFFSET
         if (
@@ -175,13 +175,13 @@ const getOrderByInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
 
       // Check if we're in a subquery context
-      const currentContext = subqueryStack[subqueryStack.length - 1];
+      const currentContext = subqueryStack.at(subqueryStack.length - 1);
       if (currentContext && currentContext.depth === parenDepth) {
         if (word === "top") {
           currentContext.hasTop = true;
@@ -190,7 +190,7 @@ const getOrderByInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
         } else if (word === "order") {
           // Check if followed by BY
           let lookAhead = end;
-          while (lookAhead < sql.length && /\s/.test(sql[lookAhead])) {
+          while (lookAhead < sql.length && /\s/.test(sql.charAt(lookAhead))) {
             lookAhead += 1;
           }
           if (lookAhead + 1 < sql.length) {

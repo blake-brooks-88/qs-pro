@@ -12,8 +12,8 @@ const getWithNolockDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -94,7 +94,7 @@ const getWithNolockDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -102,23 +102,23 @@ const getWithNolockDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (word === "with") {
         // Skip whitespace after WITH
         let pos = end;
-        while (pos < sql.length && /\s/.test(sql[pos])) {
+        while (pos < sql.length && /\s/.test(sql.charAt(pos))) {
           pos += 1;
         }
 
         // Check if followed by (NOLOCK) or ( NOLOCK )
-        if (pos < sql.length && sql[pos] === "(") {
+        if (pos < sql.length && sql.charAt(pos) === "(") {
           let innerPos = pos + 1;
           // Skip whitespace inside parentheses
-          while (innerPos < sql.length && /\s/.test(sql[innerPos])) {
+          while (innerPos < sql.length && /\s/.test(sql.charAt(innerPos))) {
             innerPos += 1;
           }
 
           // Check for NOLOCK
-          if (innerPos < sql.length && isWordChar(sql[innerPos])) {
+          if (innerPos < sql.length && isWordChar(sql.charAt(innerPos))) {
             const wordStart = innerPos;
             let wordEnd = innerPos + 1;
-            while (wordEnd < sql.length && isWordChar(sql[wordEnd])) {
+            while (wordEnd < sql.length && isWordChar(sql.charAt(wordEnd))) {
               wordEnd += 1;
             }
             const innerWord = sql.slice(wordStart, wordEnd).toLowerCase();
@@ -126,12 +126,12 @@ const getWithNolockDiagnostics = (sql: string): SqlDiagnostic[] => {
             if (innerWord === "nolock") {
               // Skip whitespace after NOLOCK
               let closePos = wordEnd;
-              while (closePos < sql.length && /\s/.test(sql[closePos])) {
+              while (closePos < sql.length && /\s/.test(sql.charAt(closePos))) {
                 closePos += 1;
               }
 
               // Check for closing parenthesis
-              if (closePos < sql.length && sql[closePos] === ")") {
+              if (closePos < sql.length && sql.charAt(closePos) === ")") {
                 diagnostics.push(
                   createDiagnostic(
                     `WITH (NOLOCK) is redundant in ${MC.SHORT}. All queries already run in read-uncommitted isolation, so this hint has no effect. Consider removing it.`,

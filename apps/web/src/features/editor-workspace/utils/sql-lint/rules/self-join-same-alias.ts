@@ -54,8 +54,9 @@ const getSelfJoinSameAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
     // This is a self-join - check if aliases are distinct
     for (let i = 0; i < occurrences.length; i++) {
       for (let j = i + 1; j < occurrences.length; j++) {
-        const first = occurrences[i];
-        const second = occurrences[j];
+        const first = occurrences.at(i);
+        const second = occurrences.at(j);
+        if (!first || !second) continue;
 
         // Check if both have no alias, or if they have the same alias
         const bothNoAlias = !first.alias && !second.alias;

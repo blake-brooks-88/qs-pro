@@ -11,8 +11,8 @@ const getNotInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -93,7 +93,7 @@ const getNotInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -101,15 +101,15 @@ const getNotInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (word === "not") {
         // Skip whitespace after NOT
         let pos = end;
-        while (pos < sql.length && /\s/.test(sql[pos])) {
+        while (pos < sql.length && /\s/.test(sql.charAt(pos))) {
           pos += 1;
         }
 
         // Check if followed by IN
-        if (pos < sql.length && isWordChar(sql[pos])) {
+        if (pos < sql.length && isWordChar(sql.charAt(pos))) {
           const inWordStart = pos;
           let inWordEnd = pos + 1;
-          while (inWordEnd < sql.length && isWordChar(sql[inWordEnd])) {
+          while (inWordEnd < sql.length && isWordChar(sql.charAt(inWordEnd))) {
             inWordEnd += 1;
           }
           const inWord = sql.slice(inWordStart, inWordEnd).toLowerCase();
@@ -117,25 +117,28 @@ const getNotInSubqueryDiagnostics = (sql: string): SqlDiagnostic[] => {
           if (inWord === "in") {
             // Skip whitespace after IN
             let parenPos = inWordEnd;
-            while (parenPos < sql.length && /\s/.test(sql[parenPos])) {
+            while (parenPos < sql.length && /\s/.test(sql.charAt(parenPos))) {
               parenPos += 1;
             }
 
             // Check if followed by (
-            if (parenPos < sql.length && sql[parenPos] === "(") {
+            if (parenPos < sql.length && sql.charAt(parenPos) === "(") {
               // Skip whitespace and check for SELECT keyword
               let selectPos = parenPos + 1;
-              while (selectPos < sql.length && /\s/.test(sql[selectPos])) {
+              while (
+                selectPos < sql.length &&
+                /\s/.test(sql.charAt(selectPos))
+              ) {
                 selectPos += 1;
               }
 
               // Check if it's a SELECT subquery
-              if (selectPos < sql.length && isWordChar(sql[selectPos])) {
+              if (selectPos < sql.length && isWordChar(sql.charAt(selectPos))) {
                 const selectWordStart = selectPos;
                 let selectWordEnd = selectPos + 1;
                 while (
                   selectWordEnd < sql.length &&
-                  isWordChar(sql[selectWordEnd])
+                  isWordChar(sql.charAt(selectWordEnd))
                 ) {
                   selectWordEnd += 1;
                 }

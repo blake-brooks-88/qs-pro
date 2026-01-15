@@ -11,8 +11,7 @@ const getSelectStarSingleDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   // First pass: check if query contains JOIN
-  const sqlLower = sql.toLowerCase();
-  const hasJoin = /\bjoin\b/i.test(sqlLower);
+  const hasJoin = /\bjoin\b/i.test(sql);
 
   // Only check for SELECT * if no JOIN is present
   if (hasJoin) {
@@ -20,8 +19,8 @@ const getSelectStarSingleDiagnostics = (sql: string): SqlDiagnostic[] => {
   }
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -102,7 +101,7 @@ const getSelectStarSingleDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -110,14 +109,14 @@ const getSelectStarSingleDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (word === "select") {
         // Skip whitespace after SELECT
         let pos = end;
-        while (pos < sql.length && /\s/.test(sql[pos])) {
+        while (pos < sql.length && /\s/.test(sql.charAt(pos))) {
           pos += 1;
         }
 
         // Check if next character is * (not part of a block comment)
-        if (pos < sql.length && sql[pos] === "*") {
+        if (pos < sql.length && sql.charAt(pos) === "*") {
           // Make sure it's not the start of a block comment
-          const nextAfterStar = sql[pos + 1];
+          const nextAfterStar = sql.charAt(pos + 1);
           if (nextAfterStar !== "/") {
             diagnostics.push(
               createDiagnostic(

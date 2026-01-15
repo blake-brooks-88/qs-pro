@@ -21,9 +21,12 @@ const removeComments = (sql: string): string => {
   let i = 0;
 
   while (i < sql.length) {
+    const char = sql.charAt(i);
+    const nextChar = sql.charAt(i + 1);
+
     // Line comment
-    if (sql[i] === "-" && sql[i + 1] === "-") {
-      while (i < sql.length && sql[i] !== "\n") {
+    if (char === "-" && nextChar === "-") {
+      while (i < sql.length && sql.charAt(i) !== "\n") {
         result += " ";
         i++;
       }
@@ -31,10 +34,13 @@ const removeComments = (sql: string): string => {
     }
 
     // Block comment
-    if (sql[i] === "/" && sql[i + 1] === "*") {
+    if (char === "/" && nextChar === "*") {
       result += "  ";
       i += 2;
-      while (i < sql.length && !(sql[i] === "*" && sql[i + 1] === "/")) {
+      while (
+        i < sql.length &&
+        !(sql.charAt(i) === "*" && sql.charAt(i + 1) === "/")
+      ) {
         result += " ";
         i++;
       }
@@ -45,7 +51,7 @@ const removeComments = (sql: string): string => {
       continue;
     }
 
-    result += sql[i];
+    result += char;
     i++;
   }
 
@@ -189,8 +195,8 @@ const createParser = (sql: string) => {
   let inBlockComment = false;
 
   const skipQuotesAndComments = (): boolean => {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -282,7 +288,7 @@ const createParser = (sql: string) => {
     advance: () => {
       index += 1;
     },
-    char: () => sql[index],
+    char: () => sql.charAt(index),
     atEnd: () => index >= sql.length,
   };
 };
@@ -315,7 +321,7 @@ const findRestrictedClauses = (sql: string): ClauseLocation[] => {
     if (isWordChar(parser.char())) {
       const start = parser.index;
       let end = start + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
@@ -325,7 +331,7 @@ const findRestrictedClauses = (sql: string): ClauseLocation[] => {
       if (word === "order" || word === "group") {
         // Skip whitespace
         let pos = end;
-        while (pos < sql.length && /\s/.test(sql[pos])) {
+        while (pos < sql.length && /\s/.test(sql.charAt(pos))) {
           pos += 1;
         }
 
@@ -343,7 +349,7 @@ const findRestrictedClauses = (sql: string): ClauseLocation[] => {
             if (isWordChar(subParser.char())) {
               const wStart = subParser.index;
               let wEnd = wStart + 1;
-              while (wEnd < sql.length && isWordChar(sql[wEnd])) {
+              while (wEnd < sql.length && isWordChar(sql.charAt(wEnd))) {
                 wEnd += 1;
               }
               const w = sql.slice(wStart, wEnd).toLowerCase();
@@ -383,7 +389,7 @@ const findRestrictedClauses = (sql: string): ClauseLocation[] => {
           if (isWordChar(subParser.char())) {
             const wStart = subParser.index;
             let wEnd = wStart + 1;
-            while (wEnd < sql.length && isWordChar(sql[wEnd])) {
+            while (wEnd < sql.length && isWordChar(sql.charAt(wEnd))) {
               wEnd += 1;
             }
             const w = sql.slice(wStart, wEnd).toLowerCase();
@@ -457,8 +463,8 @@ const getAliasInClauseDiagnostics = (sql: string): SqlDiagnostic[] => {
     let inBlockComment = false;
 
     while (i < clauseText.length) {
-      const char = clauseText[i];
-      const nextChar = clauseText[i + 1];
+      const char = clauseText.charAt(i);
+      const nextChar = clauseText.charAt(i + 1);
 
       // Handle comments
       if (inLineComment) {
@@ -508,7 +514,7 @@ const getAliasInClauseDiagnostics = (sql: string): SqlDiagnostic[] => {
       if (char === "[") {
         const bracketStart = i;
         i++;
-        while (i < clauseText.length && clauseText[i] !== "]") {
+        while (i < clauseText.length && clauseText.charAt(i) !== "]") {
           i++;
         }
         if (i < clauseText.length) {
@@ -540,7 +546,7 @@ const getAliasInClauseDiagnostics = (sql: string): SqlDiagnostic[] => {
       // Check for word token
       if (isWordChar(char)) {
         const start = i;
-        while (i < clauseText.length && isWordChar(clauseText[i])) {
+        while (i < clauseText.length && isWordChar(clauseText.charAt(i))) {
           i++;
         }
         const word = clauseText.slice(start, i);

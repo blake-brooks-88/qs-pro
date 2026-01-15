@@ -16,9 +16,12 @@ const removeComments = (sql: string): string => {
   let i = 0;
 
   while (i < sql.length) {
+    const char = sql.charAt(i);
+    const nextChar = sql.charAt(i + 1);
+
     // Line comment
-    if (sql[i] === "-" && sql[i + 1] === "-") {
-      while (i < sql.length && sql[i] !== "\n") {
+    if (char === "-" && nextChar === "-") {
+      while (i < sql.length && sql.charAt(i) !== "\n") {
         result += " ";
         i++;
       }
@@ -26,10 +29,13 @@ const removeComments = (sql: string): string => {
     }
 
     // Block comment
-    if (sql[i] === "/" && sql[i + 1] === "*") {
+    if (char === "/" && nextChar === "*") {
       result += "  ";
       i += 2;
-      while (i < sql.length && !(sql[i] === "*" && sql[i + 1] === "/")) {
+      while (
+        i < sql.length &&
+        !(sql.charAt(i) === "*" && sql.charAt(i + 1) === "/")
+      ) {
         result += " ";
         i++;
       }
@@ -40,7 +46,7 @@ const removeComments = (sql: string): string => {
       continue;
     }
 
-    result += sql[i];
+    result += char;
     i++;
   }
 
@@ -162,7 +168,8 @@ const getDuplicateColumnAliasDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (occurrences.length > 1) {
       // Mark all occurrences after the first as errors
       for (let i = 1; i < occurrences.length; i++) {
-        const occurrence = occurrences[i];
+        const occurrence = occurrences.at(i);
+        if (!occurrence) continue;
         diagnostics.push(
           createDiagnostic(
             `Duplicate column alias "${occurrence.alias}" — each column must have a unique alias. ${MC.SHORT} requires distinct column names in SELECT.`,
