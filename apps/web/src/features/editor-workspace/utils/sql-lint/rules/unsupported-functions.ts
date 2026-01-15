@@ -13,8 +13,8 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
   let inBlockComment = false;
 
   while (index < sql.length) {
-    const char = sql[index];
-    const nextChar = sql[index + 1];
+    const char = sql.charAt(index);
+    const nextChar = sql.charAt(index + 1);
 
     if (inLineComment) {
       if (char === "\n") {
@@ -95,18 +95,18 @@ const getUnsupportedFunctionDiagnostics = (sql: string): SqlDiagnostic[] => {
     if (isWordChar(char)) {
       const start = index;
       let end = index + 1;
-      while (end < sql.length && isWordChar(sql[end])) {
+      while (end < sql.length && isWordChar(sql.charAt(end))) {
         end += 1;
       }
       const word = sql.slice(start, end).toLowerCase();
 
       let checkIndex = end;
-      while (checkIndex < sql.length && /\s/.test(sql[checkIndex])) {
+      while (checkIndex < sql.length && /\s/.test(sql.charAt(checkIndex))) {
         checkIndex += 1;
       }
 
-      if (checkIndex < sql.length && sql[checkIndex] === "(") {
-        const alternative = MCE_SQL_UNSUPPORTED_FUNCTIONS[word];
+      if (checkIndex < sql.length && sql.charAt(checkIndex) === "(") {
+        const alternative = MCE_SQL_UNSUPPORTED_FUNCTIONS.get(word);
         if (alternative !== undefined) {
           const message = alternative
             ? `${word.toUpperCase()}() is not available in ${MC.SHORT}. ${alternative}`
