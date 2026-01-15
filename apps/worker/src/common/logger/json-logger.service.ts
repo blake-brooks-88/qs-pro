@@ -3,7 +3,7 @@ import { ConsoleLogger, Injectable, Scope } from "@nestjs/common";
 
 @Injectable({ scope: Scope.TRANSIENT })
 export class JsonLogger extends ConsoleLogger {
-  log(message: unknown, context?: string) {
+  override log(message: unknown, context?: string) {
     if (process.env.LOG_FORMAT === "json") {
       console.log(
         JSON.stringify({
@@ -18,7 +18,7 @@ export class JsonLogger extends ConsoleLogger {
     }
   }
 
-  error(message: unknown, stack?: string, context?: string) {
+  override error(message: unknown, stack?: string, context?: string) {
     if (process.env.LOG_FORMAT === "json") {
       console.error(
         JSON.stringify({
@@ -34,7 +34,7 @@ export class JsonLogger extends ConsoleLogger {
     }
   }
 
-  warn(message: unknown, context?: string) {
+  override warn(message: unknown, context?: string) {
     if (process.env.LOG_FORMAT === "json") {
       console.warn(
         JSON.stringify({
@@ -49,7 +49,7 @@ export class JsonLogger extends ConsoleLogger {
     }
   }
 
-  debug(message: unknown, context?: string) {
+  override debug(message: unknown, context?: string) {
     if (process.env.LOG_FORMAT === "json") {
       console.debug(
         JSON.stringify({

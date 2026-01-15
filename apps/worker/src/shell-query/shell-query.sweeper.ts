@@ -65,12 +65,17 @@ export class ShellQuerySweeper {
         searchSoap,
         "Retrieve",
       );
-    const folder = searchResponse.Body?.RetrieveResponseMsg?.Results;
+    const results = searchResponse.Body?.RetrieveResponseMsg?.Results;
+    if (!results) {
+      return;
+    }
+
+    const folder = Array.isArray(results) ? results[0] : results;
     if (!folder) {
       return;
     }
 
-    const folderId = Array.isArray(folder) ? folder[0].ID : folder.ID;
+    const folderId = folder.ID;
 
     // 2. Retrieve QueryDefinitions in that folder older than 24h
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

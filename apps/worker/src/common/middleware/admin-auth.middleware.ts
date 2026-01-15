@@ -13,7 +13,7 @@ export class AdminAuthMiddleware implements NestMiddleware {
 
   use(
     req: FastifyRequest,
-    res: FastifyReply,
+    _res: FastifyReply,
     next: (error?: Error | HttpException) => void,
   ) {
     const adminApiKey = this.configService.get<string>("ADMIN_API_KEY");
