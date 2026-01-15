@@ -385,7 +385,7 @@ function checkUnsupportedFunctions(
 
   // Check each function against the unsupported list
   for (const func of detectedFunctions) {
-    const alternative = MCE_SQL_UNSUPPORTED_FUNCTIONS[func.name];
+    const alternative = MCE_SQL_UNSUPPORTED_FUNCTIONS.get(func.name);
     if (alternative !== undefined) {
       // Found an unsupported function
       const position = findPatternPosition(sql, func.searchPattern);
@@ -408,6 +408,12 @@ function checkUnsupportedFunctions(
 }
 
 /**
+ * Escape special regex characters in a string
+ */
+const escapeRegex = (str: string): string =>
+  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
  * Token-based fallback detection for unsupported functions that may cause parse errors.
  * This handles functions like TRY_CAST, STRING_SPLIT, OPENJSON which node-sql-parser
  * may not recognize in the T-SQL dialect.
@@ -418,11 +424,11 @@ export function checkUnsupportedFunctionsViaTokens(
   const diagnostics: SqlDiagnostic[] = [];
 
   // Check for each unsupported function using regex to match function call pattern
-  for (const [funcName, alternative] of Object.entries(
-    MCE_SQL_UNSUPPORTED_FUNCTIONS,
-  )) {
+  for (const [funcName, alternative] of MCE_SQL_UNSUPPORTED_FUNCTIONS) {
     // Match function name followed by opening parenthesis, allowing whitespace
-    const pattern = new RegExp(`\\b${funcName}\\s*\\(`, "gi");
+    const escapedFuncName = escapeRegex(funcName);
+    // eslint-disable-next-line security/detect-non-literal-regexp -- funcName from MCE_SQL_UNSUPPORTED_FUNCTIONS Map keys, not user input
+    const pattern = new RegExp(`\\b${escapedFuncName}\\s*\\(`, "gi");
     let match: RegExpExecArray | null;
 
     while ((match = pattern.exec(sql)) !== null) {
@@ -463,7 +469,7 @@ export function checkPolicyViolations(
     const stmtType = stmt.type?.toLowerCase();
 
     // Prohibited statement types (INSERT, UPDATE, DELETE, etc.)
-    if (stmtType && PROHIBITED_STATEMENT_TYPES[stmtType]) {
+    if (stmtType && Object.hasOwn(PROHIBITED_STATEMENT_TYPES, stmtType)) {
       diagnostics.push({
         message: PROHIBITED_STATEMENT_TYPES[stmtType],
         severity: "error",
