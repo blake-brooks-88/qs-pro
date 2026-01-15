@@ -704,7 +704,8 @@ export function MonacoQueryEditor({
         ],
         onEnterRules: [
           {
-            beforeText: /^\s*SELECT(\s+DISTINCT)?(\s+TOP\s+\d+)?\s*$/i,
+            // eslint-disable-next-line security/detect-unsafe-regex -- Monaco requires a RegExp here; this pattern is fully anchored and avoids nested quantifiers/backtracking hotspots, so it's safe for untrusted input.
+            beforeText: /^\s*SELECT(?:\s+DISTINCT)?(?:\s+TOP\s+\d+)?\s*$/i,
             action: {
               indentAction: monacoInstance.languages.IndentAction.Indent,
             },
@@ -723,7 +724,8 @@ export function MonacoQueryEditor({
           },
           {
             beforeText:
-              /^\s*(INNER\s+|LEFT\s+(OUTER\s+)?|RIGHT\s+(OUTER\s+)?|FULL\s+(OUTER\s+)?|CROSS\s+)?JOIN\s+\S+.*(?<!\bON\b.*)$/i,
+              // eslint-disable-next-line security/detect-unsafe-regex -- Monaco requires a RegExp here; this pattern is fully anchored and avoids nested quantifiers/backtracking hotspots, so it's safe for untrusted input.
+              /^\s*(?:(?:INNER|LEFT|RIGHT|FULL)(?:\s+OUTER)?|CROSS)?\s*JOIN\s+\S+(?:\s+(?:AS\s+)?(?!ON\b)\S+)?\s*$/i,
             action: {
               indentAction: monacoInstance.languages.IndentAction.Indent,
             },
@@ -827,7 +829,9 @@ export function MonacoQueryEditor({
 
         if (/\s/.test(charBefore)) return;
 
-        const fromJoinMatch = currentWord.match(/^(f(r(om?)?)?|j(o(in?)?)?)$/i);
+        const fromJoinMatch = currentWord.match(
+          /^(?:f|fr|fro|from|j|jo|joi|join)$/i,
+        );
         const isFromOrJoinPrefix =
           wordInfo.endColumn === position.column && fromJoinMatch !== null;
         if (!isFromOrJoinPrefix) return;
