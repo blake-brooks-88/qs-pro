@@ -20,9 +20,11 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix"
-    ]
+    "apps/api/**/*.ts": "pnpm --filter api exec eslint --fix",
+    "apps/web/**/*.{ts,tsx}": "pnpm --filter @qs-pro/web exec eslint --fix",
+    "packages/backend-shared/**/*.ts": "pnpm --filter @qs-pro/backend-shared exec eslint --fix",
+    "packages/database/**/*.ts": "pnpm --filter @qs-pro/database exec eslint --fix",
+    "packages/shared-types/**/*.ts": "pnpm --filter @qs-pro/shared-types exec eslint --fix"
   },
   "packageManager": "pnpm@9.0.0",
   "devDependencies": {
