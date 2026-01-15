@@ -87,7 +87,8 @@ const isLiteralExpression = (expression: string) => {
   // Using [^']*(?:''[^']*)* pattern to avoid ReDoS (no alternation inside quantifier)
   const stringLiteralPattern =
     /^\s*'[^']*(?:''[^']*)*'\s*(?:as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i;
-  const numberPattern = /^\s*\d+(?:\.\d+)?\s*(?:as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i;
+  const numberPattern =
+    /^\s*\d+(?:\.\d+)?\s*(?:as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i;
   const keywordPattern =
     /^\s*(?:true|false|null)\s*(?:as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i;
 
