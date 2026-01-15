@@ -6,10 +6,6 @@ import {
 } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
 
-type SecureSession = {
-  get(key: string): unknown;
-};
-
 @Injectable()
 export class CsrfGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {

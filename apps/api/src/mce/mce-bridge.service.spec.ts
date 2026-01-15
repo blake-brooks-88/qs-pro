@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { MceBridgeService } from './mce-bridge.service';
 import { AuthService } from '../auth/auth.service';

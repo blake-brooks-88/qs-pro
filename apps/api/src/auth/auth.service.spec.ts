@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-/* eslint-disable @typescript-eslint/unbound-method */
+
 import { AuthService } from './auth.service';
 import { ConfigService } from '@nestjs/config';
 import { setupServer } from 'msw/node';
@@ -106,7 +106,7 @@ describe('AuthService', () => {
         {
           provide: 'USER_REPOSITORY',
           useValue: {
-            upsert: vi.fn().mockImplementation(async (values) => ({
+            upsert: vi.fn().mockImplementation((values) => ({
               id: 'u-1',
               ...(values as Record<string, unknown>),
             })),

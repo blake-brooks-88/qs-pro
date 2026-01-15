@@ -55,8 +55,6 @@ describe('FeaturesController', () => {
       })
       .compile();
 
-    const controllerWithGuard =
-      module.get<FeaturesController>(FeaturesController);
     const guard = module.get(SessionGuard);
 
     // Verify the guard throws UnauthorizedException
