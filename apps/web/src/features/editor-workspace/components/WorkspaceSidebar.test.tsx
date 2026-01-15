@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "@/test/mocks/server";
 import { WorkspaceSidebar } from "@/features/editor-workspace/components/WorkspaceSidebar";
 import {
   DataExtension,
@@ -45,8 +47,12 @@ const renderSidebar = (
 };
 
 describe("WorkspaceSidebar", () => {
+  beforeEach(() => {
+    server.resetHandlers();
+  });
+
   afterEach(() => {
-    vi.restoreAllMocks();
+    server.resetHandlers();
   });
 
   it("renders root folders and expands to show child folders", async () => {
@@ -87,7 +93,13 @@ describe("WorkspaceSidebar", () => {
 
   it("expands data extensions to reveal fields", async () => {
     const user = userEvent.setup();
-    // Arrange
+
+    server.use(
+      http.get("/api/metadata/fields", () => {
+        return HttpResponse.json([{ Name: "EmailAddress", FieldType: "Text" }]);
+      }),
+    );
+
     const folders: Folder[] = [
       {
         id: "root",
@@ -106,21 +118,12 @@ describe("WorkspaceSidebar", () => {
         fields: [],
       },
     ];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => [{ Name: "EmailAddress", FieldType: "Text" }],
-      }),
-    );
 
-    // Act
     renderSidebar(folders, dataExtensions);
 
     await user.click(screen.getByRole("button", { name: /root folder/i }));
     await user.click(screen.getByRole("button", { name: /customers/i }));
 
-    // Assert
     await waitFor(() => {
       expect(screen.getByText("EmailAddress")).toBeInTheDocument();
     });

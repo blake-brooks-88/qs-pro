@@ -101,7 +101,6 @@ describe("MCE SQL Constants", () => {
 
   describe("MCE_SQL_UNSUPPORTED_FUNCTIONS", () => {
     test("includes known unsupported functions", () => {
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["string_agg"]).toBe(null);
       expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["openjson"]).toBe(null);
       expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["try_convert"]).toBe(
         "Use CONVERT() instead",
@@ -114,6 +113,7 @@ describe("MCE SQL Constants", () => {
     test("does not include supported functions", () => {
       expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["json_value"]).toBeUndefined();
       expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["concat"]).toBeUndefined();
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS["string_agg"]).toBeUndefined();
     });
   });
 

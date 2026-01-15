@@ -73,13 +73,13 @@ export class MceBridgeService {
   /**
    * Helper for SOAP requests
    */
-  async soapRequest(
+  async soapRequest<T = unknown>(
     tenantId: string,
     userId: string,
     mid: string,
     soapBody: string,
     soapAction: string,
-  ): Promise<unknown> {
+  ): Promise<T> {
     try {
       const { accessToken, tssd } = await this.authService.refreshToken(
         tenantId,
@@ -101,9 +101,11 @@ export class MceBridgeService {
         data: envelope,
       });
 
-      return typeof response.data === "string"
-        ? parseSoapXml(response.data)
-        : response.data;
+      return (
+        typeof response.data === "string"
+          ? parseSoapXml(response.data)
+          : response.data
+      ) as T;
     } catch (error) {
       this.handleError(error);
       throw error;
