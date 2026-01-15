@@ -716,8 +716,8 @@ export const getSqlCursorContext = (
   );
   const cursorInFromJoinTable = Boolean(
     fromJoinTable &&
-      cursorIndex >= fromJoinTable.startIndex &&
-      cursorIndex <= fromJoinTable.endIndex,
+    cursorIndex >= fromJoinTable.startIndex &&
+    cursorIndex <= fromJoinTable.endIndex,
   );
   const hasTableReference =
     (lastKeyword === "from" || lastKeyword === "join") &&
