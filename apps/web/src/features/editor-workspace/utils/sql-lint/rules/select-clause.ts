@@ -11,8 +11,8 @@ const splitSelectExpressions = (clause: string) => {
   let inBracket = false;
 
   for (let index = 0; index < clause.length; index += 1) {
-    const char = clause[index];
-    const nextChar = clause[index + 1];
+    const char = clause.charAt(index);
+    const nextChar = clause.charAt(index + 1);
 
     if (inSingleQuote) {
       current += char;
@@ -83,8 +83,18 @@ const splitSelectExpressions = (clause: string) => {
 };
 
 const isLiteralExpression = (expression: string) => {
-  return /^\s*('([^']|'')*'|\d+(\.\d+)?|true|false|null)\s*(as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i.test(
-    expression,
+  // Match string literal: 'text' or 'text''with''escapes'
+  // Using [^']*(?:''[^']*)* pattern to avoid ReDoS (no alternation inside quantifier)
+  const stringLiteralPattern =
+    /^\s*'[^']*(?:''[^']*)*'\s*(?:as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i;
+  const numberPattern = /^\s*\d+(?:\.\d+)?\s*(?:as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i;
+  const keywordPattern =
+    /^\s*(?:true|false|null)\s*(?:as\s+)?\[?[A-Za-z0-9_\s]+\]?\s*$/i;
+
+  return (
+    stringLiteralPattern.test(expression) ||
+    numberPattern.test(expression) ||
+    keywordPattern.test(expression)
   );
 };
 
