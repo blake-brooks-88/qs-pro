@@ -1,25 +1,88 @@
 import {
   AltArrowLeft,
   AltArrowRight,
+  CloseCircle,
   DoubleAltArrowLeft,
   DoubleAltArrowRight,
   InfoCircle,
   LinkCircle,
 } from "@solar-icons/react";
 
-import type { ExecutionResult } from "@/features/editor-workspace/types";
+import type {
+  ExecutionResult,
+  ExecutionStatus,
+} from "@/features/editor-workspace/types";
 import { cn } from "@/lib/utils";
+
+const STATUS_MESSAGES: Record<ExecutionStatus, string> = {
+  idle: "Run a query to see results.",
+  queued: "Queued...",
+  creating_data_extension: "Creating temp Data Extension...",
+  validating_query: "Validating query...",
+  executing_query: "Executing query...",
+  fetching_results: "Fetching results...",
+  ready: "Query completed",
+  failed: "Query failed",
+  canceled: "Query canceled",
+};
+
+const IN_PROGRESS_STATUSES: ExecutionStatus[] = [
+  "queued",
+  "creating_data_extension",
+  "validating_query",
+  "executing_query",
+  "fetching_results",
+];
+
+function isInProgressStatus(status: ExecutionStatus): boolean {
+  return IN_PROGRESS_STATUSES.includes(status);
+}
+
+function getStatusMessage(result: ExecutionResult): string {
+  if (result.statusMessage) {
+    return result.statusMessage;
+  }
+
+  if (result.executionStatus) {
+    const baseMessage = STATUS_MESSAGES[result.executionStatus];
+
+    if (result.executionStatus === "ready") {
+      return `Query executed in ${result.runtime} - ${result.totalRows} records found`;
+    }
+
+    if (result.executionStatus === "failed" && result.errorMessage) {
+      return `Query failed: ${result.errorMessage}`;
+    }
+
+    return baseMessage;
+  }
+
+  if (result.status === "success") {
+    return `Query executed in ${result.runtime} - ${result.totalRows} records found`;
+  }
+  if (result.status === "error") {
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Empty error message should show default
+    return result.errorMessage || "Query failed to execute.";
+  }
+  if (result.status === "running") {
+    return "Query running...";
+  }
+
+  return "Run a query to see results.";
+}
 
 interface ResultsPaneProps {
   result: ExecutionResult;
   onPageChange?: (page: number) => void;
   onViewInContactBuilder?: () => void;
+  onCancel?: () => void;
 }
 
 export function ResultsPane({
   result,
   onPageChange,
   onViewInContactBuilder,
+  onCancel,
 }: ResultsPaneProps) {
   const totalPages =
     result.pageSize > 0
@@ -33,26 +96,45 @@ export function ResultsPane({
     result.totalRows > 0
       ? Math.min(result.currentPage * result.pageSize, result.totalRows)
       : 0;
-  const statusMessage =
-    result.status === "success"
-      ? `Query executed in ${result.runtime} • ${result.totalRows} records found`
-      : result.status === "error"
-        ? // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Empty error message should show default
-          result.errorMessage || "Query failed to execute."
-        : result.status === "running"
-          ? "Query running..."
-          : "Run a query to see results.";
+
+  const statusMessage = getStatusMessage(result);
+
+  const showCancelButton =
+    result.executionStatus && isInProgressStatus(result.executionStatus);
+  const showSpinner =
+    result.status === "running" ||
+    (result.executionStatus && isInProgressStatus(result.executionStatus));
 
   return (
-    <div className="flex flex-col h-full bg-background animate-fade-in">
+    <div
+      className="flex flex-col h-full bg-background animate-fade-in"
+      data-testid="results-pane"
+    >
       {/* Results Header */}
       <div className="h-9 border-y border-border bg-card/50 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
-          <InfoCircle size={14} className="text-primary" />
-          <span>{statusMessage}</span>
+          {showSpinner ? (
+            <span
+              className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent"
+              data-testid="status-spinner"
+            />
+          ) : (
+            <InfoCircle size={14} className="text-primary" />
+          )}
+          <span data-testid="status-message">{statusMessage}</span>
         </div>
 
         <div className="flex items-center gap-4">
+          {showCancelButton && onCancel ? (
+            <button
+              onClick={onCancel}
+              data-testid="cancel-button"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-error hover:text-error/80 transition-colors"
+            >
+              <CloseCircle size={14} />
+              Cancel
+            </button>
+          ) : null}
           <button
             onClick={onViewInContactBuilder}
             disabled={!hasRows}
@@ -122,7 +204,8 @@ export function ResultsPane({
                   colSpan={columns.length}
                   className="p-12 text-center text-muted-foreground"
                 >
-                  {result.status === "idle"
+                  {result.status === "idle" &&
+                  (!result.executionStatus || result.executionStatus === "idle")
                     ? "Run a query to see results."
                     : "No data returned for this query."}
                 </td>
