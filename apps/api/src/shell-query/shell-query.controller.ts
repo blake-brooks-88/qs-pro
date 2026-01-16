@@ -82,6 +82,14 @@ export class ShellQueryController {
     }
   }
 
+  @Get(':runId')
+  async getRunStatus(
+    @Param('runId') runId: string,
+    @CurrentUser() user: UserSession,
+  ) {
+    return this.shellQueryService.getRunStatus(runId, user.tenantId);
+  }
+
   @Sse(':runId/events')
   async streamEvents(
     @Param('runId') runId: string,

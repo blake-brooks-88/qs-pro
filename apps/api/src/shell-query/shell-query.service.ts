@@ -20,6 +20,14 @@ export interface ShellQueryContext {
   accessToken: string;
 }
 
+export interface RunStatusResponse {
+  runId: string;
+  status: string;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 @Injectable()
 export class ShellQueryService {
   private readonly logger = new Logger(ShellQueryService.name);
@@ -93,6 +101,29 @@ export class ShellQueryService {
     return this.runRepo.findRun(runId, tenantId);
   }
 
+  async getRunStatus(
+    runId: string,
+    tenantId: string,
+  ): Promise<RunStatusResponse> {
+    const run = await this.runRepo.findRun(runId, tenantId);
+    if (!run) {
+      throw new NotFoundException('Run not found');
+    }
+
+    const response: RunStatusResponse = {
+      runId: run.id,
+      status: run.status,
+      createdAt: run.createdAt,
+      updatedAt: run.completedAt ?? run.startedAt ?? run.createdAt,
+    };
+
+    if (run.status === 'failed' && run.errorMessage) {
+      response.errorMessage = run.errorMessage;
+    }
+
+    return response;
+  }
+
   async getResults(
     runId: string,
     tenantId: string,
@@ -128,9 +159,10 @@ export class ShellQueryService {
         url,
       });
       return response;
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const error = e as { message?: string };
       this.logger.error(
-        `Failed to fetch results for run ${runId}: ${e.message}`,
+        `Failed to fetch results for run ${runId}: ${error.message}`,
       );
       throw e;
     }
