@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
+import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 import { MceBridgeService, RlsContextService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createMockJob } from './factories';
@@ -9,15 +10,20 @@ describe('RunToTempFlow', () => {
   let strategy: RunToTempFlow;
   let mockDb: ReturnType<typeof createDbStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockQueryValidator: { validateQuery: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockQueryValidator = {
+      validateQuery: vi.fn().mockResolvedValue({ valid: true }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RunToTempFlow,
         { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: MceQueryValidator, useValue: mockQueryValidator },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
       ],
@@ -44,6 +50,7 @@ describe('RunToTempFlow', () => {
 
     expect(result.taskId).toBe('task-abc');
     expect(mockMceBridge.soapRequest).toHaveBeenCalledTimes(5);
+    expect(mockQueryValidator.validateQuery).toHaveBeenCalled();
   });
 
   it('should use cached folder ID when available', async () => {
@@ -73,5 +80,16 @@ describe('RunToTempFlow', () => {
       .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'Error', StatusMessage: 'Invalid SQL' } } } }); // Query fails
 
     await expect(strategy.execute(job)).rejects.toThrow('Invalid SQL');
+  });
+
+  it('should stop execution when query validation fails', async () => {
+    const job = createMockJob();
+    mockQueryValidator.validateQuery.mockResolvedValue({
+      valid: false,
+      errors: ['Invalid syntax near SELECT'],
+    });
+
+    await expect(strategy.execute(job)).rejects.toThrow('Invalid syntax near SELECT');
+    expect(mockMceBridge.soapRequest).not.toHaveBeenCalled();
   });
 });

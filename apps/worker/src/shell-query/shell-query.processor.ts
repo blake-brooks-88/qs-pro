@@ -5,7 +5,13 @@ import { eq, shellQueryRuns } from "@qs-pro/database";
 import { Job, UnrecoverableError } from "bullmq";
 import * as crypto from "crypto";
 
-import { ShellQueryJob, SoapAsyncStatusResponse } from "./shell-query.types";
+import {
+  RunStatus,
+  ShellQueryJob,
+  SoapAsyncStatusResponse,
+  SSEEvent,
+  STATUS_MESSAGES,
+} from "./shell-query.types";
 import { RunToTempFlow } from "./strategies/run-to-temp.strategy";
 
 @Processor("shell-query", { concurrency: 50, lockDuration: 120000 })
@@ -56,21 +62,24 @@ export class ShellQueryProcessor extends WorkerHost {
     (this.metricsActiveJobs as { inc: () => void }).inc();
 
     try {
-      await this.updateStatus(tenantId, mid, runId, "running", {
+      await this.updateStatus(tenantId, mid, runId, "queued", {
         startedAt: new Date(),
       });
-      await this.publishEvent(runId, { status: "running" });
+      await this.publishStatusEvent(runId, "queued");
+
+      const publishStatus = async (status: RunStatus): Promise<void> => {
+        await this.publishStatusEvent(runId, status);
+      };
 
       const result = await this.rlsContext.runWithTenantContext(
         tenantId,
         mid,
         async () => {
-          return await this.runToTempFlow.execute(job.data);
+          return await this.runToTempFlow.execute(job.data, publishStatus);
         },
       );
 
       if (result.taskId) {
-        // Start Polling
         await this.pollStatus(job, result.taskId);
       } else {
         throw new Error("No TaskID returned from flow execution");
@@ -130,10 +139,11 @@ export class ShellQueryProcessor extends WorkerHost {
         errorMessage: err.message || "Unknown error",
         completedAt: new Date(),
       });
-      await this.publishEvent(runId, {
-        status: "failed",
-        errorMessage: err.message || "Unknown error",
-      });
+      await this.publishStatusEvent(
+        runId,
+        "failed",
+        err.message || "Unknown error",
+      );
 
       if (isTerminal) {
         throw new UnrecoverableError(err.message || "Unknown error");
@@ -145,7 +155,6 @@ export class ShellQueryProcessor extends WorkerHost {
         duration,
       );
       (this.metricsActiveJobs as { dec: () => void }).dec();
-      // Cleanup assets (Task 4.8)
       await this.cleanupAssets(job.data);
     }
   }
@@ -165,21 +174,20 @@ export class ShellQueryProcessor extends WorkerHost {
 
   private async pollStatus(job: Job<ShellQueryJob>, taskId: string) {
     const { runId, tenantId, userId, mid } = job.data;
-    const maxDurationMs = 29 * 60 * 1000; // 29 minutes
+    const maxDurationMs = 29 * 60 * 1000;
     const startTime = Date.now();
 
-    let delay = 2000; // Start with 2s
-    const maxDelay = 30000; // Cap at 30s
+    let delay = 2000;
+    const maxDelay = 30000;
 
     while (Date.now() - startTime < maxDurationMs) {
-      // Check if job was canceled (Task 6.3)
       const currentRun = await this.db
         .select()
         .from(shellQueryRuns)
         .where(eq(shellQueryRuns.id, runId));
       if (currentRun[0]?.status === "canceled") {
         this.logger.log(`Run ${runId} was canceled, stopping polling.`);
-        await this.publishEvent(runId, { status: "canceled" });
+        await this.publishStatusEvent(runId, "canceled");
         return;
       }
 
@@ -212,10 +220,11 @@ export class ShellQueryProcessor extends WorkerHost {
 
         if (status === "Complete") {
           this.logger.log(`Run ${runId} completed successfully.`);
+          await this.publishStatusEvent(runId, "fetching_results");
           await this.updateStatus(tenantId, mid, runId, "ready", {
             completedAt: new Date(),
           });
-          await this.publishEvent(runId, { status: "ready" });
+          await this.publishStatusEvent(runId, "ready");
           return;
         } else if (status === "Error") {
           const errorMsg = result?.ErrorMsg || "MCE Query Execution Error";
@@ -235,8 +244,6 @@ export class ShellQueryProcessor extends WorkerHost {
         this.logger.warn(
           `Polling error for ${runId}: ${err.message || "Unknown error"}`,
         );
-        // If it's a persistent error, we might want to fail.
-        // But for transient network errors, we just continue polling.
       }
 
       await new Promise((resolve) =>
@@ -248,13 +255,31 @@ export class ShellQueryProcessor extends WorkerHost {
     throw new Error("Query timed out after 29 minutes");
   }
 
-  private async publishEvent(runId: string, payload: unknown) {
+  private async publishStatusEvent(
+    runId: string,
+    status: RunStatus,
+    errorMessage?: string,
+  ) {
+    const event: SSEEvent = {
+      status,
+      message:
+        status === "failed" && errorMessage
+          ? `${STATUS_MESSAGES[status]}: ${errorMessage}`
+          : STATUS_MESSAGES[status],
+      timestamp: new Date().toISOString(),
+      runId,
+    };
+
+    if (errorMessage) {
+      event.errorMessage = errorMessage;
+    }
+
     const channel = `run-status:${runId}`;
     await (
       this.redis as {
         publish: (channel: string, message: string) => Promise<void>;
       }
-    ).publish(channel, JSON.stringify(payload));
+    ).publish(channel, JSON.stringify(event));
   }
 
   private async updateStatus(
@@ -278,10 +303,6 @@ export class ShellQueryProcessor extends WorkerHost {
 
     this.logger.log(`Attempting cleanup for run ${runId}`);
 
-    // Best-effort deletion of QueryDefinition and DE
-    // NOTE: DE deletion might fail if it's still being used or has data,
-    // but typically we can delete it after completion.
-
     const deleteSoap = (type: string, key: string) => `
       <DeleteRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
          <Objects xsi:type="${type}">
@@ -297,11 +318,6 @@ export class ShellQueryProcessor extends WorkerHost {
         deleteSoap("QueryDefinition", queryKey),
         "Delete",
       );
-      // We don't delete the DE yet if the user needs to fetch results!
-      // Task 4.8 says "On completion/failure: attempt delete of Temp DE and QueryDefinition"
-      // BUT Task 5.5 says results endpoint proxies the DE data.
-      // So we MUST NOT delete the DE until results are fetched or it expires (24h).
-      // I will only delete the QueryDefinition.
     } catch (e: unknown) {
       const err = e as { message?: string };
       this.logger.warn(

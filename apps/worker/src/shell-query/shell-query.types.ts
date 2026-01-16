@@ -75,6 +75,40 @@ export interface FlowResult {
   errorMessage?: string;
 }
 
+export type RunStatus =
+  | "queued"
+  | "validating_query"
+  | "creating_data_extension"
+  | "executing_query"
+  | "fetching_results"
+  | "ready"
+  | "failed"
+  | "canceled";
+
+export const STATUS_MESSAGES: Record<RunStatus, string> = {
+  queued: "Queued...",
+  validating_query: "Validating query...",
+  creating_data_extension: "Creating temp Data Extension...",
+  executing_query: "Executing query...",
+  fetching_results: "Fetching results...",
+  ready: "Query completed",
+  failed: "Query failed",
+  canceled: "Query canceled",
+};
+
+export interface SSEEvent {
+  status: RunStatus;
+  message: string;
+  errorMessage?: string;
+  timestamp: string;
+  runId: string;
+}
+
+export type StatusPublisher = (status: RunStatus) => Promise<void>;
+
 export interface IFlowStrategy {
-  execute(job: ShellQueryJob): Promise<FlowResult>;
+  execute(
+    job: ShellQueryJob,
+    publishStatus?: StatusPublisher,
+  ): Promise<FlowResult>;
 }

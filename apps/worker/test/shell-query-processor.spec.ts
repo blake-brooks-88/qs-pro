@@ -61,7 +61,7 @@ describe('ShellQueryProcessor', () => {
     const result = await processor.process(job as any);
 
     expect(result.status).toBe('completed');
-    expect(mockRunToTempFlow.execute).toHaveBeenCalledWith(job.data);
+    expect(mockRunToTempFlow.execute).toHaveBeenCalledWith(job.data, expect.any(Function));
     expect(mockMceBridge.soapRequest).toHaveBeenCalledWith(
       't1', 'u1', 'm1', expect.stringContaining('AsyncActivityStatus'), 'Retrieve'
     );
