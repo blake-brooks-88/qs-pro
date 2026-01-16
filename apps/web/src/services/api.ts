@@ -1,13 +1,32 @@
-import axios, { type AxiosRequestConfig } from "axios";
+import axios, {
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from "axios";
 import { toast } from "sonner";
 
 import { useAuthStore } from "@/store/auth-store";
 
 type RetriableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
 
+const MUTATING_METHODS = ["post", "put", "patch", "delete"];
+
 const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
+});
+
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const method = config.method?.toLowerCase();
+
+  if (method && MUTATING_METHODS.includes(method)) {
+    const csrfToken = useAuthStore.getState().csrfToken;
+
+    if (csrfToken) {
+      config.headers.set("x-csrf-token", csrfToken);
+    }
+  }
+
+  return config;
 });
 
 api.interceptors.response.use(
@@ -26,12 +45,10 @@ api.interceptors.response.use(
 
       if (user && tenant) {
         try {
-          // Attempt silent refresh
           await api.get("/auth/refresh", {
             _retry: true,
           } as RetriableRequestConfig);
 
-          // Retry the original request
           return api(originalRequest);
         } catch (refreshError) {
           logout();
@@ -41,7 +58,6 @@ api.interceptors.response.use(
       }
     }
 
-    // Handle SEAT_LIMIT_EXCEEDED error
     if (
       error.response?.data?.code === "SEAT_LIMIT_EXCEEDED" ||
       error.response?.data?.error === "SEAT_LIMIT_EXCEEDED"
