@@ -271,7 +271,13 @@ export class ShellQueryProcessor extends WorkerHost {
       }
 
       if (job.data.pollCount >= POLL_CONFIG.MAX_POLL_COUNT) {
-        await this.markFailed(tenantId, userId, mid, runId, "Poll budget exceeded");
+        await this.markFailed(
+          tenantId,
+          userId,
+          mid,
+          runId,
+          "Poll budget exceeded",
+        );
         await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
           await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
         });
@@ -889,12 +895,17 @@ export class ShellQueryProcessor extends WorkerHost {
     status: string,
     extra: Record<string, unknown> = {},
   ) {
-    await this.rlsContext.runWithUserContext(tenantId, mid, userId, async () => {
-      await this.db
-        .update(shellQueryRuns)
-        .set({ status, ...extra })
-        .where(eq(shellQueryRuns.id, runId));
-    });
+    await this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        await this.db
+          .update(shellQueryRuns)
+          .set({ status, ...extra })
+          .where(eq(shellQueryRuns.id, runId));
+      },
+    );
   }
 
   private async cleanupAssets(jobData: ShellQueryJob) {
