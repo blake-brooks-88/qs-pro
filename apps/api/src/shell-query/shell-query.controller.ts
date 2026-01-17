@@ -8,6 +8,7 @@ import {
   HttpStatus,
   Inject,
   InternalServerErrorException,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -29,15 +30,20 @@ const createRunSchema = z.object({
   snippetName: z.string().max(100).optional(),
   tableMetadata: z
     .record(
-      z.string(),
-      z.array(
-        z.object({
-          Name: z.string(),
-          FieldType: z.string(),
-          MaxLength: z.number().optional(),
-        }),
-      ),
+      z.string().max(128),
+      z
+        .array(
+          z.object({
+            Name: z.string().max(128),
+            FieldType: z.string().max(32),
+            MaxLength: z.number().optional(),
+          }),
+        )
+        .max(500),
     )
+    .refine((data) => !data || Object.keys(data).length <= 50, {
+      message: 'Maximum 50 tables allowed',
+    })
     .optional(),
 });
 
@@ -121,7 +127,7 @@ export class ShellQueryController {
       user.userId,
     );
     if (!run) {
-      throw new BadRequestException('Run not found or unauthorized');
+      throw new NotFoundException('Run not found');
     }
 
     return this.shellQuerySse.streamRunEvents(runId, user.userId);

@@ -184,9 +184,7 @@ export class ShellQueryService {
     const encodedDeName = encodeURIComponent(deName);
     const url = `/data/v1/customobjectdata/key/${encodedDeName}/rowset?$page=${page}&$pageSize=${pageSize}`;
 
-    this.logger.log(
-      `Fetching results for run ${runId}: DE="${deName}", snippetName="${run.snippetName}", url="${url}"`,
-    );
+    this.logger.debug(`Fetching results for run ${runId}`);
 
     try {
       const mceResponse = await this.mceBridge.request(tenantId, userId, mid, {

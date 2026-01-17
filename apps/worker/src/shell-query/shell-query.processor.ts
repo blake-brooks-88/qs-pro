@@ -36,6 +36,8 @@ interface RowProbeResult {
   itemsLength?: number;
 }
 
+const LAST_EVENT_TTL_SECONDS = 86400;
+
 @Processor("shell-query", { concurrency: 50, lockDuration: 120000 })
 export class ShellQueryProcessor extends WorkerHost {
   private readonly logger = new Logger(ShellQueryProcessor.name);
@@ -941,11 +943,23 @@ export class ShellQueryProcessor extends WorkerHost {
     }
 
     const channel = `run-status:${runId}`;
-    await (
-      this.redis as {
-        publish: (channel: string, message: string) => Promise<void>;
-      }
-    ).publish(channel, JSON.stringify(event));
+    const lastEventKey = `run-status:last:${runId}`;
+    const eventJson = JSON.stringify(event);
+
+    const redisClient = this.redis as {
+      publish: (channel: string, message: string) => Promise<void>;
+      set: (
+        key: string,
+        value: string,
+        mode: string,
+        duration: number,
+      ) => Promise<void>;
+    };
+
+    await Promise.all([
+      redisClient.publish(channel, eventJson),
+      redisClient.set(lastEventKey, eventJson, "EX", LAST_EVENT_TTL_SECONDS),
+    ]);
   }
 
   private async updateStatus(

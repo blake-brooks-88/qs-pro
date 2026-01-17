@@ -48,6 +48,7 @@ export type QueryStatus = "running" | "success" | "error" | "idle";
 export type ExecutionStatus =
   | "idle"
   | "queued"
+  | "running"
   | "creating_data_extension"
   | "validating_query"
   | "executing_query"

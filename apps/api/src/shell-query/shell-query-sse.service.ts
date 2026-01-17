@@ -1,5 +1,13 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { filter, finalize, fromEventPattern, map, Observable } from 'rxjs';
+import {
+  concat,
+  filter,
+  finalize,
+  from,
+  fromEventPattern,
+  map,
+  Observable,
+} from 'rxjs';
 
 type RedisSubscriber = {
   subscribe(channel: string): Promise<unknown>;
@@ -18,6 +26,7 @@ type RedisClient = {
   incr(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<number>;
   decr(key: string): Promise<number>;
+  get(key: string): Promise<string | null>;
   duplicate(): RedisSubscriber;
 };
 
@@ -42,7 +51,9 @@ export class ShellQuerySseService {
     }
 
     const channel = `run-status:${runId}`;
+    const lastEventKey = `run-status:last:${runId}`;
     const subRedis = this.redis.duplicate();
+
     try {
       await subRedis.subscribe(channel);
 
@@ -51,7 +62,12 @@ export class ShellQuerySseService {
         (receivedChannel: string, message: string) => void
       >();
 
-      return fromEventPattern<[string, string]>(
+      const cachedEvent$ = from(this.redis.get(lastEventKey)).pipe(
+        filter((cached): cached is string => cached !== null),
+        map((cached) => ({ data: JSON.parse(cached) }) as MessageEvent),
+      );
+
+      const liveEvents$ = fromEventPattern<[string, string]>(
         (handler) => {
           const wrappedHandler = (receivedChannel: string, message: string) => {
             handler([receivedChannel, message]);
@@ -72,6 +88,9 @@ export class ShellQuerySseService {
         map(([, message]) => {
           return { data: JSON.parse(message) } as MessageEvent;
         }),
+      );
+
+      return concat(cachedEvent$, liveEvents$).pipe(
         finalize(() => {
           void subRedis.quit();
           void this.redis.decr(limitKey);

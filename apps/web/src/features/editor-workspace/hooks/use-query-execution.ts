@@ -17,6 +17,7 @@ import {
 export type QueryExecutionStatus =
   | "idle"
   | "queued"
+  | "running"
   | "creating_data_extension"
   | "validating_query"
   | "executing_query"

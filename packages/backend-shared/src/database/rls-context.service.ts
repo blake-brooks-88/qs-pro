@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createDatabaseFromClient } from "@qs-pro/database";
 import type { Sql } from "postgres";
 
-import { getDbFromContext, runWithDbContext } from "./db-context";
+import {
+  getDbFromContext,
+  getReservedSqlFromContext,
+  runWithDbContext,
+} from "./db-context";
 
 @Injectable()
 export class RlsContextService {
@@ -55,9 +59,8 @@ export class RlsContextService {
       const db = createDatabaseFromClient(
         this.makeDrizzleCompatibleSql(reserved),
       );
-      // We cast the schema-specific db to the generic Record version used by the context holder.
 
-      return await runWithDbContext(db, fn);
+      return await runWithDbContext(db, fn, reserved);
     } catch (error) {
       this.logger.error(
         "Failed to run with tenant context",
@@ -82,18 +85,19 @@ export class RlsContextService {
     fn: () => Promise<T>,
   ): Promise<T> {
     const existing = getDbFromContext();
-    if (existing) {
-      const reserved = await this.sql.reserve();
+    const existingReservedSql = getReservedSqlFromContext();
+
+    if (existing && existingReservedSql) {
+      // Reuse the existing reserved connection to ensure set_config applies to queries.
+      await existingReservedSql`SELECT set_config('app.user_id', ${userId}, false)`;
       try {
-        await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
         return await fn();
       } finally {
         try {
-          await reserved`RESET app.user_id`;
+          await existingReservedSql`RESET app.user_id`;
         } catch {
           // Best-effort cleanup
         }
-        reserved.release();
       }
     }
 
@@ -107,7 +111,7 @@ export class RlsContextService {
         this.makeDrizzleCompatibleSql(reserved),
       );
 
-      return await runWithDbContext(db, fn);
+      return await runWithDbContext(db, fn, reserved);
     } catch (error) {
       this.logger.error(
         "Failed to run with user context",

@@ -95,9 +95,10 @@ export class RlsContextMiddleware implements NestMiddleware {
     res.raw.once("close", () => void cleanup());
     res.raw.once("error", () => void cleanup());
 
-    const db = createDatabaseFromClient(
-      this.makeDrizzleCompatibleSql(reserved as unknown as SqlClient),
+    const compatibleSql = this.makeDrizzleCompatibleSql(
+      reserved as unknown as SqlClient,
     );
-    runWithDbContext(db, next);
+    const db = createDatabaseFromClient(compatibleSql);
+    runWithDbContext(db, next, compatibleSql);
   }
 }

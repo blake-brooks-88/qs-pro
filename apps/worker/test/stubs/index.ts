@@ -50,6 +50,8 @@ export function createRedisStub() {
     incr: vi.fn().mockResolvedValue(1),
     decr: vi.fn().mockResolvedValue(0),
     expire: vi.fn().mockResolvedValue(1),
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue('OK'),
   };
 }
 

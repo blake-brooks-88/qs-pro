@@ -88,8 +88,8 @@ export class RunToTempFlow implements IFlowStrategy {
     }
 
     const inferredSchema = await inferSchema(expandedSql, metadataFetcher);
-    this.logger.log(
-      `Inferred schema: ${JSON.stringify(inferredSchema.map((c) => ({ name: c.Name, type: c.FieldType })))}`,
+    this.logger.debug(
+      `Inferred schema for run (fields: ${inferredSchema.length})`,
     );
 
     await publishStatus?.("creating_data_extension");

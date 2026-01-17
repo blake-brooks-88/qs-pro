@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 const STATUS_MESSAGES: Record<ExecutionStatus, string> = {
   idle: "Run a query to see results.",
   queued: "Queued...",
+  running: "Running...",
   creating_data_extension: "Creating temp Data Extension...",
   validating_query: "Validating query...",
   executing_query: "Executing query...",
@@ -28,6 +29,7 @@ const STATUS_MESSAGES: Record<ExecutionStatus, string> = {
 
 const IN_PROGRESS_STATUSES: ExecutionStatus[] = [
   "queued",
+  "running",
   "creating_data_extension",
   "validating_query",
   "executing_query",

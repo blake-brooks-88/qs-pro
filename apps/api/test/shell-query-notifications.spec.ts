@@ -139,14 +139,14 @@ describe('Shell Query Notifications & Results (e2e)', () => {
   });
 
   describe('SSE /runs/:runId/events', () => {
-    it('should require authentication and ownership', async () => {
+    it('should return 404 when run not found or unauthorized', async () => {
       mockShellQueryService.getRun.mockResolvedValue(null);
 
       const res = await app.inject({
         method: 'GET',
         url: '/runs/run-1/events',
       });
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(404);
     });
 
     it('should enforce rate limiting', async () => {
