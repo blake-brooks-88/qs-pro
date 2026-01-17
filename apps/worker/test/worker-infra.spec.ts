@@ -3,7 +3,6 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { AppModule } from '../src/app.module';
 import { HealthModule } from '../src/health/health.module';
 import { HealthController } from '../src/health/health.controller';
-import request from 'supertest';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 describe('Worker Infrastructure', () => {
@@ -32,15 +31,15 @@ describe('Worker Infrastructure', () => {
   });
 
   it('should have /health endpoint', async () => {
-    return request(app.getHttpServer())
-      .get('/health')
-      .expect(200)
-      .expect((res) => {
-        expect(res.body.status).toBe('ok');
-        // We expect redis to be 'up' or 'down' depending on env, but the field should exist
-        expect(res.body).toHaveProperty('redis');
-        expect(res.body).toHaveProperty('db');
-      });
+    const fastify = app.getHttpAdapter().getInstance();
+    const res = await fastify.inject({ method: 'GET', url: '/health' });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.status).toBe('ok');
+    // We expect redis to be 'up' or 'down' depending on env, but the field should exist
+    expect(body).toHaveProperty('redis');
+    expect(body).toHaveProperty('db');
   });
 
   it('should have shell-query queue registered', () => {

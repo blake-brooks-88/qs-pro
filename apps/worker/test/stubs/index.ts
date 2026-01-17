@@ -68,3 +68,12 @@ export function createRlsContextStub() {
     runWithTenantContext: vi.fn().mockImplementation(async (_t, _m, cb) => cb()),
   };
 }
+
+// BullMQ Queue stub
+export function createQueueStub() {
+  return {
+    add: vi.fn().mockResolvedValue({ id: 'poll-job-1' }),
+    getJob: vi.fn().mockResolvedValue(null),
+    remove: vi.fn().mockResolvedValue(undefined),
+  };
+}

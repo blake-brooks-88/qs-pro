@@ -1,11 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { ShellQuerySweeper } from '../src/shell-query/shell-query.sweeper';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { RlsContextService, MceBridgeService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createMockBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub } from './stubs';
+import { createMockBullJob, createMockPollBullJob } from './factories';
+import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub } from './stubs';
 
 describe('Shell Query Cancellation & Sweeper', () => {
   let processor: ShellQueryProcessor;
@@ -13,18 +14,28 @@ describe('Shell Query Cancellation & Sweeper', () => {
   let mockDb: ReturnType<typeof createDbStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
   let mockRedis: ReturnType<typeof createRedisStub>;
+  let mockQueue: ReturnType<typeof createQueueStub>;
 
   beforeEach(async () => {
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
     mockRedis = createRedisStub();
+    mockQueue = createQueueStub();
     const mockMetrics = createMetricsStub();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ShellQueryProcessor,
         ShellQuerySweeper,
-        { provide: RunToTempFlow, useValue: { execute: vi.fn().mockResolvedValue({ taskId: 'task-123' }) } },
+        {
+          provide: RunToTempFlow,
+          useValue: {
+            execute: vi.fn().mockResolvedValue({
+              taskId: 'task-123',
+              queryDefinitionId: 'query-def-123',
+            }),
+          },
+        },
         { provide: MceBridgeService, useValue: mockMceBridge },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
@@ -33,12 +44,13 @@ describe('Shell Query Cancellation & Sweeper', () => {
         { provide: 'METRICS_DURATION', useValue: mockMetrics },
         { provide: 'METRICS_FAILURES_TOTAL', useValue: mockMetrics },
         { provide: 'METRICS_ACTIVE_JOBS', useValue: mockMetrics },
+        { provide: getQueueToken('shell-query'), useValue: mockQueue },
       ],
     }).compile();
 
     processor = module.get<ShellQueryProcessor>(ShellQueryProcessor);
     sweeper = module.get<ShellQuerySweeper>(ShellQuerySweeper);
-    processor.setPollingDelayMultiplier(0);
+    processor.setTestMode(true);
   });
 
   afterEach(() => {
@@ -47,92 +59,143 @@ describe('Shell Query Cancellation & Sweeper', () => {
 
   describe('Cancellation', () => {
     it('should stop polling when job status changes to canceled in DB', async () => {
-      const job = createMockBullJob();
-
-      // First poll: still running, second check: canceled
-      let pollCount = 0;
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => {
-            pollCount++;
-            return pollCount === 1 ? [{ status: 'running' }] : [{ status: 'canceled' }];
-          }),
-        })),
-      }));
-
-      // First poll returns Processing
-      mockMceBridge.soapRequest.mockResolvedValueOnce({
-        Body: { RetrieveResponseMsg: { Results: { Status: 'Processing' } } }
+      const job = createMockPollBullJob({
+        runId: 'run-1',
+        tenantId: 't1',
+        userId: 'u1',
+        mid: 'm1',
       });
 
-      await processor.process(job as any);
+      mockDb.setSelectResult([{ status: 'canceled' }]);
 
-      // Should have published canceled event
+      const result = await processor.process(job as any);
+
+      expect(result).toEqual({ status: 'canceled', runId: 'run-1' });
       expect(mockRedis.publish).toHaveBeenCalledWith(
         expect.stringContaining('run-status:'),
-        expect.stringContaining('canceled')
+        expect.stringContaining('canceled'),
       );
     });
 
-    it('should attempt cleanup even when canceled', async () => {
-      const job = createMockBullJob();
+    it('should attempt cleanup when poll job detects cancellation', async () => {
+      const job = createMockPollBullJob({
+        runId: 'run-1',
+        tenantId: 't1',
+        userId: 'u1',
+        mid: 'm1',
+      });
 
-      // Immediately canceled
       mockDb.setSelectResult([{ status: 'canceled' }]);
 
       await processor.process(job as any);
 
-      // Cleanup should be attempted (DeleteRequest for QueryDefinition)
       expect(mockMceBridge.soapRequest).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
         expect.anything(),
         expect.stringContaining('DeleteRequest'),
-        'Delete'
+        'Delete',
+      );
+    });
+
+    it('should cleanup on execute job failure', async () => {
+      const job = createMockBullJob({
+        runId: 'run-1',
+        tenantId: 't1',
+        userId: 'u1',
+        mid: 'm1',
+      });
+
+      const mockRunToTempFlow = {
+        execute: vi.fn().mockRejectedValue(new Error('Flow error')),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          ShellQueryProcessor,
+          { provide: RunToTempFlow, useValue: mockRunToTempFlow },
+          { provide: MceBridgeService, useValue: mockMceBridge },
+          { provide: RlsContextService, useValue: createRlsContextStub() },
+          { provide: 'DATABASE', useValue: mockDb },
+          { provide: 'REDIS_CLIENT', useValue: mockRedis },
+          { provide: 'METRICS_JOBS_TOTAL', useValue: createMetricsStub() },
+          { provide: 'METRICS_DURATION', useValue: createMetricsStub() },
+          { provide: 'METRICS_FAILURES_TOTAL', useValue: createMetricsStub() },
+          { provide: 'METRICS_ACTIVE_JOBS', useValue: createMetricsStub() },
+          { provide: getQueueToken('shell-query'), useValue: mockQueue },
+        ],
+      }).compile();
+
+      const testProcessor = module.get<ShellQueryProcessor>(ShellQueryProcessor);
+      testProcessor.setTestMode(true);
+
+      await expect(testProcessor.process(job as any)).rejects.toThrow('Flow error');
+
+      expect(mockMceBridge.soapRequest).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.stringContaining('DeleteRequest'),
+        'Delete',
       );
     });
   });
 
   describe('Sweeper', () => {
     it('should query QPP folder and delete old QueryDefinitions', async () => {
-      // Setup credentials
+      let queryCount = 0;
       mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => [{ tenantId: 't1', userId: 'u1', mid: 'm1' }]),
+        from: vi.fn(() => ({
+          where: vi.fn(() => {
+            queryCount++;
+            if (queryCount === 1) {
+              return [{ tenantId: 't1', mid: 'm1' }];
+            }
+            return {
+              limit: vi.fn(() => [{ userId: 'u1' }]),
+            };
+          }),
+        })),
       }));
 
-      // Folder search returns folder
       mockMceBridge.soapRequest
         .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: { ID: 'folder-123' } } } })
-        // Query search returns old queries
         .mockResolvedValueOnce({
           Body: { RetrieveResponseMsg: { Results: [
-            { CustomerKey: 'QPP_Query_old-run-1', Name: 'QPP_Query_old-run-1' }
-          ] } }
+            { CustomerKey: 'QPP_Query_old-run-1', Name: 'QPP_Query_old-run-1' },
+          ] } },
         })
-        // Delete calls succeed
         .mockResolvedValue({ Body: { DeleteResponse: { Results: { StatusCode: 'OK' } } } });
 
       await sweeper.handleSweep();
 
-      // Should have called delete for the old query
       expect(mockMceBridge.soapRequest).toHaveBeenCalledWith(
         't1', 'u1', 'm1',
         expect.stringContaining('DeleteRequest'),
-        'Delete'
+        'Delete',
       );
     });
 
     it('should handle empty folder gracefully', async () => {
+      let queryCount = 0;
       mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => [{ tenantId: 't1', userId: 'u1', mid: 'm1' }]),
+        from: vi.fn(() => ({
+          where: vi.fn(() => {
+            queryCount++;
+            if (queryCount === 1) {
+              return [{ tenantId: 't1', mid: 'm1' }];
+            }
+            return {
+              limit: vi.fn(() => [{ userId: 'u1' }]),
+            };
+          }),
+        })),
       }));
 
-      // No folder found
       mockMceBridge.soapRequest.mockResolvedValueOnce({
-        Body: { RetrieveResponseMsg: { Results: null } }
+        Body: { RetrieveResponseMsg: { Results: null } },
       });
 
-      // Should not throw
       await expect(sweeper.handleSweep()).resolves.not.toThrow();
     });
   });

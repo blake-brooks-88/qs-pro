@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { RlsContextService, MceBridgeService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createMockBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub } from './stubs';
+import { createMockBullJob, createMockPollBullJob } from './factories';
+import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub } from './stubs';
 import { RunStatus, STATUS_MESSAGES } from '../src/shell-query/shell-query.types';
 
 describe('Status Event Flow', () => {
@@ -13,6 +14,7 @@ describe('Status Event Flow', () => {
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
   let mockRedis: ReturnType<typeof createRedisStub>;
   let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn> };
+  let mockQueue: ReturnType<typeof createQueueStub>;
   let publishedEvents: Array<{ channel: string; payload: unknown }>;
 
   beforeEach(async () => {
@@ -20,6 +22,7 @@ describe('Status Event Flow', () => {
     mockMceBridge = createMceBridgeStub();
     mockRedis = createRedisStub();
     mockRunToTempFlow = { execute: vi.fn() };
+    mockQueue = createQueueStub();
     const mockMetrics = createMetricsStub();
     publishedEvents = [];
 
@@ -40,11 +43,12 @@ describe('Status Event Flow', () => {
         { provide: 'METRICS_DURATION', useValue: mockMetrics },
         { provide: 'METRICS_FAILURES_TOTAL', useValue: mockMetrics },
         { provide: 'METRICS_ACTIVE_JOBS', useValue: mockMetrics },
+        { provide: getQueueToken('shell-query'), useValue: mockQueue },
       ],
     }).compile();
 
     processor = module.get<ShellQueryProcessor>(ShellQueryProcessor);
-    processor.setPollingDelayMultiplier(0);
+    processor.setTestMode(true);
   });
 
   afterEach(() => {
@@ -70,11 +74,7 @@ describe('Status Event Flow', () => {
       capturedStatuses.push('creating_data_extension');
       await publishStatus('executing_query');
       capturedStatuses.push('executing_query');
-      return { taskId: 'task-123' };
-    });
-
-    mockMceBridge.soapRequest.mockResolvedValueOnce({
-      Body: { RetrieveResponseMsg: { Results: { Status: 'Complete' } } },
+      return { taskId: 'task-123', queryDefinitionId: 'query-def-123' };
     });
 
     await processor.process(job as unknown as Parameters<typeof processor.process>[0]);
@@ -85,21 +85,21 @@ describe('Status Event Flow', () => {
     expect(publishedStatuses).toContain('validating_query');
     expect(publishedStatuses).toContain('creating_data_extension');
     expect(publishedStatuses).toContain('executing_query');
-    expect(publishedStatuses).toContain('fetching_results');
-    expect(publishedStatuses).toContain('ready');
 
     const queuedIdx = publishedStatuses.indexOf('queued');
     const validatingIdx = publishedStatuses.indexOf('validating_query');
     const creatingIdx = publishedStatuses.indexOf('creating_data_extension');
     const executingIdx = publishedStatuses.indexOf('executing_query');
-    const fetchingIdx = publishedStatuses.indexOf('fetching_results');
-    const readyIdx = publishedStatuses.indexOf('ready');
 
     expect(queuedIdx).toBeLessThan(validatingIdx);
     expect(validatingIdx).toBeLessThan(creatingIdx);
     expect(creatingIdx).toBeLessThan(executingIdx);
-    expect(executingIdx).toBeLessThan(fetchingIdx);
-    expect(fetchingIdx).toBeLessThan(readyIdx);
+
+    expect(mockQueue.add).toHaveBeenCalledWith(
+      'poll-shell-query',
+      expect.objectContaining({ runId: 'run-status-test', taskId: 'task-123' }),
+      expect.anything(),
+    );
   });
 
   it('should include human-readable message with each status event', async () => {
@@ -116,11 +116,7 @@ describe('Status Event Flow', () => {
       await publishStatus('validating_query');
       await publishStatus('creating_data_extension');
       await publishStatus('executing_query');
-      return { taskId: 'task-456' };
-    });
-
-    mockMceBridge.soapRequest.mockResolvedValueOnce({
-      Body: { RetrieveResponseMsg: { Results: { Status: 'Complete' } } },
+      return { taskId: 'task-456', queryDefinitionId: 'query-def-456' };
     });
 
     await processor.process(job as unknown as Parameters<typeof processor.process>[0]);
@@ -145,9 +141,9 @@ describe('Status Event Flow', () => {
       sqlText: 'SELECT 1',
     });
 
-    mockRunToTempFlow.execute.mockResolvedValue({ taskId: 'task-789' });
-    mockMceBridge.soapRequest.mockResolvedValueOnce({
-      Body: { RetrieveResponseMsg: { Results: { Status: 'Complete' } } },
+    mockRunToTempFlow.execute.mockResolvedValue({
+      taskId: 'task-789',
+      queryDefinitionId: 'query-def-789',
     });
 
     await processor.process(job as unknown as Parameters<typeof processor.process>[0]);
@@ -189,24 +185,18 @@ describe('Status Event Flow', () => {
   });
 
   it('should emit canceled status when run is canceled during polling', async () => {
-    const job = createMockBullJob({
+    const job = createMockPollBullJob({
       runId: 'run-cancel-test',
       tenantId: 't1',
       userId: 'u1',
       mid: 'm1',
-      eid: 'e1',
-      sqlText: 'SELECT 1',
     });
-
-    mockRunToTempFlow.execute.mockResolvedValue({ taskId: 'task-cancel' });
 
     mockDb.setSelectResult([{ status: 'canceled' }]);
 
-    mockMceBridge.soapRequest.mockResolvedValue({
-      Body: { RetrieveResponseMsg: { Results: { Status: 'Processing' } } },
-    });
+    const result = await processor.process(job as unknown as Parameters<typeof processor.process>[0]);
 
-    await processor.process(job as unknown as Parameters<typeof processor.process>[0]);
+    expect(result).toEqual({ status: 'canceled', runId: 'run-cancel-test' });
 
     const canceledEvent = publishedEvents.find(
       (e) => (e.payload as { status: string }).status === 'canceled',
@@ -215,5 +205,41 @@ describe('Status Event Flow', () => {
     expect(canceledEvent).toBeDefined();
     const payload = canceledEvent?.payload as { status: string; message: string };
     expect(payload.message).toBe(STATUS_MESSAGES.canceled);
+  });
+
+  it('should emit fetching_results and ready statuses when poll job completes', async () => {
+    const job = createMockPollBullJob({
+      runId: 'run-complete-test',
+      tenantId: 't1',
+      userId: 'u1',
+      mid: 'm1',
+      taskId: 'task-123',
+    });
+
+    mockMceBridge.soapRequest.mockResolvedValue({
+      Body: {
+        RetrieveResponseMsg: {
+          Results: {
+            Properties: {
+              Property: [
+                { Name: 'Status', Value: 'Complete' },
+                { Name: 'ErrorMsg', Value: '' },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    await processor.process(job as unknown as Parameters<typeof processor.process>[0]);
+
+    const publishedStatuses = publishedEvents.map((e) => (e.payload as { status: string }).status);
+
+    expect(publishedStatuses).toContain('fetching_results');
+    expect(publishedStatuses).toContain('ready');
+
+    const fetchingIdx = publishedStatuses.indexOf('fetching_results');
+    const readyIdx = publishedStatuses.indexOf('ready');
+    expect(fetchingIdx).toBeLessThan(readyIdx);
   });
 });

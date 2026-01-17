@@ -2,8 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdminAuthMiddleware } from '../src/common/middleware/admin-auth.middleware';
-import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 
 // Test module that applies AdminAuthMiddleware to a test route
@@ -63,46 +62,50 @@ describe('AdminAuthMiddleware', () => {
 
   describe('Admin routes protection', () => {
     it('should deny access without admin key', async () => {
-      return request(app.getHttpServer())
-        .get('/admin/test')
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.statusCode).toBe(401);
-          expect(res.body.message).toContain('Unauthorized');
-        });
+      const fastify = app.getHttpAdapter().getInstance();
+      const res = await fastify.inject({ method: 'GET', url: '/admin/test' });
+
+      expect(res.statusCode).toBe(401);
+      const body = res.json();
+      expect(body.statusCode).toBe(401);
+      expect(body.message).toContain('Unauthorized');
     });
 
     it('should deny access with incorrect admin key', async () => {
-      return request(app.getHttpServer())
-        .get('/admin/test')
-        .set('x-admin-key', 'wrong-key')
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.statusCode).toBe(401);
-          expect(res.body.message).toContain('Invalid or missing admin API key');
-        });
+      const fastify = app.getHttpAdapter().getInstance();
+      const res = await fastify.inject({
+        method: 'GET',
+        url: '/admin/test',
+        headers: { 'x-admin-key': 'wrong-key' },
+      });
+
+      expect(res.statusCode).toBe(401);
+      const body = res.json();
+      expect(body.statusCode).toBe(401);
+      expect(body.message).toContain('Invalid or missing admin API key');
     });
 
     it('should allow access with correct admin key', async () => {
       const adminKey = configService.get<string>('ADMIN_API_KEY');
-      return request(app.getHttpServer())
-        .get('/admin/test')
-        .set('x-admin-key', adminKey!)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.message).toBe('Protected route accessed');
-        });
+      const fastify = app.getHttpAdapter().getInstance();
+      const res = await fastify.inject({
+        method: 'GET',
+        url: '/admin/test',
+        headers: { 'x-admin-key': adminKey! },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().message).toBe('Protected route accessed');
     });
   });
 
   describe('Public routes', () => {
     it('should allow access to public routes without admin key', async () => {
-      return request(app.getHttpServer())
-        .get('/public/test')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.message).toBe('Public route accessed');
-        });
+      const fastify = app.getHttpAdapter().getInstance();
+      const res = await fastify.inject({ method: 'GET', url: '/public/test' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().message).toBe('Public route accessed');
     });
   });
 });
@@ -151,23 +154,26 @@ describe('AdminAuthMiddleware - No API Key Configured', () => {
   });
 
   it('should deny access when ADMIN_API_KEY is not configured', async () => {
-    return request(app.getHttpServer())
-      .get('/admin/test')
-      .expect(401)
-      .expect((res) => {
-        expect(res.body.statusCode).toBe(401);
-        expect(res.body.message).toContain('Admin API key not configured');
-      });
+    const fastify = app.getHttpAdapter().getInstance();
+    const res = await fastify.inject({ method: 'GET', url: '/admin/test' });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json();
+    expect(body.statusCode).toBe(401);
+    expect(body.message).toContain('Admin API key not configured');
   });
 
   it('should deny access even with a key header when ADMIN_API_KEY is not configured', async () => {
-    return request(app.getHttpServer())
-      .get('/admin/test')
-      .set('x-admin-key', 'any-key')
-      .expect(401)
-      .expect((res) => {
-        expect(res.body.statusCode).toBe(401);
-        expect(res.body.message).toContain('Admin API key not configured');
-      });
+    const fastify = app.getHttpAdapter().getInstance();
+    const res = await fastify.inject({
+      method: 'GET',
+      url: '/admin/test',
+      headers: { 'x-admin-key': 'any-key' },
+    });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json();
+    expect(body.statusCode).toBe(401);
+    expect(body.message).toContain('Admin API key not configured');
   });
 });

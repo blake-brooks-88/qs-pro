@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from '../src/app.module';
-import request from 'supertest';
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { JsonLogger } from '../src/common/logger/json-logger.service';
 
@@ -27,18 +26,19 @@ describe('Shell Query Observability', () => {
   });
 
   it('should have /metrics endpoint returning Prometheus format', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/metrics')
-      .expect(200);
-    
-    expect(res.text).toContain('shell_query_jobs_total');
-    expect(res.header['content-type']).toContain('text/plain');
+    const fastify = app.getHttpAdapter().getInstance();
+    const res = await fastify.inject({ method: 'GET', url: '/metrics' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toContain('shell_query_jobs_total');
+    expect(res.headers['content-type']).toContain('text/plain');
   });
 
   it('should have Bull Board accessible at /admin/queues', async () => {
-    await request(app.getHttpServer())
-      .get('/admin/queues')
-      .expect(200);
+    const fastify = app.getHttpAdapter().getInstance();
+    const res = await fastify.inject({ method: 'GET', url: '/admin/queues' });
+
+    expect(res.statusCode).toBe(200);
   });
 
   it('JsonLogger should output JSON when LOG_FORMAT is json', () => {

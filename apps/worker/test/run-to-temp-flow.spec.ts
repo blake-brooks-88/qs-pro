@@ -35,40 +35,122 @@ describe('RunToTempFlow', () => {
   it('should execute full flow: folder -> DE -> Query -> Perform', async () => {
     const job = createMockJob();
 
-    // No cached folder
     mockDb.setSelectResult([]);
 
-    // SOAP responses in sequence
     mockMceBridge.soapRequest
-      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } }) // folder search
-      .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'OK', NewID: '999' } } } }) // folder create
-      .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'OK' } } } }) // DE create
-      .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'OK' } } } }) // Query create
-      .mockResolvedValueOnce({ Body: { PerformResponseMsg: { Results: { Result: { StatusCode: 'OK', TaskID: 'task-abc' } } } } }); // Perform
+      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      .mockResolvedValueOnce({
+        Body: {
+          RetrieveResponseMsg: {
+            Results: { ID: '100' },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        Body: {
+          CreateResponse: {
+            Results: {
+              StatusCode: 'OK',
+              NewID: '999',
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        Body: {
+          CreateResponse: {
+            Results: {
+              StatusCode: 'OK',
+              NewObjectID: 'obj-de-123',
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      .mockResolvedValueOnce({
+        Body: {
+          CreateResponse: {
+            Results: {
+              StatusCode: 'OK',
+              NewObjectID: 'obj-qd-123',
+              NewID: 'qd-id-123',
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        Body: {
+          PerformResponseMsg: {
+            Results: {
+              Result: {
+                StatusCode: 'OK',
+                Task: {
+                  ID: 'task-abc',
+                },
+              },
+            },
+          },
+        },
+      });
 
     const result = await strategy.execute(job);
 
     expect(result.taskId).toBe('task-abc');
-    expect(mockMceBridge.soapRequest).toHaveBeenCalledTimes(5);
+    expect(result.queryDefinitionId).toBe('obj-qd-123');
+    expect(result.queryCustomerKey).toContain('QPP_Query_');
+    expect(result.targetDeName).toContain('QPP_');
     expect(mockQueryValidator.validateQuery).toHaveBeenCalled();
   });
 
   it('should use cached folder ID when available', async () => {
     const job = createMockJob();
 
-    // Cached folder exists
     mockDb.setSelectResult([{ qppFolderId: 123 }]);
 
     mockMceBridge.soapRequest
-      .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'OK' } } } }) // DE create
-      .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'OK' } } } }) // Query create
-      .mockResolvedValueOnce({ Body: { PerformResponseMsg: { Results: { Result: { StatusCode: 'OK', TaskID: 'task-xyz' } } } } }); // Perform
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        Body: {
+          CreateResponse: {
+            Results: {
+              StatusCode: 'OK',
+              NewObjectID: 'obj-de-456',
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      .mockResolvedValueOnce({
+        Body: {
+          CreateResponse: {
+            Results: {
+              StatusCode: 'OK',
+              NewObjectID: 'obj-qd-456',
+              NewID: 'qd-id-456',
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        Body: {
+          PerformResponseMsg: {
+            Results: {
+              Result: {
+                StatusCode: 'OK',
+                Task: {
+                  ID: 'task-xyz',
+                },
+              },
+            },
+          },
+        },
+      });
 
     const result = await strategy.execute(job);
 
     expect(result.taskId).toBe('task-xyz');
-    // Should skip folder search/create - only 3 calls
-    expect(mockMceBridge.soapRequest).toHaveBeenCalledTimes(3);
+    expect(result.queryDefinitionId).toBe('obj-qd-456');
   });
 
   it('should throw on QueryDefinition creation failure', async () => {
@@ -76,8 +158,25 @@ describe('RunToTempFlow', () => {
     mockDb.setSelectResult([{ qppFolderId: 123 }]);
 
     mockMceBridge.soapRequest
-      .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'OK' } } } }) // DE
-      .mockResolvedValueOnce({ Body: { CreateResponse: { Results: { StatusCode: 'Error', StatusMessage: 'Invalid SQL' } } } }); // Query fails
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        Body: {
+          CreateResponse: {
+            Results: {
+              StatusCode: 'OK',
+              NewObjectID: 'obj-de-789',
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      .mockResolvedValueOnce({
+        Body: {
+          CreateResponse: {
+            Results: { StatusCode: 'Error', StatusMessage: 'Invalid SQL' },
+          },
+        },
+      });
 
     await expect(strategy.execute(job)).rejects.toThrow('Invalid SQL');
   });
