@@ -17,3 +17,4 @@ export * from "./interfaces";
 export * from "./repositories/drizzle-repositories";
 export * from "./schema";
 export * from "drizzle-orm";
+export type { PostgresJsDatabase } from "drizzle-orm/postgres-js";

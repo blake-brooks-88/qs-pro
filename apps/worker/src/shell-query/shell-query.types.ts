@@ -2,6 +2,7 @@
  * SOAP response types for MCE API calls
  */
 
+import type { ShellQueryRunStatus } from "@qs-pro/database";
 import type { TableMetadata } from "@qs-pro/shared-types";
 
 /** Generic retrieve response result structure */
@@ -134,17 +135,15 @@ export interface FlowResult {
 }
 
 export type RunStatus =
-  | "queued"
+  | ShellQueryRunStatus
   | "validating_query"
   | "creating_data_extension"
   | "executing_query"
-  | "fetching_results"
-  | "ready"
-  | "failed"
-  | "canceled";
+  | "fetching_results";
 
 export const STATUS_MESSAGES = {
   queued: "Queued...",
+  running: "Running...",
   validating_query: "Validating query...",
   creating_data_extension: "Creating temp Data Extension...",
   executing_query: "Executing query...",
