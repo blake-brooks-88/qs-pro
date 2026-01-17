@@ -59,6 +59,8 @@ describe('ShellQueryController', () => {
       expect(shellQueryService.getRunStatus).toHaveBeenCalledWith(
         'run-123',
         'tenant-1',
+        'mid-1',
+        'user-1',
       );
     });
 
@@ -83,6 +85,8 @@ describe('ShellQueryController', () => {
       expect(shellQueryService.getRunStatus).toHaveBeenCalledWith(
         'other-users-run',
         'tenant-1',
+        'mid-1',
+        'user-1',
       );
     });
 
@@ -144,6 +148,8 @@ describe('ShellQueryController', () => {
       expect(shellQueryService.cancelRun).toHaveBeenCalledWith(
         'run-123',
         'tenant-1',
+        'mid-1',
+        'user-1',
       );
     });
   });

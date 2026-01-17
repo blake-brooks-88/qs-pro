@@ -18,6 +18,19 @@ describe("Shell Query Engine Schema", () => {
   let client: postgres.Sql;
   let tenantId: string;
   let userId: string;
+  const mid = "123456";
+
+  // Helper to run queries with RLS context set
+  async function withRlsContext<T>(fn: () => Promise<T>): Promise<T> {
+    await client`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+    await client`SELECT set_config('app.user_id', ${userId}, false)`;
+    try {
+      return await fn();
+    } finally {
+      await client`RESET app.tenant_id`;
+      await client`RESET app.user_id`;
+    }
+  }
 
   beforeAll(async () => {
     client = postgres(connectionString);
@@ -52,10 +65,10 @@ describe("Shell Query Engine Schema", () => {
   });
 
   afterAll(async () => {
-    // Cleanup
-    await db
-      .delete(shellQueryRuns)
-      .where(eq(shellQueryRuns.tenantId, tenantId));
+    // Cleanup (need RLS context for shell_query_runs)
+    await withRlsContext(() =>
+      db.delete(shellQueryRuns).where(eq(shellQueryRuns.tenantId, tenantId)),
+    );
     await db
       .delete(tenantSettings)
       .where(eq(tenantSettings.tenantId, tenantId));
@@ -68,12 +81,14 @@ describe("Shell Query Engine Schema", () => {
     const runData = {
       tenantId,
       userId,
-      mid: "123456",
+      mid,
       sqlTextHash: "hash_of_select_star",
       status: "queued" as const,
     };
 
-    const [run] = await db.insert(shellQueryRuns).values(runData).returning();
+    const [run] = await withRlsContext(() =>
+      db.insert(shellQueryRuns).values(runData).returning(),
+    );
     if (!run) {
       throw new Error("Insert failed");
     }
@@ -81,32 +96,36 @@ describe("Shell Query Engine Schema", () => {
     expect(run.id).toBeDefined();
     expect(run.status).toBe("queued");
     expect(run.createdAt).toBeDefined();
-    expect(run.mid).toBe("123456");
+    expect(run.mid).toBe(mid);
   });
 
   it("should update shell query run status and timestamps", async () => {
-    const [run] = await db
-      .insert(shellQueryRuns)
-      .values({
-        tenantId,
-        userId,
-        mid: "123456",
-        sqlTextHash: "hash_for_update",
-        status: "queued",
-      })
-      .returning();
+    const [run] = await withRlsContext(() =>
+      db
+        .insert(shellQueryRuns)
+        .values({
+          tenantId,
+          userId,
+          mid,
+          sqlTextHash: "hash_for_update",
+          status: "queued",
+        })
+        .returning(),
+    );
     if (!run) {
       throw new Error("Insert failed");
     }
 
-    const [updated] = await db
-      .update(shellQueryRuns)
-      .set({
-        status: "running",
-        startedAt: new Date(),
-      })
-      .where(eq(shellQueryRuns.id, run.id))
-      .returning();
+    const [updated] = await withRlsContext(() =>
+      db
+        .update(shellQueryRuns)
+        .set({
+          status: "running",
+          startedAt: new Date(),
+        })
+        .where(eq(shellQueryRuns.id, run.id))
+        .returning(),
+    );
     if (!updated) {
       throw new Error("Update failed");
     }
@@ -116,16 +135,18 @@ describe("Shell Query Engine Schema", () => {
   });
 
   it("should persist queryDefinitionId and pollStartedAt", async () => {
-    const [run] = await db
-      .insert(shellQueryRuns)
-      .values({
-        tenantId,
-        userId,
-        mid: "123456",
-        sqlTextHash: "hash_for_query_definition",
-        status: "queued",
-      })
-      .returning();
+    const [run] = await withRlsContext(() =>
+      db
+        .insert(shellQueryRuns)
+        .values({
+          tenantId,
+          userId,
+          mid,
+          sqlTextHash: "hash_for_query_definition",
+          status: "queued",
+        })
+        .returning(),
+    );
     if (!run) {
       throw new Error("Insert failed");
     }
@@ -133,14 +154,16 @@ describe("Shell Query Engine Schema", () => {
     const pollStartedAt = new Date();
     const queryDefinitionId = "test-query-definition-object-id";
 
-    const [updated] = await db
-      .update(shellQueryRuns)
-      .set({
-        queryDefinitionId,
-        pollStartedAt,
-      })
-      .where(eq(shellQueryRuns.id, run.id))
-      .returning();
+    const [updated] = await withRlsContext(() =>
+      db
+        .update(shellQueryRuns)
+        .set({
+          queryDefinitionId,
+          pollStartedAt,
+        })
+        .where(eq(shellQueryRuns.id, run.id))
+        .returning(),
+    );
     if (!updated) {
       throw new Error("Update failed");
     }

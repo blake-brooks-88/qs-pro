@@ -76,7 +76,11 @@ describe('ShellQueryService', () => {
     expect(runId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
-    expect(runRepo.countActiveRuns).toHaveBeenCalledWith('user-1');
+    expect(runRepo.countActiveRuns).toHaveBeenCalledWith(
+      'tenant-1',
+      'mid-1',
+      'user-1',
+    );
     expect(runRepo.createRun).toHaveBeenCalledWith(
       expect.objectContaining({
         id: runId,
@@ -173,7 +177,7 @@ describe('ShellQueryService', () => {
         'mid-1',
         expect.objectContaining({
           method: 'GET',
-          url: '/data/v1/customobjectdata/key/QPP_New_Query_65e9/rowset?$page=1&$pageSize=50',
+          url: '/data/v1/customobjectdata/key/QPP_New_Query_65e9fec9/rowset?$page=1&$pageSize=50',
         }),
       );
 
@@ -227,7 +231,7 @@ describe('ShellQueryService', () => {
         'mid-1',
         expect.objectContaining({
           method: 'GET',
-          url: '/data/v1/customobjectdata/key/QPP_Results_abcd/rowset?$page=1&$pageSize=50',
+          url: '/data/v1/customobjectdata/key/QPP_Results_abcd1234/rowset?$page=1&$pageSize=50',
         }),
       );
 

@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import type { TableMetadata } from '@qs-pro/shared-types';
 import { Queue } from 'bullmq';
 import * as crypto from 'crypto';
 
@@ -64,6 +65,7 @@ export class ShellQueryService {
     context: ShellQueryContext,
     sqlText: string,
     snippetName?: string,
+    tableMetadata?: TableMetadata,
   ): Promise<string> {
     const runId = crypto.randomUUID();
     const sqlTextHash = crypto
@@ -72,7 +74,11 @@ export class ShellQueryService {
       .digest('hex');
 
     // 1. Check Rate Limit
-    const activeRuns = await this.runRepo.countActiveRuns(context.userId);
+    const activeRuns = await this.runRepo.countActiveRuns(
+      context.tenantId,
+      context.mid,
+      context.userId,
+    );
     if (activeRuns >= 10) {
       throw new Error(
         'Rate limit exceeded: Max 10 concurrent shell queries per user.',
@@ -98,6 +104,7 @@ export class ShellQueryService {
         ...context,
         sqlText,
         snippetName,
+        tableMetadata,
       },
       {
         attempts: 2,
@@ -118,15 +125,17 @@ export class ShellQueryService {
     return runId;
   }
 
-  async getRun(runId: string, tenantId: string) {
-    return this.runRepo.findRun(runId, tenantId);
+  async getRun(runId: string, tenantId: string, mid: string, userId: string) {
+    return this.runRepo.findRun(runId, tenantId, mid, userId);
   }
 
   async getRunStatus(
     runId: string,
     tenantId: string,
+    mid: string,
+    userId: string,
   ): Promise<RunStatusResponse> {
-    const run = await this.runRepo.findRun(runId, tenantId);
+    const run = await this.runRepo.findRun(runId, tenantId, mid, userId);
     if (!run) {
       throw new NotFoundException('Run not found');
     }
@@ -152,7 +161,7 @@ export class ShellQueryService {
     mid: string,
     page: number,
   ): Promise<RunResultsResponse> {
-    const run = await this.getRun(runId, tenantId);
+    const run = await this.getRun(runId, tenantId, mid, userId);
     if (!run) {
       throw new NotFoundException('Run not found');
     }
@@ -166,7 +175,7 @@ export class ShellQueryService {
 
     // Proxy to MCE REST Rowset API
     // The DE name follows the convention: QPP_[SnippetName]_[Hash]
-    const hash = run.id.substring(0, 4);
+    const hash = run.id.substring(0, 8);
     const deName = run.snippetName
       ? `QPP_${run.snippetName.replace(/\s+/g, '_')}_${hash}`
       : `QPP_Results_${hash}`;
@@ -184,7 +193,9 @@ export class ShellQueryService {
         url,
       });
 
-      this.logger.debug(`MCE rowset response: ${JSON.stringify(mceResponse)}`);
+      this.logger.debug(
+        `MCE rowset response: count=${mceResponse.count ?? 0}, page=${mceResponse.page ?? 1}`,
+      );
 
       return this.normalizeRowsetResponse(mceResponse, page, pageSize);
     } catch (e: unknown) {
@@ -228,8 +239,13 @@ export class ShellQueryService {
     };
   }
 
-  async cancelRun(runId: string, tenantId: string) {
-    const run = await this.getRun(runId, tenantId);
+  async cancelRun(
+    runId: string,
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ) {
+    const run = await this.getRun(runId, tenantId, mid, userId);
     if (!run) {
       throw new NotFoundException('Run not found');
     }
@@ -245,7 +261,7 @@ export class ShellQueryService {
       };
     }
 
-    await this.runRepo.markCanceled(runId, tenantId, run.mid);
+    await this.runRepo.markCanceled(runId, tenantId, mid, userId);
 
     return { status: 'canceled', runId };
   }

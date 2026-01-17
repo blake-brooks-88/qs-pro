@@ -1,6 +1,7 @@
 import type { createDatabaseFromClient } from '@qs-pro/database';
 import { and, count, eq, notInArray, shellQueryRuns } from '@qs-pro/database';
 
+import { getDbFromContext } from '../database/db-context';
 import type { RlsContextService } from '../database/rls-context.service';
 import type {
   CreateShellQueryRunParams,
@@ -16,12 +17,22 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
     private readonly rlsContext: RlsContextService,
   ) {}
 
+  /**
+   * Get the context-aware database connection.
+   * Uses the RLS-context db if available (inside runWithUserContext),
+   * otherwise falls back to the default db.
+   */
+  private getDb(): Database {
+    return (getDbFromContext() as Database) ?? this.db;
+  }
+
   async createRun(params: CreateShellQueryRunParams): Promise<void> {
-    await this.rlsContext.runWithTenantContext(
+    await this.rlsContext.runWithUserContext(
       params.tenantId,
       params.mid,
+      params.userId,
       async () => {
-        await this.db.insert(shellQueryRuns).values({
+        await this.getDb().insert(shellQueryRuns).values({
           id: params.id,
           tenantId: params.tenantId,
           userId: params.userId,
@@ -37,44 +48,80 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
   async findRun(
     runId: string,
     tenantId: string,
+    mid: string,
+    userId: string,
   ): Promise<ShellQueryRun | null> {
-    const results = await this.db
-      .select()
-      .from(shellQueryRuns)
-      .where(
-        and(
-          eq(shellQueryRuns.id, runId),
-          eq(shellQueryRuns.tenantId, tenantId),
-        ),
-      );
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const results = await this.getDb()
+          .select()
+          .from(shellQueryRuns)
+          .where(
+            and(
+              eq(shellQueryRuns.id, runId),
+              eq(shellQueryRuns.tenantId, tenantId),
+              eq(shellQueryRuns.userId, userId),
+            ),
+          );
 
-    return results[0] ?? null;
+        return results[0] ?? null;
+      },
+    );
   }
 
   async markCanceled(
     runId: string,
     tenantId: string,
     mid: string,
+    userId: string,
   ): Promise<void> {
-    await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-      await this.db
-        .update(shellQueryRuns)
-        .set({ status: 'canceled', completedAt: new Date() })
-        .where(eq(shellQueryRuns.id, runId));
-    });
+    await this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        await this.getDb()
+          .update(shellQueryRuns)
+          .set({ status: 'canceled', completedAt: new Date() })
+          .where(
+            and(
+              eq(shellQueryRuns.id, runId),
+              eq(shellQueryRuns.userId, userId),
+            ),
+          );
+      },
+    );
   }
 
-  async countActiveRuns(userId: string): Promise<number> {
-    const result = await this.db
-      .select({ count: count() })
-      .from(shellQueryRuns)
-      .where(
-        and(
-          eq(shellQueryRuns.userId, userId),
-          notInArray(shellQueryRuns.status, ['ready', 'failed', 'canceled']),
-        ),
-      );
+  async countActiveRuns(
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<number> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const result = await this.getDb()
+          .select({ count: count() })
+          .from(shellQueryRuns)
+          .where(
+            and(
+              eq(shellQueryRuns.userId, userId),
+              notInArray(shellQueryRuns.status, [
+                'ready',
+                'failed',
+                'canceled',
+              ]),
+            ),
+          );
 
-    return result[0]?.count ?? 0;
+        return result[0]?.count ?? 0;
+      },
+    );
   }
 }

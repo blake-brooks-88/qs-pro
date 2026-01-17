@@ -16,7 +16,21 @@ export interface CreateShellQueryRunParams {
 
 export interface ShellQueryRunRepository {
   createRun(params: CreateShellQueryRunParams): Promise<void>;
-  findRun(runId: string, tenantId: string): Promise<ShellQueryRun | null>;
-  markCanceled(runId: string, tenantId: string, mid: string): Promise<void>;
-  countActiveRuns(userId: string): Promise<number>;
+  findRun(
+    runId: string,
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<ShellQueryRun | null>;
+  markCanceled(
+    runId: string,
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<void>;
+  countActiveRuns(
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<number>;
 }
