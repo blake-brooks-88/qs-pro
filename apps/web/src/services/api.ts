@@ -21,7 +21,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (method && MUTATING_METHODS.includes(method)) {
     const csrfToken = useAuthStore.getState().csrfToken;
 
-    if (csrfToken) {
+    if (csrfToken && config.headers?.set) {
       config.headers.set("x-csrf-token", csrfToken);
     }
   }

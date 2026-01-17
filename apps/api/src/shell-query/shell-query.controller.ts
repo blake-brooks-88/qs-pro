@@ -36,7 +36,7 @@ const createRunSchema = z.object({
           z.object({
             Name: z.string().max(128),
             FieldType: z.string().max(32),
-            MaxLength: z.number().optional(),
+            MaxLength: z.number().int().min(1).max(4000).optional(),
           }),
         )
         .max(500),
