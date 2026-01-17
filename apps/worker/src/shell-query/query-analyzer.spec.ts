@@ -15,34 +15,43 @@ describe("Query Analyzer", () => {
   let mockMetadataFn: MetadataFetcher;
 
   beforeEach(() => {
+    const tables = new Map<
+      string,
+      Array<{ Name: string; FieldType: string; MaxLength?: number }>
+    >([
+      [
+        "DE",
+        [
+          { Name: "ID", FieldType: "Number" },
+          { Name: "Name", FieldType: "Text", MaxLength: 100 },
+          { Name: "Email", FieldType: "EmailAddress" },
+          { Name: "CreatedDate", FieldType: "Date" },
+        ],
+      ],
+      [
+        "Customers",
+        [
+          { Name: "CustomerID", FieldType: "Number" },
+          { Name: "FirstName", FieldType: "Text", MaxLength: 50 },
+          { Name: "LastName", FieldType: "Text", MaxLength: 50 },
+          { Name: "Email", FieldType: "EmailAddress" },
+        ],
+      ],
+      [
+        "Orders",
+        [
+          { Name: "OrderID", FieldType: "Number" },
+          { Name: "CustomerID", FieldType: "Number" },
+          { Name: "Amount", FieldType: "Decimal" },
+          { Name: "OrderDate", FieldType: "Date" },
+        ],
+      ],
+    ]);
+
     mockMetadataFn = {
       getFieldsForTable: vi.fn().mockImplementation((tableName: string) => {
-        const tables: Record<
-          string,
-          Array<{ Name: string; FieldType: string; MaxLength?: number }>
-        > = {
-          DE: [
-            { Name: "ID", FieldType: "Number" },
-            { Name: "Name", FieldType: "Text", MaxLength: 100 },
-            { Name: "Email", FieldType: "EmailAddress" },
-            { Name: "CreatedDate", FieldType: "Date" },
-          ],
-          Customers: [
-            { Name: "CustomerID", FieldType: "Number" },
-            { Name: "FirstName", FieldType: "Text", MaxLength: 50 },
-            { Name: "LastName", FieldType: "Text", MaxLength: 50 },
-            { Name: "Email", FieldType: "EmailAddress" },
-          ],
-          Orders: [
-            { Name: "OrderID", FieldType: "Number" },
-            { Name: "CustomerID", FieldType: "Number" },
-            { Name: "Amount", FieldType: "Decimal" },
-            { Name: "OrderDate", FieldType: "Date" },
-          ],
-        };
-
         const normalizedName = tableName.replace(/^\[|\]$/g, "");
-        return Promise.resolve(tables[normalizedName] ?? null);
+        return Promise.resolve(tables.get(normalizedName) ?? null);
       }),
     };
   });
@@ -281,25 +290,31 @@ describe("Schema Inferrer", () => {
   let mockMetadataFn: MetadataFetcher;
 
   beforeEach(() => {
+    const tables = new Map<
+      string,
+      Array<{ Name: string; FieldType: string; MaxLength?: number }>
+    >([
+      [
+        "DE",
+        [
+          { Name: "ID", FieldType: "Number" },
+          { Name: "Name", FieldType: "Text", MaxLength: 100 },
+          { Name: "Amount", FieldType: "Decimal" },
+        ],
+      ],
+      [
+        "Customers",
+        [
+          { Name: "CustomerID", FieldType: "Number" },
+          { Name: "Name", FieldType: "Text", MaxLength: 50 },
+        ],
+      ],
+    ]);
+
     mockMetadataFn = {
       getFieldsForTable: vi.fn().mockImplementation((tableName: string) => {
-        const tables: Record<
-          string,
-          Array<{ Name: string; FieldType: string; MaxLength?: number }>
-        > = {
-          DE: [
-            { Name: "ID", FieldType: "Number" },
-            { Name: "Name", FieldType: "Text", MaxLength: 100 },
-            { Name: "Amount", FieldType: "Decimal" },
-          ],
-          Customers: [
-            { Name: "CustomerID", FieldType: "Number" },
-            { Name: "Name", FieldType: "Text", MaxLength: 50 },
-          ],
-        };
-
         const normalizedName = tableName.replace(/^\[|\]$/g, "");
-        return Promise.resolve(tables[normalizedName] ?? null);
+        return Promise.resolve(tables.get(normalizedName) ?? null);
       }),
     };
   });

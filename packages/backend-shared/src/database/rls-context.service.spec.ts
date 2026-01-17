@@ -28,9 +28,8 @@ describe("RlsContextService", () => {
       .mockImplementation(
         (strings: TemplateStringsArray, ...values: unknown[]) => {
           const fullQuery = strings.reduce((acc, str, i) => {
-            return (
-              acc + str + (values[i] !== undefined ? String(values[i]) : "")
-            );
+            const val = values.at(i);
+            return acc + str + (val !== undefined ? String(val) : "");
           }, "");
 
           if (fullQuery.includes("set_config")) {
