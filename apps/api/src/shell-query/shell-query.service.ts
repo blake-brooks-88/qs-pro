@@ -28,6 +28,27 @@ export interface RunStatusResponse {
   updatedAt: Date;
 }
 
+export interface RunResultsResponse {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  totalRows: number;
+  page: number;
+  pageSize: number;
+}
+
+interface MceRowsetResponse {
+  links?: { self?: string; next?: string };
+  customObjectId?: string;
+  customObjectKey?: string;
+  pageSize?: number;
+  page?: number;
+  count?: number;
+  items?: Array<{
+    keys?: Record<string, unknown>;
+    values?: Record<string, unknown>;
+  }>;
+}
+
 @Injectable()
 export class ShellQueryService {
   private readonly logger = new Logger(ShellQueryService.name);
@@ -130,7 +151,7 @@ export class ShellQueryService {
     userId: string,
     mid: string,
     page: number,
-  ) {
+  ): Promise<RunResultsResponse> {
     const run = await this.getRun(runId, tenantId);
     if (!run) {
       throw new NotFoundException('Run not found');
@@ -153,12 +174,19 @@ export class ShellQueryService {
     const pageSize = 50;
     const url = `/data/v1/customobjectdata/key/${deName}/rowset?$page=${page}&$pageSize=${pageSize}`;
 
+    this.logger.log(
+      `Fetching results for run ${runId}: DE="${deName}", snippetName="${run.snippetName}", url="${url}"`,
+    );
+
     try {
-      const response = await this.mceBridge.request(tenantId, userId, mid, {
+      const mceResponse = await this.mceBridge.request(tenantId, userId, mid, {
         method: 'GET',
         url,
       });
-      return response;
+
+      this.logger.debug(`MCE rowset response: ${JSON.stringify(mceResponse)}`);
+
+      return this.normalizeRowsetResponse(mceResponse, page, pageSize);
     } catch (e: unknown) {
       const error = e as { message?: string };
       this.logger.error(
@@ -166,6 +194,38 @@ export class ShellQueryService {
       );
       throw e;
     }
+  }
+
+  private normalizeRowsetResponse(
+    mceResponse: MceRowsetResponse,
+    page: number,
+    pageSize: number,
+  ): RunResultsResponse {
+    const items = mceResponse.items ?? [];
+
+    const columns: string[] = [];
+    if (items.length > 0) {
+      const firstItem = items[0];
+      if (firstItem?.keys) {
+        columns.push(...Object.keys(firstItem.keys));
+      }
+      if (firstItem?.values) {
+        columns.push(...Object.keys(firstItem.values));
+      }
+    }
+
+    const rows = items.map((item) => ({
+      ...item.keys,
+      ...item.values,
+    }));
+
+    return {
+      columns,
+      rows,
+      totalRows: mceResponse.count ?? 0,
+      page: mceResponse.page ?? page,
+      pageSize: mceResponse.pageSize ?? pageSize,
+    };
   }
 
   async cancelRun(runId: string, tenantId: string) {
