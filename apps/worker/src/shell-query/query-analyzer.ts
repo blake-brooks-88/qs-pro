@@ -5,7 +5,7 @@
  * and expand them to explicit column lists using metadata.
  */
 
-import { Parser } from "node-sql-parser";
+import { type AST, Parser } from "node-sql-parser";
 
 import {
   type DataViewField,
@@ -213,30 +213,44 @@ function buildExpandedColumnList(
     .join(", ");
 }
 
-function replaceStarInQuery(sql: string, expandedColumns: string): string {
-  // Try simple SELECT * first
-  if (/\bSELECT\s+\*\s+FROM\b/i.test(sql)) {
-    return sql.replace(
-      /\bSELECT\s+\*\s+(?=FROM\b)/i,
-      `SELECT ${expandedColumns} `,
+export function replaceStarInQuery(
+  sql: string,
+  expandedColumns: string,
+  starExpr: { table: string | null },
+): string {
+  try {
+    const ast = parser.astify(sql, { database: DIALECT }) as AstStatement;
+
+    if (!ast.columns || !Array.isArray(ast.columns)) {
+      return sql;
+    }
+
+    const columns = ast.columns as SelectColumnWithExpr[];
+
+    const starIndex = columns.findIndex(
+      (col) =>
+        col.expr?.type === "column_ref" &&
+        col.expr?.column === "*" &&
+        col.expr?.table === starExpr.table,
     );
-  }
 
-  // Handle SELECT alias.*
-  const aliasStarMatch = sql.match(/\bSELECT\s+(\w+)\.\*\s+(?=FROM\b)/i);
-  if (aliasStarMatch) {
-    return sql.replace(
-      /\bSELECT\s+\w+\.\*\s+(?=FROM\b)/i,
-      `SELECT ${expandedColumns} `,
-    );
-  }
+    if (starIndex === -1) {
+      return sql;
+    }
 
-  // Handle SELECT col, * (mixed columns with star)
-  if (/\bSELECT\s+.+,\s*\*\s+FROM\b/i.test(sql)) {
-    return sql.replace(/,\s*\*\s+(?=FROM\b)/i, `, ${expandedColumns} `);
-  }
+    const helperSql = `SELECT ${expandedColumns} FROM _placeholder_`;
+    const helperAst = parser.astify(helperSql, {
+      database: DIALECT,
+    }) as AstStatement;
+    const expandedCols = helperAst.columns as SelectColumnWithExpr[];
 
-  return sql;
+    columns.splice(starIndex, 1, ...expandedCols);
+    ast.columns = columns;
+
+    return parser.sqlify(ast as unknown as AST, { database: DIALECT });
+  } catch {
+    return sql;
+  }
 }
 
 export async function expandSelectStar(
@@ -293,7 +307,7 @@ export async function expandSelectStar(
     const tableAlias = starTablePrefix ?? null;
     const expandedColumns = buildExpandedColumnList(fields, tableAlias);
 
-    result = replaceStarInQuery(result, expandedColumns);
+    result = replaceStarInQuery(result, expandedColumns, { table: tableAlias });
   }
 
   return result;

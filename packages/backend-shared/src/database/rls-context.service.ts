@@ -83,7 +83,18 @@ export class RlsContextService {
   ): Promise<T> {
     const existing = getDbFromContext();
     if (existing) {
-      return fn();
+      const reserved = await this.sql.reserve();
+      try {
+        await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
+        return await fn();
+      } finally {
+        try {
+          await reserved`RESET app.user_id`;
+        } catch {
+          // Best-effort cleanup
+        }
+        reserved.release();
+      }
     }
 
     const reserved = await this.sql.reserve();

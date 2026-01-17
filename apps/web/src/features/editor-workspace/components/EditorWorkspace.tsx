@@ -67,7 +67,6 @@ export function EditorWorkspace({
   isDataExtensionsFetching = false,
   guardrailMessage: _guardrailMessageProp,
   guardrailTitle: _guardrailTitleProp = "Guardrail Violation",
-  onRun,
   onSave,
   onSaveAs,
   onFormat,
@@ -352,12 +351,10 @@ export function EditorWorkspace({
       setIsRunBlockedOpen(true);
       return;
     }
-    onRun?.("temp");
     void execute(activeTab.content, activeTab.name);
   }, [
     isRunning,
     hasBlockingDiagnostics,
-    onRun,
     execute,
     activeTab.content,
     activeTab.name,

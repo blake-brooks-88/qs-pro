@@ -108,7 +108,6 @@ export interface EditorWorkspaceProps {
   isDataExtensionsFetching?: boolean;
   guardrailMessage?: string;
   guardrailTitle?: string;
-  onRun?: (mode: "temp" | "target") => void;
   onSave?: (tabId: string, content: string) => void;
   onSaveAs?: (tabId: string, name: string, folderId: string) => void;
   onFormat?: () => void;

@@ -102,9 +102,10 @@ export class ShellQueryProcessor extends WorkerHost {
         await this.publishStatusEvent(runId, status);
       };
 
-      const result = await this.rlsContext.runWithTenantContext(
+      const result = await this.rlsContext.runWithUserContext(
         tenantId,
         mid,
+        userId,
         async () => {
           return await this.runToTempFlow.execute(job.data, publishStatus);
         },
@@ -116,16 +117,21 @@ export class ShellQueryProcessor extends WorkerHost {
 
       const pollStartedAt = new Date();
 
-      await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-        await this.db
-          .update(shellQueryRuns)
-          .set({
-            taskId: result.taskId,
-            queryDefinitionId: result.queryDefinitionId,
-            pollStartedAt,
-          })
-          .where(eq(shellQueryRuns.id, runId));
-      });
+      await this.rlsContext.runWithUserContext(
+        tenantId,
+        mid,
+        userId,
+        async () => {
+          await this.db
+            .update(shellQueryRuns)
+            .set({
+              taskId: result.taskId,
+              queryDefinitionId: result.queryDefinitionId,
+              pollStartedAt,
+            })
+            .where(eq(shellQueryRuns.id, runId));
+        },
+      );
 
       const pollJobData: PollShellQueryJob = {
         runId,
@@ -205,9 +211,14 @@ export class ShellQueryProcessor extends WorkerHost {
         err.message || "Unknown error",
       );
 
-      await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-        await this.cleanupAssets(job.data);
-      });
+      await this.rlsContext.runWithUserContext(
+        tenantId,
+        mid,
+        userId,
+        async () => {
+          await this.cleanupAssets(job.data);
+        },
+      );
 
       if (isTerminal) {
         throw new UnrecoverableError(err.message || "Unknown error");
@@ -232,9 +243,10 @@ export class ShellQueryProcessor extends WorkerHost {
     (this.metricsActiveJobs as { inc: () => void }).inc();
 
     try {
-      const isCanceled = await this.rlsContext.runWithTenantContext(
+      const isCanceled = await this.rlsContext.runWithUserContext(
         tenantId,
         mid,
+        userId,
         async () => {
           const currentRun = await this.db
             .select()
@@ -247,9 +259,14 @@ export class ShellQueryProcessor extends WorkerHost {
       if (isCanceled) {
         this.logger.log(`Run ${runId} was canceled, stopping polling.`);
         await this.publishStatusEvent(runId, "canceled");
-        await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-        });
+        await this.rlsContext.runWithUserContext(
+          tenantId,
+          mid,
+          userId,
+          async () => {
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          },
+        );
         return { status: "canceled", runId };
       }
 
@@ -264,9 +281,14 @@ export class ShellQueryProcessor extends WorkerHost {
           runId,
           "Query timed out after 29 minutes",
         );
-        await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-        });
+        await this.rlsContext.runWithUserContext(
+          tenantId,
+          mid,
+          userId,
+          async () => {
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          },
+        );
         return { status: "timeout", runId };
       }
 
@@ -278,15 +300,21 @@ export class ShellQueryProcessor extends WorkerHost {
           runId,
           "Poll budget exceeded",
         );
-        await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-        });
+        await this.rlsContext.runWithUserContext(
+          tenantId,
+          mid,
+          userId,
+          async () => {
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          },
+        );
         return { status: "budget-exceeded", runId };
       }
 
-      const pollResult = await this.rlsContext.runWithTenantContext(
+      const pollResult = await this.rlsContext.runWithUserContext(
         tenantId,
         mid,
+        userId,
         async () => {
           return this.singleSoapPoll(tenantId, userId, mid, taskId, runId);
         },
@@ -300,9 +328,14 @@ export class ShellQueryProcessor extends WorkerHost {
       if (hasError) {
         const errorMessage = pollResult.errorMsg || "MCE Query Execution Error";
         await this.markFailed(tenantId, userId, mid, runId, errorMessage);
-        await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-        });
+        await this.rlsContext.runWithUserContext(
+          tenantId,
+          mid,
+          userId,
+          async () => {
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          },
+        );
         return { status: "failed", runId, error: errorMessage };
       }
 
@@ -317,9 +350,10 @@ export class ShellQueryProcessor extends WorkerHost {
             POLL_CONFIG.ROW_PROBE_MIN_INTERVAL_MS);
 
       if (shouldRowProbe) {
-        const probeResult = await this.rlsContext.runWithTenantContext(
+        const probeResult = await this.rlsContext.runWithUserContext(
           tenantId,
           mid,
+          userId,
           async () => {
             return this.probeRowsetHasAnyRows(
               tenantId,
@@ -342,9 +376,10 @@ export class ShellQueryProcessor extends WorkerHost {
             `Run ${runId}: Row probe found rows (count=${probeResult.count}, items=${probeResult.itemsLength}), marking ready (fast-path)`,
           );
           await this.markReady(tenantId, userId, mid, runId);
-          await this.rlsContext.runWithTenantContext(
+          await this.rlsContext.runWithUserContext(
             tenantId,
             mid,
+            userId,
             async () => {
               await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
             },
@@ -379,9 +414,10 @@ export class ShellQueryProcessor extends WorkerHost {
         this.logger.debug(
           `Run ${runId}: Starting REST isRunning checks (reason="${isRunningTriggerReason}", elapsedMs=${elapsed}, hasCompletedDate=${hasCompletedDate}, queryDefinitionIdPresent=${Boolean(queryDefinitionId)})`,
         );
-        const checkResult = await this.rlsContext.runWithTenantContext(
+        const checkResult = await this.rlsContext.runWithUserContext(
           tenantId,
           mid,
+          userId,
           async () => {
             return this.checkIsRunningWithFallback(
               tenantId,
@@ -401,9 +437,10 @@ export class ShellQueryProcessor extends WorkerHost {
           this.logger.debug(
             `Run ${runId}: queryDefinitionId missing/invalid, retrieving via SOAP fallback (customerKey="${queryCustomerKey}")`,
           );
-          const retrievedId = await this.rlsContext.runWithTenantContext(
+          const retrievedId = await this.rlsContext.runWithUserContext(
             tenantId,
             mid,
+            userId,
             async () => {
               return this.runToTempFlow.retrieveQueryDefinitionObjectId(
                 tenantId,
@@ -418,9 +455,10 @@ export class ShellQueryProcessor extends WorkerHost {
             queryDefinitionId = retrievedId;
             updatedData.queryDefinitionId = retrievedId;
 
-            await this.rlsContext.runWithTenantContext(
+            await this.rlsContext.runWithUserContext(
               tenantId,
               mid,
+              userId,
               async () => {
                 await this.db
                   .update(shellQueryRuns)
@@ -533,9 +571,14 @@ export class ShellQueryProcessor extends WorkerHost {
           runId,
           err.message || "Unknown error",
         );
-        await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-        });
+        await this.rlsContext.runWithUserContext(
+          tenantId,
+          mid,
+          userId,
+          async () => {
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          },
+        );
         throw new UnrecoverableError(err.message || "Unknown error");
       }
 
@@ -557,15 +600,21 @@ export class ShellQueryProcessor extends WorkerHost {
         `Run ${runId}: No targetDeName available, skipping rowset readiness check`,
       );
       await this.markReady(tenantId, userId, mid, runId);
-      await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-        await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-      });
+      await this.rlsContext.runWithUserContext(
+        tenantId,
+        mid,
+        userId,
+        async () => {
+          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+        },
+      );
       return { status: "completed", runId };
     }
 
-    const isReady = await this.rlsContext.runWithTenantContext(
+    const isReady = await this.rlsContext.runWithUserContext(
       tenantId,
       mid,
+      userId,
       async () => {
         return this.checkRowsetReady(tenantId, userId, mid, targetDeName);
       },
@@ -574,9 +623,14 @@ export class ShellQueryProcessor extends WorkerHost {
     if (isReady) {
       this.logger.log(`Run ${runId}: Rowset is ready, marking complete`);
       await this.markReady(tenantId, userId, mid, runId);
-      await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-        await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-      });
+      await this.rlsContext.runWithUserContext(
+        tenantId,
+        mid,
+        userId,
+        async () => {
+          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+        },
+      );
       return { status: "completed", runId };
     }
 
@@ -586,9 +640,14 @@ export class ShellQueryProcessor extends WorkerHost {
       const errorMessage = `Data Extension "${targetDeName}" not queryable after ${POLL_CONFIG.ROWSET_READY_MAX_ATTEMPTS} attempts`;
       this.logger.error(`Run ${runId}: ${errorMessage}`);
       await this.markFailed(tenantId, userId, mid, runId, errorMessage);
-      await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-        await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
-      });
+      await this.rlsContext.runWithUserContext(
+        tenantId,
+        mid,
+        userId,
+        async () => {
+          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+        },
+      );
       return { status: "rowset-not-queryable", runId };
     }
 

@@ -88,7 +88,6 @@ export class ShellQuerySweeper {
     userId: string,
     mid: string,
   ): Promise<void> {
-    // 1. Find the "QueryPlusPlus Results" folder
     const searchSoap = `
       <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
          <RetrieveRequest>
@@ -122,7 +121,6 @@ export class ShellQuerySweeper {
 
     const folderId = folder.ID;
 
-    // 2. Retrieve QueryDefinitions in that folder older than 24h
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const querySoap = `
@@ -162,46 +160,27 @@ export class ShellQuerySweeper {
         if (!q.CustomerKey) {
           continue;
         }
-        await this.deleteAsset(
-          tenantId,
-          userId,
-          mid,
-          "QueryDefinition",
-          q.CustomerKey,
-        );
-        // Delete associated DE
-        // QueryDefinition key: QPP_Query_{runId}
-        // DE name: QPP_Results_{hash} where hash = first 4 chars of runId
-        const runId = q.CustomerKey.replace("QPP_Query_", "");
-        const hash = runId.substring(0, 4);
-        await this.deleteAsset(
-          tenantId,
-          userId,
-          mid,
-          "DataExtension",
-          `QPP_Results_${hash}`,
-        );
+        await this.deleteQueryDefinition(tenantId, userId, mid, q.CustomerKey);
       }
     }
   }
 
-  private async deleteAsset(
+  private async deleteQueryDefinition(
     tenantId: string,
     userId: string,
     mid: string,
-    type: string,
-    key: string,
+    customerKey: string,
   ): Promise<void> {
     const soap = `
       <DeleteRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <Objects xsi:type="${type}">
-            <CustomerKey>${key}</CustomerKey>
+         <Objects xsi:type="QueryDefinition">
+            <CustomerKey>${customerKey}</CustomerKey>
          </Objects>
       </DeleteRequest>`;
 
     try {
       await this.mceBridge.soapRequest(tenantId, userId, mid, soap, "Delete");
-      this.logger.log(`Deleted ${type}: ${key}`);
+      this.logger.log(`Deleted QueryDefinition: ${customerKey}`);
     } catch {
       // Ignore failures during sweep - asset may already be deleted
     }

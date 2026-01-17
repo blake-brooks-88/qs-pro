@@ -6,6 +6,7 @@ import {
   expandSelectStar,
   extractTableNames,
   type MetadataFetcher,
+  replaceStarInQuery,
   SelectStarExpansionError,
 } from "./query-analyzer";
 import { type ColumnDefinition, inferSchema } from "./schema-inferrer";
@@ -126,6 +127,110 @@ describe("Query Analyzer", () => {
       expect(result).toContain("SubscriberKey");
       expect(result).toContain("EventDate");
       expect(result).not.toContain("*");
+    });
+
+    it("expands SELECT TOP 10 * FROM DE", async () => {
+      // Arrange
+      const sql = "SELECT TOP 10 * FROM DE";
+
+      // Act
+      const result = await expandSelectStar(sql, mockMetadataFn);
+
+      // Assert
+      expect(result).toContain("ID");
+      expect(result).toContain("Name");
+      expect(result).toContain("Email");
+      expect(result).toContain("CreatedDate");
+      expect(result).not.toContain("*");
+      expect(result.toLowerCase()).toContain("top");
+    });
+
+    it("expands SELECT DISTINCT * FROM DE", async () => {
+      // Arrange
+      const sql = "SELECT DISTINCT * FROM DE";
+
+      // Act
+      const result = await expandSelectStar(sql, mockMetadataFn);
+
+      // Assert
+      expect(result).toContain("ID");
+      expect(result).toContain("Name");
+      expect(result).toContain("Email");
+      expect(result).toContain("CreatedDate");
+      expect(result).not.toContain("*");
+      expect(result.toLowerCase()).toContain("distinct");
+    });
+
+    it("expands SELECT *, Name FROM DE", async () => {
+      // Arrange
+      const sql = "SELECT *, Name FROM DE";
+
+      // Act
+      const result = await expandSelectStar(sql, mockMetadataFn);
+
+      // Assert
+      expect(result).toContain("ID");
+      expect(result).toContain("Email");
+      expect(result).toContain("CreatedDate");
+      expect(result).not.toContain("SELECT *,");
+    });
+
+    it("expands SELECT Name, * FROM DE", async () => {
+      // Arrange
+      const sql = "SELECT Name, * FROM DE";
+
+      // Act
+      const result = await expandSelectStar(sql, mockMetadataFn);
+
+      // Assert
+      expect(result).toContain("ID");
+      expect(result).toContain("Email");
+      expect(result).toContain("CreatedDate");
+      expect(result).not.toContain(", *");
+    });
+  });
+
+  describe("replaceStarInQuery", () => {
+    it("replaces unqualified star with expanded columns", () => {
+      // Arrange
+      const sql = "SELECT * FROM DE";
+      const expandedColumns = "ID, Name, Email";
+
+      // Act
+      const result = replaceStarInQuery(sql, expandedColumns, { table: null });
+
+      // Assert
+      expect(result).toContain("ID");
+      expect(result).toContain("Name");
+      expect(result).toContain("Email");
+      expect(result).not.toContain("*");
+    });
+
+    it("replaces qualified star with table prefix", () => {
+      // Arrange
+      const sql = "SELECT t.* FROM DE AS t";
+      const expandedColumns = "t.ID, t.Name, t.Email";
+
+      // Act
+      const result = replaceStarInQuery(sql, expandedColumns, { table: "t" });
+
+      // Assert
+      expect(result).toContain("ID");
+      expect(result).toContain("Name");
+      expect(result).toContain("Email");
+      expect(result).not.toContain("*");
+    });
+
+    it("returns original SQL when star not found", () => {
+      // Arrange
+      const sql = "SELECT ID, Name FROM DE";
+      const expandedColumns = "ID, Name, Email";
+
+      // Act
+      const result = replaceStarInQuery(sql, expandedColumns, { table: null });
+
+      // Assert
+      expect(result).toBe(sql);
     });
   });
 

@@ -181,7 +181,8 @@ export class ShellQueryService {
       : `QPP_Results_${hash}`;
 
     const pageSize = 50;
-    const url = `/data/v1/customobjectdata/key/${deName}/rowset?$page=${page}&$pageSize=${pageSize}`;
+    const encodedDeName = encodeURIComponent(deName);
+    const url = `/data/v1/customobjectdata/key/${encodedDeName}/rowset?$page=${page}&$pageSize=${pageSize}`;
 
     this.logger.log(
       `Fetching results for run ${runId}: DE="${deName}", snippetName="${run.snippetName}", url="${url}"`,
@@ -214,16 +215,20 @@ export class ShellQueryService {
   ): RunResultsResponse {
     const items = mceResponse.items ?? [];
 
-    const columns: string[] = [];
-    if (items.length > 0) {
-      const firstItem = items[0];
-      if (firstItem?.keys) {
-        columns.push(...Object.keys(firstItem.keys));
+    const allKeys = new Set<string>();
+    for (const item of items) {
+      if (item.keys) {
+        for (const key of Object.keys(item.keys)) {
+          allKeys.add(key);
+        }
       }
-      if (firstItem?.values) {
-        columns.push(...Object.keys(firstItem.values));
+      if (item.values) {
+        for (const key of Object.keys(item.values)) {
+          allKeys.add(key);
+        }
       }
     }
+    const columns = Array.from(allKeys);
 
     const rows = items.map((item) => ({
       ...item.keys,

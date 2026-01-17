@@ -426,6 +426,11 @@ export class RunToTempFlow implements IFlowStrategy {
             <CustomerKey>${this.escapeXml(deName)}</CustomerKey>
             <CategoryID>${folderId}</CategoryID>
             <IsSendable>false</IsSendable>
+            <DataRetentionPeriodLength>1</DataRetentionPeriodLength>
+            <DataRetentionPeriod>Days</DataRetentionPeriod>
+            <RowBasedRetention>false</RowBasedRetention>
+            <ResetRetentionPeriodOnImport>false</ResetRetentionPeriodOnImport>
+            <DeleteAtEndOfRetentionPeriod>true</DeleteAtEndOfRetentionPeriod>
             <Fields>
                ${fieldsXml}
             </Fields>
