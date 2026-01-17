@@ -119,7 +119,7 @@ export class ShellQueryProcessor extends WorkerHost {
     (this.metricsActiveJobs as { inc: () => void }).inc();
 
     try {
-      await this.updateStatus(tenantId, userId, mid, runId, "queued", {
+      await this.updateStatus(tenantId, userId, mid, runId, "running", {
         startedAt: new Date(),
       });
       await this.publishStatusEvent(runId, "queued");
@@ -1025,7 +1025,7 @@ export class ShellQueryProcessor extends WorkerHost {
     const deleteSoap = (type: string, key: string) => `
       <DeleteRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
          <Objects xsi:type="${type}">
-            <CustomerKey>${key}</CustomerKey>
+            <CustomerKey>${this.escapeXml(key)}</CustomerKey>
          </Objects>
       </DeleteRequest>`;
 
@@ -1043,5 +1043,14 @@ export class ShellQueryProcessor extends WorkerHost {
         `Cleanup failed for ${runId}: ${err.message || "Unknown error"}`,
       );
     }
+  }
+
+  private escapeXml(str: string): string {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 }
