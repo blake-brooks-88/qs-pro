@@ -1,11 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
+import { QueryDefinitionService } from '../src/shell-query/query-definition.service';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { RlsContextService, MceBridgeService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub } from './stubs';
+import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createQueryDefinitionServiceStub } from './stubs';
 import { RunStatus, STATUS_MESSAGES } from '../src/shell-query/shell-query.types';
 
 describe('Status Event Flow', () => {
@@ -36,6 +37,7 @@ describe('Status Event Flow', () => {
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: QueryDefinitionService, useValue: createQueryDefinitionServiceStub() },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
         { provide: 'REDIS_CLIENT', useValue: mockRedis },

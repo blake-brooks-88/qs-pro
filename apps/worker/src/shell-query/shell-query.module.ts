@@ -6,6 +6,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { DatabaseModule, MceModule } from "@qs-pro/backend-shared";
 
 import { MceQueryValidator } from "./mce-query-validator";
+import { QueryDefinitionService } from "./query-definition.service";
 import { ShellQueryProcessor } from "./shell-query.processor";
 import { ShellQuerySweeper } from "./shell-query.sweeper";
 import { RunToTempFlow } from "./strategies/run-to-temp.strategy";
@@ -31,6 +32,7 @@ import { RunToTempFlow } from "./strategies/run-to-temp.strategy";
     MceModule,
   ],
   providers: [
+    QueryDefinitionService,
     ShellQueryProcessor,
     RunToTempFlow,
     MceQueryValidator,

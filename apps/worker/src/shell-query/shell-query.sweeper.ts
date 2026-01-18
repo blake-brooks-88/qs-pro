@@ -10,6 +10,7 @@ import {
   tenantSettings,
 } from "@qs-pro/database";
 
+import { QueryDefinitionService } from "./query-definition.service";
 import { SoapRetrieveResponse } from "./shell-query.types";
 
 @Injectable()
@@ -19,6 +20,7 @@ export class ShellQuerySweeper {
   constructor(
     private readonly mceBridge: MceBridgeService,
     private readonly rlsContext: RlsContextService,
+    private readonly queryDefinitionService: QueryDefinitionService,
     @Inject("DATABASE")
     private readonly db: PostgresJsDatabase<Record<string, never>>,
   ) {}
@@ -40,11 +42,14 @@ export class ShellQuerySweeper {
       .where(isNotNull(tenantSettings.qppFolderId));
 
     for (const setting of activeSettings) {
+      if (!setting.qppFolderId) {
+        continue;
+      }
       try {
         await this.sweepTenantMid(
           setting.tenantId,
           setting.mid,
-          setting.qppFolderId!,
+          setting.qppFolderId,
         );
       } catch (e: unknown) {
         const err = e as { message?: string };
@@ -142,27 +147,18 @@ export class ShellQuerySweeper {
     mid: string,
     customerKey: string,
   ): Promise<void> {
-    const soap = `
-      <DeleteRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <Objects xsi:type="QueryDefinition">
-            <CustomerKey>${this.escapeXml(customerKey)}</CustomerKey>
-         </Objects>
-      </DeleteRequest>`;
-
     try {
-      await this.mceBridge.soapRequest(tenantId, userId, mid, soap, "Delete");
-      this.logger.log(`Deleted QueryDefinition: ${customerKey}`);
+      const deleted = await this.queryDefinitionService.deleteByCustomerKey(
+        tenantId,
+        userId,
+        mid,
+        customerKey,
+      );
+      if (deleted) {
+        this.logger.log(`Deleted QueryDefinition: ${customerKey}`);
+      }
     } catch {
       // Ignore failures during sweep - asset may already be deleted
     }
-  }
-
-  private escapeXml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;");
   }
 }

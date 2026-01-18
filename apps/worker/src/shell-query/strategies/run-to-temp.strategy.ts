@@ -14,6 +14,7 @@ import {
   type FieldDefinition,
   type MetadataFetcher,
 } from "../query-analyzer";
+import { QueryDefinitionService } from "../query-definition.service";
 import { type ColumnDefinition, inferSchema } from "../schema-inferrer";
 import {
   FlowResult,
@@ -53,6 +54,7 @@ export class RunToTempFlow implements IFlowStrategy {
     private readonly mceBridge: MceBridgeService,
     private readonly queryValidator: MceQueryValidator,
     private readonly rlsContext: RlsContextService,
+    private readonly queryDefinitionService: QueryDefinitionService,
     @Inject("DATABASE")
     private readonly db: PostgresJsDatabase<Record<string, never>>,
   ) {}
@@ -105,7 +107,9 @@ export class RunToTempFlow implements IFlowStrategy {
       inferredSchema,
     );
 
-    const queryCustomerKey = `QPP_Query_${runId}`;
+    // MCE CustomerKey has a 36-char limit. Use truncated runId to fit.
+    // Format: QPP_Query_ (10 chars) + first 26 chars of UUID = 36 chars
+    const queryCustomerKey = `QPP_Query_${runId.substring(0, 26)}`;
     const queryIds = await this.createQueryDefinition(
       job,
       queryCustomerKey,
@@ -650,68 +654,12 @@ export class RunToTempFlow implements IFlowStrategy {
   ): Promise<void> {
     const { tenantId, userId, mid } = job;
 
-    const retrieveSoap = `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            <ObjectType>QueryDefinition</ObjectType>
-            <Properties>ObjectID</Properties>
-            <Properties>CustomerKey</Properties>
-            <Filter xsi:type="SimpleFilterPart">
-               <Property>CustomerKey</Property>
-               <SimpleOperator>equals</SimpleOperator>
-               <Value>${this.escapeXml(key)}</Value>
-            </Filter>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>`;
-
     try {
-      const retrieveResponse =
-        await this.mceBridge.soapRequest<SoapRetrieveResponse>(
-          tenantId,
-          userId,
-          mid,
-          retrieveSoap,
-          "Retrieve",
-        );
-
-      this.logger.debug(
-        `Retrieve QueryDefinition response for ${key}: ${JSON.stringify(retrieveResponse)}`,
-      );
-
-      const results = retrieveResponse.Body?.RetrieveResponseMsg?.Results;
-      if (!results) {
-        this.logger.debug(
-          `QueryDefinition ${key} not found, nothing to delete`,
-        );
-        return;
-      }
-
-      const queryDef = Array.isArray(results) ? results[0] : results;
-      const objectId = queryDef?.ObjectID;
-
-      if (!objectId) {
-        this.logger.debug(
-          `QueryDefinition ${key} has no ObjectID, cannot delete`,
-        );
-        return;
-      }
-
-      const deleteSoap = `
-        <DeleteRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-           <Objects xsi:type="QueryDefinition">
-              <ObjectID>${objectId}</ObjectID>
-           </Objects>
-        </DeleteRequest>`;
-
-      const deleteResponse = await this.mceBridge.soapRequest(
+      await this.queryDefinitionService.deleteByCustomerKey(
         tenantId,
         userId,
         mid,
-        deleteSoap,
-        "Delete",
-      );
-      this.logger.debug(
-        `Delete QueryDefinition response for ${key} (ObjectID: ${objectId}): ${JSON.stringify(deleteResponse)}`,
+        key,
       );
     } catch (error) {
       this.logger.debug(

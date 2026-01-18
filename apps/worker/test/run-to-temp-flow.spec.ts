@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
+import { QueryDefinitionService } from '../src/shell-query/query-definition.service';
 import { MceBridgeService, RlsContextService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createMockJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRlsContextStub } from './stubs';
+import { createDbStub, createMceBridgeStub, createRlsContextStub, createQueryDefinitionServiceStub } from './stubs';
 
 describe('RunToTempFlow', () => {
   let strategy: RunToTempFlow;
@@ -24,6 +25,7 @@ describe('RunToTempFlow', () => {
         RunToTempFlow,
         { provide: MceBridgeService, useValue: mockMceBridge },
         { provide: MceQueryValidator, useValue: mockQueryValidator },
+        { provide: QueryDefinitionService, useValue: createQueryDefinitionServiceStub() },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
       ],
@@ -37,8 +39,12 @@ describe('RunToTempFlow', () => {
 
     mockDb.setSelectResult([]);
 
+    // Note: deleteQueryDefinitionIfExists now uses QueryDefinitionService (stub)
+    // so no Retrieve call is made for it
     mockMceBridge.soapRequest
+      // 1. ensureQppFolder: check if folder exists
       .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      // 2. ensureQppFolder: get root folder ID
       .mockResolvedValueOnce({
         Body: {
           RetrieveResponseMsg: {
@@ -46,6 +52,7 @@ describe('RunToTempFlow', () => {
           },
         },
       })
+      // 3. ensureQppFolder: create folder
       .mockResolvedValueOnce({
         Body: {
           CreateResponse: {
@@ -56,7 +63,9 @@ describe('RunToTempFlow', () => {
           },
         },
       })
+      // 4. upsert settings (empty response)
       .mockResolvedValueOnce({})
+      // 5. ensureDataExtension: create DE
       .mockResolvedValueOnce({
         Body: {
           CreateResponse: {
@@ -67,7 +76,7 @@ describe('RunToTempFlow', () => {
           },
         },
       })
-      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      // 6. createQueryDefinition: create query
       .mockResolvedValueOnce({
         Body: {
           CreateResponse: {
@@ -79,6 +88,7 @@ describe('RunToTempFlow', () => {
           },
         },
       })
+      // 7. performQuery: start execution
       .mockResolvedValueOnce({
         Body: {
           PerformResponseMsg: {
@@ -108,8 +118,11 @@ describe('RunToTempFlow', () => {
 
     mockDb.setSelectResult([{ qppFolderId: 123 }]);
 
+    // Note: deleteQueryDefinitionIfExists now uses QueryDefinitionService (stub)
     mockMceBridge.soapRequest
+      // 1. upsert settings (uses cached folder ID)
       .mockResolvedValueOnce({})
+      // 2. ensureDataExtension: create DE
       .mockResolvedValueOnce({
         Body: {
           CreateResponse: {
@@ -120,7 +133,7 @@ describe('RunToTempFlow', () => {
           },
         },
       })
-      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      // 3. createQueryDefinition: create query
       .mockResolvedValueOnce({
         Body: {
           CreateResponse: {
@@ -132,6 +145,7 @@ describe('RunToTempFlow', () => {
           },
         },
       })
+      // 4. performQuery: start execution
       .mockResolvedValueOnce({
         Body: {
           PerformResponseMsg: {
@@ -157,8 +171,11 @@ describe('RunToTempFlow', () => {
     const job = createMockJob();
     mockDb.setSelectResult([{ qppFolderId: 123 }]);
 
+    // Note: deleteQueryDefinitionIfExists now uses QueryDefinitionService (stub)
     mockMceBridge.soapRequest
+      // 1. upsert settings (uses cached folder ID)
       .mockResolvedValueOnce({})
+      // 2. ensureDataExtension: create DE
       .mockResolvedValueOnce({
         Body: {
           CreateResponse: {
@@ -169,7 +186,7 @@ describe('RunToTempFlow', () => {
           },
         },
       })
-      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
+      // 3. createQueryDefinition: fails with error
       .mockResolvedValueOnce({
         Body: {
           CreateResponse: {

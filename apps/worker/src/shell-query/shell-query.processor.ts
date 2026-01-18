@@ -10,6 +10,7 @@ import {
 import { DelayedError, Job, Queue, UnrecoverableError } from "bullmq";
 import * as crypto from "crypto";
 
+import { QueryDefinitionService } from "./query-definition.service";
 import {
   calculateNextDelay,
   calculateRowsetReadyDelay,
@@ -52,6 +53,7 @@ export class ShellQueryProcessor extends WorkerHost {
     private readonly runToTempFlow: RunToTempFlow,
     private readonly rlsContext: RlsContextService,
     private readonly mceBridge: MceBridgeService,
+    private readonly queryDefinitionService: QueryDefinitionService,
     @Inject("DATABASE")
     private readonly db: PostgresJsDatabase<Record<string, never>>,
     @Inject("REDIS_CLIENT") private readonly redis: unknown,
@@ -1018,24 +1020,17 @@ export class ShellQueryProcessor extends WorkerHost {
     mid: string,
     runId: string,
   ) {
-    const queryKey = `QPP_Query_${runId}`;
+    // MCE CustomerKey has a 36-char limit. Use truncated runId to match creation.
+    const queryKey = `QPP_Query_${runId.substring(0, 26)}`;
 
     this.logger.log(`Attempting cleanup for run ${runId}`);
 
-    const deleteSoap = (type: string, key: string) => `
-      <DeleteRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <Objects xsi:type="${type}">
-            <CustomerKey>${this.escapeXml(key)}</CustomerKey>
-         </Objects>
-      </DeleteRequest>`;
-
     try {
-      await this.mceBridge.soapRequest(
+      await this.queryDefinitionService.deleteByCustomerKey(
         tenantId,
         userId,
         mid,
-        deleteSoap("QueryDefinition", queryKey),
-        "Delete",
+        queryKey,
       );
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -1043,14 +1038,5 @@ export class ShellQueryProcessor extends WorkerHost {
         `Cleanup failed for ${runId}: ${err.message || "Unknown error"}`,
       );
     }
-  }
-
-  private escapeXml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;");
   }
 }
