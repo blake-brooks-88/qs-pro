@@ -11,6 +11,7 @@ import { DelayedError, Job, Queue, UnrecoverableError } from "bullmq";
 import * as crypto from "crypto";
 
 import { QueryDefinitionService } from "./query-definition.service";
+import { buildQueryCustomerKey } from "./query-definition.utils";
 import {
   calculateNextDelay,
   calculateRowsetReadyDelay,
@@ -1020,8 +1021,7 @@ export class ShellQueryProcessor extends WorkerHost {
     mid: string,
     runId: string,
   ) {
-    // MCE CustomerKey has a 36-char limit. Use truncated runId to match creation.
-    const queryKey = `QPP_Query_${runId.substring(0, 26)}`;
+    const queryKey = buildQueryCustomerKey(runId);
 
     this.logger.log(`Attempting cleanup for run ${runId}`);
 

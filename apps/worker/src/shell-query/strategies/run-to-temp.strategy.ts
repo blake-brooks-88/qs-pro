@@ -15,6 +15,7 @@ import {
   type MetadataFetcher,
 } from "../query-analyzer";
 import { QueryDefinitionService } from "../query-definition.service";
+import { buildQueryCustomerKey } from "../query-definition.utils";
 import { type ColumnDefinition, inferSchema } from "../schema-inferrer";
 import {
   FlowResult,
@@ -107,9 +108,7 @@ export class RunToTempFlow implements IFlowStrategy {
       inferredSchema,
     );
 
-    // MCE CustomerKey has a 36-char limit. Use truncated runId to fit.
-    // Format: QPP_Query_ (10 chars) + first 26 chars of UUID = 36 chars
-    const queryCustomerKey = `QPP_Query_${runId.substring(0, 26)}`;
+    const queryCustomerKey = buildQueryCustomerKey(runId);
     const queryIds = await this.createQueryDefinition(
       job,
       queryCustomerKey,
