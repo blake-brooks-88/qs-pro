@@ -28,12 +28,18 @@ export interface MceTokenResponse {
   token_type: string;
 }
 
+type RefreshTokenResult = {
+  accessToken: string;
+  tssd: string;
+  didRefresh: boolean;
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly refreshLocks = new Map<
     string,
-    Promise<{ accessToken: string; tssd: string }>
+    Promise<RefreshTokenResult>
   >();
   private readonly allowedJwtAlgorithms: jose.JWTVerifyOptions["algorithms"] = [
     "HS256",
@@ -255,27 +261,33 @@ export class AuthService {
     mid: string,
     forceRefresh = false,
   ): Promise<{ accessToken: string; tssd: string }> {
-    // Lock by (tenantId, userId, mid) only—regardless of forceRefresh.
-    // This prevents concurrent MCE refresh_token API calls for the same session,
-    // which could cause invalid_grant errors if MCE rotates tokens on use.
     const lockKey = `${tenantId}:${userId}:${mid}`;
-    const existingLock = this.refreshLocks.get(lockKey);
-    if (existingLock) {
-      return existingLock;
-    }
+    while (true) {
+      const existingLock = this.refreshLocks.get(lockKey);
+      if (existingLock) {
+        const result = await existingLock;
+        if (!forceRefresh || result.didRefresh) {
+          return { accessToken: result.accessToken, tssd: result.tssd };
+        }
+        continue;
+      }
 
-    const refreshPromise = this.refreshTokenInternal(
-      tenantId,
-      userId,
-      mid,
-      forceRefresh,
-    );
-    this.refreshLocks.set(lockKey, refreshPromise);
+      const refreshPromise = this.refreshTokenInternal(
+        tenantId,
+        userId,
+        mid,
+        forceRefresh,
+      );
+      this.refreshLocks.set(lockKey, refreshPromise);
 
-    try {
-      return await refreshPromise;
-    } finally {
-      this.refreshLocks.delete(lockKey);
+      try {
+        const result = await refreshPromise;
+        return { accessToken: result.accessToken, tssd: result.tssd };
+      } finally {
+        if (this.refreshLocks.get(lockKey) === refreshPromise) {
+          this.refreshLocks.delete(lockKey);
+        }
+      }
     }
   }
 
@@ -575,7 +587,7 @@ export class AuthService {
     userId: string,
     mid: string,
     forceRefresh: boolean,
-  ): Promise<{ accessToken: string; tssd: string }> {
+  ): Promise<RefreshTokenResult> {
     const creds = await this.credRepo.findByUserTenantMid(
       userId,
       tenantId,
@@ -600,7 +612,11 @@ export class AuthService {
         throw new InternalServerErrorException("ENCRYPTION_KEY not configured");
       }
       const decryptedAccessToken = decrypt(creds.accessToken, encryptionKey);
-      return { accessToken: decryptedAccessToken, tssd: tenant.tssd };
+      return {
+        accessToken: decryptedAccessToken,
+        tssd: tenant.tssd,
+        didRefresh: false,
+      };
     }
 
     const encryptionKey = this.configService.get<string>("ENCRYPTION_KEY");
@@ -635,7 +651,11 @@ export class AuthService {
 
       const tokenData = response.data;
       await this.saveTokens(tenant.id, userId, mid, tokenData);
-      return { accessToken: tokenData.access_token, tssd: tenant.tssd };
+      return {
+        accessToken: tokenData.access_token,
+        tssd: tenant.tssd,
+        didRefresh: true,
+      };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const data = error.response?.data;
