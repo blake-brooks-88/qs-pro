@@ -1,4 +1,6 @@
+export { SeatLimitExceededException } from "./common/exceptions/seat-limit-exceeded.exception";
 export * from "./database/database.module";
+export * from "./database/db-context";
 export * from "./database/rls-context.service";
 export { MceOperationError, McePaginationError } from "./mce/errors";
 export * from "./mce/mce.module";
@@ -33,3 +35,4 @@ export { buildDeleteQueryDefinition } from "./mce/soap/request-bodies/query-defi
 // Exporting AuthModule is tricky if it has controllers, but we might just need the service
 export * from "./auth/auth.module";
 export * from "./auth/auth.service";
+export * from "./auth/seat-limit.service";

@@ -1,5 +1,10 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import {
+  AuthService,
+  RlsContextService,
+  SeatLimitService,
+} from '@qs-pro/backend-shared';
 import type {
   ICredentialsRepository,
   ITenantRepository,
@@ -16,10 +21,6 @@ import {
   it,
   vi,
 } from 'vitest';
-
-import { RlsContextService } from '../database/rls-context.service';
-import { SeatLimitService } from '../features/seat-limit.service';
-import { AuthService } from './auth.service';
 
 const server = setupServer(
   http.post(

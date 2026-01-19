@@ -13,12 +13,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AuthService } from '@qs-pro/backend-shared';
 import { randomBytes } from 'crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { AuthService } from './auth.service';
 import { SessionGuard } from './session.guard';
 
 type SecureSession = {

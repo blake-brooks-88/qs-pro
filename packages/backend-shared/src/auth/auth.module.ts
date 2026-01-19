@@ -8,11 +8,13 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { DatabaseModule } from "../database/database.module";
 import { AuthService } from "./auth.service";
+import { SeatLimitService } from "./seat-limit.service";
 
 @Module({
   imports: [DatabaseModule],
   providers: [
     AuthService,
+    SeatLimitService,
     {
       provide: "TENANT_REPOSITORY",
       useFactory: (db: PostgresJsDatabase) => new DrizzleTenantRepository(db),
@@ -30,6 +32,6 @@ import { AuthService } from "./auth.service";
       inject: ["DATABASE"],
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, SeatLimitService],
 })
 export class AuthModule {}

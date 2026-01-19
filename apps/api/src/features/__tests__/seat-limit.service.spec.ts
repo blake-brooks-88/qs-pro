@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import {
+  SeatLimitExceededException,
+  SeatLimitService,
+} from '@qs-pro/backend-shared';
 import type { ITenantRepository, Tenant } from '@qs-pro/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { SeatLimitExceededException } from '../../common/exceptions/seat-limit-exceeded.exception';
-import { SeatLimitService } from '../seat-limit.service';
 
 describe('SeatLimitService', () => {
   let service: SeatLimitService;

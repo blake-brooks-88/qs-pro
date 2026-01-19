@@ -7,13 +7,13 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { getDbFromContext, runWithDbContext } from '@qs-pro/backend-shared';
 import { createDatabaseFromClient } from '@qs-pro/database';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Sql } from 'postgres';
 
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { getDbFromContext, runWithDbContext } from './database/db-context';
 
 type Session = {
   get(key: string): unknown;

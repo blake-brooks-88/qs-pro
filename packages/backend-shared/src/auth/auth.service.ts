@@ -16,6 +16,7 @@ import axios from "axios";
 import * as jose from "jose";
 
 import { RlsContextService } from "../database/rls-context.service";
+import { SeatLimitService } from "./seat-limit.service";
 
 export interface MceTokenResponse {
   access_token: string;
@@ -27,12 +28,18 @@ export interface MceTokenResponse {
   token_type: string;
 }
 
+type RefreshTokenResult = {
+  accessToken: string;
+  tssd: string;
+  didRefresh: boolean;
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly refreshLocks = new Map<
     string,
-    Promise<{ accessToken: string; tssd: string }>
+    Promise<RefreshTokenResult>
   >();
   private readonly allowedJwtAlgorithms: jose.JWTVerifyOptions["algorithms"] = [
     "HS256",
@@ -44,6 +51,7 @@ export class AuthService {
     @Inject("USER_REPOSITORY") private userRepo: IUserRepository,
     @Inject("CREDENTIALS_REPOSITORY") private credRepo: ICredentialsRepository,
     private readonly rlsContext: RlsContextService,
+    private readonly seatLimitService: SeatLimitService,
   ) {}
 
   async verifyMceJwt(jwt: string) {
@@ -148,15 +156,19 @@ export class AuthService {
   async handleJwtLogin(jwt: string) {
     const { sfUserId, eid, mid, tssd } = await this.verifyMceJwt(jwt);
 
-    // Exchange for tokens using MID (member_id) context
     const tokenData = await this.getTokensViaClientCredentials(tssd, mid);
 
-    // JIT Provisioning
     const tenant = await this.tenantRepo.upsert({ eid, tssd });
 
-    // MCE JWT doesn't always have email/name. We can fetch it if needed or leave it.
-    // For now, we'll try to use what's in handleCallback if we had a code,
-    // but here we just have a JWT.
+    // sfUserId is a Salesforce User ID (18-char format), which is globally unique
+    // across all MCE enterprises. A user belongs to exactly one MCE enterprise,
+    // so we check globally rather than per-tenant.
+    const existingUser = await this.userRepo.findBySfUserId(sfUserId);
+
+    if (!existingUser) {
+      await this.seatLimitService.checkSeatLimit(tenant.id);
+    }
+
     const user = await this.userRepo.upsert({
       sfUserId,
       tenantId: tenant.id,
@@ -178,7 +190,7 @@ export class AuthService {
   getAuthUrl(tssd: string, state: string): string {
     const clientId = this.configService.get<string>("MCE_CLIENT_ID");
     const redirectUri =
-      this.configService.get<string>("MCE_REDIRECT_URI") || "";
+      this.configService.get<string>("MCE_REDIRECT_URI") ?? "";
     if (!clientId || !redirectUri) {
       throw new InternalServerErrorException("MCE OAuth config not complete");
     }
@@ -247,29 +259,35 @@ export class AuthService {
     tenantId: string,
     userId: string,
     mid: string,
-    forceRefresh?: boolean,
+    forceRefresh = false,
   ): Promise<{ accessToken: string; tssd: string }> {
     const lockKey = `${tenantId}:${userId}:${mid}`;
-
-    if (!forceRefresh) {
+    while (true) {
       const existingLock = this.refreshLocks.get(lockKey);
       if (existingLock) {
-        return existingLock;
+        const result = await existingLock;
+        if (!forceRefresh || result.didRefresh) {
+          return { accessToken: result.accessToken, tssd: result.tssd };
+        }
+        continue;
       }
-    }
 
-    const refreshPromise = this.refreshTokenInternal(
-      tenantId,
-      userId,
-      mid,
-      forceRefresh,
-    );
-    this.refreshLocks.set(lockKey, refreshPromise);
+      const refreshPromise = this.refreshTokenInternal(
+        tenantId,
+        userId,
+        mid,
+        forceRefresh,
+      );
+      this.refreshLocks.set(lockKey, refreshPromise);
 
-    try {
-      return await refreshPromise;
-    } finally {
-      this.refreshLocks.delete(lockKey);
+      try {
+        const result = await refreshPromise;
+        return { accessToken: result.accessToken, tssd: result.tssd };
+      } finally {
+        if (this.refreshLocks.get(lockKey) === refreshPromise) {
+          this.refreshLocks.delete(lockKey);
+        }
+      }
     }
   }
 
@@ -278,8 +296,26 @@ export class AuthService {
     userId: string,
     mid: string,
   ): Promise<void> {
-    const lockKey = `${tenantId}:${userId}:${mid}`;
-    this.refreshLocks.delete(lockKey);
+    const creds = await this.credRepo.findByUserTenantMid(
+      userId,
+      tenantId,
+      mid,
+    );
+    if (!creds) {
+      return;
+    }
+
+    await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
+      await this.credRepo.upsert({
+        tenantId,
+        userId,
+        mid,
+        accessToken: creds.accessToken,
+        refreshToken: creds.refreshToken,
+        expiresAt: new Date(0),
+        updatedAt: new Date(),
+      });
+    });
   }
 
   async saveTokens(
@@ -316,7 +352,7 @@ export class AuthService {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    return response.data; // contains enterprise_id, sub (user_id), email, name
+    return response.data;
   }
 
   async handleCallback(
@@ -332,7 +368,6 @@ export class AuthService {
     const embeddedEid = embedded?.eid;
     const fallbackCode = embedded?.authCode;
 
-    // 1. Exchange code
     const tokenData = await this.exchangeCodeForToken(
       tssd,
       code,
@@ -340,63 +375,75 @@ export class AuthService {
       mid,
     );
 
-    // 2. Discover missing info if necessary
-    let effectiveSfUserId = sfUserId;
-    let effectiveEid = eid || embeddedEid;
-    let effectiveEmail = email;
-    let effectiveName = name;
-    let effectiveMid = mid;
+    const info = await this.getUserInfo(tssd, tokenData.access_token);
 
-    if (!effectiveSfUserId || !effectiveEid || !effectiveMid) {
-      const info = await this.getUserInfo(tssd, tokenData.access_token);
-      if (!info?.sub && !info?.user_id && !info?.user?.sub) {
-        this.logger.warn("Userinfo response missing user identifiers", {
-          keys: Object.keys(info ?? {}),
-          userKeys: Object.keys(info?.user ?? {}),
-          orgKeys: Object.keys(info?.organization ?? {}),
-        });
-      }
-      effectiveSfUserId =
-        effectiveSfUserId ||
-        this.coerceId(info.sub) ||
-        this.coerceId(info.user_id) ||
-        this.coerceId(info.user?.sub) ||
-        this.coerceId(info.user?.id) ||
-        this.coerceId(info.user?.user_id) ||
-        this.extractIdFromObject(info.user, [
-          "userId",
-          "userID",
-          "memberId",
-          "member_id",
-        ]);
-      effectiveEid =
-        effectiveEid ||
-        this.coerceId(info.enterprise_id) ||
-        this.coerceId(info.organization?.enterprise_id) ||
-        this.coerceId(info.organization?.id) ||
-        this.coerceId(info.organization?.org_id) ||
-        this.extractIdFromObject(info.organization, [
-          "enterpriseId",
-          "enterpriseID",
-          "orgId",
-          "orgID",
-          "eid",
-        ]);
-      effectiveEmail = effectiveEmail || info.email || info.user?.email;
-      effectiveName =
-        effectiveName || info.name || info.user?.name || info.user?.full_name;
-      effectiveMid =
-        effectiveMid ||
-        this.coerceId(info.member_id) ||
-        this.coerceId(info.user?.member_id) ||
-        this.coerceId(info.organization?.member_id) ||
-        this.extractIdFromObject(info.user, ["mid", "member_id", "memberId"]) ||
-        this.extractIdFromObject(info.organization, [
-          "mid",
-          "member_id",
-          "memberId",
-        ]);
+    if (!info?.sub && !info?.user_id && !info?.user?.sub) {
+      this.logger.warn("Userinfo response missing user identifiers", {
+        keys: Object.keys(info ?? {}),
+        userKeys: Object.keys(info?.user ?? {}),
+        orgKeys: Object.keys(info?.organization ?? {}),
+      });
     }
+
+    const derivedSfUserId =
+      this.coerceId(info.sub) ??
+      this.coerceId(info.user_id) ??
+      this.coerceId(info.user?.sub) ??
+      this.coerceId(info.user?.id) ??
+      this.coerceId(info.user?.user_id) ??
+      this.extractIdFromObject(info.user, [
+        "userId",
+        "userID",
+        "memberId",
+        "member_id",
+      ]);
+    const derivedEid =
+      this.coerceId(info.enterprise_id) ??
+      this.coerceId(info.organization?.enterprise_id) ??
+      this.coerceId(info.organization?.id) ??
+      this.coerceId(info.organization?.org_id) ??
+      this.extractIdFromObject(info.organization, [
+        "enterpriseId",
+        "enterpriseID",
+        "orgId",
+        "orgID",
+        "eid",
+      ]);
+    const derivedMid =
+      this.coerceId(info.member_id) ??
+      this.coerceId(info.user?.member_id) ??
+      this.coerceId(info.organization?.member_id) ??
+      this.extractIdFromObject(info.user, ["mid", "member_id", "memberId"]) ??
+      this.extractIdFromObject(info.organization, [
+        "mid",
+        "member_id",
+        "memberId",
+      ]);
+
+    const providedSfUserId = this.coerceId(sfUserId);
+    const providedEid = this.coerceId(eid) ?? this.coerceId(embeddedEid);
+    const providedMid = this.coerceId(mid);
+
+    if (
+      providedSfUserId &&
+      derivedSfUserId &&
+      providedSfUserId !== derivedSfUserId
+    ) {
+      throw new UnauthorizedException("OAuth identity mismatch");
+    }
+    if (providedEid && derivedEid && providedEid !== derivedEid) {
+      throw new UnauthorizedException("OAuth identity mismatch");
+    }
+    if (providedMid && derivedMid && providedMid !== derivedMid) {
+      throw new UnauthorizedException("OAuth identity mismatch");
+    }
+
+    const effectiveSfUserId = derivedSfUserId ?? providedSfUserId;
+    const effectiveEid = derivedEid ?? providedEid;
+    const effectiveMid = derivedMid ?? providedMid;
+    const effectiveEmail = info.email ?? info.user?.email ?? email;
+    const effectiveName =
+      info.name ?? info.user?.name ?? info.user?.full_name ?? name;
 
     if (!effectiveSfUserId || !effectiveEid || !effectiveMid) {
       throw new UnauthorizedException(
@@ -404,10 +451,17 @@ export class AuthService {
       );
     }
 
-    // 3. Ensure tenant exists
     const tenant = await this.tenantRepo.upsert({ eid: effectiveEid, tssd });
 
-    // 4. Ensure user exists
+    // sfUserId is a Salesforce User ID (18-char format), which is globally unique
+    // across all MCE enterprises. A user belongs to exactly one MCE enterprise,
+    // so we check globally rather than per-tenant.
+    const existingUser = await this.userRepo.findBySfUserId(effectiveSfUserId);
+
+    if (!existingUser) {
+      await this.seatLimitService.checkSeatLimit(tenant.id);
+    }
+
     const user = await this.userRepo.upsert({
       sfUserId: effectiveSfUserId,
       tenantId: tenant.id,
@@ -415,7 +469,6 @@ export class AuthService {
       name: effectiveName,
     });
 
-    // 5. Save tokens
     await this.saveTokens(tenant.id, user.id, effectiveMid, tokenData);
 
     return { user, tenant, mid: effectiveMid };
@@ -430,22 +483,7 @@ export class AuthService {
     }
 
     for (const key of keys) {
-      /**
-       * ESLINT-DISABLE JUSTIFICATION:
-       * This eslint-disable is an exception to project standards, not a pattern to follow.
-       *
-       * Why this is safe: The `keys` parameter is a string array passed from call sites
-       * with compile-time literal strings representing known OAuth/OIDC claim names
-       * (e.g., ["userId", "userID", "memberId"]). The `obj` parameter comes from MCE's
-       * userinfo endpoint response after successful OAuth token exchange, which is a
-       * verified authenticated response from Salesforce Marketing Cloud.
-       *
-       * Why not refactor: This method intentionally iterates over multiple possible claim
-       * names because MCE's userinfo response structure varies across API versions and
-       * account configurations. Using a Map would require pre-populating all possible
-       * claim variations, defeating the purpose of this flexible extraction pattern.
-       */
-      // eslint-disable-next-line security/detect-object-injection
+      // eslint-disable-next-line security/detect-object-injection -- `key` comes from hardcoded array parameter, not user input
       const value = obj[key];
       const direct = this.coerceId(value);
       if (direct) {
@@ -484,13 +522,15 @@ export class AuthService {
       return undefined;
     }
     const parts = code.split(".");
-    const payload64 = parts[1];
-    if (!payload64) {
+    const encodedPayload = parts[1];
+    if (!encodedPayload) {
       return undefined;
     }
 
     try {
-      const payloadJson = Buffer.from(payload64, "base64url").toString("utf8");
+      const payloadJson = Buffer.from(encodedPayload, "base64url").toString(
+        "utf8",
+      );
       const payload = JSON.parse(payloadJson) as {
         auth_code?: string;
         eid?: number | string;
@@ -546,8 +586,8 @@ export class AuthService {
     tenantId: string,
     userId: string,
     mid: string,
-    forceRefresh?: boolean,
-  ): Promise<{ accessToken: string; tssd: string }> {
+    forceRefresh: boolean,
+  ): Promise<RefreshTokenResult> {
     const creds = await this.credRepo.findByUserTenantMid(
       userId,
       tenantId,
@@ -572,7 +612,11 @@ export class AuthService {
         throw new InternalServerErrorException("ENCRYPTION_KEY not configured");
       }
       const decryptedAccessToken = decrypt(creds.accessToken, encryptionKey);
-      return { accessToken: decryptedAccessToken, tssd: tenant.tssd };
+      return {
+        accessToken: decryptedAccessToken,
+        tssd: tenant.tssd,
+        didRefresh: false,
+      };
     }
 
     const encryptionKey = this.configService.get<string>("ENCRYPTION_KEY");
@@ -607,8 +651,26 @@ export class AuthService {
 
       const tokenData = response.data;
       await this.saveTokens(tenant.id, userId, mid, tokenData);
-      return { accessToken: tokenData.access_token, tssd: tenant.tssd };
+      return {
+        accessToken: tokenData.access_token,
+        tssd: tenant.tssd,
+        didRefresh: true,
+      };
     } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data;
+        const errorCode =
+          data && typeof data === "object" && "error" in data
+            ? typeof (data as { error?: unknown }).error === "string"
+              ? (data as { error?: string }).error
+              : ""
+            : "";
+        if (errorCode === "access_denied" || errorCode === "invalid_grant") {
+          throw new UnauthorizedException(
+            "MCE session is invalid or access is revoked. Please re-authenticate.",
+          );
+        }
+      }
       this.logTokenError("Refresh token failed", error);
       throw new UnauthorizedException("Failed to refresh token");
     }
@@ -624,7 +686,6 @@ export class AuthService {
       return false;
     }
 
-    // Refresh ~1 minute early to avoid edge races.
     return Date.now() < expiry - 60_000;
   }
 
@@ -634,7 +695,6 @@ export class AuthService {
       throw new Error("TSSD is empty");
     }
 
-    // Restrict to the expected stack subdomain format to prevent host injection.
     if (!/^[a-z0-9-]+$/i.test(trimmed)) {
       throw new Error("TSSD has invalid format");
     }
