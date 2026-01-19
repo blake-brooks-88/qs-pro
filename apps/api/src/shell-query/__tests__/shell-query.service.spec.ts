@@ -3,9 +3,9 @@ import * as crypto from 'node:crypto';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { RestDataService } from '@qs-pro/backend-shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MceBridgeService } from '../../mce/mce-bridge.service';
 import {
   type ShellQueryContext,
   ShellQueryService,
@@ -16,10 +16,10 @@ describe('ShellQueryService', () => {
   let service: ShellQueryService;
   let runRepo: ShellQueryRunRepository;
   let queue: { add: ReturnType<typeof vi.fn> };
-  let mceBridge: { request: ReturnType<typeof vi.fn> };
+  let restDataService: { getRowset: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    mceBridge = { request: vi.fn() };
+    restDataService = { getRowset: vi.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -29,8 +29,8 @@ describe('ShellQueryService', () => {
           useValue: { add: vi.fn() },
         },
         {
-          provide: MceBridgeService,
-          useValue: mceBridge,
+          provide: RestDataService,
+          useValue: restDataService,
         },
         {
           provide: 'SHELL_QUERY_RUN_REPOSITORY',
@@ -151,7 +151,7 @@ describe('ShellQueryService', () => {
         completedAt: new Date(),
       } as any);
 
-      vi.mocked(mceBridge.request).mockResolvedValue({
+      vi.mocked(restDataService.getRowset).mockResolvedValue({
         pageSize: 50,
         page: 1,
         count: 1,
@@ -171,14 +171,13 @@ describe('ShellQueryService', () => {
         1,
       );
 
-      expect(mceBridge.request).toHaveBeenCalledWith(
+      expect(restDataService.getRowset).toHaveBeenCalledWith(
         'tenant-1',
         'user-1',
         'mid-1',
-        expect.objectContaining({
-          method: 'GET',
-          url: '/data/v1/customobjectdata/key/QPP_New_Query_65e9fec9/rowset?$page=1&$pageSize=50',
-        }),
+        'QPP_New_Query_65e9fec9',
+        1,
+        50,
       );
 
       expect(result).toEqual({
@@ -210,7 +209,7 @@ describe('ShellQueryService', () => {
         completedAt: new Date(),
       } as any);
 
-      vi.mocked(mceBridge.request).mockResolvedValue({
+      vi.mocked(restDataService.getRowset).mockResolvedValue({
         pageSize: 50,
         page: 1,
         count: 0,
@@ -225,14 +224,13 @@ describe('ShellQueryService', () => {
         1,
       );
 
-      expect(mceBridge.request).toHaveBeenCalledWith(
+      expect(restDataService.getRowset).toHaveBeenCalledWith(
         'tenant-1',
         'user-1',
         'mid-1',
-        expect.objectContaining({
-          method: 'GET',
-          url: '/data/v1/customobjectdata/key/QPP_Results_abcd1234/rowset?$page=1&$pageSize=50',
-        }),
+        'QPP_Results_abcd1234',
+        1,
+        50,
       );
 
       expect(result.totalRows).toBe(0);

@@ -2,16 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qs-pro/backend-shared';
+import { RlsContextService, MceBridgeService, AsyncStatusService, RestDataService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub } from './stubs';
+import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub, createRestDataServiceStub } from './stubs';
 import { RunStatus, STATUS_MESSAGES } from '../src/shell-query/shell-query.types';
 
 describe('Status Event Flow', () => {
   let processor: ShellQueryProcessor;
   let mockDb: ReturnType<typeof createDbStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockRestDataService: ReturnType<typeof createRestDataServiceStub>;
   let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
   let mockRedis: ReturnType<typeof createRedisStub>;
   let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn>; retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn> };
@@ -21,6 +22,7 @@ describe('Status Event Flow', () => {
   beforeEach(async () => {
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockRestDataService = createRestDataServiceStub();
     mockAsyncStatusService = createAsyncStatusServiceStub();
     mockRedis = createRedisStub();
     mockRunToTempFlow = {
@@ -41,6 +43,7 @@ describe('Status Event Flow', () => {
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: RestDataService, useValue: mockRestDataService },
         { provide: AsyncStatusService, useValue: mockAsyncStatusService },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },

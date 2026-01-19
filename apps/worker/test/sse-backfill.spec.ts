@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qs-pro/backend-shared';
+import { RlsContextService, MceBridgeService, AsyncStatusService, RestDataService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
 import {
@@ -13,12 +13,14 @@ import {
   createRlsContextStub,
   createQueueStub,
   createAsyncStatusServiceStub,
+  createRestDataServiceStub,
 } from './stubs';
 
 describe('ShellQueryProcessor SSE Backfill', () => {
   let processor: ShellQueryProcessor;
   let mockRedis: ReturnType<typeof createRedisStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockRestDataService: ReturnType<typeof createRestDataServiceStub>;
   let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
   let mockRunToTempFlow: {
     execute: ReturnType<typeof vi.fn>;
@@ -29,6 +31,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
   beforeEach(async () => {
     const mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockRestDataService = createRestDataServiceStub();
     mockAsyncStatusService = createAsyncStatusServiceStub();
     mockRunToTempFlow = {
       execute: vi.fn(),
@@ -43,6 +46,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: RestDataService, useValue: mockRestDataService },
         { provide: AsyncStatusService, useValue: mockAsyncStatusService },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
@@ -108,7 +112,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockResolvedValue({});
+      mockRestDataService.getRowset.mockResolvedValue({ count: 0, items: [] });
 
       await processor.process(job as any);
 
@@ -168,6 +172,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
           ShellQueryProcessor,
           { provide: RunToTempFlow, useValue: mockRunToTempFlow },
           { provide: MceBridgeService, useValue: mockMceBridge },
+          { provide: RestDataService, useValue: createRestDataServiceStub() },
           { provide: AsyncStatusService, useValue: createAsyncStatusServiceStub() },
           { provide: RlsContextService, useValue: createRlsContextStub() },
           { provide: 'DATABASE', useValue: mockDb },

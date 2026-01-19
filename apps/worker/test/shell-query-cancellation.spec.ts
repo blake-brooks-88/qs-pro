@@ -8,6 +8,7 @@ import {
   MceBridgeService,
   AsyncStatusService,
   QueryDefinitionService,
+  RestDataService,
 } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
@@ -20,6 +21,7 @@ import {
   createQueueStub,
   createAsyncStatusServiceStub,
   createQueryDefinitionServiceStub,
+  createRestDataServiceStub,
 } from './stubs';
 
 describe('Shell Query Cancellation & Sweeper', () => {
@@ -27,6 +29,7 @@ describe('Shell Query Cancellation & Sweeper', () => {
   let sweeper: ShellQuerySweeper;
   let mockDb: ReturnType<typeof createDbStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockRestDataService: ReturnType<typeof createRestDataServiceStub>;
   let mockRedis: ReturnType<typeof createRedisStub>;
   let mockQueue: ReturnType<typeof createQueueStub>;
   let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
@@ -36,6 +39,7 @@ describe('Shell Query Cancellation & Sweeper', () => {
   beforeEach(async () => {
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockRestDataService = createRestDataServiceStub();
     mockRedis = createRedisStub();
     mockQueue = createQueueStub();
     mockAsyncStatusService = createAsyncStatusServiceStub();
@@ -55,6 +59,7 @@ describe('Shell Query Cancellation & Sweeper', () => {
         ShellQuerySweeper,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: RestDataService, useValue: mockRestDataService },
         { provide: AsyncStatusService, useValue: mockAsyncStatusService },
         { provide: QueryDefinitionService, useValue: mockQueryDefinitionService },
         { provide: RlsContextService, useValue: createRlsContextStub() },
@@ -137,6 +142,7 @@ describe('Shell Query Cancellation & Sweeper', () => {
           ShellQueryProcessor,
           { provide: RunToTempFlow, useValue: failureRunToTempFlow },
           { provide: MceBridgeService, useValue: mockMceBridge },
+          { provide: RestDataService, useValue: createRestDataServiceStub() },
           { provide: AsyncStatusService, useValue: createAsyncStatusServiceStub() },
           { provide: RlsContextService, useValue: createRlsContextStub() },
           { provide: 'DATABASE', useValue: mockDb },

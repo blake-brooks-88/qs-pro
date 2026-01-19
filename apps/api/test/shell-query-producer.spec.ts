@@ -4,17 +4,17 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
+import { RestDataService } from '@qs-pro/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionGuard } from '../src/auth/session.guard';
-import { MceBridgeService } from '../src/mce/mce-bridge.service';
 import { ShellQueryController } from '../src/shell-query/shell-query.controller';
 import { ShellQueryService } from '../src/shell-query/shell-query.service';
 import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
 import { createMockShellQueryContext } from './factories';
 import {
-  createMceBridgeStub,
   createQueueStub,
+  createRestDataServiceStub,
   createSessionGuardMock,
   createShellQueryRunRepoStub,
   createShellQuerySseServiceStub,
@@ -23,7 +23,7 @@ import {
 
 let mockQueue: ReturnType<typeof createQueueStub>;
 let mockTenantRepo: ReturnType<typeof createTenantRepoStub>;
-let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+let mockRestDataService: ReturnType<typeof createRestDataServiceStub>;
 let mockRunRepo: ReturnType<typeof createShellQueryRunRepoStub>;
 let mockSseService: ReturnType<typeof createShellQuerySseServiceStub>;
 
@@ -34,7 +34,7 @@ describe('Shell Query Producer (e2e)', () => {
   beforeEach(async () => {
     mockQueue = createQueueStub();
     mockTenantRepo = createTenantRepoStub();
-    mockMceBridge = createMceBridgeStub();
+    mockRestDataService = createRestDataServiceStub();
     mockRunRepo = createShellQueryRunRepoStub();
     mockSseService = createShellQuerySseServiceStub();
 
@@ -44,7 +44,7 @@ describe('Shell Query Producer (e2e)', () => {
         ShellQueryService,
         { provide: getQueueToken('shell-query'), useValue: mockQueue },
         { provide: 'TENANT_REPOSITORY', useValue: mockTenantRepo },
-        { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: RestDataService, useValue: mockRestDataService },
         { provide: 'SHELL_QUERY_RUN_REPOSITORY', useValue: mockRunRepo },
         { provide: ShellQuerySseService, useValue: mockSseService },
       ],
