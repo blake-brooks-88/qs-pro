@@ -117,6 +117,7 @@ export class RunToTempFlow implements IFlowStrategy {
       queryCustomerKey,
       expandedSql,
       deObjectId,
+      deName,
       folderId,
     );
 
@@ -309,6 +310,8 @@ export class RunToTempFlow implements IFlowStrategy {
       );
     }
 
+    await this.deleteDataExtensionIfExists(job, deName);
+
     const result = await this.dataExtensionService.create(
       tenantId,
       userId,
@@ -352,11 +355,28 @@ export class RunToTempFlow implements IFlowStrategy {
     return ["Text", "EmailAddress", "Phone"].includes(fieldType);
   }
 
+  private async deleteDataExtensionIfExists(
+    job: ShellQueryJob,
+    deName: string,
+  ): Promise<void> {
+    const { tenantId, userId, mid } = job;
+
+    try {
+      await this.dataExtensionService.delete(tenantId, userId, mid, deName);
+      this.logger.debug(`Deleted existing Data Extension: ${deName}`);
+    } catch (error) {
+      this.logger.debug(
+        `Delete DE failed for ${deName} (may not exist): ${(error as Error).message}`,
+      );
+    }
+  }
+
   private async createQueryDefinition(
     job: ShellQueryJob,
     key: string,
     sql: string,
     deObjectId: string,
+    deName: string,
     folderId: number,
   ): Promise<QueryDefinitionIds> {
     const { tenantId, userId, mid } = job;
@@ -372,6 +392,8 @@ export class RunToTempFlow implements IFlowStrategy {
         customerKey: key,
         categoryId: folderId,
         targetId: deObjectId,
+        targetCustomerKey: deName,
+        targetName: deName,
         queryText: sql,
       },
     );
