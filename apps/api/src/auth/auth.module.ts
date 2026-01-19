@@ -6,5 +6,6 @@ import { AuthController } from './auth.controller';
 @Module({
   imports: [BackendSharedAuthModule],
   controllers: [AuthController],
+  exports: [BackendSharedAuthModule],
 })
 export class AuthModule {}
