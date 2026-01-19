@@ -1,28 +1,32 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
-import { QueryDefinitionService } from '../src/shell-query/query-definition.service';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService } from '@qs-pro/backend-shared';
+import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createQueryDefinitionServiceStub } from './stubs';
+import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub } from './stubs';
 import { RunStatus, STATUS_MESSAGES } from '../src/shell-query/shell-query.types';
 
 describe('Status Event Flow', () => {
   let processor: ShellQueryProcessor;
   let mockDb: ReturnType<typeof createDbStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
   let mockRedis: ReturnType<typeof createRedisStub>;
-  let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn> };
+  let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn>; retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn> };
   let mockQueue: ReturnType<typeof createQueueStub>;
   let publishedEvents: Array<{ channel: string; payload: unknown }>;
 
   beforeEach(async () => {
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockAsyncStatusService = createAsyncStatusServiceStub();
     mockRedis = createRedisStub();
-    mockRunToTempFlow = { execute: vi.fn() };
+    mockRunToTempFlow = {
+      execute: vi.fn(),
+      retrieveQueryDefinitionObjectId: vi.fn().mockResolvedValue(null),
+    };
     mockQueue = createQueueStub();
     const mockMetrics = createMetricsStub();
     publishedEvents = [];
@@ -37,7 +41,7 @@ describe('Status Event Flow', () => {
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
-        { provide: QueryDefinitionService, useValue: createQueryDefinitionServiceStub() },
+        { provide: AsyncStatusService, useValue: mockAsyncStatusService },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
         { provide: 'REDIS_CLIENT', useValue: mockRedis },
@@ -218,19 +222,9 @@ describe('Status Event Flow', () => {
       taskId: 'task-123',
     });
 
-    mockMceBridge.soapRequest.mockResolvedValue({
-      Body: {
-        RetrieveResponseMsg: {
-          Results: {
-            Properties: {
-              Property: [
-                { Name: 'Status', Value: 'Complete' },
-                { Name: 'ErrorMsg', Value: '' },
-              ],
-            },
-          },
-        },
-      },
+    mockAsyncStatusService.retrieve.mockResolvedValue({
+      status: 'Complete',
+      errorMsg: '',
     });
 
     await processor.process(job as unknown as Parameters<typeof processor.process>[0]);

@@ -1,6 +1,11 @@
 import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Logger } from "@nestjs/common";
-import { MceBridgeService, RlsContextService } from "@qs-pro/backend-shared";
+import {
+  AsyncStatusService,
+  buildDeleteQueryDefinition,
+  MceBridgeService,
+  RlsContextService,
+} from "@qs-pro/backend-shared";
 import {
   eq,
   type PostgresJsDatabase,
@@ -10,7 +15,6 @@ import {
 import { DelayedError, Job, Queue, UnrecoverableError } from "bullmq";
 import * as crypto from "crypto";
 
-import { QueryDefinitionService } from "./query-definition.service";
 import { buildQueryCustomerKey } from "./query-definition.utils";
 import {
   calculateNextDelay,
@@ -19,7 +23,6 @@ import {
   PollShellQueryJob,
   RunStatus,
   ShellQueryJob,
-  SoapAsyncStatusResponse,
   SSEEvent,
   STATUS_MESSAGES,
 } from "./shell-query.types";
@@ -54,7 +57,7 @@ export class ShellQueryProcessor extends WorkerHost {
     private readonly runToTempFlow: RunToTempFlow,
     private readonly rlsContext: RlsContextService,
     private readonly mceBridge: MceBridgeService,
-    private readonly queryDefinitionService: QueryDefinitionService,
+    private readonly asyncStatusService: AsyncStatusService,
     @Inject("DATABASE")
     private readonly db: PostgresJsDatabase<Record<string, never>>,
     @Inject("REDIS_CLIENT") private readonly redis: unknown,
@@ -293,7 +296,7 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
           },
         );
         return { status: "canceled", runId };
@@ -315,7 +318,7 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
           },
         );
         return { status: "timeout", runId };
@@ -334,7 +337,7 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
           },
         );
         return { status: "budget-exceeded", runId };
@@ -345,8 +348,17 @@ export class ShellQueryProcessor extends WorkerHost {
         mid,
         userId,
         async () => {
-          return this.singleSoapPoll(tenantId, userId, mid, taskId, runId);
+          return await this.asyncStatusService.retrieve(
+            tenantId,
+            userId,
+            mid,
+            taskId,
+          );
         },
+      );
+
+      this.logger.debug(
+        `Run ${runId} AsyncStatusService response: ${JSON.stringify(pollResult)}`,
       );
 
       const normalizedStatus = pollResult.status?.trim().toLowerCase();
@@ -362,7 +374,7 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
           },
         );
         return { status: "failed", runId, error: errorMessage };
@@ -410,7 +422,7 @@ export class ShellQueryProcessor extends WorkerHost {
             mid,
             userId,
             async () => {
-              await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+              await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
             },
           );
           return { status: "completed", runId };
@@ -605,7 +617,7 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
           },
         );
         throw new UnrecoverableError(err.message || "Unknown error");
@@ -621,7 +633,7 @@ export class ShellQueryProcessor extends WorkerHost {
     job: Job<PollShellQueryJob> | { data: PollShellQueryJob },
     token?: string,
   ): Promise<unknown> {
-    const { runId, tenantId, userId, mid, targetDeName } = job.data;
+    const { runId, tenantId, userId, mid, targetDeName, queryDefinitionId } = job.data;
     const currentAttempts = job.data.rowsetReadyAttempts ?? 0;
 
     if (!targetDeName) {
@@ -634,7 +646,7 @@ export class ShellQueryProcessor extends WorkerHost {
         mid,
         userId,
         async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
         },
       );
       return { status: "completed", runId };
@@ -657,7 +669,7 @@ export class ShellQueryProcessor extends WorkerHost {
         mid,
         userId,
         async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
         },
       );
       return { status: "completed", runId };
@@ -674,7 +686,7 @@ export class ShellQueryProcessor extends WorkerHost {
         mid,
         userId,
         async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId);
+          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
         },
       );
       return { status: "rowset-not-queryable", runId };
@@ -831,75 +843,6 @@ export class ShellQueryProcessor extends WorkerHost {
     return { isRunning: true, needsIdFallback: true };
   }
 
-  private async singleSoapPoll(
-    tenantId: string,
-    userId: string,
-    mid: string,
-    taskId: string,
-    runId: string,
-  ): Promise<{ status?: string; errorMsg?: string; completedDate?: string }> {
-    const soap = `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            <ObjectType>AsyncActivityStatus</ObjectType>
-            <Properties>Status</Properties>
-            <Properties>ErrorMsg</Properties>
-            <Properties>CompletedDate</Properties>
-            <Filter xsi:type="SimpleFilterPart">
-               <Property>TaskID</Property>
-               <SimpleOperator>equals</SimpleOperator>
-               <Value>${taskId}</Value>
-            </Filter>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>`;
-
-    try {
-      const response =
-        await this.mceBridge.soapRequest<SoapAsyncStatusResponse>(
-          tenantId,
-          userId,
-          mid,
-          soap,
-          "Retrieve",
-        );
-
-      const result = response.Body?.RetrieveResponseMsg?.Results;
-      const properties = result?.Properties?.Property;
-
-      this.logger.debug(
-        `Run ${runId} SOAP response: ${JSON.stringify({ properties, resultKeys: result ? Object.keys(result) : [] })}`,
-      );
-
-      const statusProp = Array.isArray(properties)
-        ? properties.find(
-            (p: { Name: string; Value: string }) => p.Name === "Status",
-          )
-        : null;
-      const errorMsgProp = Array.isArray(properties)
-        ? properties.find(
-            (p: { Name: string; Value: string }) => p.Name === "ErrorMsg",
-          )
-        : null;
-      const completedDateProp = Array.isArray(properties)
-        ? properties.find(
-            (p: { Name: string; Value: string }) => p.Name === "CompletedDate",
-          )
-        : null;
-
-      const status = statusProp?.Value || result?.Status;
-      const errorMsg = errorMsgProp?.Value || result?.ErrorMsg;
-      const completedDate = completedDateProp?.Value;
-
-      return { status, errorMsg, completedDate };
-    } catch (error) {
-      const err = error as { message?: string };
-      this.logger.warn(
-        `Polling error for ${runId}: ${err.message || "Unknown error"}`,
-      );
-      return {};
-    }
-  }
-
   private async markReady(
     tenantId: string,
     userId: string,
@@ -1020,18 +963,38 @@ export class ShellQueryProcessor extends WorkerHost {
     userId: string,
     mid: string,
     runId: string,
+    queryDefinitionId?: string,
   ) {
     const queryKey = buildQueryCustomerKey(runId);
 
     this.logger.log(`Attempting cleanup for run ${runId}`);
 
     try {
-      await this.queryDefinitionService.deleteByCustomerKey(
+      let objectId = queryDefinitionId;
+
+      if (!objectId) {
+        const retrieveResult = await this.runToTempFlow.retrieveQueryDefinitionObjectId(
+          tenantId,
+          userId,
+          mid,
+          queryKey,
+        );
+        objectId = retrieveResult ?? undefined;
+      }
+
+      if (!objectId) {
+        this.logger.log(`No QueryDefinition found for run ${runId}, skipping cleanup`);
+        return;
+      }
+
+      await this.mceBridge.soapRequest(
         tenantId,
         userId,
         mid,
-        queryKey,
+        buildDeleteQueryDefinition(objectId),
+        "Delete",
       );
+      this.logger.log(`Successfully deleted QueryDefinition for run ${runId}`);
     } catch (e: unknown) {
       const err = e as { message?: string };
       this.logger.warn(

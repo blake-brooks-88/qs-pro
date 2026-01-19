@@ -4,24 +4,25 @@ import { Test, TestingModule } from "@nestjs/testing";
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AuthService } from "../auth/auth.service";
+import { MCE_AUTH_PROVIDER, MceAuthProvider } from "./mce-auth.provider";
 import { MceBridgeService } from "./mce-bridge.service";
 
 describe("MceBridgeService", () => {
   let service: MceBridgeService;
-  let authService: AuthService;
+  let authProvider: MceAuthProvider;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MceBridgeService,
         {
-          provide: AuthService,
+          provide: MCE_AUTH_PROVIDER,
           useValue: {
             refreshToken: vi.fn().mockResolvedValue({
               accessToken: "valid-token",
               tssd: "test-tssd",
             }),
+            invalidateToken: vi.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -34,7 +35,7 @@ describe("MceBridgeService", () => {
     }).compile();
 
     service = module.get<MceBridgeService>(MceBridgeService);
-    authService = module.get<AuthService>(AuthService);
+    authProvider = module.get<MceAuthProvider>(MCE_AUTH_PROVIDER);
   });
 
   afterEach(() => {
@@ -65,7 +66,7 @@ describe("MceBridgeService", () => {
         url: "/asset/v1/content/assets", // Relative URL
       });
 
-      expect(vi.mocked(authService.refreshToken)).toHaveBeenCalledWith(
+      expect(vi.mocked(authProvider.refreshToken)).toHaveBeenCalledWith(
         "tenant-1",
         "user-1",
         "mid-1",

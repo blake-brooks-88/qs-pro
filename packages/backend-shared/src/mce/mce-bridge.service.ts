@@ -1,7 +1,13 @@
-import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import axios, { AxiosRequestConfig } from "axios";
 
-import { AuthService } from "../auth/auth.service";
+import { MCE_AUTH_PROVIDER, MceAuthProvider } from "./mce-auth.provider";
 import { parseSoapXml } from "./soap-xml.util";
 
 export interface ProblemDetails {
@@ -15,7 +21,9 @@ export interface ProblemDetails {
 
 @Injectable()
 export class MceBridgeService {
-  constructor(private authService: AuthService) {}
+  constructor(
+    @Inject(MCE_AUTH_PROVIDER) private authProvider: MceAuthProvider,
+  ) {}
 
   /**
    * Constructs a SOAP Envelope for MCE
@@ -42,7 +50,7 @@ export class MceBridgeService {
     config: AxiosRequestConfig,
   ): Promise<T> {
     try {
-      const { accessToken, tssd } = await this.authService.refreshToken(
+      const { accessToken, tssd } = await this.authProvider.refreshToken(
         tenantId,
         userId,
         mid,
@@ -68,7 +76,7 @@ export class MceBridgeService {
   }
 
   /**
-   * Helper for SOAP requests
+   * Helper for SOAP requests with retry-on-auth-failure logic
    */
   async soapRequest<T = unknown>(
     tenantId: string,
@@ -77,14 +85,14 @@ export class MceBridgeService {
     soapBody: string,
     soapAction: string,
   ): Promise<T> {
-    try {
-      const { accessToken, tssd } = await this.authService.refreshToken(
+    const baseRequest = async (forceRefresh: boolean) => {
+      const { accessToken, tssd } = await this.authProvider.refreshToken(
         tenantId,
         userId,
         mid,
+        forceRefresh,
       );
       const envelope = this.buildSoapEnvelope(accessToken, soapBody);
-
       const baseUrl = `https://${tssd}.soap.marketingcloudapis.com`;
 
       const response = await axios.request({
@@ -98,15 +106,74 @@ export class MceBridgeService {
         data: envelope,
       });
 
-      return (
+      const parsed =
         typeof response.data === "string"
           ? parseSoapXml(response.data)
-          : response.data
-      ) as T;
+          : (response.data as unknown);
+
+      return { raw: response.data, parsed };
+    };
+
+    let first: { raw: unknown; parsed: unknown };
+    try {
+      first = await baseRequest(false);
     } catch (error) {
       this.handleError(error);
       throw error;
     }
+
+    if (this.isSoapLoginFailedFault(first.raw, first.parsed)) {
+      await this.authProvider.invalidateToken(tenantId, userId, mid);
+      let second: { raw: unknown; parsed: unknown };
+      try {
+        second = await baseRequest(true);
+      } catch (error) {
+        this.handleError(error);
+        throw error;
+      }
+      if (this.isSoapLoginFailedFault(second.raw, second.parsed)) {
+        throw new UnauthorizedException("MCE SOAP authentication failed");
+      }
+      return second.parsed as T;
+    }
+
+    return first.parsed as T;
+  }
+
+  private isSoapLoginFailedFault(raw: unknown, parsed: unknown): boolean {
+    if (typeof raw === "string") {
+      const hasFaultString =
+        /<faultstring>\s*Login Failed\s*<\/faultstring>/i.test(raw);
+      const hasSecurityFaultCode =
+        /<faultcode[^>]*>[^<]*Security[^<]*<\/faultcode>/i.test(raw);
+      if (hasFaultString && hasSecurityFaultCode) {
+        return true;
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return false;
+    }
+    const record = parsed as Record<string, unknown>;
+    const body = record.Body as Record<string, unknown> | undefined;
+    const fault = body?.Fault as Record<string, unknown> | undefined;
+    const faultcode = fault?.faultcode;
+    const faultstring = fault?.faultstring;
+
+    const code =
+      typeof faultcode === "string"
+        ? faultcode
+        : Array.isArray(faultcode)
+          ? String(faultcode[0] ?? "")
+          : "";
+    const message =
+      typeof faultstring === "string"
+        ? faultstring
+        : Array.isArray(faultstring)
+          ? String(faultstring[0] ?? "")
+          : "";
+
+    return /Security/i.test(code) && /Login Failed/i.test(message);
   }
 
   private handleError(error: unknown): void {

@@ -1,9 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
-import { QueryDefinitionService } from '../src/shell-query/query-definition.service';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService } from '@qs-pro/backend-shared';
+import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
 import {
@@ -13,13 +12,14 @@ import {
   createMetricsStub,
   createRlsContextStub,
   createQueueStub,
-  createQueryDefinitionServiceStub,
+  createAsyncStatusServiceStub,
 } from './stubs';
 
 describe('ShellQueryProcessor SSE Backfill', () => {
   let processor: ShellQueryProcessor;
   let mockRedis: ReturnType<typeof createRedisStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
   let mockRunToTempFlow: {
     execute: ReturnType<typeof vi.fn>;
     retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn>;
@@ -29,6 +29,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
   beforeEach(async () => {
     const mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockAsyncStatusService = createAsyncStatusServiceStub();
     mockRunToTempFlow = {
       execute: vi.fn(),
       retrieveQueryDefinitionObjectId: vi.fn().mockResolvedValue(null),
@@ -42,7 +43,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
-        { provide: QueryDefinitionService, useValue: createQueryDefinitionServiceStub() },
+        { provide: AsyncStatusService, useValue: mockAsyncStatusService },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
         { provide: 'REDIS_CLIENT', useValue: mockRedis },
@@ -64,7 +65,6 @@ describe('ShellQueryProcessor SSE Backfill', () => {
 
   describe('Event persistence for reconnect backfill', () => {
     it('persists status event to Redis with 24h TTL when publishing', async () => {
-      // Arrange
       const job = createMockBullJob({
         runId: 'run-1',
         tenantId: 't1',
@@ -81,10 +81,8 @@ describe('ShellQueryProcessor SSE Backfill', () => {
         targetDeName: 'QPP_Results_run-',
       });
 
-      // Act
       await processor.process(job as any);
 
-      // Assert - verify set was called with EX flag for TTL
       expect(mockRedis.set).toHaveBeenCalled();
       const setCalls = mockRedis.set.mock.calls;
       const lastEventSetCall = setCalls.find(
@@ -97,7 +95,6 @@ describe('ShellQueryProcessor SSE Backfill', () => {
     });
 
     it('persists terminal ready state to Redis', async () => {
-      // Arrange
       const job = createMockPollBullJob({
         runId: 'run-1',
         tenantId: 't1',
@@ -106,27 +103,15 @@ describe('ShellQueryProcessor SSE Backfill', () => {
         taskId: 'task-123',
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Complete' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Complete',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockResolvedValue({});
 
-      // Act
       await processor.process(job as any);
 
-      // Assert - verify ready event was persisted
       const setCalls = mockRedis.set.mock.calls;
       const readyEventCall = setCalls.find(
         (call: [string, string, string, number]) => {
@@ -139,7 +124,6 @@ describe('ShellQueryProcessor SSE Backfill', () => {
     });
 
     it('persists terminal failed state with error message to Redis', async () => {
-      // Arrange
       const job = createMockPollBullJob({
         runId: 'run-1',
         tenantId: 't1',
@@ -148,25 +132,13 @@ describe('ShellQueryProcessor SSE Backfill', () => {
         taskId: 'task-123',
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Error' },
-                  { Name: 'ErrorMsg', Value: 'Syntax error in query' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Error',
+        errorMsg: 'Syntax error in query',
       });
 
-      // Act
       await processor.process(job as any);
 
-      // Assert - verify failed event was persisted with error message
       const setCalls = mockRedis.set.mock.calls;
       const failedEventCall = setCalls.find(
         (call: [string, string, string, number]) => {
@@ -181,7 +153,6 @@ describe('ShellQueryProcessor SSE Backfill', () => {
     });
 
     it('persists canceled state to Redis', async () => {
-      // Arrange
       const job = createMockPollBullJob({
         runId: 'run-1',
         tenantId: 't1',
@@ -197,7 +168,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
           ShellQueryProcessor,
           { provide: RunToTempFlow, useValue: mockRunToTempFlow },
           { provide: MceBridgeService, useValue: mockMceBridge },
-          { provide: QueryDefinitionService, useValue: createQueryDefinitionServiceStub() },
+          { provide: AsyncStatusService, useValue: createAsyncStatusServiceStub() },
           { provide: RlsContextService, useValue: createRlsContextStub() },
           { provide: 'DATABASE', useValue: mockDb },
           { provide: 'REDIS_CLIENT', useValue: mockRedis },
@@ -214,10 +185,8 @@ describe('ShellQueryProcessor SSE Backfill', () => {
       );
       processorWithCanceled.setTestMode(true);
 
-      // Act
       await processorWithCanceled.process(job as any);
 
-      // Assert - verify canceled event was persisted
       const setCalls = mockRedis.set.mock.calls;
       const canceledEventCall = setCalls.find(
         (call: [string, string, string, number]) => {
@@ -230,7 +199,6 @@ describe('ShellQueryProcessor SSE Backfill', () => {
     });
 
     it('publishes to channel and persists in parallel', async () => {
-      // Arrange
       const job = createMockBullJob({
         runId: 'run-1',
         tenantId: 't1',
@@ -247,10 +215,8 @@ describe('ShellQueryProcessor SSE Backfill', () => {
         targetDeName: 'QPP_Results_run-',
       });
 
-      // Act
       await processor.process(job as any);
 
-      // Assert - both publish and set should be called for each status event
       const publishCalls = mockRedis.publish.mock.calls.filter(
         (call: [string, string]) => call[0] === 'run-status:run-1',
       );

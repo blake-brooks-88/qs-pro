@@ -84,6 +84,7 @@ export function EditorWorkspacePage() {
       ) : null}
       <EditorWorkspace
         tenantId={tenant?.id}
+        eid={tenant?.eid}
         folders={folders}
         savedQueries={[]}
         dataExtensions={dataExtensions}

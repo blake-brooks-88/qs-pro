@@ -247,14 +247,23 @@ export class AuthService {
     tenantId: string,
     userId: string,
     mid: string,
+    forceRefresh?: boolean,
   ): Promise<{ accessToken: string; tssd: string }> {
     const lockKey = `${tenantId}:${userId}:${mid}`;
-    const existingLock = this.refreshLocks.get(lockKey);
-    if (existingLock) {
-      return existingLock;
+
+    if (!forceRefresh) {
+      const existingLock = this.refreshLocks.get(lockKey);
+      if (existingLock) {
+        return existingLock;
+      }
     }
 
-    const refreshPromise = this.refreshTokenInternal(tenantId, userId, mid);
+    const refreshPromise = this.refreshTokenInternal(
+      tenantId,
+      userId,
+      mid,
+      forceRefresh,
+    );
     this.refreshLocks.set(lockKey, refreshPromise);
 
     try {
@@ -262,6 +271,15 @@ export class AuthService {
     } finally {
       this.refreshLocks.delete(lockKey);
     }
+  }
+
+  async invalidateToken(
+    tenantId: string,
+    userId: string,
+    mid: string,
+  ): Promise<void> {
+    const lockKey = `${tenantId}:${userId}:${mid}`;
+    this.refreshLocks.delete(lockKey);
   }
 
   async saveTokens(
@@ -528,6 +546,7 @@ export class AuthService {
     tenantId: string,
     userId: string,
     mid: string,
+    forceRefresh?: boolean,
   ): Promise<{ accessToken: string; tssd: string }> {
     const creds = await this.credRepo.findByUserTenantMid(
       userId,
@@ -543,7 +562,11 @@ export class AuthService {
       throw new UnauthorizedException("Tenant not found");
     }
 
-    if (creds.accessToken && this.isAccessTokenValid(creds.expiresAt)) {
+    if (
+      !forceRefresh &&
+      creds.accessToken &&
+      this.isAccessTokenValid(creds.expiresAt)
+    ) {
       const encryptionKey = this.configService.get<string>("ENCRYPTION_KEY");
       if (!encryptionKey) {
         throw new InternalServerErrorException("ENCRYPTION_KEY not configured");

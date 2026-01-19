@@ -1,31 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
-import { QueryDefinitionService } from '../src/shell-query/query-definition.service';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService } from '@qs-pro/backend-shared';
+import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qs-pro/backend-shared';
 import { DelayedError } from 'bullmq';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createQueryDefinitionServiceStub, type QueryDefinitionServiceStub } from './stubs';
+import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub } from './stubs';
 
 describe('ShellQueryProcessor', () => {
   let processor: ShellQueryProcessor;
   let mockDb: ReturnType<typeof createDbStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
   let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn>; retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn> };
   let mockQueue: ReturnType<typeof createQueueStub>;
-  let mockQueryDefService: QueryDefinitionServiceStub;
 
   beforeEach(async () => {
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockAsyncStatusService = createAsyncStatusServiceStub();
     mockRunToTempFlow = {
       execute: vi.fn(),
       retrieveQueryDefinitionObjectId: vi.fn().mockResolvedValue(null),
     };
     mockQueue = createQueueStub();
-    mockQueryDefService = createQueryDefinitionServiceStub();
     const mockRedis = createRedisStub();
     const mockMetrics = createMetricsStub();
 
@@ -34,7 +33,7 @@ describe('ShellQueryProcessor', () => {
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
-        { provide: QueryDefinitionService, useValue: mockQueryDefService },
+        { provide: AsyncStatusService, useValue: mockAsyncStatusService },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
         { provide: 'REDIS_CLIENT', useValue: mockRedis },
@@ -116,19 +115,9 @@ describe('ShellQueryProcessor', () => {
         taskId: 'task-123',
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Complete' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Complete',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockResolvedValue({});
@@ -148,19 +137,9 @@ describe('ShellQueryProcessor', () => {
         taskId: 'task-123',
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: '  COMPLETE  ' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: '  COMPLETE  ',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockResolvedValue({});
@@ -179,19 +158,9 @@ describe('ShellQueryProcessor', () => {
         taskId: 'task-123',
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Error' },
-                  { Name: 'ErrorMsg', Value: 'Syntax error in query' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Error',
+        errorMsg: 'Syntax error in query',
       });
 
       const result = await processor.process(job as any);
@@ -213,19 +182,9 @@ describe('ShellQueryProcessor', () => {
         pollCount: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Processing' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Processing',
+        errorMsg: '',
       });
 
       const result = await processor.process(job as any);
@@ -246,17 +205,21 @@ describe('ShellQueryProcessor', () => {
         tenantId: 't1',
         userId: 'u1',
         mid: 'm1',
+        queryDefinitionId: '', // Force retrieve path
       });
 
       mockDb.setSelectResult([{ status: 'canceled' }]);
 
+      mockRunToTempFlow.retrieveQueryDefinitionObjectId.mockResolvedValue('obj-123');
+
       const result = await processor.process(job as any);
 
       expect(result).toEqual({ status: 'canceled', runId: 'run-1' });
-      expect(mockQueryDefService.deleteByCustomerKey).toHaveBeenCalledWith(
+      expect(mockRunToTempFlow.retrieveQueryDefinitionObjectId).toHaveBeenCalledWith(
         't1', 'u1', 'm1',
         expect.stringContaining('QPP_Query_'),
       );
+      expect(mockMceBridge.soapRequest).toHaveBeenCalled();
     });
 
     it('should timeout after max duration', async () => {
@@ -302,20 +265,10 @@ describe('ShellQueryProcessor', () => {
         notRunningConfirmations: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                  { Name: 'CompletedDate', Value: '1/16/2026 10:54:35 AM' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
+        completedDate: '1/16/2026 10:54:35 AM',
       });
 
       mockMceBridge.request.mockResolvedValue({ isRunning: false });
@@ -347,19 +300,9 @@ describe('ShellQueryProcessor', () => {
         notRunningConfirmations: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockResolvedValue({ isRunning: false });
@@ -393,19 +336,9 @@ describe('ShellQueryProcessor', () => {
         notRunningConfirmations: 1,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       mockMceBridge.request
@@ -431,19 +364,9 @@ describe('ShellQueryProcessor', () => {
         notRunningConfirmations: 1,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockResolvedValue({ isRunning: true });
@@ -477,19 +400,9 @@ describe('ShellQueryProcessor', () => {
         pollStartedAt,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockResolvedValueOnce({ count: 1, items: [{ SubscriberKey: 'test' }] });
@@ -513,19 +426,9 @@ describe('ShellQueryProcessor', () => {
         pollCount: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockResolvedValueOnce({ count: 0, items: [] });
@@ -557,19 +460,9 @@ describe('ShellQueryProcessor', () => {
         pollStartedAt,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockRejectedValueOnce({ status: 401, message: 'No credentials found' });
@@ -593,19 +486,9 @@ describe('ShellQueryProcessor', () => {
         pollCount: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       const result = await processor.process(job as any);
@@ -639,19 +522,9 @@ describe('ShellQueryProcessor', () => {
         rowProbeLastCheckedAt,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       const result = await processor.process(job as any);
@@ -677,19 +550,9 @@ describe('ShellQueryProcessor', () => {
         pollCount: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Queued' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Queued',
+        errorMsg: '',
       });
 
       const result = await processor.process(job as any);
@@ -714,19 +577,9 @@ describe('ShellQueryProcessor', () => {
         rowsetReadyAttempts: 5,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Complete' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Complete',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockRejectedValue({ status: 404 });
@@ -746,19 +599,9 @@ describe('ShellQueryProcessor', () => {
         rowsetReadyAttempts: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Complete' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Complete',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockRejectedValue({ status: 401, message: 'No credentials found' });
@@ -790,19 +633,9 @@ describe('ShellQueryProcessor', () => {
         pollCount: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Processing' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Processing',
+        errorMsg: '',
       });
 
       await expect(processor.process(job as any, 'token')).rejects.toBeInstanceOf(
@@ -834,19 +667,9 @@ describe('ShellQueryProcessor', () => {
         rowsetReadyAttempts: 0,
       });
 
-      mockMceBridge.soapRequest.mockResolvedValue({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: {
-              Properties: {
-                Property: [
-                  { Name: 'Status', Value: 'Complete' },
-                  { Name: 'ErrorMsg', Value: '' },
-                ],
-              },
-            },
-          },
-        },
+      mockAsyncStatusService.retrieve.mockResolvedValue({
+        status: 'Complete',
+        errorMsg: '',
       });
 
       mockMceBridge.request.mockRejectedValue({ status: 404 });

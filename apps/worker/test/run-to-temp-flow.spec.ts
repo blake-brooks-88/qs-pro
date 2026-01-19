@@ -1,33 +1,66 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
-import { QueryDefinitionService } from '../src/shell-query/query-definition.service';
-import { MceBridgeService, RlsContextService } from '@qs-pro/backend-shared';
+import {
+  DataExtensionService,
+  DataFolderService,
+  QueryDefinitionService,
+  RlsContextService,
+} from '@qs-pro/backend-shared';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createMockJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRlsContextStub, createQueryDefinitionServiceStub } from './stubs';
+import { createDbStub, createRlsContextStub } from './stubs';
 
 describe('RunToTempFlow', () => {
   let strategy: RunToTempFlow;
   let mockDb: ReturnType<typeof createDbStub>;
-  let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
   let mockQueryValidator: { validateQuery: ReturnType<typeof vi.fn> };
+  let mockDataExtensionService: {
+    retrieveFields: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+  };
+  let mockDataFolderService: {
+    retrieve: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+  };
+  let mockQueryDefinitionService: {
+    retrieve: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    perform: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     mockDb = createDbStub();
-    mockMceBridge = createMceBridgeStub();
     mockQueryValidator = {
       validateQuery: vi.fn().mockResolvedValue({ valid: true }),
+    };
+    mockDataExtensionService = {
+      retrieveFields: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({ objectId: 'mock-de-object-id' }),
+      delete: vi.fn().mockResolvedValue(undefined),
+    };
+    mockDataFolderService = {
+      retrieve: vi.fn().mockResolvedValue([{ id: 123, name: 'QueryPlusPlus Results' }]),
+      create: vi.fn().mockResolvedValue({ id: 456 }),
+    };
+    mockQueryDefinitionService = {
+      retrieve: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ objectId: 'mock-qd-object-id' }),
+      perform: vi.fn().mockResolvedValue({ taskId: 'mock-task-id' }),
+      delete: vi.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RunToTempFlow,
-        { provide: MceBridgeService, useValue: mockMceBridge },
         { provide: MceQueryValidator, useValue: mockQueryValidator },
-        { provide: QueryDefinitionService, useValue: createQueryDefinitionServiceStub() },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
+        { provide: DataExtensionService, useValue: mockDataExtensionService },
+        { provide: DataFolderService, useValue: mockDataFolderService },
+        { provide: QueryDefinitionService, useValue: mockQueryDefinitionService },
       ],
     }).compile();
 
@@ -39,70 +72,17 @@ describe('RunToTempFlow', () => {
 
     mockDb.setSelectResult([]);
 
-    // Note: deleteQueryDefinitionIfExists now uses QueryDefinitionService (stub)
-    // so no Retrieve call is made for it
-    mockMceBridge.soapRequest
-      // 1. ensureQppFolder: check if folder exists
-      .mockResolvedValueOnce({ Body: { RetrieveResponseMsg: { Results: [] } } })
-      // 2. ensureQppFolder: get root folder ID
-      .mockResolvedValueOnce({
-        Body: {
-          RetrieveResponseMsg: {
-            Results: { ID: '100' },
-          },
-        },
-      })
-      // 3. ensureQppFolder: create folder
-      .mockResolvedValueOnce({
-        Body: {
-          CreateResponse: {
-            Results: {
-              StatusCode: 'OK',
-              NewID: '999',
-            },
-          },
-        },
-      })
-      // 4. upsert settings (empty response)
-      .mockResolvedValueOnce({})
-      // 5. ensureDataExtension: create DE
-      .mockResolvedValueOnce({
-        Body: {
-          CreateResponse: {
-            Results: {
-              StatusCode: 'OK',
-              NewObjectID: 'obj-de-123',
-            },
-          },
-        },
-      })
-      // 6. createQueryDefinition: create query
-      .mockResolvedValueOnce({
-        Body: {
-          CreateResponse: {
-            Results: {
-              StatusCode: 'OK',
-              NewObjectID: 'obj-qd-123',
-              NewID: 'qd-id-123',
-            },
-          },
-        },
-      })
-      // 7. performQuery: start execution
-      .mockResolvedValueOnce({
-        Body: {
-          PerformResponseMsg: {
-            Results: {
-              Result: {
-                StatusCode: 'OK',
-                Task: {
-                  ID: 'task-abc',
-                },
-              },
-            },
-          },
-        },
-      });
+    mockDataFolderService.retrieve
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 100, name: 'Data Extensions' }]);
+
+    mockDataFolderService.create.mockResolvedValue({ id: 999 });
+
+    mockDataExtensionService.create.mockResolvedValue({ objectId: 'obj-de-123' });
+
+    mockQueryDefinitionService.retrieve.mockResolvedValue(null);
+    mockQueryDefinitionService.create.mockResolvedValue({ objectId: 'obj-qd-123' });
+    mockQueryDefinitionService.perform.mockResolvedValue({ taskId: 'task-abc' });
 
     const result = await strategy.execute(job);
 
@@ -118,82 +98,27 @@ describe('RunToTempFlow', () => {
 
     mockDb.setSelectResult([{ qppFolderId: 123 }]);
 
-    // Note: deleteQueryDefinitionIfExists now uses QueryDefinitionService (stub)
-    mockMceBridge.soapRequest
-      // 1. upsert settings (uses cached folder ID)
-      .mockResolvedValueOnce({})
-      // 2. ensureDataExtension: create DE
-      .mockResolvedValueOnce({
-        Body: {
-          CreateResponse: {
-            Results: {
-              StatusCode: 'OK',
-              NewObjectID: 'obj-de-456',
-            },
-          },
-        },
-      })
-      // 3. createQueryDefinition: create query
-      .mockResolvedValueOnce({
-        Body: {
-          CreateResponse: {
-            Results: {
-              StatusCode: 'OK',
-              NewObjectID: 'obj-qd-456',
-              NewID: 'qd-id-456',
-            },
-          },
-        },
-      })
-      // 4. performQuery: start execution
-      .mockResolvedValueOnce({
-        Body: {
-          PerformResponseMsg: {
-            Results: {
-              Result: {
-                StatusCode: 'OK',
-                Task: {
-                  ID: 'task-xyz',
-                },
-              },
-            },
-          },
-        },
-      });
+    mockDataExtensionService.create.mockResolvedValue({ objectId: 'obj-de-456' });
+
+    mockQueryDefinitionService.retrieve.mockResolvedValue(null);
+    mockQueryDefinitionService.create.mockResolvedValue({ objectId: 'obj-qd-456' });
+    mockQueryDefinitionService.perform.mockResolvedValue({ taskId: 'task-xyz' });
 
     const result = await strategy.execute(job);
 
     expect(result.taskId).toBe('task-xyz');
     expect(result.queryDefinitionId).toBe('obj-qd-456');
+    expect(mockDataFolderService.retrieve).not.toHaveBeenCalled();
   });
 
   it('should throw on QueryDefinition creation failure', async () => {
     const job = createMockJob();
     mockDb.setSelectResult([{ qppFolderId: 123 }]);
 
-    // Note: deleteQueryDefinitionIfExists now uses QueryDefinitionService (stub)
-    mockMceBridge.soapRequest
-      // 1. upsert settings (uses cached folder ID)
-      .mockResolvedValueOnce({})
-      // 2. ensureDataExtension: create DE
-      .mockResolvedValueOnce({
-        Body: {
-          CreateResponse: {
-            Results: {
-              StatusCode: 'OK',
-              NewObjectID: 'obj-de-789',
-            },
-          },
-        },
-      })
-      // 3. createQueryDefinition: fails with error
-      .mockResolvedValueOnce({
-        Body: {
-          CreateResponse: {
-            Results: { StatusCode: 'Error', StatusMessage: 'Invalid SQL' },
-          },
-        },
-      });
+    mockDataExtensionService.create.mockResolvedValue({ objectId: 'obj-de-789' });
+
+    mockQueryDefinitionService.retrieve.mockResolvedValue(null);
+    mockQueryDefinitionService.create.mockRejectedValue(new Error('Invalid SQL'));
 
     await expect(strategy.execute(job)).rejects.toThrow('Invalid SQL');
   });
@@ -206,6 +131,8 @@ describe('RunToTempFlow', () => {
     });
 
     await expect(strategy.execute(job)).rejects.toThrow('Invalid syntax near SELECT');
-    expect(mockMceBridge.soapRequest).not.toHaveBeenCalled();
+    expect(mockDataExtensionService.create).not.toHaveBeenCalled();
+    expect(mockDataFolderService.retrieve).not.toHaveBeenCalled();
+    expect(mockQueryDefinitionService.create).not.toHaveBeenCalled();
   });
 });

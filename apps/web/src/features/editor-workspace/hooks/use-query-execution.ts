@@ -3,7 +3,10 @@ import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import type { DataExtensionField } from "@/features/editor-workspace/types";
+import type {
+  DataExtension,
+  DataExtensionField,
+} from "@/features/editor-workspace/types";
 import { extractTableReferences } from "@/features/editor-workspace/utils/sql-context";
 import api from "@/services/api";
 
@@ -65,6 +68,7 @@ function safeRecordSet<V>(
 
 interface UseQueryExecutionOptions {
   tenantId?: string | null;
+  eid?: string;
 }
 
 interface UseQueryExecutionResult {
@@ -112,7 +116,7 @@ function mapFieldToDefinition(field: DataExtensionField): FieldDefinition {
 export function useQueryExecution(
   options: UseQueryExecutionOptions = {},
 ): UseQueryExecutionResult {
-  const { tenantId } = options;
+  const { tenantId, eid } = options;
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<QueryExecutionStatus>("idle");
   const [runId, setRunId] = useState<string | null>(null);
@@ -188,10 +192,19 @@ export function useQueryExecution(
 
   const getFieldsFromCache = useCallback(
     (tableName: string): DataExtensionField[] | null => {
-      const queryKey = metadataQueryKeys.fields(tenantId, tableName);
+      const dataExtensions = queryClient.getQueryData<DataExtension[]>(
+        metadataQueryKeys.dataExtensions(tenantId, eid),
+      );
+
+      const de = dataExtensions?.find(
+        (d) => d.name.toLowerCase() === tableName.toLowerCase(),
+      );
+
+      const lookupKey = de?.customerKey ?? tableName;
+      const queryKey = metadataQueryKeys.fields(tenantId, lookupKey);
       return queryClient.getQueryData<DataExtensionField[]>(queryKey) ?? null;
     },
-    [queryClient, tenantId],
+    [queryClient, tenantId, eid],
   );
 
   const buildTableMetadata = useCallback(

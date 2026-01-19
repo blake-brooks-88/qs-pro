@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
 
-// Database stub that properly chains methods
 export function createDbStub() {
   const stub: any = {
     _selectResult: [],
@@ -39,7 +38,6 @@ export function createDbStub() {
   return stub;
 }
 
-// MCE Bridge stub
 export function createMceBridgeStub() {
   return {
     soapRequest: vi.fn(),
@@ -47,7 +45,6 @@ export function createMceBridgeStub() {
   };
 }
 
-// Redis stub
 export function createRedisStub() {
   return {
     publish: vi.fn().mockResolvedValue(undefined),
@@ -63,7 +60,6 @@ export function createRedisStub() {
   };
 }
 
-// Metrics stub
 export function createMetricsStub() {
   return {
     inc: vi.fn(),
@@ -72,7 +68,6 @@ export function createMetricsStub() {
   };
 }
 
-// RLS Context stub
 export function createRlsContextStub() {
   return {
     runWithTenantContext: vi.fn().mockImplementation(async (_t, _m, cb) => cb()),
@@ -80,7 +75,6 @@ export function createRlsContextStub() {
   };
 }
 
-// BullMQ Queue stub
 export function createQueueStub() {
   return {
     add: vi.fn().mockResolvedValue({ id: 'poll-job-1' }),
@@ -89,14 +83,37 @@ export function createQueueStub() {
   };
 }
 
-// QueryDefinitionService stub
-export function createQueryDefinitionServiceStub() {
-  const stub = {
-    deleteByCustomerKey: vi.fn().mockResolvedValue(true),
+export function createAsyncStatusServiceStub() {
+  return {
+    retrieve: vi.fn().mockResolvedValue({
+      status: 'Pending',
+      errorMsg: null,
+      completedDate: null,
+    }),
   };
-  return stub;
 }
 
-export type QueryDefinitionServiceStub = ReturnType<
-  typeof createQueryDefinitionServiceStub
->;
+export function createDataFolderServiceStub() {
+  return {
+    retrieve: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockResolvedValue({ id: 1 }),
+  };
+}
+
+export function createDataExtensionServiceStub() {
+  return {
+    retrieve: vi.fn().mockResolvedValue(null),
+    retrieveFields: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockResolvedValue({ objectId: 'de-obj-1' }),
+  };
+}
+
+export function createQueryDefinitionServiceStub() {
+  return {
+    retrieve: vi.fn().mockResolvedValue(null),
+    retrieveByFolder: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockResolvedValue({ objectId: 'obj-1' }),
+    perform: vi.fn().mockResolvedValue({ taskId: 'task-1' }),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+}

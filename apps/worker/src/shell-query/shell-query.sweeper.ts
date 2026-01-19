@@ -1,6 +1,9 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { MceBridgeService, RlsContextService } from "@qs-pro/backend-shared";
+import {
+  QueryDefinitionService,
+  RlsContextService,
+} from "@qs-pro/backend-shared";
 import {
   and,
   credentials,
@@ -10,17 +13,13 @@ import {
   tenantSettings,
 } from "@qs-pro/database";
 
-import { QueryDefinitionService } from "./query-definition.service";
-import { SoapRetrieveResponse } from "./shell-query.types";
-
 @Injectable()
 export class ShellQuerySweeper {
   private readonly logger = new Logger(ShellQuerySweeper.name);
 
   constructor(
-    private readonly mceBridge: MceBridgeService,
-    private readonly rlsContext: RlsContextService,
     private readonly queryDefinitionService: QueryDefinitionService,
+    private readonly rlsContext: RlsContextService,
     @Inject("DATABASE")
     private readonly db: PostgresJsDatabase<Record<string, never>>,
   ) {}
@@ -29,9 +28,6 @@ export class ShellQuerySweeper {
   async handleSweep() {
     this.logger.log("Starting hourly shell query asset sweep...");
 
-    // Query tenantSettings (no RLS) to get tenant/mid pairs that have QPP folders.
-    // This is more efficient than iterating all credentials and ensures we only
-    // sweep tenants that actually use the QPP feature.
     const activeSettings = await this.db
       .select({
         tenantId: tenantSettings.tenantId,
@@ -95,79 +91,30 @@ export class ShellQuerySweeper {
     mid: string,
     folderId: number,
   ): Promise<void> {
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const queries = await this.queryDefinitionService.retrieveByFolder(
+      tenantId,
+      userId,
+      mid,
+      folderId,
+      yesterday,
+    );
 
-    const querySoap = `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            <ObjectType>QueryDefinition</ObjectType>
-            <Properties>CustomerKey</Properties>
-            <Properties>Name</Properties>
-            <Properties>ObjectID</Properties>
-            <Filter xsi:type="ComplexFilterPart">
-               <LeftOperand xsi:type="SimpleFilterPart">
-                  <Property>CategoryID</Property>
-                  <SimpleOperator>equals</SimpleOperator>
-                  <Value>${folderId}</Value>
-               </LeftOperand>
-               <LogicalOperator>AND</LogicalOperator>
-               <RightOperand xsi:type="SimpleFilterPart">
-                  <Property>CreatedDate</Property>
-                  <SimpleOperator>lessThan</SimpleOperator>
-                  <Value>${yesterday}</Value>
-               </RightOperand>
-            </Filter>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>`;
-
-    const queriesResponse =
-      await this.mceBridge.soapRequest<SoapRetrieveResponse>(
-        tenantId,
-        userId,
-        mid,
-        querySoap,
-        "Retrieve",
-      );
-    const results = queriesResponse.Body?.RetrieveResponseMsg?.Results;
-    if (!results) {
-      return;
-    }
-
-    const queries = Array.isArray(results) ? results : [results];
-    for (const q of queries) {
-      if (!q.CustomerKey) {
+    for (const query of queries) {
+      if (!query.objectId) {
         continue;
       }
-      await this.deleteQueryDefinition(
-        tenantId,
-        userId,
-        mid,
-        q.CustomerKey,
-        q.ObjectID,
-      );
-    }
-  }
-
-  private async deleteQueryDefinition(
-    tenantId: string,
-    userId: string,
-    mid: string,
-    customerKey: string,
-    objectId?: string,
-  ): Promise<void> {
-    try {
-      const deleted = await this.queryDefinitionService.deleteByCustomerKey(
-        tenantId,
-        userId,
-        mid,
-        customerKey,
-        objectId,
-      );
-      if (deleted) {
-        this.logger.log(`Deleted QueryDefinition: ${customerKey}`);
+      try {
+        await this.queryDefinitionService.delete(
+          tenantId,
+          userId,
+          mid,
+          query.objectId,
+        );
+        this.logger.log(`Deleted QueryDefinition: ${query.customerKey}`);
+      } catch {
+        // Asset may already be deleted
       }
-    } catch {
-      // Ignore failures during sweep - asset may already be deleted
     }
   }
 }
