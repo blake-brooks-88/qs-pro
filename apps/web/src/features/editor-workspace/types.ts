@@ -100,6 +100,7 @@ export interface DataExtensionDraft {
 
 export interface EditorWorkspaceProps {
   tenantId?: string | null;
+  eid?: string;
   folders: Folder[];
   savedQueries: SavedQuery[];
   dataExtensions: DataExtension[];

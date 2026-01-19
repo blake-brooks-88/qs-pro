@@ -58,6 +58,7 @@ const createDefaultTab = (): QueryTab => ({
 
 export function EditorWorkspace({
   tenantId,
+  eid,
   folders,
   savedQueries,
   dataExtensions,
@@ -103,7 +104,7 @@ export function EditorWorkspace({
     results,
     currentPage,
     setPage,
-  } = useQueryExecution({ tenantId });
+  } = useQueryExecution({ tenantId, eid });
 
   // Tab Management - ensure tabs array is never empty
   const [{ tabs, activeTabId }, setTabState] = useState(() => {

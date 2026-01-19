@@ -31,11 +31,15 @@ export class AsyncStatusService {
     );
 
     const result = response.Body?.RetrieveResponseMsg?.Results;
-    const properties = result?.Properties?.Property;
+    const rawProperties = result?.Properties?.Property;
 
-    if (!Array.isArray(properties)) {
+    if (!rawProperties) {
       return {};
     }
+
+    const properties = Array.isArray(rawProperties)
+      ? rawProperties
+      : [rawProperties];
 
     const statusProp = properties.find((p) => p.Name === "Status");
     const errorMsgProp = properties.find((p) => p.Name === "ErrorMsg");
