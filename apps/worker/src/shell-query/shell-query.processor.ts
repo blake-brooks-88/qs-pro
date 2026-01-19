@@ -3,8 +3,11 @@ import { Inject, Logger } from "@nestjs/common";
 import {
   AsyncStatusService,
   buildDeleteQueryDefinition,
+  type IsRunningResponse,
   MceBridgeService,
+  RestDataService,
   RlsContextService,
+  type RowsetResponse,
 } from "@qs-pro/backend-shared";
 import {
   eq,
@@ -35,11 +38,6 @@ interface IsRunningCheckResult {
   needsIdFallback: boolean;
 }
 
-interface RowsetProbeResponse {
-  count?: number;
-  items?: unknown[];
-}
-
 interface RowProbeResult {
   hasRows: boolean;
   count?: number;
@@ -58,6 +56,7 @@ export class ShellQueryProcessor extends WorkerHost {
     private readonly rlsContext: RlsContextService,
     private readonly mceBridge: MceBridgeService,
     private readonly asyncStatusService: AsyncStatusService,
+    private readonly restDataService: RestDataService,
     @Inject("DATABASE")
     private readonly db: PostgresJsDatabase<Record<string, never>>,
     @Inject("REDIS_CLIENT") private readonly redis: unknown,
@@ -786,10 +785,7 @@ export class ShellQueryProcessor extends WorkerHost {
     deName: string,
   ): Promise<boolean> {
     try {
-      await this.mceBridge.request(tenantId, userId, mid, {
-        method: "GET",
-        url: `/data/v1/customobjectdata/key/${encodeURIComponent(deName)}/rowset?$page=1&$pageSize=1`,
-      });
+      await this.restDataService.getRowset(tenantId, userId, mid, deName, 1, 1);
 
       return true;
     } catch (error) {
@@ -815,10 +811,14 @@ export class ShellQueryProcessor extends WorkerHost {
     deName: string,
   ): Promise<RowProbeResult> {
     try {
-      const response = (await this.mceBridge.request(tenantId, userId, mid, {
-        method: "GET",
-        url: `/data/v1/customobjectdata/key/${encodeURIComponent(deName)}/rowset?$page=1&$pageSize=${POLL_CONFIG.ROW_PROBE_PAGE_SIZE}`,
-      })) as RowsetProbeResponse;
+      const response: RowsetResponse = await this.restDataService.getRowset(
+        tenantId,
+        userId,
+        mid,
+        deName,
+        1,
+        POLL_CONFIG.ROW_PROBE_PAGE_SIZE,
+      );
 
       const count = response.count ?? 0;
       const itemsLength = response.items?.length ?? 0;
@@ -866,16 +866,17 @@ export class ShellQueryProcessor extends WorkerHost {
     }
 
     for (const candidate of candidates) {
-      const candidateValue = encodeURIComponent(candidate.value);
-
       try {
-        const response = await this.mceBridge.request(tenantId, userId, mid, {
-          method: "GET",
-          url: `/automation/v1/queries/${candidateValue}/actions/isrunning/`,
-        });
+        const response: IsRunningResponse =
+          await this.restDataService.checkIsRunning(
+            tenantId,
+            userId,
+            mid,
+            candidate.value,
+          );
 
         return {
-          isRunning: (response as { isRunning?: boolean }).isRunning === true,
+          isRunning: response.isRunning === true,
           needsIdFallback: false,
         };
       } catch (error) {

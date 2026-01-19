@@ -1,6 +1,10 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { DatabaseModule, RlsContextService } from '@qs-pro/backend-shared';
+import {
+  DatabaseModule,
+  MceModule as SharedMceModule,
+  RlsContextService,
+} from '@qs-pro/backend-shared';
 import { DrizzleTenantRepository } from '@qs-pro/database';
 
 import { CsrfGuard } from '../auth/csrf.guard';
@@ -17,6 +21,7 @@ import { ShellQuerySseService } from './shell-query-sse.service';
     }),
     DatabaseModule,
     MceModule,
+    SharedMceModule,
   ],
   controllers: [ShellQueryController],
   providers: [
