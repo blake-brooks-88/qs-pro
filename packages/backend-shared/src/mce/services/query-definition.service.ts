@@ -30,6 +30,8 @@ export interface CreateQueryDefinitionParams {
   customerKey: string;
   categoryId: number;
   targetId: string;
+  targetCustomerKey: string;
+  targetName: string;
   queryText: string;
 }
 

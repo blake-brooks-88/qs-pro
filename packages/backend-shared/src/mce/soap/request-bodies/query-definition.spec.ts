@@ -117,6 +117,8 @@ describe("QueryDefinition SOAP Request Builders", () => {
       customerKey: "test-key",
       categoryId: 123,
       targetId: "target-object-id",
+      targetCustomerKey: "target-de-key",
+      targetName: "Target DE Name",
       queryText: "SELECT * FROM DataExtension",
     };
 
@@ -149,6 +151,8 @@ describe("QueryDefinition SOAP Request Builders", () => {
         customerKey: "key&test",
         categoryId: 123,
         targetId: 'id"test',
+        targetCustomerKey: "target-key",
+        targetName: "target-name",
         queryText: "SELECT * WHERE x < 10",
       });
 

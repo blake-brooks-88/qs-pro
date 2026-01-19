@@ -20,13 +20,23 @@ export interface CreateQueryDefinitionParams {
   customerKey: string;
   categoryId: number;
   targetId: string;
+  targetCustomerKey: string;
+  targetName: string;
   queryText: string;
 }
 
 export function buildCreateQueryDefinition(
   params: CreateQueryDefinitionParams,
 ): string {
-  const { name, customerKey, categoryId, targetId, queryText } = params;
+  const {
+    name,
+    customerKey,
+    categoryId,
+    targetId,
+    targetCustomerKey,
+    targetName,
+    queryText,
+  } = params;
 
   return `<CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
   <Objects xsi:type="QueryDefinition">
@@ -37,8 +47,8 @@ export function buildCreateQueryDefinition(
     <TargetType>DE</TargetType>
     <DataExtensionTarget>
       <ObjectID>${escapeXml(targetId)}</ObjectID>
-      <CustomerKey>${escapeXml(customerKey)}</CustomerKey>
-      <Name>${escapeXml(name)}</Name>
+      <CustomerKey>${escapeXml(targetCustomerKey)}</CustomerKey>
+      <Name>${escapeXml(targetName)}</Name>
     </DataExtensionTarget>
     <TargetUpdateType>Overwrite</TargetUpdateType>
     <CategoryID>${categoryId}</CategoryID>
