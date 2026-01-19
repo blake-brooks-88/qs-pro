@@ -1,8 +1,10 @@
+import {
+  getDbFromContext,
+  type RlsContextService,
+} from '@qs-pro/backend-shared';
 import type { createDatabaseFromClient } from '@qs-pro/database';
 import { and, count, eq, notInArray, shellQueryRuns } from '@qs-pro/database';
 
-import { getDbFromContext } from '../database/db-context';
-import type { RlsContextService } from '../database/rls-context.service';
 import type {
   CreateShellQueryRunParams,
   ShellQueryRun,

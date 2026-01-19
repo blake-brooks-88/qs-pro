@@ -5,9 +5,9 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { AuthService } from '@qs-pro/backend-shared';
 import axios, { AxiosRequestConfig } from 'axios';
 
-import { AuthService } from '../auth/auth.service';
 import { parseSoapXml } from './soap-xml.util';
 
 export interface ProblemDetails {

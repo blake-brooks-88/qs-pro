@@ -296,7 +296,13 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+            await this.cleanupAssetsForPoll(
+              tenantId,
+              userId,
+              mid,
+              runId,
+              queryDefinitionId,
+            );
           },
         );
         return { status: "canceled", runId };
@@ -318,7 +324,13 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+            await this.cleanupAssetsForPoll(
+              tenantId,
+              userId,
+              mid,
+              runId,
+              queryDefinitionId,
+            );
           },
         );
         return { status: "timeout", runId };
@@ -337,7 +349,13 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+            await this.cleanupAssetsForPoll(
+              tenantId,
+              userId,
+              mid,
+              runId,
+              queryDefinitionId,
+            );
           },
         );
         return { status: "budget-exceeded", runId };
@@ -374,7 +392,13 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+            await this.cleanupAssetsForPoll(
+              tenantId,
+              userId,
+              mid,
+              runId,
+              queryDefinitionId,
+            );
           },
         );
         return { status: "failed", runId, error: errorMessage };
@@ -422,7 +446,13 @@ export class ShellQueryProcessor extends WorkerHost {
             mid,
             userId,
             async () => {
-              await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+              await this.cleanupAssetsForPoll(
+                tenantId,
+                userId,
+                mid,
+                runId,
+                queryDefinitionId,
+              );
             },
           );
           return { status: "completed", runId };
@@ -617,7 +647,13 @@ export class ShellQueryProcessor extends WorkerHost {
           mid,
           userId,
           async () => {
-            await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+            await this.cleanupAssetsForPoll(
+              tenantId,
+              userId,
+              mid,
+              runId,
+              queryDefinitionId,
+            );
           },
         );
         throw new UnrecoverableError(err.message || "Unknown error");
@@ -633,7 +669,8 @@ export class ShellQueryProcessor extends WorkerHost {
     job: Job<PollShellQueryJob> | { data: PollShellQueryJob },
     token?: string,
   ): Promise<unknown> {
-    const { runId, tenantId, userId, mid, targetDeName, queryDefinitionId } = job.data;
+    const { runId, tenantId, userId, mid, targetDeName, queryDefinitionId } =
+      job.data;
     const currentAttempts = job.data.rowsetReadyAttempts ?? 0;
 
     if (!targetDeName) {
@@ -646,7 +683,13 @@ export class ShellQueryProcessor extends WorkerHost {
         mid,
         userId,
         async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+          await this.cleanupAssetsForPoll(
+            tenantId,
+            userId,
+            mid,
+            runId,
+            queryDefinitionId,
+          );
         },
       );
       return { status: "completed", runId };
@@ -669,7 +712,13 @@ export class ShellQueryProcessor extends WorkerHost {
         mid,
         userId,
         async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+          await this.cleanupAssetsForPoll(
+            tenantId,
+            userId,
+            mid,
+            runId,
+            queryDefinitionId,
+          );
         },
       );
       return { status: "completed", runId };
@@ -686,7 +735,13 @@ export class ShellQueryProcessor extends WorkerHost {
         mid,
         userId,
         async () => {
-          await this.cleanupAssetsForPoll(tenantId, userId, mid, runId, queryDefinitionId);
+          await this.cleanupAssetsForPoll(
+            tenantId,
+            userId,
+            mid,
+            runId,
+            queryDefinitionId,
+          );
         },
       );
       return { status: "rowset-not-queryable", runId };
@@ -973,17 +1028,20 @@ export class ShellQueryProcessor extends WorkerHost {
       let objectId = queryDefinitionId;
 
       if (!objectId) {
-        const retrieveResult = await this.runToTempFlow.retrieveQueryDefinitionObjectId(
-          tenantId,
-          userId,
-          mid,
-          queryKey,
-        );
+        const retrieveResult =
+          await this.runToTempFlow.retrieveQueryDefinitionObjectId(
+            tenantId,
+            userId,
+            mid,
+            queryKey,
+          );
         objectId = retrieveResult ?? undefined;
       }
 
       if (!objectId) {
-        this.logger.log(`No QueryDefinition found for run ${runId}, skipping cleanup`);
+        this.logger.log(
+          `No QueryDefinition found for run ${runId}, skipping cleanup`,
+        );
         return;
       }
 
