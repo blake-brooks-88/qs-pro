@@ -10,6 +10,7 @@ export {
 } from "./mce/mce-auth.provider";
 export * from "./mce/mce-bridge.service";
 export { MetadataService } from "./mce/metadata.service";
+export { buildQppResultsDataExtensionName } from "./mce/qpp-names";
 export {
   buildIsRunningRequest,
   buildRowsetRequest,
