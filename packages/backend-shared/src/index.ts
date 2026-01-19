@@ -9,6 +9,16 @@ export {
   type MceAuthProvider,
 } from "./mce/mce-auth.provider";
 export * from "./mce/mce-bridge.service";
+export { MetadataService } from "./mce/metadata.service";
+export {
+  buildIsRunningRequest,
+  buildRowsetRequest,
+} from "./mce/rest/request-bodies";
+export {
+  type IsRunningResponse,
+  type RowsetItem,
+  type RowsetResponse,
+} from "./mce/rest/types";
 export {
   type AsyncStatus,
   AsyncStatusService,
@@ -30,6 +40,7 @@ export {
   type QueryDefinition,
   QueryDefinitionService,
 } from "./mce/services/query-definition.service";
+export { RestDataService } from "./mce/services/rest-data.service";
 export { escapeXml } from "./mce/soap/helpers";
 export { buildDeleteQueryDefinition } from "./mce/soap/request-bodies/query-definition";
 // Exporting AuthModule is tricky if it has controllers, but we might just need the service

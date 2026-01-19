@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MetadataService } from '@qs-pro/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MetadataController } from './metadata.controller';
-import { MetadataService } from './metadata.service';
 
 describe('MetadataController', () => {
   let controller: MetadataController;
