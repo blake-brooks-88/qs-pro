@@ -114,10 +114,23 @@ export class MceBridgeService {
       return { raw: response.data, parsed };
     };
 
-    const first = await baseRequest(false);
+    let first: { raw: unknown; parsed: unknown };
+    try {
+      first = await baseRequest(false);
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+
     if (this.isSoapLoginFailedFault(first.raw, first.parsed)) {
       await this.authProvider.invalidateToken(tenantId, userId, mid);
-      const second = await baseRequest(true);
+      let second: { raw: unknown; parsed: unknown };
+      try {
+        second = await baseRequest(true);
+      } catch (error) {
+        this.handleError(error);
+        throw error;
+      }
       if (this.isSoapLoginFailedFault(second.raw, second.parsed)) {
         throw new UnauthorizedException("MCE SOAP authentication failed");
       }
