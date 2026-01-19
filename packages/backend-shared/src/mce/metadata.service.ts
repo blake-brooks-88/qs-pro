@@ -3,6 +3,12 @@ import { Inject, Injectable } from "@nestjs/common";
 import * as cacheManager from "cache-manager";
 
 import { MceBridgeService } from "./mce-bridge.service";
+import {
+  buildContinueRequest,
+  buildRetrieveDataExtensionFields,
+  buildRetrieveDataExtensions,
+  buildRetrieveDataFolder,
+} from "./soap/request-bodies";
 
 interface MceSoapFolder {
   ID: string | number;
@@ -65,45 +71,18 @@ export class MetadataService {
     mid: string,
     clientId?: string,
   ): Promise<MceSoapFolder[]> {
-    const clientContext = clientId
-      ? `
-      <ClientIDs>
-        <ClientID>${clientId}</ClientID>
-      </ClientIDs>
-    `
-      : "";
-
     let allFolders: MceSoapFolder[] = [];
-    let continueRequest: string | null = null;
+    let continueRequestId: string | null = null;
     let page = 1;
     const MAX_PAGES = 50;
 
     do {
-      const soapBody = continueRequest
-        ? `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            <ContinueRequest>${continueRequest}</ContinueRequest>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>
-    `
-        : `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            ${clientContext}
-            <ObjectType>DataFolder</ObjectType>
-            <Properties>ID</Properties>
-            <Properties>Name</Properties>
-            <Properties>ParentFolder.ID</Properties>
-            <Properties>Description</Properties>
-            <Filter xsi:type="SimpleFilterPart">
-               <Property>ContentType</Property>
-               <SimpleOperator>equals</SimpleOperator>
-               <Value>dataextension</Value>
-            </Filter>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>
-    `;
+      const soapBody = continueRequestId
+        ? buildContinueRequest(continueRequestId)
+        : buildRetrieveDataFolder({
+            contentType: "dataextension",
+            clientId,
+          });
 
       const response = (await this.bridge.soapRequest(
         tenantId,
@@ -122,12 +101,12 @@ export class MetadataService {
       allFolders = allFolders.concat(folders);
 
       const status = retrieveResponse?.OverallStatus;
-      continueRequest =
+      continueRequestId =
         status === "MoreDataAvailable"
           ? (retrieveResponse?.RequestID ?? null)
           : null;
       page++;
-    } while (continueRequest && page <= MAX_PAGES);
+    } while (continueRequestId && page <= MAX_PAGES);
 
     if (!clientId) {
       return allFolders;
@@ -193,40 +172,15 @@ export class MetadataService {
     mid: string,
     clientId?: string,
   ): Promise<unknown[]> {
-    const clientContext = clientId
-      ? `
-      <ClientIDs>
-        <ClientID>${clientId}</ClientID>
-      </ClientIDs>
-    `
-      : "";
-
     let allDEs: unknown[] = [];
-    let continueRequest: string | null = null;
+    let continueRequestId: string | null = null;
     let page = 1;
     const MAX_PAGES = 50;
 
     do {
-      const soapBody = continueRequest
-        ? `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            <ContinueRequest>${continueRequest}</ContinueRequest>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>
-    `
-        : `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            ${clientContext}
-            <ObjectType>DataExtension</ObjectType>
-            <Properties>CustomerKey</Properties>
-            <Properties>Name</Properties>
-            <Properties>CategoryID</Properties>
-            <Properties>IsSendable</Properties>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>
-    `;
+      const soapBody = continueRequestId
+        ? buildContinueRequest(continueRequestId)
+        : buildRetrieveDataExtensions(clientId);
 
       const response = (await this.bridge.soapRequest(
         tenantId,
@@ -243,12 +197,12 @@ export class MetadataService {
       allDEs = allDEs.concat(des);
 
       const status = retrieveResponse?.OverallStatus;
-      continueRequest =
+      continueRequestId =
         status === "MoreDataAvailable"
           ? (retrieveResponse?.RequestID ?? null)
           : null;
       page++;
-    } while (continueRequest && page <= MAX_PAGES);
+    } while (continueRequestId && page <= MAX_PAGES);
 
     return allDEs;
   }
@@ -265,23 +219,7 @@ export class MetadataService {
       return cached as unknown[];
     }
 
-    const soapBody = `
-      <RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
-         <RetrieveRequest>
-            <ObjectType>DataExtensionField</ObjectType>
-            <Properties>Name</Properties>
-            <Properties>FieldType</Properties>
-            <Properties>MaxLength</Properties>
-            <Properties>IsPrimaryKey</Properties>
-            <Properties>IsRequired</Properties>
-            <Filter xsi:type="SimpleFilterPart">
-               <Property>DataExtension.CustomerKey</Property>
-               <SimpleOperator>equals</SimpleOperator>
-               <Value>${deKey}</Value>
-            </Filter>
-         </RetrieveRequest>
-      </RetrieveRequestMsg>
-    `;
+    const soapBody = buildRetrieveDataExtensionFields({ customerKey: deKey });
 
     const response = (await this.bridge.soapRequest(
       tenantId,

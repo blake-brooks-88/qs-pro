@@ -51,6 +51,8 @@ export function buildRetrieveDataFolder(
     <ObjectType>DataFolder</ObjectType>
     <Properties>ID</Properties>
     <Properties>Name</Properties>
+    <Properties>ParentFolder.ID</Properties>
+    <Properties>Description</Properties>
     ${filterXml}
   </RetrieveRequest>
 </RetrieveRequestMsg>`;

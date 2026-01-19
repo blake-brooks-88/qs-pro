@@ -6,11 +6,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  buildQppResultsDataExtensionName,
+  RestDataService,
+  type RowsetResponse,
+} from '@qs-pro/backend-shared';
 import type { TableMetadata } from '@qs-pro/shared-types';
 import { Queue } from 'bullmq';
 import * as crypto from 'crypto';
 
-import { MceBridgeService } from '../mce/mce-bridge.service';
 import type { ShellQueryRunRepository } from './shell-query-run.repository';
 
 export interface ShellQueryContext {
@@ -37,26 +41,13 @@ export interface RunResultsResponse {
   pageSize: number;
 }
 
-interface MceRowsetResponse {
-  links?: { self?: string; next?: string };
-  customObjectId?: string;
-  customObjectKey?: string;
-  pageSize?: number;
-  page?: number;
-  count?: number;
-  items?: Array<{
-    keys?: Record<string, unknown>;
-    values?: Record<string, unknown>;
-  }>;
-}
-
 @Injectable()
 export class ShellQueryService {
   private readonly logger = new Logger(ShellQueryService.name);
 
   constructor(
     @InjectQueue('shell-query') private shellQueryQueue: Queue,
-    private mceBridge: MceBridgeService,
+    private restDataService: RestDataService,
     @Inject('SHELL_QUERY_RUN_REPOSITORY')
     private readonly runRepo: ShellQueryRunRepository,
   ) {}
@@ -175,22 +166,21 @@ export class ShellQueryService {
 
     // Proxy to MCE REST Rowset API
     // The DE name follows the convention: QPP_[SnippetName]_[Hash]
-    const hash = run.id.substring(0, 8);
-    const deName = run.snippetName
-      ? `QPP_${run.snippetName.replace(/\s+/g, '_')}_${hash}`
-      : `QPP_Results_${hash}`;
+    const deName = buildQppResultsDataExtensionName(run.id, run.snippetName);
 
     const pageSize = 50;
-    const encodedDeName = encodeURIComponent(deName);
-    const url = `/data/v1/customobjectdata/key/${encodedDeName}/rowset?$page=${page}&$pageSize=${pageSize}`;
 
     this.logger.debug(`Fetching results for run ${runId}`);
 
     try {
-      const mceResponse = await this.mceBridge.request(tenantId, userId, mid, {
-        method: 'GET',
-        url,
-      });
+      const mceResponse = await this.restDataService.getRowset(
+        tenantId,
+        userId,
+        mid,
+        deName,
+        page,
+        pageSize,
+      );
 
       this.logger.debug(
         `MCE rowset response: count=${mceResponse.count ?? 0}, page=${mceResponse.page ?? 1}`,
@@ -207,7 +197,7 @@ export class ShellQueryService {
   }
 
   private normalizeRowsetResponse(
-    mceResponse: MceRowsetResponse,
+    mceResponse: RowsetResponse,
     page: number,
     pageSize: number,
   ): RunResultsResponse {

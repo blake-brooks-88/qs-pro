@@ -85,6 +85,19 @@ export function createMceBridgeStub() {
   };
 }
 
+// REST Data Service stub
+export function createRestDataServiceStub() {
+  return {
+    getRowset: vi.fn().mockResolvedValue({
+      pageSize: 50,
+      page: 1,
+      count: 0,
+      items: [],
+    }),
+    checkIsRunning: vi.fn().mockResolvedValue({ isRunning: false }),
+  };
+}
+
 // Shell Query Service stub
 export function createShellQueryServiceStub() {
   return {

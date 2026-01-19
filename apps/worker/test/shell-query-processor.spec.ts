@@ -2,16 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qs-pro/backend-shared';
+import { RlsContextService, MceBridgeService, AsyncStatusService, RestDataService } from '@qs-pro/backend-shared';
 import { DelayedError } from 'bullmq';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub } from './stubs';
+import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub, createRestDataServiceStub } from './stubs';
 
 describe('ShellQueryProcessor', () => {
   let processor: ShellQueryProcessor;
   let mockDb: ReturnType<typeof createDbStub>;
   let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
+  let mockRestDataService: ReturnType<typeof createRestDataServiceStub>;
   let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
   let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn>; retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn> };
   let mockQueue: ReturnType<typeof createQueueStub>;
@@ -19,6 +20,7 @@ describe('ShellQueryProcessor', () => {
   beforeEach(async () => {
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
+    mockRestDataService = createRestDataServiceStub();
     mockAsyncStatusService = createAsyncStatusServiceStub();
     mockRunToTempFlow = {
       execute: vi.fn(),
@@ -33,6 +35,7 @@ describe('ShellQueryProcessor', () => {
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: mockRunToTempFlow },
         { provide: MceBridgeService, useValue: mockMceBridge },
+        { provide: RestDataService, useValue: mockRestDataService },
         { provide: AsyncStatusService, useValue: mockAsyncStatusService },
         { provide: RlsContextService, useValue: createRlsContextStub() },
         { provide: 'DATABASE', useValue: mockDb },
@@ -120,7 +123,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockResolvedValue({});
+      mockRestDataService.getRowset.mockResolvedValue({ count: 0, items: [] });
 
       const result = await processor.process(job as any);
 
@@ -142,7 +145,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockResolvedValue({});
+      mockRestDataService.getRowset.mockResolvedValue({ count: 0, items: [] });
 
       const result = await processor.process(job as any);
 
@@ -271,7 +274,7 @@ describe('ShellQueryProcessor', () => {
         completedDate: '1/16/2026 10:54:35 AM',
       });
 
-      mockMceBridge.request.mockResolvedValue({ isRunning: false });
+      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: false });
 
       const result = await processor.process(job as any);
 
@@ -305,7 +308,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockResolvedValue({ isRunning: false });
+      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: false });
 
       const result = await processor.process(job as any);
 
@@ -341,9 +344,8 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request
-        .mockResolvedValueOnce({ isRunning: false })
-        .mockResolvedValueOnce({});
+      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: false });
+      mockRestDataService.getRowset.mockResolvedValue({ count: 0, items: [] });
 
       const result = await processor.process(job as any);
 
@@ -369,7 +371,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockResolvedValue({ isRunning: true });
+      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: true });
 
       const result = await processor.process(job as any);
 
@@ -405,7 +407,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockResolvedValueOnce({ count: 1, items: [{ SubscriberKey: 'test' }] });
+      mockRestDataService.getRowset.mockResolvedValueOnce({ count: 1, items: [{ SubscriberKey: 'test' }] });
 
       const result = await processor.process(job as any);
 
@@ -431,7 +433,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockResolvedValueOnce({ count: 0, items: [] });
+      mockRestDataService.getRowset.mockResolvedValueOnce({ count: 0, items: [] });
 
       const result = await processor.process(job as any);
 
@@ -465,7 +467,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockRejectedValueOnce({ status: 401, message: 'No credentials found' });
+      mockRestDataService.getRowset.mockRejectedValueOnce({ status: 401, message: 'No credentials found' });
 
       await expect(processor.process(job as any)).rejects.toThrow(
         'No credentials found for tenant t1 MID m1',
@@ -498,7 +500,7 @@ describe('ShellQueryProcessor', () => {
         runId: 'run-1',
         pollCount: 1,
       });
-      expect(mockMceBridge.request).not.toHaveBeenCalled();
+      expect(mockRestDataService.getRowset).not.toHaveBeenCalled();
       expect(job.updateData).toHaveBeenCalledWith(
         expect.not.objectContaining({
           rowProbeAttempts: expect.any(Number),
@@ -534,7 +536,7 @@ describe('ShellQueryProcessor', () => {
         runId: 'run-1',
         pollCount: 1,
       });
-      expect(mockMceBridge.request).not.toHaveBeenCalled();
+      expect(mockRestDataService.getRowset).not.toHaveBeenCalled();
     });
 
     it('should skip row probe when targetDeName is not set', async () => {
@@ -562,7 +564,7 @@ describe('ShellQueryProcessor', () => {
         runId: 'run-1',
         pollCount: 1,
       });
-      expect(mockMceBridge.request).not.toHaveBeenCalled();
+      expect(mockRestDataService.getRowset).not.toHaveBeenCalled();
     });
   });
 
@@ -582,7 +584,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockRejectedValue({ status: 404 });
+      mockRestDataService.getRowset.mockRejectedValue({ status: 404 });
 
       const result = await processor.process(job as any);
 
@@ -604,7 +606,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockRejectedValue({ status: 401, message: 'No credentials found' });
+      mockRestDataService.getRowset.mockRejectedValue({ status: 401, message: 'No credentials found' });
 
       await expect(processor.process(job as any)).rejects.toThrow(
         'No credentials found for tenant t1 MID m1',
@@ -672,7 +674,7 @@ describe('ShellQueryProcessor', () => {
         errorMsg: '',
       });
 
-      mockMceBridge.request.mockRejectedValue({ status: 404 });
+      mockRestDataService.getRowset.mockRejectedValue({ status: 404 });
 
       await expect(processor.process(job as any, 'token')).rejects.toBeInstanceOf(
         DelayedError,

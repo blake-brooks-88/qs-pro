@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
+  buildQppResultsDataExtensionName,
   type DataExtensionField,
   DataExtensionService,
   DataFolderService,
@@ -68,10 +69,7 @@ export class RunToTempFlow implements IFlowStrategy {
     publishStatus?: StatusPublisher,
   ): Promise<FlowResult> {
     const { runId, tenantId, userId, mid, sqlText, snippetName } = job;
-    const hash = runId.substring(0, 8);
-    const deName = snippetName
-      ? `QPP_${snippetName.replace(/\s+/g, "_")}_${hash}`
-      : `QPP_Results_${hash}`;
+    const deName = buildQppResultsDataExtensionName(runId, snippetName);
 
     await publishStatus?.("validating_query");
     const validationResult = await this.queryValidator.validateQuery(sqlText, {

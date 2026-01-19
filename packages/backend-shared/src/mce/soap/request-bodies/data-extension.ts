@@ -1,7 +1,7 @@
 import { escapeXml } from "../helpers";
 
-export function buildRetrieveDataExtensionFields(
-  dataExtensionName: string,
+export function buildRetrieveDataExtensionFieldsByCustomerKey(
+  customerKey: string,
 ): string {
   return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
   <RetrieveRequest>
@@ -9,21 +9,42 @@ export function buildRetrieveDataExtensionFields(
     <Properties>Name</Properties>
     <Properties>FieldType</Properties>
     <Properties>MaxLength</Properties>
-    <Filter xsi:type="ComplexFilterPart">
-      <LeftOperand xsi:type="SimpleFilterPart">
-        <Property>DataExtension.CustomerKey</Property>
-        <SimpleOperator>equals</SimpleOperator>
-        <Value>${escapeXml(dataExtensionName)}</Value>
-      </LeftOperand>
-      <LogicalOperator>OR</LogicalOperator>
-      <RightOperand xsi:type="SimpleFilterPart">
-        <Property>DataExtension.Name</Property>
-        <SimpleOperator>equals</SimpleOperator>
-        <Value>${escapeXml(dataExtensionName)}</Value>
-      </RightOperand>
+    <Properties>IsPrimaryKey</Properties>
+    <Properties>IsRequired</Properties>
+    <Filter xsi:type="SimpleFilterPart">
+      <Property>DataExtension.CustomerKey</Property>
+      <SimpleOperator>equals</SimpleOperator>
+      <Value>${escapeXml(customerKey)}</Value>
     </Filter>
   </RetrieveRequest>
 </RetrieveRequestMsg>`;
+}
+
+export function buildRetrieveDataExtensionFieldsByName(name: string): string {
+  return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+  <RetrieveRequest>
+    <ObjectType>DataExtensionField</ObjectType>
+    <Properties>Name</Properties>
+    <Properties>FieldType</Properties>
+    <Properties>MaxLength</Properties>
+    <Properties>IsPrimaryKey</Properties>
+    <Properties>IsRequired</Properties>
+    <Filter xsi:type="SimpleFilterPart">
+      <Property>DataExtension.Name</Property>
+      <SimpleOperator>equals</SimpleOperator>
+      <Value>${escapeXml(name)}</Value>
+    </Filter>
+  </RetrieveRequest>
+</RetrieveRequestMsg>`;
+}
+
+export function buildRetrieveDataExtensionFields(
+  params: { customerKey: string } | { name: string },
+): string {
+  if ("customerKey" in params) {
+    return buildRetrieveDataExtensionFieldsByCustomerKey(params.customerKey);
+  }
+  return buildRetrieveDataExtensionFieldsByName(params.name);
 }
 
 export interface DataExtensionField {
@@ -97,7 +118,7 @@ export function buildCreateDataExtension(
     <DataRetentionPeriod>Days</DataRetentionPeriod>
     <RowBasedRetention>false</RowBasedRetention>
     <ResetRetentionPeriodOnImport>false</ResetRetentionPeriodOnImport>
-    <DeleteAtEndOfRetentionPeriod>true</DeleteAtEndOfRetentionPeriod>
+    <DeleteAtEndOfRetentionPeriod>false</DeleteAtEndOfRetentionPeriod>
     <Fields>
       ${fieldsXml}
     </Fields>
@@ -127,6 +148,22 @@ export function buildRetrieveDataExtensions(clientId?: string): string {
     <Properties>Name</Properties>
     <Properties>CategoryID</Properties>
     <Properties>IsSendable</Properties>
+  </RetrieveRequest>
+</RetrieveRequestMsg>`;
+}
+
+export function buildRetrieveDataExtensionByName(name: string): string {
+  return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+  <RetrieveRequest>
+    <ObjectType>DataExtension</ObjectType>
+    <Properties>ObjectID</Properties>
+    <Properties>CustomerKey</Properties>
+    <Properties>Name</Properties>
+    <Filter xsi:type="SimpleFilterPart">
+      <Property>Name</Property>
+      <SimpleOperator>equals</SimpleOperator>
+      <Value>${escapeXml(name)}</Value>
+    </Filter>
   </RetrieveRequest>
 </RetrieveRequestMsg>`;
 }

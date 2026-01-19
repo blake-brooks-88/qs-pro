@@ -200,9 +200,21 @@ export function useQueryExecution(
         (d) => d.name.toLowerCase() === tableName.toLowerCase(),
       );
 
-      const lookupKey = de?.customerKey ?? tableName;
-      const queryKey = metadataQueryKeys.fields(tenantId, lookupKey);
-      return queryClient.getQueryData<DataExtensionField[]>(queryKey) ?? null;
+      // Try customerKey first if we found the DE
+      if (de?.customerKey) {
+        const byCustomerKey = queryClient.getQueryData<DataExtensionField[]>(
+          metadataQueryKeys.fields(tenantId, de.customerKey),
+        );
+        if (byCustomerKey && byCustomerKey.length > 0) {
+          return byCustomerKey;
+        }
+      }
+
+      // Fall back to tableName as the key (autocomplete may have used it)
+      const byTableName = queryClient.getQueryData<DataExtensionField[]>(
+        metadataQueryKeys.fields(tenantId, tableName),
+      );
+      return byTableName ?? null;
     },
     [queryClient, tenantId, eid],
   );
