@@ -9,10 +9,18 @@ export function buildRetrieveDataExtensionFields(
     <Properties>Name</Properties>
     <Properties>FieldType</Properties>
     <Properties>MaxLength</Properties>
-    <Filter xsi:type="SimpleFilterPart">
-      <Property>DataExtension.CustomerKey</Property>
-      <SimpleOperator>equals</SimpleOperator>
-      <Value>${escapeXml(dataExtensionName)}</Value>
+    <Filter xsi:type="ComplexFilterPart">
+      <LeftOperand xsi:type="SimpleFilterPart">
+        <Property>DataExtension.CustomerKey</Property>
+        <SimpleOperator>equals</SimpleOperator>
+        <Value>${escapeXml(dataExtensionName)}</Value>
+      </LeftOperand>
+      <LogicalOperator>OR</LogicalOperator>
+      <RightOperand xsi:type="SimpleFilterPart">
+        <Property>DataExtension.Name</Property>
+        <SimpleOperator>equals</SimpleOperator>
+        <Value>${escapeXml(dataExtensionName)}</Value>
+      </RightOperand>
     </Filter>
   </RetrieveRequest>
 </RetrieveRequestMsg>`;
