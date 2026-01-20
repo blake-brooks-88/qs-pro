@@ -45,7 +45,7 @@ Shift the application's authentication from a standalone OAuth2 flow to a platfo
 - Reuse `saveTokens` for encrypted token persistence and `getUserInfo` patterns for identity discovery.
 - Extend `handleCallback` logic to support the JWT-based handshake flow.
 
-**MceBridgeService (apps/api/src/mce/mce-bridge.service.ts)**
+**MceBridgeService (`packages/backend-shared/src/mce/mce-bridge.service.ts`)**
 - Reference the `request` and `soapRequest` wrappers for how TSSD and access tokens are used for MCE API calls.
 
 **Drizzle Repositories (packages/database/src/repositories/drizzle-repositories.ts)**

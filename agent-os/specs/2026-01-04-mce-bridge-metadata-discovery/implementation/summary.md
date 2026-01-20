@@ -3,14 +3,14 @@
 ## Task Group 1: MceBridgeService
 
 ### Implemented Components
-1.  **`MceBridgeService`**: Located in `apps/api/src/mce/mce-bridge.service.ts`.
+1.  **`MceBridgeService`**: Located in `packages/backend-shared/src/mce/mce-bridge.service.ts`.
     *   Handles OAuth2 token refreshment via `AuthService`.
     *   Wraps `axios` for REST and SOAP requests.
     *   Implements `buildSoapEnvelope` for SOAP envelope construction.
     *   Normalizes errors to RFC 7807 `ProblemDetails` format.
 2.  **`MceModule`**: Located in `apps/api/src/mce/mce.module.ts`.
     *   Registers and exports `MceBridgeService` and `MetadataService`.
-3.  **Tests**: `apps/api/src/mce/mce-bridge.service.spec.ts`.
+3.  **Tests**: `packages/backend-shared/src/mce/mce-bridge.service.spec.ts`.
     *   Verifies token injection, SOAP construction, and error normalization.
 
 ## Task Group 2: MetadataService

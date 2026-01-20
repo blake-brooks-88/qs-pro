@@ -126,7 +126,7 @@ Implement a NestJS-based worker that executes SQL queries against Salesforce Mar
 
 ## Existing Code to Leverage
 
-**MceBridgeService (`apps/api/src/mce/mce-bridge.service.ts`)**
+**MceBridgeService (`packages/backend-shared/src/mce/mce-bridge.service.ts`)**
 - Provides `soapRequest()` for SOAP Create/Retrieve/Perform/Delete operations
 - Provides `request()` for REST API calls (rowset retrieval)
 - Handles token injection via `AuthService.refreshToken()` and error normalization
@@ -140,8 +140,8 @@ Implement a NestJS-based worker that executes SQL queries against Salesforce Mar
 - Use `runWithTenantContext(tenantId, mid, fn)` for database operations within worker jobs
 - Sets PostgreSQL session variables for RLS policy enforcement
 
-**MceModule (`apps/api/src/mce/mce.module.ts`)**
-- Exports `MceBridgeService` and `MetadataService`
+**MceModule (`packages/backend-shared/src/mce/mce.module.ts`)**
+- Exports `MceBridgeService` and `MetadataService` (and related MCE services)
 - Import AuthModule and CacheModule dependencies
 - Can be shared directly with worker app
 

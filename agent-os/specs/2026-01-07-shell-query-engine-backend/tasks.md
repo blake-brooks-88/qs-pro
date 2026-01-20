@@ -390,7 +390,7 @@ Recommended implementation sequence:
 ## Technical Notes
 
 ### Existing Code to Leverage
-- `apps/api/src/mce/mce-bridge.service.ts` - SOAP/REST bridge with token injection
+- `packages/backend-shared/src/mce/mce-bridge.service.ts` - SOAP/REST bridge with token injection
 - `apps/worker/src/index.ts` - Basic BullMQ scaffold (refactor to NestJS)
 - `apps/api/src/database/rls-context.service.ts` - RLS tenant context
 - `packages/database/src/schema.ts` - Drizzle schema patterns

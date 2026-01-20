@@ -80,7 +80,7 @@ Details: On each run we should check if a query from query plus plus exists, if 
 
 **Similar Features Identified:**
 - Feature: BullMQ scaffold - Path: `apps/worker/src/index.ts`
-- Backend logic to reference: MCE Bridge service - Path: `apps/api/src/mce/mce-bridge.service.ts`
+- Backend logic to reference: MCE Bridge service - Path: `packages/backend-shared/src/mce/mce-bridge.service.ts`
 - Polling/SSE: No existing SSE or polling logic identified for reference.
 
 ### Follow-up Questions
@@ -118,7 +118,7 @@ Deletion Rule:
 **Follow-up 6:** Can you point me to existing code we should reuse for BullMQ setup and any current SSE/polling endpoints (paths are enough)?
 **Answer:**
 BullMQ: There is a basic scaffold in apps/worker/src/index.ts. It’s currently a standalone script and needs to be migrated to a NestJS module to share our MceBridgeService.
-MCE Service: Reuse apps/api/src/mce/mce-bridge.service.ts. It already has the base soapRequest and request methods you need.
+MCE Service: Reuse packages/backend-shared/src/mce/mce-bridge.service.ts. It already has the base soapRequest and request methods you need.
 Polling/SSE: There is no existing SSE or polling logic in the project yet. You will be establishing the pattern in apps/api (for SSE) and apps/worker (for the MCE-status polling).
 
 ## Visual Assets
@@ -141,7 +141,7 @@ No visual assets provided.
 
 ### Reusability Opportunities
 - BullMQ scaffold to migrate into NestJS modules: `apps/worker/src/index.ts`
-- MCE bridge service to reuse for SOAP/REST calls: `apps/api/src/mce/mce-bridge.service.ts`
+- MCE bridge service to reuse for SOAP/REST calls: `packages/backend-shared/src/mce/mce-bridge.service.ts`
 - No similar SSE or polling logic identified for reference.
 
 ### Scope Boundaries
