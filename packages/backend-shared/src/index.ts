@@ -1,3 +1,12 @@
+export {
+  AppError,
+  appErrorToProblemDetails,
+  ErrorCode,
+  getErrorTitle,
+  getHttpStatus,
+  isTerminal,
+  toAppError,
+} from "./common/errors";
 export { SeatLimitExceededException } from "./common/exceptions/seat-limit-exceeded.exception";
 export * from "./database/database.module";
 export * from "./database/db-context";

@@ -1,0 +1,35 @@
+/**
+ * Centralized error codes for the application.
+ * Used by AppError and error handling policies to classify errors uniformly.
+ */
+
+export const ErrorCode = {
+  // MCE HTTP Errors (mapped from MceBridgeService response codes)
+  MCE_BAD_REQUEST: "MCE_BAD_REQUEST",
+  MCE_AUTH_EXPIRED: "MCE_AUTH_EXPIRED",
+  MCE_CREDENTIALS_MISSING: "MCE_CREDENTIALS_MISSING",
+  MCE_TENANT_NOT_FOUND: "MCE_TENANT_NOT_FOUND",
+  MCE_FORBIDDEN: "MCE_FORBIDDEN",
+  MCE_SERVER_ERROR: "MCE_SERVER_ERROR",
+
+  // MCE SOAP Errors
+  MCE_SOAP_FAILURE: "MCE_SOAP_FAILURE",
+  MCE_PAGINATION_EXCEEDED: "MCE_PAGINATION_EXCEEDED",
+  MCE_VALIDATION_FAILED: "MCE_VALIDATION_FAILED",
+
+  // Query Processing
+  SELECT_STAR_EXPANSION_FAILED: "SELECT_STAR_EXPANSION_FAILED",
+  SCHEMA_INFERENCE_FAILED: "SCHEMA_INFERENCE_FAILED",
+
+  // Business Logic
+  SEAT_LIMIT_EXCEEDED: "SEAT_LIMIT_EXCEEDED",
+  RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
+
+  // Infrastructure
+  CONFIG_ERROR: "CONFIG_ERROR",
+  DATABASE_ERROR: "DATABASE_ERROR",
+  REDIS_ERROR: "REDIS_ERROR",
+  UNKNOWN: "UNKNOWN",
+} as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
