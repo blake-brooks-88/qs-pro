@@ -3,7 +3,7 @@ import {
   DrizzleCredentialsRepository,
   DrizzleTenantRepository,
   DrizzleUserRepository,
-} from "@qs-pro/database";
+} from "@qpp/database";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { DatabaseModule } from "../database/database.module";

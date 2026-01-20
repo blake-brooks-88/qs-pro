@@ -1,6 +1,6 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
-import { DatabaseModule } from "@qs-pro/backend-shared";
+import { DatabaseModule } from "@qpp/backend-shared";
 
 import { HealthController } from "./health.controller";
 

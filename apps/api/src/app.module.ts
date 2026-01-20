@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { DatabaseModule } from '@qs-pro/backend-shared';
+import { DatabaseModule } from '@qpp/backend-shared';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';

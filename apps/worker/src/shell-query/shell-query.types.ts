@@ -2,8 +2,8 @@
  * SOAP response types for MCE API calls
  */
 
-import type { ShellQueryRunStatus } from "@qs-pro/database";
-import type { TableMetadata } from "@qs-pro/shared-types";
+import type { ShellQueryRunStatus } from "@qpp/database";
+import type { TableMetadata } from "@qpp/shared-types";
 
 /** Generic retrieve response result structure */
 interface RetrieveResult {

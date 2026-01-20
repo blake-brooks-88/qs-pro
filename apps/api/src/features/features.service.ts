@@ -7,9 +7,9 @@ import {
 import type {
   IFeatureOverrideRepository,
   ITenantRepository,
-} from '@qs-pro/database';
-import type { FeatureKey, TenantFeatures } from '@qs-pro/shared-types';
-import { ALL_FEATURE_KEYS, getTierFeatures } from '@qs-pro/shared-types';
+} from '@qpp/database';
+import type { FeatureKey, TenantFeatures } from '@qpp/shared-types';
+import { ALL_FEATURE_KEYS, getTierFeatures } from '@qpp/shared-types';
 
 @Injectable()
 export class FeaturesService {

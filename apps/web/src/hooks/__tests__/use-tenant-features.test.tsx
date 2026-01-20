@@ -1,4 +1,4 @@
-import { type TenantFeatures } from "@qs-pro/shared-types";
+import { type TenantFeatures } from "@qpp/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";

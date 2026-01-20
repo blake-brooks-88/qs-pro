@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import type { TenantFeatures } from '@qs-pro/shared-types';
+import type { TenantFeatures } from '@qpp/shared-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionGuard } from '../../auth/session.guard';

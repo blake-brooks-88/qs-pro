@@ -3,7 +3,7 @@ import type {
   IFeatureOverrideRepository,
   ITenantRepository,
   TenantFeatureOverride,
-} from '@qs-pro/database';
+} from '@qpp/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FeaturesService } from '../features.service';

@@ -1,4 +1,4 @@
-import type { FeatureKey } from "@qs-pro/shared-types";
+import type { FeatureKey } from "@qpp/shared-types";
 import type { ReactNode } from "react";
 
 import {

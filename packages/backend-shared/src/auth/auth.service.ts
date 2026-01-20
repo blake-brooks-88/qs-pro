@@ -10,8 +10,8 @@ import type {
   ICredentialsRepository,
   ITenantRepository,
   IUserRepository,
-} from "@qs-pro/database";
-import { decrypt, encrypt } from "@qs-pro/database";
+} from "@qpp/database";
+import { decrypt, encrypt } from "@qpp/database";
 import axios from "axios";
 import * as jose from "jose";
 

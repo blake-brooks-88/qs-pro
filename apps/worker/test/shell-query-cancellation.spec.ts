@@ -8,7 +8,7 @@ import {
   MceBridgeService,
   AsyncStatusService,
   QueryDefinitionService,
-} from '@qs-pro/backend-shared';
+} from '@qpp/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
 import {

@@ -1,5 +1,5 @@
 {
-  "name": "@qs-pro/database",
+  "name": "@qpp/database",
   "version": "0.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,7 +23,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@qs-pro/eslint-config": "workspace:^",
+    "@qpp/eslint-config": "workspace:^",
     "@types/node": "^22.10.7",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.2",

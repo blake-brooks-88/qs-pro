@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qs-pro/backend-shared';
+import { RlsContextService, MceBridgeService, AsyncStatusService } from '@qpp/backend-shared';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockBullJob, createMockPollBullJob } from './factories';
 import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub } from './stubs';

@@ -1,9 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import {
-  QueryDefinitionService,
-  RlsContextService,
-} from "@qs-pro/backend-shared";
+import { QueryDefinitionService, RlsContextService } from "@qpp/backend-shared";
 import {
   and,
   credentials,
@@ -11,7 +8,7 @@ import {
   isNotNull,
   type PostgresJsDatabase,
   tenantSettings,
-} from "@qs-pro/database";
+} from "@qpp/database";
 
 @Injectable()
 export class ShellQuerySweeper {

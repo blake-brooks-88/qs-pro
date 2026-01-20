@@ -9,7 +9,7 @@ export default defineConfig({
     environment: 'node',
     server: {
       deps: {
-        inline: ['@qs-pro/database'],
+        inline: ['@qpp/database'],
       },
     },
   },

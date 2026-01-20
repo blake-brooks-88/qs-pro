@@ -1,7 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { DatabaseModule, RlsContextService } from '@qs-pro/backend-shared';
-import { DrizzleTenantRepository } from '@qs-pro/database';
+import { DatabaseModule, RlsContextService } from '@qpp/backend-shared';
+import { DrizzleTenantRepository } from '@qpp/database';
 
 import { CsrfGuard } from '../auth/csrf.guard';
 import { MceModule } from '../mce/mce.module';
