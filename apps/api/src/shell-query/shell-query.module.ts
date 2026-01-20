@@ -8,7 +8,6 @@ import {
 import { DrizzleTenantRepository } from '@qpp/database';
 
 import { CsrfGuard } from '../auth/csrf.guard';
-import { MceModule } from '../mce/mce.module';
 import { DrizzleShellQueryRunRepository } from './drizzle-shell-query-run.repository';
 import { ShellQueryController } from './shell-query.controller';
 import { ShellQueryService } from './shell-query.service';
@@ -20,7 +19,6 @@ import { ShellQuerySseService } from './shell-query-sse.service';
       name: 'shell-query',
     }),
     DatabaseModule,
-    MceModule,
     SharedMceModule,
   ],
   controllers: [ShellQueryController],

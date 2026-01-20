@@ -112,6 +112,52 @@ describe("MceBridgeService", () => {
       );
     });
 
+    it("should retry once when SOAP returns Login Failed security fault", async () => {
+      const faultXml = `
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <soap:Fault>
+              <faultcode xmlns:q0="...wssecurity...">q0:Security</faultcode>
+              <faultstring>Login Failed</faultstring>
+            </soap:Fault>
+          </soap:Body>
+        </soap:Envelope>
+      `;
+
+      vi.spyOn(axios, "request")
+        .mockResolvedValueOnce({ data: faultXml })
+        .mockResolvedValueOnce({ data: "<soap>ok</soap>" });
+
+      await service.soapRequest(
+        "tenant-1",
+        "user-1",
+        "mid-1",
+        "<RetrieveRequestMsg>...</RetrieveRequestMsg>",
+        "Retrieve",
+      );
+
+      expect(vi.mocked(authProvider.invalidateToken)).toHaveBeenCalledWith(
+        "tenant-1",
+        "user-1",
+        "mid-1",
+      );
+      expect(vi.mocked(authProvider.refreshToken)).toHaveBeenNthCalledWith(
+        1,
+        "tenant-1",
+        "user-1",
+        "mid-1",
+        false,
+      );
+      expect(vi.mocked(authProvider.refreshToken)).toHaveBeenNthCalledWith(
+        2,
+        "tenant-1",
+        "user-1",
+        "mid-1",
+        true,
+      );
+      expect(vi.mocked(axios.request)).toHaveBeenCalledTimes(2);
+    });
+
     it("should normalize axios 401 error to ProblemDetails", async () => {
       const error = new AxiosError(
         "Unauthorized",
