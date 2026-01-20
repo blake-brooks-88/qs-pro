@@ -51,7 +51,7 @@ Run:
 
 Disable:
 
-- Run the normal dev server: `pnpm --filter @qs-pro/web dev`
+- Run the normal dev server: `pnpm --filter @qpp/web dev`
 
 Preview catalog:
 

@@ -1,4 +1,4 @@
-import type { TenantFeatures } from "@qs-pro/shared-types";
+import type { TenantFeatures } from "@qpp/shared-types";
 import { http, HttpResponse } from "msw";
 
 export const defaultFeatures: TenantFeatures = {

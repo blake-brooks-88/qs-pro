@@ -10,8 +10,8 @@ import {
   buildQppResultsDataExtensionName,
   RestDataService,
   type RowsetResponse,
-} from '@qs-pro/backend-shared';
-import type { TableMetadata } from '@qs-pro/shared-types';
+} from '@qpp/backend-shared';
+import type { TableMetadata } from '@qpp/shared-types';
 import { Queue } from 'bullmq';
 import * as crypto from 'crypto';
 

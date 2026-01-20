@@ -1,4 +1,4 @@
-const baseConfig = require("@qs-pro/eslint-config");
+const baseConfig = require("@qpp/eslint-config");
 const globals = require("globals");
 const react = require("eslint-plugin-react");
 const reactHooks = require("eslint-plugin-react-hooks");
@@ -64,11 +64,11 @@ module.exports = tseslint.config(
           paths: [
             {
               name: "lucide-react",
-              message: "Use @solar-icons/react for icons in @qs-pro/web.",
+              message: "Use @solar-icons/react for icons in @qpp/web.",
             },
             {
               name: "solar-icon-react",
-              message: "Use @solar-icons/react for Solar icons in @qs-pro/web.",
+              message: "Use @solar-icons/react for Solar icons in @qpp/web.",
             },
           ],
           patterns: [

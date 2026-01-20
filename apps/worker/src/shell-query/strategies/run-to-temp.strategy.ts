@@ -6,13 +6,13 @@ import {
   DataFolderService,
   QueryDefinitionService,
   RlsContextService,
-} from "@qs-pro/backend-shared";
+} from "@qpp/backend-shared";
 import {
   and,
   eq,
   type PostgresJsDatabase,
   tenantSettings,
-} from "@qs-pro/database";
+} from "@qpp/database";
 
 import { MceQueryValidator } from "../mce-query-validator";
 import {

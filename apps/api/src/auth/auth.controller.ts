@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AuthService } from '@qs-pro/backend-shared';
+import { AuthService } from '@qpp/backend-shared';
 import { randomBytes } from 'crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 

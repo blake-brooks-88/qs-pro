@@ -1,5 +1,5 @@
 {
-  "name": "@qs-pro/backend-shared",
+  "name": "@qpp/backend-shared",
   "version": "0.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,8 +17,8 @@
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
-    "@qs-pro/database": "workspace:^",
-    "@qs-pro/shared-types": "workspace:^",
+    "@qpp/database": "workspace:^",
+    "@qpp/shared-types": "workspace:^",
     "axios": "^1.6.7",
     "cache-manager": "^7.2.7",
     "drizzle-orm": "^0.45.1",
@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.1",
-    "@qs-pro/eslint-config": "workspace:^",
+    "@qpp/eslint-config": "workspace:^",
     "@types/node": "^22.10.7",
     "eslint": "^9.18.0",
     "typescript": "^5.7.3",

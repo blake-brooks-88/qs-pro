@@ -8,13 +8,13 @@ import {
   RestDataService,
   RlsContextService,
   type RowsetResponse,
-} from "@qs-pro/backend-shared";
+} from "@qpp/backend-shared";
 import {
   eq,
   type PostgresJsDatabase,
   shellQueryRuns,
   type ShellQueryRunStatus,
-} from "@qs-pro/database";
+} from "@qpp/database";
 import { DelayedError, Job, Queue, UnrecoverableError } from "bullmq";
 import * as crypto from "crypto";
 

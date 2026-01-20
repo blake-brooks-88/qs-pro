@@ -6,7 +6,7 @@ import {
   DataFolderService,
   QueryDefinitionService,
   RlsContextService,
-} from '@qs-pro/backend-shared';
+} from '@qpp/backend-shared';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createMockJob } from './factories';
 import { createDbStub, createRlsContextStub } from './stubs';

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '@qs-pro/backend-shared';
+import { DatabaseModule } from '@qpp/backend-shared';
 import {
   DrizzleFeatureOverrideRepository,
   DrizzleTenantRepository,
-} from '@qs-pro/database';
+} from '@qpp/database';
 
 import { FeaturesController } from './features.controller';
 import { FeaturesService } from './features.service';

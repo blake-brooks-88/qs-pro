@@ -3,7 +3,7 @@ import { BullBoardModule } from "@bull-board/nestjs";
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
-import { DatabaseModule, MceModule } from "@qs-pro/backend-shared";
+import { DatabaseModule, MceModule } from "@qpp/backend-shared";
 
 import { MceQueryValidator } from "./mce-query-validator";
 import { ShellQueryProcessor } from "./shell-query.processor";

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { MceBridgeService } from "@qs-pro/backend-shared";
+import { MceBridgeService } from "@qpp/backend-shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MceQueryValidator } from "./mce-query-validator";

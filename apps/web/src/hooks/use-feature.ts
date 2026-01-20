@@ -1,4 +1,4 @@
-import type { FeatureKey } from "@qs-pro/shared-types";
+import type { FeatureKey } from "@qpp/shared-types";
 
 import { useTenantFeatures } from "@/hooks/use-tenant-features";
 

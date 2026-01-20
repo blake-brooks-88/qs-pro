@@ -1,5 +1,5 @@
 {
-  "name": "@qs-pro/web",
+  "name": "@qpp/web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
-    "@qs-pro/shared-types": "workspace:*",
+    "@qpp/shared-types": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.4",
@@ -34,7 +34,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
-    "@qs-pro/eslint-config": "workspace:*",
+    "@qpp/eslint-config": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",

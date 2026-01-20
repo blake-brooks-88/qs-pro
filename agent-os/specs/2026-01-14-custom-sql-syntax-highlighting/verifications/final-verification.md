@@ -117,7 +117,7 @@ This spec enhances existing functionality rather than introducing new roadmap it
 
 ### Web Test Command Output
 ```
-pnpm --filter @qs-pro/web test
+pnpm --filter @qpp/web test
 
  Test Files  40 passed (40)
       Tests  555 passed (555)

@@ -1,4 +1,4 @@
-import type { shellQueryRuns } from '@qs-pro/database';
+import type { shellQueryRuns } from '@qpp/database';
 
 export type ShellQueryRun = typeof shellQueryRuns.$inferSelect;
 export type ShellQueryRunStatus =

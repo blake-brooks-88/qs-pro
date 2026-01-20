@@ -1,5 +1,5 @@
 import { Inject, Injectable, NestMiddleware } from "@nestjs/common";
-import { createDatabaseFromClient, createSqlClient } from "@qs-pro/database";
+import { createDatabaseFromClient, createSqlClient } from "@qpp/database";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { getDbFromContext, runWithDbContext } from "./db-context";

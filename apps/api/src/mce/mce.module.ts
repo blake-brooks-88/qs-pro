@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MceModule as SharedMceModule } from '@qs-pro/backend-shared';
+import { MceModule as SharedMceModule } from '@qpp/backend-shared';
 
 import { AuthModule } from '../auth/auth.module';
 import { MceBridgeService } from './mce-bridge.service';

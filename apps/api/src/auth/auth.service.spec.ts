@@ -4,12 +4,12 @@ import {
   AuthService,
   RlsContextService,
   SeatLimitService,
-} from '@qs-pro/backend-shared';
+} from '@qpp/backend-shared';
 import type {
   ICredentialsRepository,
   ITenantRepository,
   IUserRepository,
-} from '@qs-pro/database';
+} from '@qpp/database';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import {

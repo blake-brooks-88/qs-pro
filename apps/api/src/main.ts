@@ -7,8 +7,8 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { getDbFromContext, runWithDbContext } from '@qs-pro/backend-shared';
-import { createDatabaseFromClient } from '@qs-pro/database';
+import { getDbFromContext, runWithDbContext } from '@qpp/backend-shared';
+import { createDatabaseFromClient } from '@qpp/database';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Sql } from 'postgres';
 

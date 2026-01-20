@@ -65,10 +65,10 @@ This is the difference between:
 
 Tokens are stored server-side in the database (Credentials table).
 
-- Refresh token: stored encrypted at rest using AES-256-GCM via `encrypt()`/`decrypt()` from `@qs-pro/database`.
+- Refresh token: stored encrypted at rest using AES-256-GCM via `encrypt()`/`decrypt()` from `@qpp/database`.
 - Access token: stored encrypted at rest using the same AES-256-GCM mechanism; decrypted only just-in-time for outbound MCE API calls.
 - Encryption key:
-  - `ENCRYPTION_KEY` must be a stable 32-byte hex key (as required by `@qs-pro/database`).
+  - `ENCRYPTION_KEY` must be a stable 32-byte hex key (as required by `@qpp/database`).
 
 The browser never receives refresh tokens.
 
@@ -196,7 +196,7 @@ This implementation is designed to pass the Salesforce AppExchange security revi
 - **Server-to-server token exchange:** Authorization codes are exchanged server-side; tokens never reach the browser.
 
 ### Token Storage Requirements
-- **Encryption at rest:** Access and refresh tokens are encrypted using AES-256-GCM via the `encrypt()`/`decrypt()` functions from `@qs-pro/database`.
+- **Encryption at rest:** Access and refresh tokens are encrypted using AES-256-GCM via the `encrypt()`/`decrypt()` functions from `@qpp/database`.
 - **No browser storage:** Tokens are stored server-side in the database, keyed by `(tenantId, userId, mid)`.
 - **Encryption key management:** `ENCRYPTION_KEY` must be a 32-byte hex key stored securely (environment variable, not in code).
 

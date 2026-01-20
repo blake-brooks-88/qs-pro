@@ -1,7 +1,7 @@
 import { HttpException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from '@qs-pro/backend-shared';
+import { AuthService } from '@qpp/backend-shared';
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

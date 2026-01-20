@@ -6,7 +6,7 @@ Scaffolded the web application using Vite, React, and TypeScript.
 ## Key Changes
 - **apps/web**: Initialized with Vite. Installed Zustand, TanStack Query, and Axios.
 - Created standard folder structure (`bridge`, `core`, `features`, etc.).
-- Linked to `@qs-pro/shared-types` and verified type safety in `App.tsx`.
+- Linked to `@qpp/shared-types` and verified type safety in `App.tsx`.
 
 ## Verification
 - Application builds successfully (`pnpm build`).
