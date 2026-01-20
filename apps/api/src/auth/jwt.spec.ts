@@ -4,7 +4,7 @@ import {
   AuthService,
   RlsContextService,
   SeatLimitService,
-} from '@qs-pro/backend-shared';
+} from '@qpp/backend-shared';
 import * as jose from 'jose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { createDatabaseFromClient } from "@qs-pro/database";
+import { createDatabaseFromClient } from "@qpp/database";
 import type { Sql } from "postgres";
 
 import {

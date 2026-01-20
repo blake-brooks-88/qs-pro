@@ -56,13 +56,13 @@ importers:
       '@nestjs/platform-fastify':
         specifier: ^11.1.11
         version: 11.1.11(@fastify/static@9.0.0)(@fastify/view@11.1.1)(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11)(reflect-metadata@0.2.2)(rxjs@7.8.2))
-      '@qs-pro/backend-shared':
+      '@qpp/backend-shared':
         specifier: workspace:^
         version: link:../../packages/backend-shared
-      '@qs-pro/database':
+      '@qpp/database':
         specifier: workspace:^
         version: link:../../packages/database
-      '@qs-pro/shared-types':
+      '@qpp/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
       axios:
@@ -195,7 +195,7 @@ importers:
       '@monaco-editor/react':
         specifier: ^4.6.0
         version: 4.7.0(monaco-editor@0.52.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@qs-pro/shared-types':
+      '@qpp/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       '@radix-ui/react-dialog':
@@ -250,7 +250,7 @@ importers:
         specifier: ^4.5.2
         version: 4.5.7(@types/react@18.3.27)(react@18.3.1)
     devDependencies:
-      '@qs-pro/eslint-config':
+      '@qpp/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
       '@tailwindcss/vite':
@@ -361,13 +361,13 @@ importers:
       '@nestjs/schedule':
         specifier: ^6.1.0
         version: 6.1.0(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11)(reflect-metadata@0.2.2)(rxjs@7.8.2))
-      '@qs-pro/backend-shared':
+      '@qpp/backend-shared':
         specifier: workspace:^
         version: link:../../packages/backend-shared
-      '@qs-pro/database':
+      '@qpp/database':
         specifier: workspace:^
         version: link:../../packages/database
-      '@qs-pro/shared-types':
+      '@qpp/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
       bullmq:
@@ -404,7 +404,7 @@ importers:
       '@nestjs/testing':
         specifier: ^11.0.1
         version: 11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11))
-      '@qs-pro/eslint-config':
+      '@qpp/eslint-config':
         specifier: workspace:^
         version: link:../../packages/eslint-config
       '@types/node':
@@ -443,10 +443,10 @@ importers:
       '@nestjs/core':
         specifier: ^11.0.1
         version: 11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@qs-pro/database':
+      '@qpp/database':
         specifier: workspace:^
         version: link:../database
-      '@qs-pro/shared-types':
+      '@qpp/shared-types':
         specifier: workspace:^
         version: link:../shared-types
       axios:
@@ -477,7 +477,7 @@ importers:
       '@nestjs/testing':
         specifier: ^11.0.1
         version: 11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11))
-      '@qs-pro/eslint-config':
+      '@qpp/eslint-config':
         specifier: workspace:^
         version: link:../eslint-config
       '@types/node':
@@ -514,7 +514,7 @@ importers:
         specifier: ^3.22.4
         version: 3.25.76
     devDependencies:
-      '@qs-pro/eslint-config':
+      '@qpp/eslint-config':
         specifier: workspace:^
         version: link:../eslint-config
       '@types/node':
@@ -576,7 +576,7 @@ importers:
         specifier: ^3.22.4
         version: 3.25.76
     devDependencies:
-      '@qs-pro/eslint-config':
+      '@qpp/eslint-config':
         specifier: workspace:^
         version: link:../eslint-config
       eslint:

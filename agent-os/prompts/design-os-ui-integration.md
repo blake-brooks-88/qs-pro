@@ -2,11 +2,11 @@
 
 You are working in the **qs-pro** monorepo.
 
-Goal: integrate UI components exported from Design OS (Query++ workspace designs) into the real `@qs-pro/web` frontend in a controlled, incremental way.
+Goal: integrate UI components exported from Design OS (Query++ workspace designs) into the real `@qpp/web` frontend in a controlled, incremental way.
 
 ## Context
 
-- `@qs-pro/web` is a Vite + React app located at `apps/web`.
+- `@qpp/web` is a Vite + React app located at `apps/web`.
 - Design OS exports a handoff package called `product-plan/`.
 - Treat `agent-os/product-plan/` as a **read-only snapshot**. Do not edit it directly.
 - Implement production code in `apps/web/src/...`.
@@ -20,7 +20,7 @@ Goal: integrate UI components exported from Design OS (Query++ workspace designs
 ## Verify/Setup (must do first)
 
 1. **Solar icons dependency**
-   - Ensure `@solar-icons/react` is installed in `@qs-pro/web`.
+   - Ensure `@solar-icons/react` is installed in `@qpp/web`.
    - Remove any usage of `lucide-react`.
    - ESLint should fail on any `lucide-react` import.
 

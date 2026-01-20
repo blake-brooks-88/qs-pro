@@ -1,4 +1,4 @@
-const baseConfig = require('@qs-pro/eslint-config');
+const baseConfig = require('@qpp/eslint-config');
 
 module.exports = [
   ...baseConfig,

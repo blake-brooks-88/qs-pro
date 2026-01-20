@@ -6,7 +6,7 @@
 - Focused unit tests for touched modules pass.
 
 ## Commands Run
-- `pnpm --filter @qs-pro/web test -- src/hooks/__tests__/use-tenant-features.test.tsx src/features/editor-workspace/hooks/use-metadata.test.tsx`
+- `pnpm --filter @qpp/web test -- src/hooks/__tests__/use-tenant-features.test.tsx src/features/editor-workspace/hooks/use-metadata.test.tsx`
 - `pnpm --filter api test -- src/shell-query/__tests__/shell-query.service.spec.ts src/shell-query/__tests__/shell-query-sse.service.spec.ts`
 - `rg -n "fetch\\(" apps/web/src`
 - `rg -n "from \\\"axios\\\"|import axios" apps/web/src`

@@ -95,7 +95,7 @@ Reference source-of-truth:
   - [x] 5.2 Add/adjust CSS classes for semantic highlighting and error-style decorations as needed
 - [x] 5.3 Verification
   - [x] 5.4 Add focused unit tests for any pure helpers introduced (e.g., diagnostics→decorations mapping)
-  - [x] 5.5 Run `pnpm --filter @qs-pro/web test` (or the smallest relevant test command used in this repo)
+  - [x] 5.5 Run `pnpm --filter @qpp/web test` (or the smallest relevant test command used in this repo)
   - [x] 5.6 Manual QA in the editor with the acceptance-criteria SQL snippets
 
 **Acceptance Criteria:**

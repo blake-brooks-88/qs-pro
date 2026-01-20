@@ -8,7 +8,7 @@ import {
 } from "./db-context";
 import { RlsContextService } from "./rls-context.service";
 
-vi.mock("@qs-pro/database", () => ({
+vi.mock("@qpp/database", () => ({
   createDatabaseFromClient: vi.fn().mockReturnValue({ mock: "db" }),
 }));
 

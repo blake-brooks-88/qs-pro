@@ -4,8 +4,8 @@ import {
   DatabaseModule,
   MceModule as SharedMceModule,
   RlsContextService,
-} from '@qs-pro/backend-shared';
-import { DrizzleTenantRepository } from '@qs-pro/database';
+} from '@qpp/backend-shared';
+import { DrizzleTenantRepository } from '@qpp/database';
 
 import { CsrfGuard } from '../auth/csrf.guard';
 import { MceModule } from '../mce/mce.module';

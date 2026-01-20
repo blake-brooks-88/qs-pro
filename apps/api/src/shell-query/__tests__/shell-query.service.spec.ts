@@ -3,7 +3,7 @@ import * as crypto from 'node:crypto';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { RestDataService } from '@qs-pro/backend-shared';
+import { RestDataService } from '@qpp/backend-shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

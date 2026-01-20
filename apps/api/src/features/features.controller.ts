@@ -1,5 +1,5 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import type { TenantFeatures } from '@qs-pro/shared-types';
+import type { TenantFeatures } from '@qpp/shared-types';
 
 import { SessionGuard } from '../auth/session.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';

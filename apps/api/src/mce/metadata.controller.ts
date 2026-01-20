@@ -1,5 +1,5 @@
 import { Controller, Get, Query, UseFilters, UseGuards } from '@nestjs/common';
-import { MetadataService } from '@qs-pro/backend-shared';
+import { MetadataService } from '@qpp/backend-shared';
 
 import { SessionGuard } from '../auth/session.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';

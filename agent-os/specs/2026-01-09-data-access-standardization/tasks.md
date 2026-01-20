@@ -32,7 +32,7 @@ Total Tasks: 3
     - Replace raw `axios` usage in `apps/web/src/App.tsx` with `services/auth.ts` (which uses `apps/web/src/services/api.ts`)
     - Keep any dev-only verification tooling isolated to `apps/web/src/features/verification/*`; prefer updating it to use the shared client/services
   - [x] 1.5 Run only the impacted web tests
-    - Run `pnpm --filter @qs-pro/web test` (or the narrowest equivalent) and ensure the updated tests from 1.1 pass
+    - Run `pnpm --filter @qpp/web test` (or the narrowest equivalent) and ensure the updated tests from 1.1 pass
 
 **Acceptance Criteria:**
 - No production hooks/components use ad-hoc `fetch()` or raw `axios`; HTTP routes through `apps/web/src/services/api.ts`

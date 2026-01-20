@@ -294,7 +294,7 @@ async getRun(runId: string, tenantId: string, mid: string, userId: string) {
 
 **Fix - Worker's backend-shared RlsContextService:**
 
-The worker package also has its own `RlsContextService` in `@qs-pro/backend-shared`. It needs the same `runWithUserContext` method added.
+The worker package also has its own `RlsContextService` in `@qpp/backend-shared`. It needs the same `runWithUserContext` method added.
 
 **Testing Considerations:**
 

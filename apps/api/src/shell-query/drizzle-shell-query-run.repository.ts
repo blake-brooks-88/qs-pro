@@ -1,9 +1,6 @@
-import {
-  getDbFromContext,
-  type RlsContextService,
-} from '@qs-pro/backend-shared';
-import type { createDatabaseFromClient } from '@qs-pro/database';
-import { and, count, eq, notInArray, shellQueryRuns } from '@qs-pro/database';
+import { getDbFromContext, type RlsContextService } from '@qpp/backend-shared';
+import type { createDatabaseFromClient } from '@qpp/database';
+import { and, count, eq, notInArray, shellQueryRuns } from '@qpp/database';
 
 import type {
   CreateShellQueryRunParams,

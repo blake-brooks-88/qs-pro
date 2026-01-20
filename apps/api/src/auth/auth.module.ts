@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AuthModule as BackendSharedAuthModule } from '@qs-pro/backend-shared';
+import { AuthModule as BackendSharedAuthModule } from '@qpp/backend-shared';
 
 import { AuthController } from './auth.controller';
 

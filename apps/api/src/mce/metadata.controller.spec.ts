@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { MetadataService } from '@qs-pro/backend-shared';
+import { MetadataService } from '@qpp/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MetadataController } from './metadata.controller';

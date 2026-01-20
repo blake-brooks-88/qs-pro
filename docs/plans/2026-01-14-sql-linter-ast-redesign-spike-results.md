@@ -229,7 +229,7 @@ The spike test file is located at:
 
 Run with:
 ```bash
-pnpm --filter @qs-pro/web test -- --run src/features/editor-workspace/utils/sql-lint/parser/sql-parser-spike.test.ts
+pnpm --filter @qpp/web test -- --run src/features/editor-workspace/utils/sql-lint/parser/sql-parser-spike.test.ts
 ```
 
 ## Next Steps

@@ -1,6 +1,6 @@
 import { Global, Logger, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createDatabaseFromClient, createSqlClient } from "@qs-pro/database";
+import { createDatabaseFromClient, createSqlClient } from "@qpp/database";
 
 import { createDbProxy } from "./db-proxy";
 import { RlsContextService } from "./rls-context.service";
