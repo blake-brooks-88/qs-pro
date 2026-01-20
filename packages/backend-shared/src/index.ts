@@ -5,6 +5,7 @@ export {
   getErrorTitle,
   getHttpStatus,
   isTerminal,
+  type ProblemDetails,
   toAppError,
 } from "./common/errors";
 export { SeatLimitExceededException } from "./common/exceptions/seat-limit-exceeded.exception";

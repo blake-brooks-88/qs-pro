@@ -1,23 +1,9 @@
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import axios, { AxiosRequestConfig } from "axios";
 
+import { AppError, ErrorCode } from "../common/errors";
 import { MCE_AUTH_PROVIDER, MceAuthProvider } from "./mce-auth.provider";
 import { parseSoapXml } from "./soap-xml.util";
-
-export interface ProblemDetails {
-  type: string;
-  title: string;
-  status: number;
-  detail?: string;
-  instance?: string;
-  [key: string]: string | number | undefined;
-}
 
 @Injectable()
 export class MceBridgeService {
@@ -41,7 +27,8 @@ export class MceBridgeService {
   }
 
   /**
-   * Generic request wrapper handling token injection and error normalization
+   * REST request with internal 401 retry (token refresh).
+   * After retry fails, throws AppError with MCE_AUTH_EXPIRED.
    */
   async request<T = unknown>(
     tenantId: string,
@@ -49,17 +36,16 @@ export class MceBridgeService {
     mid: string,
     config: AxiosRequestConfig,
   ): Promise<T> {
-    try {
+    const makeRequest = async (forceRefresh: boolean) => {
       const { accessToken, tssd } = await this.authProvider.refreshToken(
         tenantId,
         userId,
         mid,
+        forceRefresh,
       );
-
-      // Determine Base URL (REST by default)
       const baseUrl = `https://${tssd}.rest.marketingcloudapis.com`;
 
-      const response = await axios.request<T>({
+      return axios.request<T>({
         ...config,
         baseURL: config.baseURL ?? baseUrl,
         headers: {
@@ -67,12 +53,30 @@ export class MceBridgeService {
           Authorization: `Bearer ${accessToken}`,
         },
       });
+    };
 
+    try {
+      const response = await makeRequest(false);
       return response.data;
     } catch (error) {
+      // Pass through AppError from AuthService
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      // Internal 401 retry (like SOAP does)
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        await this.authProvider.invalidateToken(tenantId, userId, mid);
+        try {
+          const response = await makeRequest(true);
+          return response.data;
+        } catch (retryError) {
+          this.handleError(retryError);
+        }
+      }
       this.handleError(error);
-      throw error; // handleRequest throws HttpException, but TypeScript needs this
     }
+    throw new Error("unreachable"); // TypeScript requires this
   }
 
   /**
@@ -132,7 +136,10 @@ export class MceBridgeService {
         throw error;
       }
       if (this.isSoapLoginFailedFault(second.raw, second.parsed)) {
-        throw new UnauthorizedException("MCE SOAP authentication failed");
+        throw new AppError(
+          ErrorCode.MCE_AUTH_EXPIRED,
+          "MCE SOAP authentication failed after token refresh",
+        );
       }
       return second.parsed as T;
     }
@@ -176,35 +183,60 @@ export class MceBridgeService {
     return /Security/i.test(code) && /Login Failed/i.test(message);
   }
 
-  private handleError(error: unknown): void {
-    if (error instanceof HttpException) {
+  /**
+   * Maps Axios errors to AppError with appropriate codes.
+   * AppError from AuthService is passed through unchanged.
+   */
+  private handleError(error: unknown): never {
+    // Pass through AppError (from AuthService or elsewhere)
+    if (error instanceof AppError) {
       throw error;
     }
 
     if (axios.isAxiosError(error) && error.response) {
       const { status, statusText, data } = error.response;
+      let detail: string;
+      if (typeof data === "string") {
+        detail = data;
+      } else if (
+        typeof (data as Record<string, unknown>)?.message === "string"
+      ) {
+        detail = (data as Record<string, unknown>).message as string;
+      } else {
+        detail = JSON.stringify(data);
+      }
 
-      const problem: ProblemDetails = {
-        type: `https://httpstatuses.com/${status}`,
-        title: statusText || "An error occurred",
-        status,
-        detail:
-          typeof data === "string"
-            ? data
-            : data?.message || JSON.stringify(data),
-      };
-
-      throw new HttpException(problem, status);
+      // Map HTTP status to error code
+      const code = this.mapStatusToErrorCode(status);
+      throw new AppError(
+        code,
+        detail || statusText || `MCE request failed with status ${status}`,
+        error,
+      );
     }
 
-    // Non-Axios error or no response
-    const problem: ProblemDetails = {
-      type: "about:blank",
-      title: "Internal Server Error",
-      status: HttpStatus.INTERNAL_SERVER_ERROR,
-      detail: error instanceof Error ? error.message : "Unknown error",
-    };
+    // Non-Axios error or no response (network error)
+    throw new AppError(
+      ErrorCode.MCE_SERVER_ERROR,
+      error instanceof Error ? error.message : "Unknown MCE error",
+      error,
+    );
+  }
 
-    throw new HttpException(problem, HttpStatus.INTERNAL_SERVER_ERROR);
+  private mapStatusToErrorCode(status: number): ErrorCode {
+    switch (status) {
+      case 400:
+        return ErrorCode.MCE_BAD_REQUEST;
+      case 401:
+        return ErrorCode.MCE_AUTH_EXPIRED; // Already retried internally
+      case 403:
+        return ErrorCode.MCE_FORBIDDEN;
+      default:
+        if (status >= 500) {
+          return ErrorCode.MCE_SERVER_ERROR;
+        }
+        // Other 4xx - treat as bad request
+        return ErrorCode.MCE_BAD_REQUEST;
+    }
   }
 }
