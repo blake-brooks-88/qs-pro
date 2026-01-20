@@ -89,4 +89,32 @@ describe("appErrorToProblemDetails", () => {
       expect(result.detail).toBe("test message");
     });
   });
+
+  it("preserves type and title for upstream 5xx errors (MCE_SERVER_ERROR)", () => {
+    const error = new AppError(
+      ErrorCode.MCE_SERVER_ERROR,
+      "Salesforce API temporarily unavailable",
+    );
+    const result = appErrorToProblemDetails(error, "/api/query");
+
+    expect(result.status).toBe(502);
+    expect(result.type).toBe("urn:qpp:error:mce-server-error");
+    expect(result.title).toBe("MCE Server Error");
+    expect(result.detail).toBe("Salesforce API temporarily unavailable");
+  });
+
+  it("masks internal infrastructure 5xx errors (DATABASE_ERROR, REDIS_ERROR)", () => {
+    const tests = [ErrorCode.DATABASE_ERROR, ErrorCode.REDIS_ERROR];
+
+    tests.forEach((code) => {
+      const error = new AppError(code, "Internal failure details");
+      const result = appErrorToProblemDetails(error, "/test");
+
+      expect(result.status).toBe(500);
+      expect(result.type).toBe("urn:qpp:error:internal-server-error");
+      expect(result.title).toBe("Internal Server Error");
+      expect(result.detail).toBe("An unexpected error occurred");
+      expect(result.type).not.toContain(code.toLowerCase());
+    });
+  });
 });

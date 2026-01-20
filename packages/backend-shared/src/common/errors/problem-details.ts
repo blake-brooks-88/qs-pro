@@ -16,9 +16,12 @@ export interface ProblemDetails {
 /**
  * Converts an AppError to RFC 9457 Problem Details format.
  *
- * Security: 5xx errors get generic type, title, and detail messages to avoid
- * leaking implementation details (database, cache, etc.). Full error is logged
- * server-side for debugging.
+ * Security strategy for 5xx errors:
+ * - Internal infrastructure errors (database, Redis, config) → generic type/title/detail
+ * - Upstream service errors (MCE 5xx) → preserve specific type/title for debugging
+ *
+ * This prevents reconnaissance of our internals while exposing helpful upstream status.
+ * Full error details logged server-side for all 5xx errors.
  */
 export function appErrorToProblemDetails(
   error: AppError,
@@ -26,14 +29,17 @@ export function appErrorToProblemDetails(
 ): ProblemDetails {
   const status = getHttpStatus(error.code);
   const is5xx = status >= 500;
+  // Upstream service errors are safe to expose (don't leak our infrastructure)
+  const isUpstreamError = error.code === "MCE_SERVER_ERROR";
+  const shouldMask = is5xx && !isUpstreamError;
 
   return {
-    type: is5xx
+    type: shouldMask
       ? "urn:qpp:error:internal-server-error"
       : `urn:qpp:error:${error.code.toLowerCase().replace(/_/g, "-")}`,
-    title: is5xx ? "Internal Server Error" : getErrorTitle(error.code),
+    title: shouldMask ? "Internal Server Error" : getErrorTitle(error.code),
     status,
-    detail: is5xx ? "An unexpected error occurred" : error.message,
+    detail: shouldMask ? "An unexpected error occurred" : error.message,
     instance: requestPath,
   };
 }
