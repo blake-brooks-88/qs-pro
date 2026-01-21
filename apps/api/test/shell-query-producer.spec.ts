@@ -8,6 +8,7 @@ import { RestDataService } from '@qpp/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionGuard } from '../src/auth/session.guard';
+import { configureApp } from '../src/configure-app';
 import { ShellQueryController } from '../src/shell-query/shell-query.controller';
 import { ShellQueryService } from '../src/shell-query/shell-query.service';
 import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
@@ -56,6 +57,7 @@ describe('Shell Query Producer (e2e)', () => {
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
       new FastifyAdapter(),
     );
+    configureApp(app, { globalPrefix: false });
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
     service = moduleFixture.get<ShellQueryService>(ShellQueryService);
@@ -156,6 +158,8 @@ describe('Shell Query Producer (e2e)', () => {
       });
 
       expect(res.statusCode).toBe(429);
+      expect(res.json().type).toBe('urn:qpp:error:http-429');
+      expect(res.json().detail).toBeTruthy();
     });
   });
 });

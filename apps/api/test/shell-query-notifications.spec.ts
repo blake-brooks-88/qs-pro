@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionGuard } from '../src/auth/session.guard';
+import { configureApp } from '../src/configure-app';
 import { ShellQueryController } from '../src/shell-query/shell-query.controller';
 import { ShellQueryService } from '../src/shell-query/shell-query.service';
 import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
@@ -45,6 +46,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
       new FastifyAdapter(),
     );
+    configureApp(app, { globalPrefix: false });
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
   });
@@ -82,6 +84,8 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=0',
       });
       expect(res.statusCode).toBe(400);
+      expect(res.json().type).toBe('urn:qpp:error:http-400');
+      expect(res.json().detail).toBeTruthy();
     });
 
     it('should return 400 for page > 50', async () => {
@@ -90,9 +94,10 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=51',
       });
       expect(res.statusCode).toBe(400);
-      expect(String(res.json().message)).toContain(
+      expect(String(res.json().detail)).toContain(
         'Page number exceeds maximum of 50',
       );
+      expect(res.json().type).toBe('urn:qpp:error:http-400');
     });
 
     it('should return 409 when job still running', async () => {
@@ -105,7 +110,8 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=1',
       });
       expect(res.statusCode).toBe(409);
-      expect(String(res.json().message)).toContain('Run is still running');
+      expect(String(res.json().detail)).toContain('Run is still running');
+      expect(res.json().type).toBe('urn:qpp:error:http-409');
     });
 
     it('should return 404 when run not found', async () => {
@@ -118,7 +124,8 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=1',
       });
       expect(res.statusCode).toBe(404);
-      expect(String(res.json().message)).toContain('Run not found');
+      expect(String(res.json().detail)).toContain('Run not found');
+      expect(res.json().type).toBe('urn:qpp:error:http-404');
     });
 
     it('should return 409 when job failed', async () => {
@@ -134,7 +141,8 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/results?page=1',
       });
       expect(res.statusCode).toBe(409);
-      expect(String(res.json().message)).toContain('Run failed');
+      expect(String(res.json().detail)).toContain('Run failed');
+      expect(res.json().type).toBe('urn:qpp:error:http-409');
     });
   });
 
@@ -147,6 +155,8 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/events',
       });
       expect(res.statusCode).toBe(404);
+      expect(res.json().type).toBe('urn:qpp:error:http-404');
+      expect(res.json().detail).toBeTruthy();
     });
 
     it('should enforce rate limiting', async () => {
@@ -158,6 +168,8 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/events',
       });
       expect(res.statusCode).toBe(429);
+      expect(res.json().type).toBe('urn:qpp:error:http-429');
+      expect(res.json().detail).toBeTruthy();
 
       expect(mockRedis.decr).toHaveBeenCalled();
     });
