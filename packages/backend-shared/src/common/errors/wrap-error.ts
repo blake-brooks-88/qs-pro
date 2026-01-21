@@ -13,7 +13,7 @@ export function toAppError(error: unknown): AppError {
     return error;
   }
 
-  // Unknown errors
-  const message = error instanceof Error ? error.message : "Unknown error";
-  return new AppError(ErrorCode.UNKNOWN, message, error);
+  // Wrap unknown errors with UNKNOWN code
+  // Original error preserved as cause for logging
+  return new AppError(ErrorCode.UNKNOWN, error);
 }

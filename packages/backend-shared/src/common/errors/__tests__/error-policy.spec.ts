@@ -25,7 +25,7 @@ describe("isTerminal", () => {
       ErrorCode.RATE_LIMIT_EXCEEDED,
       ErrorCode.CONFIG_ERROR,
     ])("returns true for %s", (code) => {
-      const error = new AppError(code, "test");
+      const error = new AppError(code);
       expect(isTerminal(error)).toBe(true);
     });
   });
@@ -37,7 +37,7 @@ describe("isTerminal", () => {
       ErrorCode.REDIS_ERROR,
       ErrorCode.UNKNOWN,
     ])("returns false for %s", (code) => {
-      const error = new AppError(code, "test");
+      const error = new AppError(code);
       expect(isTerminal(error)).toBe(false);
     });
   });

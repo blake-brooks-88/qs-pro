@@ -46,6 +46,30 @@ export function isTerminal(error: unknown): boolean {
 }
 
 /**
+ * Unrecoverable errors should stop ALL processing immediately.
+ * No retry, no fallback, no probing will help - the fundamental
+ * operation is broken (auth, config, permissions).
+ *
+ * This is a SUBSET of terminal errors. Use this in inner loops
+ * (probing, fallback) where you need to distinguish "give up entirely"
+ * from "this attempt failed, try another way".
+ */
+const UNRECOVERABLE_CODES = new Set<ErrorCode>([
+  ErrorCode.MCE_AUTH_EXPIRED,
+  ErrorCode.MCE_CREDENTIALS_MISSING,
+  ErrorCode.MCE_TENANT_NOT_FOUND,
+  ErrorCode.MCE_FORBIDDEN,
+  ErrorCode.CONFIG_ERROR,
+]);
+
+export function isUnrecoverable(error: unknown): boolean {
+  if (!(error instanceof AppError)) {
+    return false;
+  }
+  return UNRECOVERABLE_CODES.has(error.code);
+}
+
+/**
  * Maps AppError codes to HTTP status codes.
  * Used by GlobalExceptionFilter for domain errors.
  */
@@ -56,6 +80,9 @@ export function getHttpStatus(code: ErrorCode): number {
       return 400;
     case ErrorCode.MCE_AUTH_EXPIRED:
     case ErrorCode.MCE_CREDENTIALS_MISSING:
+      return 401;
+    // MCE_TENANT_NOT_FOUND: User's auth context references a non-existent tenant.
+    // This is a data integrity issue requiring re-authentication, not "resource not found".
     case ErrorCode.MCE_TENANT_NOT_FOUND:
       return 401;
     case ErrorCode.MCE_FORBIDDEN:

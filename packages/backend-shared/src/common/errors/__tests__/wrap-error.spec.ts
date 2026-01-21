@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { AppError, ErrorCode, toAppError } from "../index";
+import { AppError, ErrorCode, ErrorMessages, toAppError } from "../index";
 
 describe("toAppError", () => {
   it("passes through existing AppError unchanged", () => {
-    const original = new AppError(ErrorCode.MCE_VALIDATION_FAILED, "test");
+    const original = new AppError(ErrorCode.MCE_VALIDATION_FAILED);
     const result = toAppError(original);
     expect(result).toBe(original);
   });
@@ -13,14 +13,14 @@ describe("toAppError", () => {
     const original = new Error("something broke");
     const result = toAppError(original);
     expect(result.code).toBe(ErrorCode.UNKNOWN);
-    expect(result.message).toBe("something broke");
+    expect(result.message).toBe(ErrorMessages[ErrorCode.UNKNOWN]);
     expect(result.cause).toBe(original);
   });
 
   it("handles string errors gracefully", () => {
     const result = toAppError("string error");
     expect(result.code).toBe(ErrorCode.UNKNOWN);
-    expect(result.message).toBe("Unknown error");
+    expect(result.message).toBe(ErrorMessages[ErrorCode.UNKNOWN]);
   });
 
   it("handles null/undefined gracefully", () => {
@@ -31,6 +31,6 @@ describe("toAppError", () => {
   it("wraps arbitrary objects with UNKNOWN code", () => {
     const result = toAppError({ foo: "bar" });
     expect(result.code).toBe(ErrorCode.UNKNOWN);
-    expect(result.message).toBe("Unknown error");
+    expect(result.message).toBe(ErrorMessages[ErrorCode.UNKNOWN]);
   });
 });

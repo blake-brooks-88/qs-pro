@@ -7,11 +7,15 @@ import { getErrorTitle, getHttpStatus } from "./error-policy";
  * Provides machine-readable error information to API clients.
  */
 export interface ProblemDetails {
-  type: string; // URN format: urn:qpp:error:seat-limit-exceeded
-  title: string; // Human-readable summary
-  status: number; // HTTP status code
-  detail: string; // Specific error message (masked for 5xx)
-  instance: string; // Request path
+  type: string;
+  title: string;
+  status: number;
+  detail: string;
+  instance: string;
+  // Extension fields (typed, safe)
+  violations?: string[];
+  field?: string;
+  retryAfter?: number;
 }
 
 /**
@@ -30,12 +34,10 @@ export function appErrorToProblemDetails(
 ): ProblemDetails {
   const status = getHttpStatus(error.code);
   const is5xx = status >= 500;
-  // Upstream service errors expose type/title (tells client MCE is down)
-  // but mask detail (don't leak Salesforce internal errors)
   const isUpstreamError = error.code === ErrorCode.MCE_SERVER_ERROR;
   const shouldMaskType = is5xx && !isUpstreamError;
 
-  return {
+  const base: ProblemDetails = {
     type: shouldMaskType
       ? "urn:qpp:error:internal-server-error"
       : `urn:qpp:error:${error.code.toLowerCase().replace(/_/g, "-")}`,
@@ -44,4 +46,19 @@ export function appErrorToProblemDetails(
     detail: is5xx ? "An unexpected error occurred" : error.message,
     instance: requestPath,
   };
+
+  // Add extensions for non-5xx errors (safe to expose)
+  if (!is5xx && error.extensions) {
+    if (error.extensions.violations) {
+      base.violations = error.extensions.violations;
+    }
+    if (error.extensions.field) {
+      base.field = error.extensions.field;
+    }
+    if (error.extensions.retryAfter) {
+      base.retryAfter = error.extensions.retryAfter;
+    }
+  }
+
+  return base;
 }
