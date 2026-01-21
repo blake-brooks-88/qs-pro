@@ -18,7 +18,6 @@ export { SeatLimitExceededException } from "./common/exceptions/seat-limit-excee
 export * from "./database/database.module";
 export * from "./database/db-context";
 export * from "./database/rls-context.service";
-export { MceOperationError, McePaginationError } from "./mce/errors";
 export * from "./mce/mce.module";
 export {
   MCE_AUTH_PROVIDER,

@@ -17,6 +17,14 @@ export interface ErrorContext {
 
   // MCE correlation - from MCE response headers
   mceRequestId?: string;
+
+  // MCE operation details - for debugging SOAP failures
+  operation?: string;
+  status?: string;
+  statusMessage?: string;
+
+  // MCE pagination - for debugging pagination limits
+  maxPages?: number;
 }
 
 /**

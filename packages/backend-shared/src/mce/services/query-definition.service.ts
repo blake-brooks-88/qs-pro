@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
-import { MceOperationError, McePaginationError } from "../errors";
+import { AppError, ErrorCode } from "../../common/errors";
 import { MceBridgeService } from "../mce-bridge.service";
 import {
   buildContinueRequest,
@@ -62,7 +62,10 @@ export class QueryDefinitionService {
       if (status === "Error" && !msg?.Results) {
         return null;
       }
-      throw new MceOperationError("RetrieveQueryDefinition", status);
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "RetrieveQueryDefinition",
+        status,
+      });
     }
 
     const rawResults = msg?.Results;
@@ -143,7 +146,10 @@ export class QueryDefinitionService {
       const status = msg?.OverallStatus;
 
       if (status && status !== "OK" && status !== "MoreDataAvailable") {
-        throw new MceOperationError("RetrieveQueryDefinitionByFolder", status);
+        throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+          operation: "RetrieveQueryDefinitionByFolder",
+          status,
+        });
       }
 
       const rawResults = msg?.Results;
@@ -177,10 +183,10 @@ export class QueryDefinitionService {
 
     while (currentRequestId) {
       if (page >= MAX_PAGES) {
-        throw new McePaginationError(
-          "RetrieveQueryDefinitionByFolder",
-          MAX_PAGES,
-        );
+        throw new AppError(ErrorCode.MCE_PAGINATION_EXCEEDED, undefined, {
+          operation: "RetrieveQueryDefinitionByFolder",
+          maxPages: MAX_PAGES,
+        });
       }
 
       const continueBody = buildContinueRequest(currentRequestId);
@@ -216,20 +222,20 @@ export class QueryDefinitionService {
 
     const result = response.Body?.CreateResponse?.Results;
     if (result?.StatusCode !== "OK") {
-      throw new MceOperationError(
-        "CreateQueryDefinition",
-        result?.StatusCode ?? "Unknown",
-        result?.StatusMessage,
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "CreateQueryDefinition",
+        status: result?.StatusCode ?? "Unknown",
+        statusMessage: result?.StatusMessage,
+      });
     }
 
     const objectId = result?.NewObjectID;
     if (!objectId || typeof objectId !== "string") {
-      throw new MceOperationError(
-        "CreateQueryDefinition",
-        "NoObjectID",
-        "Query Definition created but no ObjectID returned",
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "CreateQueryDefinition",
+        status: "NoObjectID",
+        statusMessage: "Query Definition created but no ObjectID returned",
+      });
     }
 
     return { objectId };
@@ -255,20 +261,20 @@ export class QueryDefinitionService {
     const task = result?.Task;
 
     if (task?.StatusCode !== "OK" && result?.StatusCode !== "OK") {
-      throw new MceOperationError(
-        "PerformQueryDefinition",
-        task?.StatusCode ?? result?.StatusCode ?? "Unknown",
-        task?.StatusMessage ?? result?.StatusMessage,
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "PerformQueryDefinition",
+        status: task?.StatusCode ?? result?.StatusCode ?? "Unknown",
+        statusMessage: task?.StatusMessage ?? result?.StatusMessage,
+      });
     }
 
     const taskId = result?.TaskID ?? task?.ID;
     if (!taskId) {
-      throw new MceOperationError(
-        "PerformQueryDefinition",
-        "NoTaskID",
-        "Query performed but no TaskID returned",
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "PerformQueryDefinition",
+        status: "NoTaskID",
+        statusMessage: "Query performed but no TaskID returned",
+      });
     }
 
     return { taskId };
@@ -292,11 +298,11 @@ export class QueryDefinitionService {
 
     const result = response.Body?.DeleteResponse?.Results;
     if (result?.StatusCode && result.StatusCode !== "OK") {
-      throw new MceOperationError(
-        "DeleteQueryDefinition",
-        result.StatusCode,
-        result.StatusMessage,
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "DeleteQueryDefinition",
+        status: result.StatusCode,
+        statusMessage: result.StatusMessage,
+      });
     }
   }
 }

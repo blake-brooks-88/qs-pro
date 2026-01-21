@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
-import { MceOperationError, McePaginationError } from "../errors";
+import { AppError, ErrorCode } from "../../common/errors";
 import { MceBridgeService } from "../mce-bridge.service";
 import {
   buildContinueRequest,
@@ -77,7 +77,10 @@ export class DataExtensionService {
       const status = msg?.OverallStatus;
 
       if (status && status !== "OK" && status !== "MoreDataAvailable") {
-        throw new MceOperationError("RetrieveDataExtensions", status);
+        throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+          operation: "RetrieveDataExtensions",
+          status,
+        });
       }
 
       const rawResults = msg?.Results;
@@ -96,7 +99,10 @@ export class DataExtensionService {
       page++;
 
       if (page >= MAX_PAGES && requestId) {
-        throw new McePaginationError("RetrieveDataExtensions", MAX_PAGES);
+        throw new AppError(ErrorCode.MCE_PAGINATION_EXCEEDED, undefined, {
+          operation: "RetrieveDataExtensions",
+          maxPages: MAX_PAGES,
+        });
       }
     } while (requestId);
 
@@ -123,7 +129,10 @@ export class DataExtensionService {
     const status = msg?.OverallStatus;
 
     if (status && status !== "OK" && status !== "MoreDataAvailable") {
-      throw new MceOperationError("RetrieveDataExtensionByName", status);
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "RetrieveDataExtensionByName",
+        status,
+      });
     }
 
     const rawResults = msg?.Results;
@@ -179,7 +188,10 @@ export class DataExtensionService {
     const status = msg?.OverallStatus;
 
     if (status && status !== "OK" && status !== "MoreDataAvailable") {
-      throw new MceOperationError("RetrieveDataExtensionFields", status);
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "RetrieveDataExtensionFields",
+        status,
+      });
     }
 
     const rawResults = msg?.Results;
@@ -217,20 +229,20 @@ export class DataExtensionService {
 
     const result = response.Body?.CreateResponse?.Results;
     if (result?.StatusCode !== "OK") {
-      throw new MceOperationError(
-        "CreateDataExtension",
-        result?.StatusCode ?? "Unknown",
-        result?.StatusMessage,
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "CreateDataExtension",
+        status: result?.StatusCode ?? "Unknown",
+        statusMessage: result?.StatusMessage,
+      });
     }
 
     const objectId = result?.NewObjectID;
     if (!objectId || typeof objectId !== "string") {
-      throw new MceOperationError(
-        "CreateDataExtension",
-        "NoObjectID",
-        "Data Extension created but no ObjectID returned",
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "CreateDataExtension",
+        status: "NoObjectID",
+        statusMessage: "Data Extension created but no ObjectID returned",
+      });
     }
 
     return { objectId };
@@ -254,11 +266,11 @@ export class DataExtensionService {
 
     const result = response.Body?.DeleteResponse?.Results;
     if (result?.StatusCode && result.StatusCode !== "OK") {
-      throw new MceOperationError(
-        "DeleteDataExtension",
-        result.StatusCode,
-        result.StatusMessage,
-      );
+      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
+        operation: "DeleteDataExtension",
+        status: result.StatusCode,
+        statusMessage: result.StatusMessage,
+      });
     }
   }
 }
