@@ -1,0 +1,61 @@
+import { Injectable } from "@nestjs/common";
+import axios, { AxiosRequestConfig } from "axios";
+
+import { AppError } from "../common/errors/app-error";
+import { ErrorCode } from "../common/errors/error-codes";
+
+/**
+ * Infrastructure layer HTTP client for MCE API calls.
+ * Translates HTTP errors to AppError at the boundary.
+ *
+ * MceBridgeService passes fully-configured requests (including auth headers).
+ * This class is responsible ONLY for HTTP execution and error translation.
+ */
+@Injectable()
+export class MceHttpClient {
+  async request<T>(config: AxiosRequestConfig): Promise<T> {
+    try {
+      const response = await axios.request<T>(config);
+      return response.data;
+    } catch (error) {
+      throw this.translateError(error);
+    }
+  }
+
+  private translateError(error: unknown): AppError {
+    if (error instanceof AppError) {
+      return error;
+    }
+
+    if (axios.isAxiosError(error) && error.response) {
+      const { status, data } = error.response;
+      const detail =
+        typeof data === "string"
+          ? data
+          : data?.message || `MCE request failed (${status})`;
+
+      return new AppError(this.mapStatusToErrorCode(status), error, {
+        status: String(status),
+        operation: error.config?.url,
+        statusMessage: detail,
+      });
+    }
+
+    return new AppError(ErrorCode.MCE_SERVER_ERROR, error);
+  }
+
+  private mapStatusToErrorCode(status: number): ErrorCode {
+    switch (status) {
+      case 400:
+        return ErrorCode.MCE_BAD_REQUEST;
+      case 401:
+        return ErrorCode.MCE_AUTH_EXPIRED;
+      case 403:
+        return ErrorCode.MCE_FORBIDDEN;
+      default:
+        return status >= 500
+          ? ErrorCode.MCE_SERVER_ERROR
+          : ErrorCode.MCE_BAD_REQUEST;
+    }
+  }
+}
