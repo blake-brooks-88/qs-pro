@@ -124,7 +124,7 @@ describe('ShellQueryService', () => {
 
     // Act / Assert
     await expect(service.createRun(context, 'select 1')).rejects.toThrow(
-      /Rate limit exceeded/i,
+      /Too many requests/i,
     );
     expect(runRepo.createRun).not.toHaveBeenCalled();
     expect(queue.add).not.toHaveBeenCalled();

@@ -1,8 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  SeatLimitExceededException,
-  SeatLimitService,
-} from '@qpp/backend-shared';
+import { AppError, ErrorCode, SeatLimitService } from '@qpp/backend-shared';
 import type { ITenantRepository, Tenant } from '@qpp/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,7 +46,7 @@ describe('SeatLimitService', () => {
     expect(tenantRepo.countUsersByTenantId).toHaveBeenCalledWith(tenantId);
   });
 
-  it('throws SeatLimitExceededException when at seat limit', async () => {
+  it('throws AppError with SEAT_LIMIT_EXCEEDED when at seat limit', async () => {
     // Arrange
     const tenantId = 'tenant-2';
     const mockTenant: Tenant = {
@@ -65,12 +62,13 @@ describe('SeatLimitService', () => {
     vi.mocked(tenantRepo.countUsersByTenantId).mockResolvedValue(10);
 
     // Act & Assert
-    await expect(service.checkSeatLimit(tenantId)).rejects.toThrow(
-      SeatLimitExceededException,
-    );
+    await expect(service.checkSeatLimit(tenantId)).rejects.toThrow(AppError);
+    await expect(service.checkSeatLimit(tenantId)).rejects.toMatchObject({
+      code: ErrorCode.SEAT_LIMIT_EXCEEDED,
+    });
   });
 
-  it('throws SeatLimitExceededException when over seat limit', async () => {
+  it('throws AppError with SEAT_LIMIT_EXCEEDED when over seat limit', async () => {
     // Arrange
     const tenantId = 'tenant-3';
     const mockTenant: Tenant = {
@@ -86,9 +84,10 @@ describe('SeatLimitService', () => {
     vi.mocked(tenantRepo.countUsersByTenantId).mockResolvedValue(15);
 
     // Act & Assert
-    await expect(service.checkSeatLimit(tenantId)).rejects.toThrow(
-      SeatLimitExceededException,
-    );
+    await expect(service.checkSeatLimit(tenantId)).rejects.toThrow(AppError);
+    await expect(service.checkSeatLimit(tenantId)).rejects.toMatchObject({
+      code: ErrorCode.SEAT_LIMIT_EXCEEDED,
+    });
   });
 
   it('allows unlimited users when seat limit is null', async () => {

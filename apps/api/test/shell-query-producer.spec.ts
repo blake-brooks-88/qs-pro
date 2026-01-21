@@ -106,7 +106,7 @@ describe('Shell Query Producer (e2e)', () => {
       const sqlText = 'SELECT 1';
 
       await expect(service.createRun(context, sqlText)).rejects.toThrow(
-        'Rate limit exceeded',
+        'Too many requests',
       );
 
       expect(mockQueue.add).not.toHaveBeenCalled();
@@ -158,7 +158,7 @@ describe('Shell Query Producer (e2e)', () => {
       });
 
       expect(res.statusCode).toBe(429);
-      expect(res.json().type).toBe('urn:qpp:error:http-429');
+      expect(res.json().type).toBe('urn:qpp:error:rate-limit-exceeded');
       expect(res.json().detail).toBeTruthy();
     });
   });

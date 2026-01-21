@@ -4,7 +4,6 @@ import {
   Controller,
   Get,
   HttpCode,
-  HttpException,
   HttpStatus,
   Inject,
   InternalServerErrorException,
@@ -15,6 +14,7 @@ import {
   Sse,
   UseGuards,
 } from '@nestjs/common';
+import { AppError } from '@qpp/backend-shared';
 import type { Observable } from 'rxjs';
 import { z } from 'zod';
 
@@ -92,8 +92,9 @@ export class ShellQueryController {
 
       return { runId, status: 'queued' };
     } catch (error: unknown) {
-      if (error instanceof Error && error.message.includes('Rate limit')) {
-        throw new HttpException(error.message, HttpStatus.TOO_MANY_REQUESTS);
+      // Let AppError propagate to GlobalExceptionFilter for proper handling
+      if (error instanceof AppError) {
+        throw error;
       }
       throw new InternalServerErrorException(
         error instanceof Error ? error.message : 'Unknown error',

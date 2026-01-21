@@ -7,7 +7,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AppError,
   buildQppResultsDataExtensionName,
+  ErrorCode,
   RestDataService,
   type RowsetResponse,
 } from '@qpp/backend-shared';
@@ -71,9 +73,11 @@ export class ShellQueryService {
       context.userId,
     );
     if (activeRuns >= 10) {
-      throw new Error(
-        'Rate limit exceeded: Max 10 concurrent shell queries per user.',
-      );
+      throw new AppError(ErrorCode.RATE_LIMIT_EXCEEDED, undefined, {
+        activeRuns,
+        maxConcurrent: 10,
+        userId: context.userId,
+      });
     }
 
     // 2. Persist initial state to DB
