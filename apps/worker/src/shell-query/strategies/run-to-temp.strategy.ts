@@ -84,7 +84,7 @@ export class RunToTempFlow implements IFlowStrategy {
       throw new AppError(
         ErrorCode.MCE_VALIDATION_FAILED,
         undefined,
-        { sql: sqlText },
+        undefined,
         { violations: validationResult.errors },
       );
     }

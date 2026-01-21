@@ -2,6 +2,24 @@ import { ErrorCode } from "./error-codes";
 import { ErrorMessages } from "./error-messages";
 
 /**
+ * Correlation IDs for error tracing.
+ * These are safe to log - they contain only identifiers, never sensitive content.
+ * Use these to correlate errors with jobs, sessions, and external systems.
+ */
+export interface ErrorContext {
+  // Identity - for API errors where filter doesn't have session
+  tenantId?: string;
+  userId?: string;
+  mid?: string;
+
+  // Job correlation - for linking to worker jobs
+  runId?: string;
+
+  // MCE correlation - from MCE response headers
+  mceRequestId?: string;
+}
+
+/**
  * Extension data for RFC 9457 Problem Details.
  * These fields ARE exposed to clients - must be safe.
  */
@@ -31,7 +49,7 @@ export class AppError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly cause?: unknown,
-    readonly context?: Record<string, unknown>,
+    readonly context?: ErrorContext,
     readonly extensions?: AppErrorExtensions,
   ) {
     super(ErrorMessages[code]);

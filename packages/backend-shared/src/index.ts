@@ -3,6 +3,7 @@ export {
   type AppErrorExtensions,
   appErrorToProblemDetails,
   ErrorCode,
+  type ErrorContext,
   ErrorMessages,
   getErrorTitle,
   getHttpStatus,

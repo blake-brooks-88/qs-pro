@@ -187,9 +187,7 @@ async function getFieldsForTable(
 
   const fields = await metadataFn.getFieldsForTable(effectiveTableName);
   if (!fields) {
-    throw new AppError(ErrorCode.SELECT_STAR_EXPANSION_FAILED, undefined, {
-      tableName: effectiveTableName,
-    });
+    throw new AppError(ErrorCode.SELECT_STAR_EXPANSION_FAILED);
   }
 
   return fields;
@@ -211,9 +209,7 @@ function buildExpandedColumnList(
   return fields
     .map((f) => {
       if (f.Name.includes("]")) {
-        throw new AppError(ErrorCode.SELECT_STAR_EXPANSION_FAILED, undefined, {
-          columnName: f.Name,
-        });
+        throw new AppError(ErrorCode.SELECT_STAR_EXPANSION_FAILED);
       }
       const colName = needsBracketQuoting(f.Name)
         ? bracketQuote(f.Name)
@@ -299,9 +295,7 @@ export async function expandSelectStar(
     const starTablePrefix = getStarTablePrefix(stmt.columns);
 
     if (hasUnqualifiedSelectStar(stmt.columns) && tables.length > 1) {
-      throw new AppError(ErrorCode.SELECT_STAR_EXPANSION_FAILED, undefined, {
-        tables,
-      });
+      throw new AppError(ErrorCode.SELECT_STAR_EXPANSION_FAILED);
     }
 
     let targetTable: string;

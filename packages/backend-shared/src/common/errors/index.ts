@@ -1,4 +1,8 @@
-export { AppError, type AppErrorExtensions } from "./app-error";
+export {
+  AppError,
+  type AppErrorExtensions,
+  type ErrorContext,
+} from "./app-error";
 export { ErrorCode } from "./error-codes";
 export { ErrorMessages } from "./error-messages";
 export {
