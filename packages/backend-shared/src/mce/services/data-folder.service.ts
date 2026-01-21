@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { AppError, ErrorCode } from "../../common/errors";
 import { MceBridgeService } from "../mce-bridge.service";
+import { mceSoapFailure } from "../mce-errors";
 import {
   buildContinueRequest,
   buildCreateDataFolder,
@@ -60,10 +61,7 @@ export class DataFolderService {
       const status = msg?.OverallStatus;
 
       if (status && status !== "OK" && status !== "MoreDataAvailable") {
-        throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-          operation: "RetrieveDataFolder",
-          status,
-        });
+        throw mceSoapFailure("RetrieveDataFolder", status);
       }
 
       const rawResults = msg?.Results;
@@ -116,20 +114,20 @@ export class DataFolderService {
 
     const result = response.Body?.CreateResponse?.Results;
     if (result?.StatusCode !== "OK") {
-      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-        operation: "CreateDataFolder",
-        status: result?.StatusCode ?? "Unknown",
-        statusMessage: result?.StatusMessage,
-      });
+      throw mceSoapFailure(
+        "CreateDataFolder",
+        result?.StatusCode ?? "Unknown",
+        result?.StatusMessage,
+      );
     }
 
     const newId = result?.NewID;
     if (!newId) {
-      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-        operation: "CreateDataFolder",
-        status: "NoID",
-        statusMessage: "Data Folder created but no ID returned",
-      });
+      throw mceSoapFailure(
+        "CreateDataFolder",
+        "NoID",
+        "Data Folder created but no ID returned",
+      );
     }
 
     return { id: parseInt(newId, 10) };

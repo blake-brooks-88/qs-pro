@@ -24,6 +24,7 @@ export {
   type MceAuthProvider,
 } from "./mce/mce-auth.provider";
 export * from "./mce/mce-bridge.service";
+export { mceSoapFailure } from "./mce/mce-errors";
 export { MetadataService } from "./mce/metadata.service";
 export { buildQppResultsDataExtensionName } from "./mce/qpp-names";
 export {

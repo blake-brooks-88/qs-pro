@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { AppError, ErrorCode } from "../../common/errors";
 import { MceBridgeService } from "../mce-bridge.service";
+import { mceSoapFailure } from "../mce-errors";
 import {
   buildContinueRequest,
   buildCreateDataExtension,
@@ -77,10 +78,7 @@ export class DataExtensionService {
       const status = msg?.OverallStatus;
 
       if (status && status !== "OK" && status !== "MoreDataAvailable") {
-        throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-          operation: "RetrieveDataExtensions",
-          status,
-        });
+        throw mceSoapFailure("RetrieveDataExtensions", status);
       }
 
       const rawResults = msg?.Results;
@@ -129,10 +127,7 @@ export class DataExtensionService {
     const status = msg?.OverallStatus;
 
     if (status && status !== "OK" && status !== "MoreDataAvailable") {
-      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-        operation: "RetrieveDataExtensionByName",
-        status,
-      });
+      throw mceSoapFailure("RetrieveDataExtensionByName", status);
     }
 
     const rawResults = msg?.Results;
@@ -188,10 +183,7 @@ export class DataExtensionService {
     const status = msg?.OverallStatus;
 
     if (status && status !== "OK" && status !== "MoreDataAvailable") {
-      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-        operation: "RetrieveDataExtensionFields",
-        status,
-      });
+      throw mceSoapFailure("RetrieveDataExtensionFields", status);
     }
 
     const rawResults = msg?.Results;
@@ -229,20 +221,20 @@ export class DataExtensionService {
 
     const result = response.Body?.CreateResponse?.Results;
     if (result?.StatusCode !== "OK") {
-      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-        operation: "CreateDataExtension",
-        status: result?.StatusCode ?? "Unknown",
-        statusMessage: result?.StatusMessage,
-      });
+      throw mceSoapFailure(
+        "CreateDataExtension",
+        result?.StatusCode ?? "Unknown",
+        result?.StatusMessage,
+      );
     }
 
     const objectId = result?.NewObjectID;
     if (!objectId || typeof objectId !== "string") {
-      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-        operation: "CreateDataExtension",
-        status: "NoObjectID",
-        statusMessage: "Data Extension created but no ObjectID returned",
-      });
+      throw mceSoapFailure(
+        "CreateDataExtension",
+        "NoObjectID",
+        "Data Extension created but no ObjectID returned",
+      );
     }
 
     return { objectId };
@@ -266,11 +258,11 @@ export class DataExtensionService {
 
     const result = response.Body?.DeleteResponse?.Results;
     if (result?.StatusCode && result.StatusCode !== "OK") {
-      throw new AppError(ErrorCode.MCE_SOAP_FAILURE, undefined, {
-        operation: "DeleteDataExtension",
-        status: result.StatusCode,
-        statusMessage: result.StatusMessage,
-      });
+      throw mceSoapFailure(
+        "DeleteDataExtension",
+        result.StatusCode,
+        result.StatusMessage,
+      );
     }
   }
 }

@@ -2,28 +2,28 @@ import { ErrorCode } from "./error-codes";
 import { ErrorMessages } from "./error-messages";
 
 /**
- * Correlation IDs for error tracing.
- * These are safe to log - they contain only identifiers, never sensitive content.
- * Use these to correlate errors with jobs, sessions, and external systems.
+ * Debugging context for error tracing. Logged server-side, NEVER exposed to clients.
+ *
+ * Contains two categories of data:
+ * 1. Correlation IDs (tenantId, userId, mid, runId, mceRequestId) - always safe to log
+ * 2. Operational details (operation, status, statusMessage) - may include upstream
+ *    service messages that could contain object names or account identifiers
+ *
+ * Current logging policy: entire context logged at WARN level for debugging.
+ * If log aggregation is added later, consider selective logging by category.
  */
 export interface ErrorContext {
-  // Identity - for API errors where filter doesn't have session
+  // Correlation IDs - safe to log, use for tracing
   tenantId?: string;
   userId?: string;
   mid?: string;
-
-  // Job correlation - for linking to worker jobs
   runId?: string;
-
-  // MCE correlation - from MCE response headers
   mceRequestId?: string;
 
-  // MCE operation details - for debugging SOAP failures
+  // Operational details - may include upstream service messages
   operation?: string;
   status?: string;
   statusMessage?: string;
-
-  // MCE pagination - for debugging pagination limits
   maxPages?: number;
 }
 
