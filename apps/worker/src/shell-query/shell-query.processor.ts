@@ -101,8 +101,8 @@ export class ShellQueryProcessor extends WorkerHost {
 
     const maxAttempts = job.opts.attempts ?? 1;
     const isFinalAttempt = job.attemptsMade >= maxAttempts;
-    const isUnrecoverable = error instanceof UnrecoverableError;
-    const isPermanentFailure = isUnrecoverable || isFinalAttempt;
+    const isUnrecoverableError = error instanceof UnrecoverableError;
+    const isPermanentFailure = isUnrecoverableError || isFinalAttempt;
 
     if (!isPermanentFailure) {
       this.logger.warn(
@@ -127,7 +127,7 @@ export class ShellQueryProcessor extends WorkerHost {
         runId,
         attemptsMade: job.attemptsMade,
         maxAttempts,
-        isUnrecoverable,
+        isUnrecoverableError,
         error: message,
         stack: error.stack,
         timestamp: new Date().toISOString(),
