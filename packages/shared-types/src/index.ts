@@ -33,3 +33,6 @@ export type {
   FieldDefinition,
   TableMetadata,
 } from "./shell-query.js";
+
+// Error handling
+export { ErrorCode, ErrorMessages } from "./errors/index.js";

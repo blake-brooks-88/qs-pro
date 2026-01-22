@@ -1,6 +1,8 @@
+import { ErrorCode } from "@qpp/shared-types";
 import { and, count, eq } from "drizzle-orm";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
+import { DatabaseError } from "../errors";
 import {
   Credential,
   ICredentialsRepository,
@@ -45,7 +47,11 @@ export class DrizzleTenantRepository implements ITenantRepository {
       })
       .returning();
     if (!result) {
-      throw new Error("Tenant upsert failed to return a result");
+      throw new DatabaseError(
+        ErrorCode.DATABASE_ERROR,
+        "Tenant upsert failed to return a result",
+        { operation: "upsertTenant" },
+      );
     }
     return result;
   }
@@ -89,7 +95,11 @@ export class DrizzleUserRepository implements IUserRepository {
       })
       .returning();
     if (!result) {
-      throw new Error("User upsert failed to return a result");
+      throw new DatabaseError(
+        ErrorCode.DATABASE_ERROR,
+        "User upsert failed to return a result",
+        { operation: "upsertUser" },
+      );
     }
     return result;
   }
@@ -135,7 +145,11 @@ export class DrizzleCredentialsRepository implements ICredentialsRepository {
       })
       .returning();
     if (!result) {
-      throw new Error("Credential upsert failed to return a result");
+      throw new DatabaseError(
+        ErrorCode.DATABASE_ERROR,
+        "Credential upsert failed to return a result",
+        { operation: "upsertCredential" },
+      );
     }
     return result;
   }

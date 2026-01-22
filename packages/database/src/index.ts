@@ -13,6 +13,7 @@ export const createDatabaseFromClient = (client: ReturnType<typeof postgres>) =>
   drizzle(client);
 
 export * from "./crypto";
+export * from "./errors";
 export * from "./interfaces";
 export * from "./repositories/drizzle-repositories";
 export * from "./schema";

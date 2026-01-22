@@ -49,9 +49,9 @@ export class ShellQuerySweeper {
           setting.qppFolderId,
         );
       } catch (e: unknown) {
-        const err = e as { message?: string };
+        const message = e instanceof Error ? e.message : "Unknown error";
         this.logger.error(
-          `Sweep failed for tenant ${setting.tenantId} MID ${setting.mid}: ${err.message || "Unknown error"}`,
+          `Sweep failed for tenant ${setting.tenantId} MID ${setting.mid}: ${message}`,
         );
       }
     }

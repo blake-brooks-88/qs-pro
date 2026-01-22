@@ -3,12 +3,14 @@ import axios, { AxiosRequestConfig } from "axios";
 
 import { AppError, ErrorCode } from "../common/errors";
 import { MCE_AUTH_PROVIDER, MceAuthProvider } from "./mce-auth.provider";
+import { MceHttpClient } from "./mce-http-client";
 import { parseSoapXml } from "./soap-xml.util";
 
 @Injectable()
 export class MceBridgeService {
   constructor(
     @Inject(MCE_AUTH_PROVIDER) private authProvider: MceAuthProvider,
+    private readonly httpClient: MceHttpClient,
   ) {}
 
   /**
@@ -36,7 +38,7 @@ export class MceBridgeService {
     mid: string,
     config: AxiosRequestConfig,
   ): Promise<T> {
-    const makeRequest = async (forceRefresh: boolean) => {
+    const makeRequest = async (forceRefresh: boolean): Promise<T> => {
       const { accessToken, tssd } = await this.authProvider.refreshToken(
         tenantId,
         userId,
@@ -45,7 +47,7 @@ export class MceBridgeService {
       );
       const baseUrl = `https://${tssd}.rest.marketingcloudapis.com`;
 
-      return axios.request<T>({
+      return this.httpClient.request<T>({
         ...config,
         baseURL: config.baseURL ?? baseUrl,
         headers: {
@@ -56,27 +58,19 @@ export class MceBridgeService {
     };
 
     try {
-      const response = await makeRequest(false);
-      return response.data;
+      return await makeRequest(false);
     } catch (error) {
-      // Pass through AppError from AuthService
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      // Internal 401 retry (like SOAP does)
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
+      // MceHttpClient already translates errors to AppError
+      // Check for auth expiry and retry once
+      if (
+        error instanceof AppError &&
+        error.code === ErrorCode.MCE_AUTH_EXPIRED
+      ) {
         await this.authProvider.invalidateToken(tenantId, userId, mid);
-        try {
-          const response = await makeRequest(true);
-          return response.data;
-        } catch (retryError) {
-          this.handleError(retryError);
-        }
+        return await makeRequest(true);
       }
-      this.handleError(error);
+      throw error;
     }
-    throw new Error("unreachable"); // TypeScript requires this
   }
 
   /**

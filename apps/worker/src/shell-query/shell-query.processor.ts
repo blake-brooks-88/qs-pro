@@ -251,7 +251,9 @@ export class ShellQueryProcessor extends WorkerHost {
       );
 
       if (!result.taskId) {
-        throw new Error("No TaskID returned from flow execution");
+        throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+          statusMessage: "Missing TaskID",
+        });
       }
 
       const pollStartedAt = new Date();
@@ -332,7 +334,9 @@ export class ShellQueryProcessor extends WorkerHost {
     let { queryDefinitionId } = job.data;
 
     if (!token && !this.testMode) {
-      throw new Error("Missing BullMQ token for poll job");
+      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+        statusMessage: "Missing BullMQ token",
+      });
     }
 
     (this.metricsActiveJobs as { inc: () => void }).inc();
@@ -683,7 +687,9 @@ export class ShellQueryProcessor extends WorkerHost {
       }
 
       if (!token) {
-        throw new Error("Token required for moveToDelayed");
+        throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+          statusMessage: "Missing delay token",
+        });
       }
       await job.moveToDelayed(Date.now() + delayMs, token);
       throw new DelayedError();
@@ -812,7 +818,9 @@ export class ShellQueryProcessor extends WorkerHost {
       }
 
       if (!token) {
-        throw new Error("Token required for moveToDelayed");
+        throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+          statusMessage: "Missing delay token",
+        });
       }
       await (job as Job<PollShellQueryJob>).moveToDelayed(
         Date.now() + delayMs,

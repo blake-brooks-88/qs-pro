@@ -1,3 +1,5 @@
+import { DatabaseError } from "@qpp/database";
+
 import { AppError } from "./app-error";
 import { ErrorCode } from "./error-codes";
 
@@ -11,6 +13,11 @@ import { ErrorCode } from "./error-codes";
 export function toAppError(error: unknown): AppError {
   if (error instanceof AppError) {
     return error;
+  }
+
+  // Convert DatabaseError to AppError with the appropriate code
+  if (error instanceof DatabaseError) {
+    return new AppError(error.code, error, error.context);
   }
 
   // Wrap unknown errors with UNKNOWN code

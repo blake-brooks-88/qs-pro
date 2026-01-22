@@ -1,9 +1,8 @@
 import * as crypto from 'node:crypto';
 
 import { getQueueToken } from '@nestjs/bullmq';
-import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { RestDataService } from '@qpp/backend-shared';
+import { ErrorCode, RestDataService } from '@qpp/backend-shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -124,7 +123,7 @@ describe('ShellQueryService', () => {
 
     // Act / Assert
     await expect(service.createRun(context, 'select 1')).rejects.toThrow(
-      /Rate limit exceeded/i,
+      /Too many requests/i,
     );
     expect(runRepo.createRun).not.toHaveBeenCalled();
     expect(queue.add).not.toHaveBeenCalled();
@@ -238,15 +237,17 @@ describe('ShellQueryService', () => {
       expect(result.columns).toEqual([]);
     });
 
-    it('throws 404 when run does not exist', async () => {
+    it('throws RESOURCE_NOT_FOUND when run does not exist', async () => {
       vi.mocked(runRepo.findRun).mockResolvedValue(null);
 
       await expect(
         service.getResults('missing-run', 'tenant-1', 'user-1', 'mid-1', 1),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toMatchObject({
+        code: ErrorCode.RESOURCE_NOT_FOUND,
+      });
     });
 
-    it('throws 409 when run is not ready', async () => {
+    it('throws INVALID_STATE when run is not ready', async () => {
       vi.mocked(runRepo.findRun).mockResolvedValue({
         id: 'run-1',
         tenantId: 'tenant-1',
@@ -266,10 +267,12 @@ describe('ShellQueryService', () => {
 
       await expect(
         service.getResults('run-1', 'tenant-1', 'user-1', 'mid-1', 1),
-      ).rejects.toBeInstanceOf(ConflictException);
+      ).rejects.toMatchObject({
+        code: ErrorCode.INVALID_STATE,
+      });
     });
 
-    it('throws 409 with error message when run failed', async () => {
+    it('throws INVALID_STATE with error message when run failed', async () => {
       vi.mocked(runRepo.findRun).mockResolvedValue({
         id: 'run-1',
         tenantId: 'tenant-1',
@@ -289,7 +292,9 @@ describe('ShellQueryService', () => {
 
       await expect(
         service.getResults('run-1', 'tenant-1', 'user-1', 'mid-1', 1),
-      ).rejects.toBeInstanceOf(ConflictException);
+      ).rejects.toMatchObject({
+        code: ErrorCode.INVALID_STATE,
+      });
     });
   });
 });

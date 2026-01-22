@@ -168,7 +168,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         url: '/runs/run-1/events',
       });
       expect(res.statusCode).toBe(429);
-      expect(res.json().type).toBe('urn:qpp:error:http-429');
+      expect(res.json().type).toBe('urn:qpp:error:rate-limit-exceeded');
       expect(res.json().detail).toBeTruthy();
 
       expect(mockRedis.decr).toHaveBeenCalled();

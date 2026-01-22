@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 
-import { HttpException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { ErrorCode } from '@qpp/backend-shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ShellQuerySseService } from '../shell-query-sse.service';
@@ -88,7 +88,9 @@ describe('ShellQuerySseService', () => {
     // Act / Assert
     await expect(
       service.streamRunEvents('run-1', 'user-1'),
-    ).rejects.toBeInstanceOf(HttpException);
+    ).rejects.toMatchObject({
+      code: ErrorCode.RATE_LIMIT_EXCEEDED,
+    });
     expect(redis.decr).toHaveBeenCalledWith('sse-limit:user-1');
     expect(redis.duplicate).not.toHaveBeenCalled();
   });

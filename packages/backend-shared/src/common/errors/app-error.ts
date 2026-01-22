@@ -25,6 +25,14 @@ export interface ErrorContext {
   status?: string;
   statusMessage?: string;
   maxPages?: number;
+
+  // Validation/invariant context
+  reason?: string;
+  field?: string;
+
+  // Rate limiting context
+  activeRuns?: number;
+  maxConcurrent?: number;
 }
 
 /**

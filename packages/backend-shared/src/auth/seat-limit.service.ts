@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { ITenantRepository } from "@qpp/database";
 
-import { SeatLimitExceededException } from "../common/exceptions/seat-limit-exceeded.exception";
+import { AppError, ErrorCode } from "../common/errors";
 
 @Injectable()
 export class SeatLimitService {
@@ -24,7 +24,7 @@ export class SeatLimitService {
       await this.tenantRepo.countUsersByTenantId(tenantId);
 
     if (currentUserCount >= tenant.seatLimit) {
-      throw new SeatLimitExceededException();
+      throw new AppError(ErrorCode.SEAT_LIMIT_EXCEEDED);
     }
   }
 }

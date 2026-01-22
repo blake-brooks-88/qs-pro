@@ -1,10 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type {
   ICredentialsRepository,
@@ -15,7 +9,7 @@ import { decrypt, encrypt } from "@qpp/database";
 import axios from "axios";
 import * as jose from "jose";
 
-import { AppError, ErrorCode } from "../common/errors";
+import { AppError, ErrorCode, safeContext } from "../common/errors";
 import { RlsContextService } from "../database/rls-context.service";
 import { SeatLimitService } from "./seat-limit.service";
 
@@ -58,9 +52,9 @@ export class AuthService {
   async verifyMceJwt(jwt: string) {
     const secret = this.configService.get<string>("MCE_JWT_SIGNING_SECRET");
     if (!secret) {
-      throw new InternalServerErrorException(
-        "MCE_JWT_SIGNING_SECRET not configured",
-      );
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: "MCE_JWT_SIGNING_SECRET not configured",
+      });
     }
 
     try {
@@ -101,11 +95,15 @@ export class AuthService {
       }
 
       if (!sfUserId || !eid || !mid) {
-        throw new Error("JWT missing required identity claims");
+        throw new AppError(ErrorCode.MCE_AUTH_EXPIRED, undefined, {
+          reason: "JWT missing required identity claims",
+        });
       }
 
       if (!tssd) {
-        throw new Error("Could not determine TSSD from JWT");
+        throw new AppError(ErrorCode.MCE_AUTH_EXPIRED, undefined, {
+          reason: "Could not determine TSSD from JWT",
+        });
       }
 
       return {
@@ -115,11 +113,17 @@ export class AuthService {
         tssd: this.assertValidTssd(tssd),
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       this.logger.error(
         "JWT Verification failed",
         error instanceof Error ? error.stack : error,
       );
-      throw new UnauthorizedException("Invalid MCE JWT");
+      throw new AppError(
+        ErrorCode.AUTH_UNAUTHORIZED,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -132,9 +136,9 @@ export class AuthService {
     const tokenUrl = `https://${tssd}.auth.marketingcloudapis.com/v2/token`;
 
     if (!clientId || !clientSecret) {
-      throw new InternalServerErrorException(
-        "MCE client credentials not configured",
-      );
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: "MCE_CLIENT_ID/MCE_CLIENT_SECRET not configured",
+      });
     }
 
     const body = new URLSearchParams({
@@ -193,7 +197,9 @@ export class AuthService {
     const redirectUri =
       this.configService.get<string>("MCE_REDIRECT_URI") ?? "";
     if (!clientId || !redirectUri) {
-      throw new InternalServerErrorException("MCE OAuth config not complete");
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: "MCE_CLIENT_ID/MCE_REDIRECT_URI not configured",
+      });
     }
     return `https://${tssd}.auth.marketingcloudapis.com/v2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
   }
@@ -211,7 +217,10 @@ export class AuthService {
     const tokenUrl = `https://${tssd}.auth.marketingcloudapis.com/v2/token`;
 
     if (!clientId || !clientSecret || !redirectUri) {
-      throw new InternalServerErrorException("MCE OAuth config not complete");
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason:
+          "MCE_CLIENT_ID/MCE_CLIENT_SECRET/MCE_REDIRECT_URI not configured",
+      });
     }
 
     const codes =
@@ -247,13 +256,14 @@ export class AuthService {
         }
 
         this.logTokenError("Auth code exchange failed", error);
-        throw new UnauthorizedException(
-          "Failed to exchange authorization code",
+        throw new AppError(
+          ErrorCode.AUTH_UNAUTHORIZED,
+          error instanceof Error ? error : undefined,
         );
       }
     }
 
-    throw new UnauthorizedException("Failed to exchange authorization code");
+    throw new AppError(ErrorCode.AUTH_UNAUTHORIZED);
   }
 
   async refreshToken(
@@ -327,7 +337,9 @@ export class AuthService {
   ) {
     const encryptionKey = this.configService.get<string>("ENCRYPTION_KEY");
     if (!encryptionKey) {
-      throw new InternalServerErrorException("ENCRYPTION_KEY not configured");
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: "ENCRYPTION_KEY not configured",
+      });
     }
     const encryptedAccessToken = encrypt(tokenData.access_token, encryptionKey);
     const encryptedRefreshToken = encrypt(
@@ -430,13 +442,13 @@ export class AuthService {
       derivedSfUserId &&
       providedSfUserId !== derivedSfUserId
     ) {
-      throw new UnauthorizedException("OAuth identity mismatch");
+      throw new AppError(ErrorCode.AUTH_IDENTITY_MISMATCH);
     }
     if (providedEid && derivedEid && providedEid !== derivedEid) {
-      throw new UnauthorizedException("OAuth identity mismatch");
+      throw new AppError(ErrorCode.AUTH_IDENTITY_MISMATCH);
     }
     if (providedMid && derivedMid && providedMid !== derivedMid) {
-      throw new UnauthorizedException("OAuth identity mismatch");
+      throw new AppError(ErrorCode.AUTH_IDENTITY_MISMATCH);
     }
 
     const effectiveSfUserId = derivedSfUserId ?? providedSfUserId;
@@ -447,9 +459,9 @@ export class AuthService {
       info.name ?? info.user?.name ?? info.user?.full_name ?? name;
 
     if (!effectiveSfUserId || !effectiveEid || !effectiveMid) {
-      throw new UnauthorizedException(
-        "Could not determine MCE User ID, Enterprise ID, or MID",
-      );
+      throw new AppError(ErrorCode.AUTH_UNAUTHORIZED, undefined, {
+        reason: "Could not determine MCE User ID, Enterprise ID, or MID",
+      });
     }
 
     const tenant = await this.tenantRepo.upsert({ eid: effectiveEid, tssd });
@@ -556,9 +568,11 @@ export class AuthService {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const data = error.response?.data;
+      const redacted =
+        data && typeof data === "object" ? safeContext(data) : undefined;
       this.logger.error(
         `${message} (${status ?? "unknown status"})`,
-        data ? JSON.stringify(data) : undefined,
+        redacted ? JSON.stringify(redacted) : undefined,
       );
       return;
     }
@@ -706,11 +720,15 @@ export class AuthService {
   private assertValidTssd(value: string): string {
     const trimmed = value.trim();
     if (!trimmed) {
-      throw new Error("TSSD is empty");
+      throw new AppError(ErrorCode.MCE_AUTH_EXPIRED, undefined, {
+        reason: "TSSD is empty",
+      });
     }
 
     if (!/^[a-z0-9-]+$/i.test(trimmed)) {
-      throw new Error("TSSD has invalid format");
+      throw new AppError(ErrorCode.MCE_AUTH_EXPIRED, undefined, {
+        reason: "TSSD has invalid format",
+      });
     }
 
     return trimmed.toLowerCase();

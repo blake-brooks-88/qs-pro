@@ -6,6 +6,10 @@ import { ErrorCode } from "./error-codes";
  * Examples: validation failures, missing credentials, business rule violations.
  */
 const TERMINAL_CODES = new Set<ErrorCode>([
+  // Authentication errors
+  ErrorCode.AUTH_UNAUTHORIZED,
+  ErrorCode.AUTH_IDENTITY_MISMATCH,
+
   // MCE HTTP errors that won't resolve with retry
   ErrorCode.MCE_BAD_REQUEST,
   ErrorCode.MCE_AUTH_EXPIRED,
@@ -25,9 +29,13 @@ const TERMINAL_CODES = new Set<ErrorCode>([
   // Business logic
   ErrorCode.SEAT_LIMIT_EXCEEDED,
   ErrorCode.RATE_LIMIT_EXCEEDED,
+  ErrorCode.RESOURCE_NOT_FOUND,
+  ErrorCode.INVALID_STATE,
+  ErrorCode.VALIDATION_ERROR,
 
   // Infrastructure (misconfiguration won't fix itself)
   ErrorCode.CONFIG_ERROR,
+  ErrorCode.INTERNAL_ERROR,
 ]);
 
 /**
@@ -55,6 +63,8 @@ export function isTerminal(error: unknown): boolean {
  * from "this attempt failed, try another way".
  */
 const UNRECOVERABLE_CODES = new Set<ErrorCode>([
+  ErrorCode.AUTH_UNAUTHORIZED,
+  ErrorCode.AUTH_IDENTITY_MISMATCH,
   ErrorCode.MCE_AUTH_EXPIRED,
   ErrorCode.MCE_CREDENTIALS_MISSING,
   ErrorCode.MCE_TENANT_NOT_FOUND,
@@ -75,6 +85,11 @@ export function isUnrecoverable(error: unknown): boolean {
  */
 export function getHttpStatus(code: ErrorCode): number {
   switch (code) {
+    // Authentication errors
+    case ErrorCode.AUTH_UNAUTHORIZED:
+    case ErrorCode.AUTH_IDENTITY_MISMATCH:
+      return 401;
+
     // MCE HTTP errors - preserve original status
     case ErrorCode.MCE_BAD_REQUEST:
       return 400;
@@ -94,6 +109,7 @@ export function getHttpStatus(code: ErrorCode): number {
     case ErrorCode.MCE_VALIDATION_FAILED:
     case ErrorCode.SELECT_STAR_EXPANSION_FAILED:
     case ErrorCode.SCHEMA_INFERENCE_FAILED:
+    case ErrorCode.VALIDATION_ERROR:
       return 400;
 
     // Business logic
@@ -101,6 +117,10 @@ export function getHttpStatus(code: ErrorCode): number {
       return 403;
     case ErrorCode.RATE_LIMIT_EXCEEDED:
       return 429;
+    case ErrorCode.RESOURCE_NOT_FOUND:
+      return 404;
+    case ErrorCode.INVALID_STATE:
+      return 409; // Conflict
 
     // Infrastructure
     case ErrorCode.CONFIG_ERROR:
@@ -117,6 +137,8 @@ export function getHttpStatus(code: ErrorCode): number {
  */
 export function getErrorTitle(code: ErrorCode): string {
   const titles: Record<ErrorCode, string> = {
+    [ErrorCode.AUTH_UNAUTHORIZED]: "Unauthorized",
+    [ErrorCode.AUTH_IDENTITY_MISMATCH]: "Identity Mismatch",
     [ErrorCode.MCE_BAD_REQUEST]: "MCE Bad Request",
     [ErrorCode.MCE_AUTH_EXPIRED]: "MCE Authentication Expired",
     [ErrorCode.MCE_CREDENTIALS_MISSING]: "MCE Credentials Missing",
@@ -130,9 +152,13 @@ export function getErrorTitle(code: ErrorCode): string {
     [ErrorCode.SCHEMA_INFERENCE_FAILED]: "Schema Inference Failed",
     [ErrorCode.SEAT_LIMIT_EXCEEDED]: "Seat Limit Exceeded",
     [ErrorCode.RATE_LIMIT_EXCEEDED]: "Rate Limit Exceeded",
+    [ErrorCode.RESOURCE_NOT_FOUND]: "Resource Not Found",
+    [ErrorCode.INVALID_STATE]: "Invalid State",
+    [ErrorCode.VALIDATION_ERROR]: "Validation Error",
     [ErrorCode.CONFIG_ERROR]: "Configuration Error",
     [ErrorCode.DATABASE_ERROR]: "Database Error",
     [ErrorCode.REDIS_ERROR]: "Redis Error",
+    [ErrorCode.INTERNAL_ERROR]: "Internal Error",
     [ErrorCode.UNKNOWN]: "Internal Server Error",
   };
   return titles[code];

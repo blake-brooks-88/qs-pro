@@ -9,16 +9,28 @@ import {
   AppError,
   appErrorToProblemDetails,
   type ProblemDetails,
+  safeContext,
 } from '@qpp/backend-shared';
 import { FastifyReply, FastifyRequest } from 'fastify';
 
-// Mock Sentry for now as we don't have the SDK installed yet
+// Mock Sentry for now - when real SDK is added, configure beforeSend
+// to scrub sensitive fields (e.g., request headers, axios config)
 const Sentry = {
-  captureException: (exception: unknown) => {
-    // In a real app, this would send to Sentry
+  captureException: (
+    exception: unknown,
+    hint?: { extra?: Record<string, unknown> },
+  ) => {
     void exception;
+    void hint;
   },
 };
+
+function getStackTrace(error: unknown): string | undefined {
+  if (error instanceof Error) {
+    return error.stack;
+  }
+  return undefined;
+}
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -30,26 +42,27 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<FastifyRequest>();
     const path = this.sanitizePath(request.url);
 
-    // Classify exception and get Problem Details
     const problemDetails = this.classifyException(exception, path);
+    const redactedContext =
+      exception instanceof AppError
+        ? safeContext(exception.context)
+        : undefined;
 
-    // Log context for AppError (server-side only, never exposed to client)
-    // TODO: When log aggregation is added, consider logging statusMessage at DEBUG
-    // level only (it's untrusted upstream data that may contain sensitive details).
-    // See: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
-    if (exception instanceof AppError && exception.context) {
+    if (redactedContext) {
       this.logger.warn({
         message: 'AppError context',
-        code: exception.code,
-        context: exception.context,
+        code: (exception as AppError).code,
+        context: redactedContext,
         path,
       });
     }
 
-    // Log appropriately
     if (problemDetails.status >= 500) {
-      this.logger.error(`[${problemDetails.status}] ${path}`, exception);
-      Sentry.captureException(exception);
+      this.logger.error(
+        `[${problemDetails.status}] ${path}`,
+        getStackTrace(exception),
+      );
+      Sentry.captureException(exception, { extra: redactedContext });
     } else {
       this.logger.warn(
         `[${problemDetails.status}] ${path} - ${problemDetails.detail}`,

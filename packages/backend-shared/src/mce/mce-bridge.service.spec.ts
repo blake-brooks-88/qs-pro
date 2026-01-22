@@ -1,17 +1,23 @@
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppError, ErrorCode, ErrorMessages } from "../common/errors";
 import { MCE_AUTH_PROVIDER, MceAuthProvider } from "./mce-auth.provider";
 import { MceBridgeService } from "./mce-bridge.service";
+import { MceHttpClient } from "./mce-http-client";
 
 describe("MceBridgeService", () => {
   let service: MceBridgeService;
   let authProvider: MceAuthProvider;
+  let mockHttpClient: { request: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    mockHttpClient = {
+      request: vi.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MceBridgeService,
@@ -30,6 +36,10 @@ describe("MceBridgeService", () => {
           useValue: {
             get: vi.fn(),
           },
+        },
+        {
+          provide: MceHttpClient,
+          useValue: mockHttpClient,
         },
       ],
     }).compile();
@@ -57,9 +67,7 @@ describe("MceBridgeService", () => {
 
   describe("request", () => {
     it("should make a request with refreshed token and correct base URL", async () => {
-      vi.spyOn(axios, "request").mockResolvedValue({
-        data: { success: true },
-      });
+      mockHttpClient.request.mockResolvedValue({ success: true });
 
       const response = await service.request("tenant-1", "user-1", "mid-1", {
         method: "GET",
@@ -72,7 +80,7 @@ describe("MceBridgeService", () => {
         "mid-1",
         false, // forceRefresh parameter
       );
-      expect(vi.mocked(axios.request)).toHaveBeenCalledWith(
+      expect(mockHttpClient.request).toHaveBeenCalledWith(
         expect.objectContaining({
           baseURL: "https://test-tssd.rest.marketingcloudapis.com",
           url: "/asset/v1/content/assets",
@@ -160,9 +168,10 @@ describe("MceBridgeService", () => {
     });
 
     it("should retry internally on 401 and succeed", async () => {
-      vi.spyOn(axios, "request")
-        .mockRejectedValueOnce(createAxiosError(401))
-        .mockResolvedValueOnce({ data: { success: true } });
+      // MceHttpClient throws AppError with MCE_AUTH_EXPIRED for 401
+      mockHttpClient.request
+        .mockRejectedValueOnce(new AppError(ErrorCode.MCE_AUTH_EXPIRED))
+        .mockResolvedValueOnce({ success: true });
 
       const response = await service.request("t1", "u1", "m1", {
         url: "/test",
@@ -174,9 +183,10 @@ describe("MceBridgeService", () => {
     });
 
     it("should throw MCE_AUTH_EXPIRED after 401 retry fails", async () => {
-      vi.spyOn(axios, "request")
-        .mockRejectedValueOnce(createAxiosError(401))
-        .mockRejectedValueOnce(createAxiosError(401));
+      // MceHttpClient throws AppError with MCE_AUTH_EXPIRED for 401
+      mockHttpClient.request
+        .mockRejectedValueOnce(new AppError(ErrorCode.MCE_AUTH_EXPIRED))
+        .mockRejectedValueOnce(new AppError(ErrorCode.MCE_AUTH_EXPIRED));
 
       try {
         await service.request("t1", "u1", "m1", { url: "/test" });
@@ -188,8 +198,9 @@ describe("MceBridgeService", () => {
     });
 
     it("should throw MCE_BAD_REQUEST for 400", async () => {
-      vi.spyOn(axios, "request").mockRejectedValue(
-        createAxiosError(400, "Invalid params"),
+      // MceHttpClient throws AppError with MCE_BAD_REQUEST for 400
+      mockHttpClient.request.mockRejectedValue(
+        new AppError(ErrorCode.MCE_BAD_REQUEST),
       );
 
       try {
@@ -205,7 +216,10 @@ describe("MceBridgeService", () => {
     });
 
     it("should throw MCE_FORBIDDEN for 403", async () => {
-      vi.spyOn(axios, "request").mockRejectedValue(createAxiosError(403));
+      // MceHttpClient throws AppError with MCE_FORBIDDEN for 403
+      mockHttpClient.request.mockRejectedValue(
+        new AppError(ErrorCode.MCE_FORBIDDEN),
+      );
 
       try {
         await service.request("t1", "u1", "m1", { url: "/test" });
@@ -217,7 +231,10 @@ describe("MceBridgeService", () => {
     });
 
     it("should throw MCE_SERVER_ERROR for 500", async () => {
-      vi.spyOn(axios, "request").mockRejectedValue(createAxiosError(500));
+      // MceHttpClient throws AppError with MCE_SERVER_ERROR for 500
+      mockHttpClient.request.mockRejectedValue(
+        new AppError(ErrorCode.MCE_SERVER_ERROR),
+      );
 
       try {
         await service.request("t1", "u1", "m1", { url: "/test" });
@@ -241,19 +258,3 @@ describe("MceBridgeService", () => {
     });
   });
 });
-
-function createAxiosError(status: number, message = "Error"): AxiosError {
-  return new AxiosError(
-    message,
-    "ERR",
-    {} as InternalAxiosRequestConfig,
-    null,
-    {
-      status,
-      statusText: message,
-      data: { message },
-      headers: {},
-      config: {} as InternalAxiosRequestConfig,
-    },
-  );
-}

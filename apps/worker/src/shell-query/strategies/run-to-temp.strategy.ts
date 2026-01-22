@@ -160,7 +160,7 @@ export class RunToTempFlow implements IFlowStrategy {
       return null;
     } catch (error) {
       this.logger.warn(
-        `Failed to retrieve QueryDefinition ObjectID by CustomerKey ${customerKey}: ${(error as Error).message}`,
+        `Failed to retrieve QueryDefinition ObjectID by CustomerKey ${customerKey}: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
       return null;
     }
@@ -214,7 +214,7 @@ export class RunToTempFlow implements IFlowStrategy {
       );
     } catch (error) {
       this.logger.warn(
-        `Failed to fetch metadata for table ${tableName}: ${(error as Error).message}`,
+        `Failed to fetch metadata for table ${tableName}: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
       return null;
     }
@@ -262,9 +262,9 @@ export class RunToTempFlow implements IFlowStrategy {
 
         const rootFolder = rootFolders[0];
         if (!rootFolder) {
-          throw new Error(
-            "Could not find root Data Extensions folder. Please ensure the folder exists in Marketing Cloud.",
-          );
+          throw new AppError(ErrorCode.MCE_BAD_REQUEST, undefined, {
+            statusMessage: "Root DE folder not found",
+          });
         }
 
         const parentFolderId = rootFolder.id;
@@ -308,9 +308,9 @@ export class RunToTempFlow implements IFlowStrategy {
     const { tenantId, userId, mid } = job;
 
     if (schema.length === 0) {
-      throw new Error(
-        "Internal error: schema inference returned empty array. This should not happen.",
-      );
+      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+        statusMessage: "Empty schema array",
+      });
     }
 
     await this.deleteDataExtensionIfExists(job, deName);
@@ -369,7 +369,7 @@ export class RunToTempFlow implements IFlowStrategy {
       this.logger.debug(`Deleted existing Data Extension: ${deName}`);
     } catch (error) {
       this.logger.debug(
-        `Delete DE failed for ${deName} (may not exist): ${(error as Error).message}`,
+        `Delete DE failed for ${deName} (may not exist): ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -443,7 +443,7 @@ export class RunToTempFlow implements IFlowStrategy {
       );
     } catch (error) {
       this.logger.debug(
-        `Delete QueryDefinition failed for ${key}: ${(error as Error).message}`,
+        `Delete QueryDefinition failed for ${key}: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }

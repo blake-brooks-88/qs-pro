@@ -1,9 +1,5 @@
-import {
-  Inject,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { AppError, ErrorCode } from '@qpp/backend-shared';
 import type {
   IFeatureOverrideRepository,
   ITenantRepository,
@@ -26,13 +22,15 @@ export class FeaturesService {
   async getTenantFeatures(tenantId: string): Promise<TenantFeatures> {
     const tenant = await this.tenantRepo.findById(tenantId);
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'getTenantFeatures',
+      });
     }
 
     if (!tenant.subscriptionTier) {
-      throw new InternalServerErrorException(
-        'Tenant subscription tier not set',
-      );
+      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+        reason: 'Tenant subscription tier not set',
+      });
     }
 
     // Start with base tier features

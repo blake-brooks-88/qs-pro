@@ -5,6 +5,7 @@ import { AuthModule } from "../auth/auth.module";
 import { AuthService } from "../auth/auth.service";
 import { MCE_AUTH_PROVIDER } from "./mce-auth.provider";
 import { MceBridgeService } from "./mce-bridge.service";
+import { MceHttpClient } from "./mce-http-client";
 import { MetadataService } from "./metadata.service";
 import { AsyncStatusService } from "./services/async-status.service";
 import { DataExtensionService } from "./services/data-extension.service";
@@ -15,6 +16,7 @@ import { RestDataService } from "./services/rest-data.service";
 @Module({
   imports: [AuthModule, CacheModule.register()],
   providers: [
+    MceHttpClient,
     MceBridgeService,
     MetadataService,
     DataExtensionService,
