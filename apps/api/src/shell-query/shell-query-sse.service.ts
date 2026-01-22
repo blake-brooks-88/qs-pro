@@ -1,4 +1,5 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { AppError, ErrorCode } from '@qpp/backend-shared';
 import {
   concat,
   filter,
@@ -44,10 +45,9 @@ export class ShellQuerySseService {
 
     if (currentConnections > 5) {
       await this.redis.decr(limitKey);
-      throw new HttpException(
-        'Too many active connections',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new AppError(ErrorCode.RATE_LIMIT_EXCEEDED, undefined, {
+        maxConcurrent: 5,
+      });
     }
 
     const channel = `run-status:${runId}`;

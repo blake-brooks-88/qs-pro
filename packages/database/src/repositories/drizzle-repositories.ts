@@ -50,7 +50,7 @@ export class DrizzleTenantRepository implements ITenantRepository {
       throw new DatabaseError(
         ErrorCode.DATABASE_ERROR,
         "Tenant upsert failed to return a result",
-        { operation: "upsertTenant", eid: tenant.eid },
+        { operation: "upsertTenant" },
       );
     }
     return result;
@@ -98,7 +98,7 @@ export class DrizzleUserRepository implements IUserRepository {
       throw new DatabaseError(
         ErrorCode.DATABASE_ERROR,
         "User upsert failed to return a result",
-        { operation: "upsertUser", sfUserId: user.sfUserId },
+        { operation: "upsertUser" },
       );
     }
     return result;
@@ -148,7 +148,7 @@ export class DrizzleCredentialsRepository implements ICredentialsRepository {
       throw new DatabaseError(
         ErrorCode.DATABASE_ERROR,
         "Credential upsert failed to return a result",
-        { operation: "upsertCredential", userId: credential.userId },
+        { operation: "upsertCredential" },
       );
     }
     return result;

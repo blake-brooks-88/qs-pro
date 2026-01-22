@@ -1,11 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AppError,
   buildQppResultsDataExtensionName,
@@ -132,7 +126,10 @@ export class ShellQueryService {
   ): Promise<RunStatusResponse> {
     const run = await this.runRepo.findRun(runId, tenantId, mid, userId);
     if (!run) {
-      throw new NotFoundException('Run not found');
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'getRunStatus',
+        runId,
+      });
     }
 
     const response: RunStatusResponse = {
@@ -158,14 +155,24 @@ export class ShellQueryService {
   ): Promise<RunResultsResponse> {
     const run = await this.getRun(runId, tenantId, mid, userId);
     if (!run) {
-      throw new NotFoundException('Run not found');
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'getResults',
+        runId,
+      });
     }
 
     if (run.status !== 'ready') {
       if (run.status === 'failed') {
-        throw new ConflictException(`Run failed: ${run.errorMessage}`);
+        throw new AppError(ErrorCode.INVALID_STATE, undefined, {
+          operation: 'getResults',
+          status: run.status,
+          statusMessage: run.errorMessage ?? undefined,
+        });
       }
-      throw new ConflictException(`Run is still ${run.status}`);
+      throw new AppError(ErrorCode.INVALID_STATE, undefined, {
+        operation: 'getResults',
+        status: run.status,
+      });
     }
 
     // Proxy to MCE REST Rowset API
@@ -242,7 +249,10 @@ export class ShellQueryService {
   ) {
     const run = await this.getRun(runId, tenantId, mid, userId);
     if (!run) {
-      throw new NotFoundException('Run not found');
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'cancelRun',
+        runId,
+      });
     }
 
     if (

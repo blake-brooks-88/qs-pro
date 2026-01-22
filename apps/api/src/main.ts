@@ -7,14 +7,18 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { getDbFromContext, runWithDbContext } from '@qpp/backend-shared';
+import {
+  AppError,
+  ErrorCode,
+  getDbFromContext,
+  runWithDbContext,
+} from '@qpp/backend-shared';
 import { createDatabaseFromClient } from '@qpp/database';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Sql } from 'postgres';
 
 import { AppModule } from './app.module';
 import { handleFatalError } from './bootstrap/handle-fatal-error';
-import { validateRequiredConfig } from './bootstrap/validate-config';
 import { configureApp } from './configure-app';
 
 type Session = {
@@ -52,8 +56,6 @@ const setSecurityHeaders = (reply: FastifyReply, cookieSecure: boolean) => {
 
 async function bootstrap() {
   try {
-    validateRequiredConfig();
-
     const adapter = new FastifyAdapter({
       trustProxy: true,
       ignoreTrailingSlash: true,
@@ -80,19 +82,25 @@ async function bootstrap() {
       logger.error(
         'SESSION_SECRET and SESSION_SALT are required; set them in the repo root `.env`.',
       );
-      throw new Error('Missing session configuration');
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: 'SESSION_SECRET and SESSION_SALT are required',
+      });
     }
 
     if (sessionSecret.length < 32) {
       logger.error(
         'SESSION_SECRET must be at least 32 characters (use `npx --yes @fastify/secure-session` or a secret manager).',
       );
-      throw new Error('Invalid session configuration');
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: 'SESSION_SECRET must be at least 32 characters',
+      });
     }
 
     if (sessionSalt.length < 16) {
       logger.error('SESSION_SALT must be at least 16 characters.');
-      throw new Error('Invalid session configuration');
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: 'SESSION_SALT must be at least 16 characters',
+      });
     }
 
     const cookieSecureRaw = configService.get<string>('COOKIE_SECURE');
@@ -117,7 +125,9 @@ async function bootstrap() {
       logger.error(
         'Invalid cookie configuration: COOKIE_SAMESITE=none requires COOKIE_SECURE=true.',
       );
-      throw new Error('Invalid cookie configuration');
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: 'COOKIE_SAMESITE=none requires COOKIE_SECURE=true',
+      });
     }
 
     const cookieDomain =
@@ -136,7 +146,9 @@ async function bootstrap() {
       logger.error(
         'Invalid cookie configuration: COOKIE_PARTITIONED=true cannot be used with COOKIE_DOMAIN (partitioned cookies must be host-only).',
       );
-      throw new Error('Invalid cookie configuration');
+      throw new AppError(ErrorCode.CONFIG_ERROR, undefined, {
+        reason: 'COOKIE_PARTITIONED=true cannot be used with COOKIE_DOMAIN',
+      });
     }
 
     adapter

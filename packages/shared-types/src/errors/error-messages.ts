@@ -12,6 +12,11 @@ import { ErrorCode } from "./error-codes.js";
  * internal identifiers, paths, or implementation details.
  */
 export const ErrorMessages: Record<ErrorCode, string> = {
+  // Authentication & Authorization
+  [ErrorCode.AUTH_UNAUTHORIZED]: "Authentication required. Please log in.",
+  [ErrorCode.AUTH_IDENTITY_MISMATCH]:
+    "Identity verification failed. Please log in again.",
+
   // MCE HTTP Errors
   [ErrorCode.MCE_BAD_REQUEST]: "Invalid request to Marketing Cloud.",
   [ErrorCode.MCE_AUTH_EXPIRED]:
@@ -42,6 +47,10 @@ export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCode.SEAT_LIMIT_EXCEEDED]: "User limit reached for your organization.",
   [ErrorCode.RATE_LIMIT_EXCEEDED]:
     "Too many requests. Please wait before trying again.",
+  [ErrorCode.RESOURCE_NOT_FOUND]: "The requested resource was not found.",
+  [ErrorCode.INVALID_STATE]:
+    "Operation not allowed in current state. Please try again.",
+  [ErrorCode.VALIDATION_ERROR]: "Invalid input. Please check your request.",
 
   // Infrastructure (these get masked to generic "unexpected error" for 5xx anyway)
   [ErrorCode.CONFIG_ERROR]: "Service configuration error.",

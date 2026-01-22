@@ -4,6 +4,10 @@
  */
 
 export const ErrorCode = {
+  // Authentication & Authorization
+  AUTH_UNAUTHORIZED: "AUTH_UNAUTHORIZED",
+  AUTH_IDENTITY_MISMATCH: "AUTH_IDENTITY_MISMATCH",
+
   // MCE HTTP Errors (mapped from MceBridgeService response codes)
   MCE_BAD_REQUEST: "MCE_BAD_REQUEST",
   MCE_AUTH_EXPIRED: "MCE_AUTH_EXPIRED",
@@ -24,6 +28,9 @@ export const ErrorCode = {
   // Business Logic
   SEAT_LIMIT_EXCEEDED: "SEAT_LIMIT_EXCEEDED",
   RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
+  RESOURCE_NOT_FOUND: "RESOURCE_NOT_FOUND",
+  INVALID_STATE: "INVALID_STATE",
+  VALIDATION_ERROR: "VALIDATION_ERROR",
 
   // Infrastructure
   CONFIG_ERROR: "CONFIG_ERROR",
