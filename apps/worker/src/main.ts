@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import {
   FastifyAdapter,
@@ -19,7 +20,10 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  const port = process.env.PORT || 3001;
+  // Get port from validated config
+  const configService = app.get(ConfigService);
+  const port = configService.get('PORT', { infer: true });
+
   await app.listen(port, "0.0.0.0");
   Logger.log(`Worker running on port ${port}`, "WorkerBootstrap");
 }

@@ -3,7 +3,7 @@ import { BullBoardModule } from "@bull-board/nestjs";
 import { BullModule } from "@nestjs/bullmq";
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { AuthModule, DatabaseModule, MceModule } from "@qpp/backend-shared";
+import { AuthModule, DatabaseModule, MceModule, validateWorkerEnv } from "@qpp/backend-shared";
 
 import { AdminAuthMiddleware } from "./common/middleware/admin-auth.middleware";
 import { HealthModule } from "./health/health.module";
@@ -15,6 +15,7 @@ import { ShellQueryModule } from "./shell-query/shell-query.module";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateWorkerEnv,
       envFilePath: "../../.env",
     }),
     BullModule.forRootAsync({
