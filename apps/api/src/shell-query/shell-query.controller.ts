@@ -14,12 +14,11 @@ import {
   Sse,
   UseGuards,
 } from '@nestjs/common';
-import { AppError } from '@qpp/backend-shared';
+import { AppError, SessionGuard } from '@qpp/backend-shared';
 import type { Observable } from 'rxjs';
 import { z } from 'zod';
 
 import { CsrfGuard } from '../auth/csrf.guard';
-import { SessionGuard } from '../auth/session.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ShellQueryService } from './shell-query.service';

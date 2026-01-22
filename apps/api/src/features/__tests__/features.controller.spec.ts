@@ -1,9 +1,9 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { SessionGuard } from '@qpp/backend-shared';
 import type { TenantFeatures } from '@qpp/shared-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SessionGuard } from '../../auth/session.guard';
 import type { UserSession } from '../../common/decorators/current-user.decorator';
 import { FeaturesController } from '../features.controller';
 import { FeaturesService } from '../features.service';

@@ -22,7 +22,7 @@ async function bootstrap() {
 
   // Get port from validated config
   const configService = app.get(ConfigService);
-  const port = configService.get('PORT', { infer: true });
+  const port = configService.get("PORT", { infer: true });
 
   await app.listen(port, "0.0.0.0");
   Logger.log(`Worker running on port ${port}`, "WorkerBootstrap");
