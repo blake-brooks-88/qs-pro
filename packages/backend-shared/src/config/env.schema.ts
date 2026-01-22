@@ -18,6 +18,9 @@ export const infrastructureSchema = z.object({
     .default("postgres://postgres:password@127.0.0.1:5432/qs_pro"),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
   LOG_FORMAT: z.enum(["json", "text"]).default("text"),
+  LOG_LEVEL: z
+    .enum(["trace", "debug", "info", "warn", "error", "fatal"])
+    .default("info"),
 });
 
 /**
