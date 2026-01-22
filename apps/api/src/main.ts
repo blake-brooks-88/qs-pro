@@ -275,6 +275,7 @@ async function bootstrap() {
 
         const qs = new URLSearchParams({ code, state }).toString();
         void reply.redirect(`/api/auth/callback?${qs}`, 302);
+        return done();
       } catch {
         done();
       }

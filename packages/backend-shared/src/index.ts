@@ -10,6 +10,8 @@ export {
   isTerminal,
   isUnrecoverable,
   type ProblemDetails,
+  redactContext,
+  safeContext,
   toAppError,
   type ValidationViolation,
   ValidationViolations,

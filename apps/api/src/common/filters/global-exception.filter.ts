@@ -9,6 +9,7 @@ import {
   AppError,
   appErrorToProblemDetails,
   type ProblemDetails,
+  safeContext,
 } from '@qpp/backend-shared';
 import { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -33,17 +34,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     // Classify exception and get Problem Details
     const problemDetails = this.classifyException(exception, path);
 
-    // Log context for AppError (server-side only, never exposed to client)
-    // TODO: When log aggregation is added, consider logging statusMessage at DEBUG
-    // level only (it's untrusted upstream data that may contain sensitive details).
-    // See: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
-    if (exception instanceof AppError && exception.context) {
-      this.logger.warn({
-        message: 'AppError context',
-        code: exception.code,
-        context: exception.context,
-        path,
-      });
+    if (exception instanceof AppError) {
+      const redacted = safeContext(exception.context);
+      if (redacted) {
+        this.logger.warn({
+          message: 'AppError context',
+          code: exception.code,
+          context: redacted,
+          path,
+        });
+      }
     }
 
     // Log appropriately

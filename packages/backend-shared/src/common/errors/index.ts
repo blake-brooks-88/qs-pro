@@ -15,6 +15,7 @@ export {
   appErrorToProblemDetails,
   type ProblemDetails,
 } from "./problem-details";
+export { redactContext, safeContext } from "./redact-context";
 export {
   type ValidationViolation,
   ValidationViolations,

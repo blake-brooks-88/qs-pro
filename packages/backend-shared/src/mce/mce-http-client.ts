@@ -4,6 +4,14 @@ import axios, { AxiosRequestConfig } from "axios";
 import { AppError } from "../common/errors/app-error";
 import { ErrorCode } from "../common/errors/error-codes";
 
+const MAX_STATUS_MESSAGE_LENGTH = 500;
+
+function truncate(value: string, maxLength: number): string {
+  return value.length <= maxLength
+    ? value
+    : `${value.slice(0, maxLength)}... [truncated]`;
+}
+
 /**
  * Infrastructure layer HTTP client for MCE API calls.
  * Translates HTTP errors to AppError at the boundary.
@@ -29,7 +37,7 @@ export class MceHttpClient {
 
     if (axios.isAxiosError(error) && error.response) {
       const { status, data } = error.response;
-      const detail =
+      const rawDetail =
         typeof data === "string"
           ? data
           : data?.message || `MCE request failed (${status})`;
@@ -37,7 +45,7 @@ export class MceHttpClient {
       return new AppError(this.mapStatusToErrorCode(status), error, {
         status: String(status),
         operation: error.config?.url,
-        statusMessage: detail,
+        statusMessage: truncate(rawDetail, MAX_STATUS_MESSAGE_LENGTH),
       });
     }
 
