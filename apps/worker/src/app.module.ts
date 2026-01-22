@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import {
   AuthModule,
   DatabaseModule,
+  LoggerModule,
   MceModule,
   validateWorkerEnv,
 } from "@qpp/backend-shared";
@@ -23,6 +24,7 @@ import { ShellQueryModule } from "./shell-query/shell-query.module";
       validate: validateWorkerEnv,
       envFilePath: "../../.env",
     }),
+    LoggerModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

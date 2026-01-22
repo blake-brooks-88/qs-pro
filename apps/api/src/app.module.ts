@@ -1,10 +1,10 @@
 import path from 'node:path';
 
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import {
   DatabaseModule,
-  RequestLoggerMiddleware,
+  LoggerModule,
   validateApiEnv,
 } from '@qpp/backend-shared';
 
@@ -27,6 +27,7 @@ import { UsersModule } from './users/users.module';
         path.resolve(__dirname, '..', '..', '..', '.env'),
       ],
     }),
+    LoggerModule,
     DatabaseModule,
     AuthModule,
     UsersModule,
@@ -38,8 +39,4 @@ import { UsersModule } from './users/users.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestLoggerMiddleware).forRoutes('*path');
-  }
-}
+export class AppModule {}

@@ -2,8 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { JsonLogger } from '../src/common/logger/json-logger.service';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 describe('Shell Query Observability', () => {
   let app: NestFastifyApplication;
@@ -57,24 +56,5 @@ describe('Shell Query Observability', () => {
     });
 
     expect(res.statusCode).toBe(200);
-  });
-
-  it('JsonLogger should output JSON when LOG_FORMAT is json', () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    process.env.LOG_FORMAT = 'json';
-    
-    const logger = new JsonLogger();
-    logger.log('test message', 'TestContext');
-    
-    expect(consoleSpy).toHaveBeenCalled();
-    const output = JSON.parse(consoleSpy.mock.calls[0][0]);
-    expect(output).toMatchObject({
-        level: 'log',
-        message: 'test message',
-        context: 'TestContext'
-    });
-    
-    process.env.LOG_FORMAT = undefined;
-    consoleSpy.mockRestore();
   });
 });

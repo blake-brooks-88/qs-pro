@@ -6,6 +6,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
 import { handleFatalError } from './bootstrap/handle-fatal-error';
@@ -46,8 +47,10 @@ async function bootstrap() {
     const app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
       adapter,
-      { bodyParser: false },
+      { bodyParser: false, bufferLogs: true },
     );
+
+    app.useLogger(app.get(Logger));
 
     await app.register(formBody);
 
