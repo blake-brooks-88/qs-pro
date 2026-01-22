@@ -8,6 +8,7 @@ import {
 
 import { AppModule } from "./app.module";
 import { JsonLogger } from "./common/logger/json-logger.service";
+import { configureApp } from "./configure-app";
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -17,6 +18,9 @@ async function bootstrap() {
       logger: new JsonLogger(),
     },
   );
+
+  // Configure admin auth before initializing routes
+  configureApp(app);
 
   app.enableShutdownHooks();
 

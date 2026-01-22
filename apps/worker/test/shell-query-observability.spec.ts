@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/configure-app';
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { JsonLogger } from '../src/common/logger/json-logger.service';
 
@@ -15,6 +16,10 @@ describe('Shell Query Observability', () => {
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
       new FastifyAdapter(),
     );
+
+    // Apply the same configuration as main.ts
+    configureApp(app);
+
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
   });
@@ -34,9 +39,22 @@ describe('Shell Query Observability', () => {
     expect(res.headers['content-type']).toContain('text/plain');
   });
 
-  it('should have Bull Board accessible at /admin/queues', async () => {
+  it('should deny access to Bull Board without admin key', async () => {
     const fastify = app.getHttpAdapter().getInstance();
     const res = await fastify.inject({ method: 'GET', url: '/admin/queues' });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json();
+    expect(body.message).toContain('Unauthorized');
+  });
+
+  it('should allow access to Bull Board with valid admin key', async () => {
+    const fastify = app.getHttpAdapter().getInstance();
+    const res = await fastify.inject({
+      method: 'GET',
+      url: '/admin/queues',
+      headers: { 'x-admin-key': 'test_api_key' },
+    });
 
     expect(res.statusCode).toBe(200);
   });
