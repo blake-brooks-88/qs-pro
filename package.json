@@ -39,6 +39,7 @@
     "dotenv": "^16.4.5",
     "esbuild": "0.25.12",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7"
+    "lint-staged": "^16.2.7",
+    "vitest": "^3.0.0"
   }
 }
