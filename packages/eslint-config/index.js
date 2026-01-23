@@ -4,6 +4,7 @@ const tseslint = require('typescript-eslint');
 const prettier = require('eslint-plugin-prettier/recommended');
 const security = require('eslint-plugin-security');
 const simpleImportSort = require('eslint-plugin-simple-import-sort');
+const vitest = require('@vitest/eslint-plugin');
 const globals = require('globals');
 
 module.exports = tseslint.config(
@@ -62,6 +63,29 @@ module.exports = tseslint.config(
       // ═══════════════════════════════════════════════════════════════
       "security/detect-object-injection": "warn",
       "prettier/prettier": "error",
+    },
+  },
+  // ═══════════════════════════════════════════════════════════════════
+  // VITEST TEST FILES
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts'],
+    plugins: {
+      vitest,
+    },
+    rules: {
+      // Error-level rules (must fix)
+      'vitest/expect-expect': 'error',
+      'vitest/no-conditional-expect': 'error',
+      'vitest/no-focused-tests': 'error',
+      'vitest/no-identical-title': 'error',
+      'vitest/no-duplicate-hooks': 'error',
+      // Warning-level rules (should fix)
+      'vitest/no-disabled-tests': 'warn',
+      'vitest/prefer-hooks-in-order': 'warn',
+      'vitest/prefer-hooks-on-top': 'warn',
+      'vitest/prefer-to-be': 'warn',
+      'vitest/prefer-to-have-length': 'warn',
     },
   }
 );
