@@ -16,6 +16,7 @@
     "test:web": "pnpm -r --filter \"./packages/**\" build && pnpm --filter @qpp/web test",
     "test:worker": "pnpm -r --filter \"./packages/**\" build && pnpm --filter worker test",
     "test:e2e": "pnpm -r test:e2e",
+    "test:integration": "pnpm -r --filter api --filter worker --filter @qpp/database test:integration",
     "lint": "pnpm -r lint",
     "pretypecheck": "pnpm -r --filter \"./packages/**\" build",
     "typecheck": "pnpm -r typecheck",
@@ -39,6 +40,7 @@
     "dotenv": "^16.4.5",
     "esbuild": "0.25.12",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7"
+    "lint-staged": "^16.2.7",
+    "vitest": "^3.0.0"
   }
 }

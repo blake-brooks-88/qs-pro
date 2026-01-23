@@ -9,21 +9,22 @@ import {
   RestDataService,
   SessionGuard,
 } from '@qpp/backend-shared';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { configureApp } from '../src/configure-app';
-import { ShellQueryController } from '../src/shell-query/shell-query.controller';
-import { ShellQueryService } from '../src/shell-query/shell-query.service';
-import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
-import { createMockShellQueryContext } from './factories';
 import {
+  createMockShellQueryContext,
   createQueueStub,
   createRestDataServiceStub,
   createSessionGuardMock,
   createShellQueryRunRepoStub,
   createShellQuerySseServiceStub,
   createTenantRepoStub,
-} from './stubs';
+  resetFactories,
+} from '@qpp/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { configureApp } from '../src/configure-app';
+import { ShellQueryController } from '../src/shell-query/shell-query.controller';
+import { ShellQueryService } from '../src/shell-query/shell-query.service';
+import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
 
 let mockQueue: ReturnType<typeof createQueueStub>;
 let mockTenantRepo: ReturnType<typeof createTenantRepoStub>;
@@ -40,6 +41,7 @@ describe('Shell Query Producer (e2e)', () => {
   };
 
   beforeEach(async () => {
+    resetFactories();
     mockQueue = createQueueStub();
     mockTenantRepo = createTenantRepoStub();
     mockRestDataService = createRestDataServiceStub();

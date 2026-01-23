@@ -5,18 +5,19 @@ import {
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EncryptionService, SessionGuard } from '@qpp/backend-shared';
+import {
+  createRedisStub,
+  createSessionGuardMock,
+  createShellQueryServiceStub,
+  createTenantRepoStub,
+  resetFactories,
+} from '@qpp/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { configureApp } from '../src/configure-app';
 import { ShellQueryController } from '../src/shell-query/shell-query.controller';
 import { ShellQueryService } from '../src/shell-query/shell-query.service';
 import { ShellQuerySseService } from '../src/shell-query/shell-query-sse.service';
-import {
-  createRedisStub,
-  createSessionGuardMock,
-  createShellQueryServiceStub,
-  createTenantRepoStub,
-} from './stubs';
 
 let mockRedis: ReturnType<typeof createRedisStub>;
 let mockShellQueryService: ReturnType<typeof createShellQueryServiceStub>;
@@ -26,6 +27,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
   let app: NestFastifyApplication;
 
   beforeEach(async () => {
+    resetFactories();
     mockRedis = createRedisStub();
     mockShellQueryService = createShellQueryServiceStub();
     mockTenantRepo = createTenantRepoStub();

@@ -1,12 +1,34 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  AppError,
+  AsyncStatusService,
+  EncryptionService,
+  ErrorCode,
+  ErrorMessages,
+  MceBridgeService,
+  RestDataService,
+  RlsContextService,
+} from '@qpp/backend-shared';
+import {
+  createAsyncStatusServiceStub,
+  createDbStub,
+  createEncryptionServiceStub,
+  createMceBridgeStub,
+  createMetricsStub,
+  createMockBullJob,
+  createMockPollBullJob,
+  createQueueStub,
+  createRedisStub,
+  createRestDataServiceStub,
+  createRlsContextStub,
+  resetFactories,
+} from '@qpp/test-utils';
+import { DelayedError } from 'bullmq';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService, AsyncStatusService, RestDataService, AppError, ErrorCode, ErrorMessages, EncryptionService } from '@qpp/backend-shared';
-import { DelayedError } from 'bullmq';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createMockBullJob, createMockPollBullJob } from './factories';
-import { createDbStub, createMceBridgeStub, createRedisStub, createMetricsStub, createRlsContextStub, createQueueStub, createAsyncStatusServiceStub, createRestDataServiceStub, createEncryptionServiceStub } from './stubs';
 
 describe('ShellQueryProcessor', () => {
   let processor: ShellQueryProcessor;
@@ -18,6 +40,7 @@ describe('ShellQueryProcessor', () => {
   let mockQueue: ReturnType<typeof createQueueStub>;
 
   beforeEach(async () => {
+    resetFactories();
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
     mockRestDataService = createRestDataServiceStub();

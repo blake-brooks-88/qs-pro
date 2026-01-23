@@ -1,21 +1,30 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  AsyncStatusService,
+  EncryptionService,
+  MceBridgeService,
+  RestDataService,
+  RlsContextService,
+} from '@qpp/backend-shared';
+import {
+  createAsyncStatusServiceStub,
+  createDbStub,
+  createEncryptionServiceStub,
+  createMceBridgeStub,
+  createMetricsStub,
+  createMockBullJob,
+  createMockPollBullJob,
+  createQueueStub,
+  createRedisStub,
+  createRestDataServiceStub,
+  createRlsContextStub,
+  resetFactories,
+} from '@qpp/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { RlsContextService, MceBridgeService, AsyncStatusService, RestDataService, EncryptionService } from '@qpp/backend-shared';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createMockBullJob, createMockPollBullJob } from './factories';
-import {
-  createDbStub,
-  createMceBridgeStub,
-  createRedisStub,
-  createMetricsStub,
-  createRlsContextStub,
-  createQueueStub,
-  createAsyncStatusServiceStub,
-  createRestDataServiceStub,
-  createEncryptionServiceStub,
-} from './stubs';
 
 // Helper to decrypt Redis event data (stub uses 'encrypted:' prefix)
 function decryptEventData(encrypted: string): unknown {
@@ -36,6 +45,7 @@ describe('ShellQueryProcessor SSE Backfill', () => {
   let mockQueue: ReturnType<typeof createQueueStub>;
 
   beforeEach(async () => {
+    resetFactories();
     const mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
     mockRestDataService = createRestDataServiceStub();

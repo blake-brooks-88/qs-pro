@@ -23,6 +23,9 @@ importers:
       lint-staged:
         specifier: ^16.2.7
         version: 16.2.7
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@22.19.3)(jsdom@27.4.0)(lightningcss@1.30.2)(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(terser@5.44.1)
 
   apps/api:
     dependencies:
@@ -114,6 +117,9 @@ importers:
       '@nestjs/testing':
         specifier: ^11.0.1
         version: 11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11))
+      '@qpp/test-utils':
+        specifier: workspace:^
+        version: link:../../packages/test-utils
       '@types/express':
         specifier: ^5.0.0
         version: 5.0.6
@@ -413,6 +419,9 @@ importers:
       '@qpp/eslint-config':
         specifier: workspace:^
         version: link:../../packages/eslint-config
+      '@qpp/test-utils':
+        specifier: workspace:^
+        version: link:../../packages/test-utils
       '@types/node':
         specifier: ^22.10.7
         version: 22.19.3
@@ -608,6 +617,24 @@ importers:
         version: 9.39.2(jiti@2.6.1)
       typescript:
         specifier: ^5.3.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.19.3)(jsdom@27.4.0)(lightningcss@1.30.2)(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(terser@5.44.1)
+
+  packages/test-utils:
+    devDependencies:
+      '@qpp/database':
+        specifier: workspace:^
+        version: link:../database
+      '@qpp/eslint-config':
+        specifier: workspace:^
+        version: link:../eslint-config
+      '@qpp/shared-types':
+        specifier: workspace:^
+        version: link:../shared-types
+      typescript:
+        specifier: ^5.7.3
         version: 5.9.3
       vitest:
         specifier: ^3.2.4

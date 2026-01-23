@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:e2e": "vitest run --config ./vitest-e2e.config.ts"
+    "test:e2e": "vitest run --config ./vitest-e2e.config.ts",
+    "test:integration": "vitest run --config ./vitest-integration.config.ts"
   },
   "dependencies": {
     "@fastify/formbody": "^8.0.2",
@@ -46,6 +47,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@qpp/test-utils": "workspace:^",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",

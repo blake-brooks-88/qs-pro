@@ -1,30 +1,33 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  AsyncStatusService,
+  EncryptionService,
+  MceBridgeService,
+  QueryDefinitionService,
+  RestDataService,
+  RlsContextService,
+} from '@qpp/backend-shared';
+import {
+  createAsyncStatusServiceStub,
+  createDbStub,
+  createEncryptionServiceStub,
+  createMceBridgeStub,
+  createMetricsStub,
+  createMockBullJob,
+  createMockPollBullJob,
+  createQueryDefinitionServiceStub,
+  createQueueStub,
+  createRedisStub,
+  createRestDataServiceStub,
+  createRlsContextStub,
+  resetFactories,
+} from '@qpp/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { ShellQuerySweeper } from '../src/shell-query/shell-query.sweeper';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import {
-  RlsContextService,
-  MceBridgeService,
-  AsyncStatusService,
-  QueryDefinitionService,
-  RestDataService,
-  EncryptionService,
-} from '@qpp/backend-shared';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createMockBullJob, createMockPollBullJob } from './factories';
-import {
-  createDbStub,
-  createMceBridgeStub,
-  createRedisStub,
-  createMetricsStub,
-  createRlsContextStub,
-  createQueueStub,
-  createAsyncStatusServiceStub,
-  createQueryDefinitionServiceStub,
-  createRestDataServiceStub,
-  createEncryptionServiceStub,
-} from './stubs';
 
 describe('Shell Query Cancellation & Sweeper', () => {
   let processor: ShellQueryProcessor;
@@ -39,6 +42,7 @@ describe('Shell Query Cancellation & Sweeper', () => {
   let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn>; retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    resetFactories();
     mockDb = createDbStub();
     mockMceBridge = createMceBridgeStub();
     mockRestDataService = createRestDataServiceStub();

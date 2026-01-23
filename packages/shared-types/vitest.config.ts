@@ -1,8 +1,13 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from "vitest/config";
 
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-  },
-});
+import sharedConfig from "../../vitest.shared";
+
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: {
+      name: "shared-types",
+      include: ["src/**/*.test.ts"],
+    },
+  }),
+);

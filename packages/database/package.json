@@ -13,7 +13,8 @@
     "db:migrate": "ts-node src/migrate.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\" --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config ./vitest-integration.config.ts"
   },
   "dependencies": {
     "@qpp/shared-types": "workspace:^",

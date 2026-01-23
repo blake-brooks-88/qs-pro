@@ -1,15 +1,20 @@
 import swc from "unplugin-swc";
-import { defineConfig } from "vitest/config";
+import { defineConfig, mergeConfig } from "vitest/config";
 
-export default defineConfig({
-  test: {
-    globals: false,
-    environment: "node",
-    include: ["src/**/*.spec.ts", "src/**/*.test.ts"],
-  },
-  plugins: [
-    swc.vite({
-      module: { type: "es6" },
-    }),
-  ],
-});
+import sharedConfig from "../../vitest.shared";
+
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: {
+      name: "backend-shared",
+      include: ["src/**/*.test.ts"],
+      root: "./",
+    },
+    plugins: [
+      swc.vite({
+        module: { type: "es6" },
+      }),
+    ],
+  }),
+);

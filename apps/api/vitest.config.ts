@@ -1,18 +1,21 @@
 import swc from 'unplugin-swc';
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from 'vitest/config';
 
-export default defineConfig({
-  test: {
-    include: ['**/*.spec.ts'],
-    exclude: ['**/*.e2e-spec.ts', 'node_modules/**'],
-    globals: true,
-    root: './',
-    environment: 'node',
-  },
-  plugins: [
-    // This is required to support NestJS decorators and metadata in Vitest
-    swc.vite({
-      module: { type: 'es6' },
-    }),
-  ],
-});
+import sharedConfig from '../../vitest.shared';
+
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: {
+      name: 'api',
+      include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+      exclude: ['**/*.e2e-spec.ts', '**/*.e2e.test.ts', 'node_modules/**'],
+      root: './',
+    },
+    plugins: [
+      swc.vite({
+        module: { type: 'es6' },
+      }),
+    ],
+  }),
+);

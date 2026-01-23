@@ -1,15 +1,15 @@
-import { defineConfig } from "vitest/config";
-import path from "path";
+import { defineConfig, mergeConfig } from "vitest/config";
 
-export default defineConfig({
-  test: {
-    globals: false,
-    environment: "node",
-    include: ["src/**/*.spec.ts", "src/**/*.test.ts"],
-    // Load .env from monorepo root
-    env: {
-      // dotenv will be loaded via setupFiles
+import sharedConfig from "../../vitest.shared";
+
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: {
+      name: "database",
+      include: ["src/**/*.test.ts"],
+      root: "./",
+      setupFiles: ["./vitest.setup.ts"],
     },
-    setupFiles: ["./vitest.setup.ts"],
-  },
-});
+  }),
+);

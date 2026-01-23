@@ -1,6 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
-import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 import {
   DataExtensionService,
   DataFolderService,
@@ -9,9 +7,16 @@ import {
   QueryDefinitionService,
   RlsContextService,
 } from '@qpp/backend-shared';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createMockJob } from './factories';
-import { createDbStub, createRlsContextStub } from './stubs';
+import {
+  createDbStub,
+  createMockJob,
+  createRlsContextStub,
+  resetFactories,
+} from '@qpp/test-utils';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
+import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 
 describe('RunToTempFlow', () => {
   let strategy: RunToTempFlow;
@@ -34,6 +39,7 @@ describe('RunToTempFlow', () => {
   };
 
   beforeEach(async () => {
+    resetFactories();
     mockDb = createDbStub();
     mockQueryValidator = {
       validateQuery: vi.fn().mockResolvedValue({ valid: true }),

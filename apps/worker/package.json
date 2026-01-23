@@ -9,7 +9,8 @@
     "start:dev": "DOTENV_CONFIG_PATH=../../.env nest start --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\" --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config ./vitest-integration.config.ts"
   },
   "keywords": [],
   "author": "",
@@ -38,6 +39,7 @@
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@qpp/test-utils": "workspace:^",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
