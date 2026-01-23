@@ -67,4 +67,5 @@ export * from "./auth/auth.service";
 export * from "./auth/seat-limit.service";
 export { SessionGuard } from "./auth/session.guard";
 export * from "./config";
+export * from "./encryption";
 export * from "./logger";
