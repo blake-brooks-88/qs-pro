@@ -40,6 +40,9 @@ for pkg in "${PACKAGES[@]}"; do
     echo ""
     echo "=== Testing $pkg ==="
 
+    # Clean stale package coverage to prevent merging outdated data
+    rm -rf "$pkg/coverage"
+
     # Run vitest with coverage in each package directory
     # Track failures but continue to collect coverage from all packages
     (cd "$pkg" && npx vitest run --coverage) || failures=1
