@@ -194,7 +194,13 @@ export class ShellQueryProcessor extends WorkerHost {
   }
 
   private async handleExecute(job: Job<ShellQueryJob>): Promise<unknown> {
-    const { runId, tenantId, userId, mid, sqlText: encryptedSqlText } = job.data;
+    const {
+      runId,
+      tenantId,
+      userId,
+      mid,
+      sqlText: encryptedSqlText,
+    } = job.data;
     const sqlText = this.encryptionService.decrypt(encryptedSqlText);
     if (!sqlText) {
       throw new UnrecoverableError("Failed to decrypt sqlText");
@@ -1038,7 +1044,12 @@ export class ShellQueryProcessor extends WorkerHost {
 
     await Promise.all([
       redisClient.publish(channel, encryptedEventJson),
-      redisClient.set(lastEventKey, encryptedEventJson, "EX", LAST_EVENT_TTL_SECONDS),
+      redisClient.set(
+        lastEventKey,
+        encryptedEventJson,
+        "EX",
+        LAST_EVENT_TTL_SECONDS,
+      ),
     ]);
   }
 
