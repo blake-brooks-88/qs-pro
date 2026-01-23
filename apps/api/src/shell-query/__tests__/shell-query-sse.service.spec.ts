@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ErrorCode } from '@qpp/backend-shared';
+import { EncryptionService, ErrorCode } from '@qpp/backend-shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ShellQuerySseService } from '../shell-query-sse.service';
@@ -42,6 +42,13 @@ describe('ShellQuerySseService', () => {
         {
           provide: 'REDIS_CLIENT',
           useValue: redis,
+        },
+        {
+          provide: EncryptionService,
+          useValue: {
+            encrypt: vi.fn((value: string) => value),
+            decrypt: vi.fn((value: string) => value),
+          },
         },
       ],
     }).compile();

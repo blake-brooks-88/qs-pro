@@ -4,7 +4,11 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
-import { RestDataService, SessionGuard } from '@qpp/backend-shared';
+import {
+  EncryptionService,
+  RestDataService,
+  SessionGuard,
+} from '@qpp/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { configureApp } from '../src/configure-app';
@@ -30,6 +34,10 @@ let mockSseService: ReturnType<typeof createShellQuerySseServiceStub>;
 describe('Shell Query Producer (e2e)', () => {
   let app: NestFastifyApplication;
   let service: ShellQueryService;
+  let encryptionService: {
+    encrypt: ReturnType<typeof vi.fn>;
+    decrypt: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     mockQueue = createQueueStub();
@@ -37,6 +45,10 @@ describe('Shell Query Producer (e2e)', () => {
     mockRestDataService = createRestDataServiceStub();
     mockRunRepo = createShellQueryRunRepoStub();
     mockSseService = createShellQuerySseServiceStub();
+    encryptionService = {
+      encrypt: vi.fn((value: string) => `encrypted:${value}`),
+      decrypt: vi.fn((value: string) => value.replace(/^encrypted:/, '')),
+    };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [ShellQueryController],
@@ -47,6 +59,7 @@ describe('Shell Query Producer (e2e)', () => {
         { provide: RestDataService, useValue: mockRestDataService },
         { provide: 'SHELL_QUERY_RUN_REPOSITORY', useValue: mockRunRepo },
         { provide: ShellQuerySseService, useValue: mockSseService },
+        { provide: EncryptionService, useValue: encryptionService },
       ],
     })
       .overrideGuard(SessionGuard)
@@ -64,7 +77,7 @@ describe('Shell Query Producer (e2e)', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    await app.close();
+    await app?.close();
   });
 
   it('should be defined', () => {
@@ -80,6 +93,8 @@ describe('Shell Query Producer (e2e)', () => {
       const snippetName = 'My Query';
 
       const runId = await service.createRun(context, sqlText, snippetName);
+      const encryptedSqlText = encryptionService.encrypt.mock.results[0]
+        ?.value as string;
 
       expect(runId).toBeDefined();
       expect(mockQueue.add).toHaveBeenCalledWith(
@@ -89,12 +104,13 @@ describe('Shell Query Producer (e2e)', () => {
           tenantId: context.tenantId,
           userId: context.userId,
           mid: context.mid,
-          sqlText,
+          sqlText: encryptedSqlText,
           snippetName,
         }),
         expect.any(Object),
       );
 
+      expect(encryptionService.encrypt).toHaveBeenCalledWith(sqlText);
       expect(mockRunRepo.createRun).toHaveBeenCalled();
     });
 

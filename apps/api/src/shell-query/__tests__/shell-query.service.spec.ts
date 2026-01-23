@@ -2,7 +2,11 @@ import * as crypto from 'node:crypto';
 
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ErrorCode, RestDataService } from '@qpp/backend-shared';
+import {
+  EncryptionService,
+  ErrorCode,
+  RestDataService,
+} from '@qpp/backend-shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -16,9 +20,17 @@ describe('ShellQueryService', () => {
   let runRepo: ShellQueryRunRepository;
   let queue: { add: ReturnType<typeof vi.fn> };
   let restDataService: { getRowset: ReturnType<typeof vi.fn> };
+  let encryptionService: {
+    encrypt: ReturnType<typeof vi.fn>;
+    decrypt: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     restDataService = { getRowset: vi.fn() };
+    encryptionService = {
+      encrypt: vi.fn((value: string) => `encrypted:${value}`),
+      decrypt: vi.fn((value: string) => value.replace(/^encrypted:/, '')),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -40,6 +52,7 @@ describe('ShellQueryService', () => {
             countActiveRuns: vi.fn(),
           },
         },
+        { provide: EncryptionService, useValue: encryptionService },
       ],
     }).compile();
 
@@ -63,6 +76,7 @@ describe('ShellQueryService', () => {
     vi.mocked(queue.add).mockResolvedValue(undefined);
 
     const sqlText = 'select * from foo';
+    const encryptedSqlText = `encrypted:${sqlText}`;
     const expectedHash = crypto
       .createHash('sha256')
       .update(sqlText)
@@ -99,7 +113,7 @@ describe('ShellQueryService', () => {
         userId: 'user-1',
         mid: 'mid-1',
         eid: 'eid-1',
-        sqlText,
+        sqlText: encryptedSqlText,
         snippetName: 'Snippet One',
       }),
       expect.objectContaining({
@@ -107,6 +121,7 @@ describe('ShellQueryService', () => {
         attempts: 2,
       }),
     );
+    expect(encryptionService.encrypt).toHaveBeenCalledWith(sqlText);
   });
 
   it('rejects createRun when per-user active run limit is exceeded', async () => {
@@ -284,7 +299,7 @@ describe('ShellQueryService', () => {
         taskId: null,
         queryDefinitionId: null,
         pollStartedAt: null,
-        errorMessage: 'Query failed',
+        errorMessage: 'encrypted:Query failed',
         createdAt: new Date(),
         startedAt: new Date(),
         completedAt: new Date(),

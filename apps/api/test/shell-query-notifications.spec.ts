@@ -4,7 +4,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
-import { SessionGuard } from '@qpp/backend-shared';
+import { EncryptionService, SessionGuard } from '@qpp/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { configureApp } from '../src/configure-app';
@@ -37,6 +37,13 @@ describe('Shell Query Notifications & Results (e2e)', () => {
         ShellQuerySseService,
         { provide: 'REDIS_CLIENT', useValue: mockRedis },
         { provide: 'TENANT_REPOSITORY', useValue: mockTenantRepo },
+        {
+          provide: EncryptionService,
+          useValue: {
+            encrypt: vi.fn((value: string) => value),
+            decrypt: vi.fn((value: string) => value),
+          },
+        },
       ],
     })
       .overrideGuard(SessionGuard)
@@ -53,7 +60,7 @@ describe('Shell Query Notifications & Results (e2e)', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    await app.close();
+    await app?.close();
   });
 
   describe('GET /runs/:runId/results', () => {
