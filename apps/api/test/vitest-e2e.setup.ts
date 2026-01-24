@@ -4,13 +4,9 @@
  * This file runs BEFORE any e2e tests and sets up required environment variables
  * with sensible test defaults.
  *
- * IMPORTANT: Do NOT set DATABASE_URL or REDIS_URL here.
- * - CI provides these via workflow env vars
- * - Locally, developers should have these set via .env or docker-compose
- *
  * The `setIfMissing` pattern ensures:
- * - CI env vars are NOT clobbered
- * - Local development has sensible defaults
+ * - CI env vars are NOT clobbered (CI sets DATABASE_URL and REDIS_URL explicitly)
+ * - Local development has sensible defaults (localhost services via docker-compose)
  */
 
 /**
@@ -58,3 +54,6 @@ setIfMissing(
 setIfMissing('COOKIE_SECURE', 'true');
 setIfMissing('COOKIE_SAMESITE', 'none');
 setIfMissing('COOKIE_PARTITIONED', 'true');
+
+// Redis connection (used by BullMQ and ioredis clients)
+setIfMissing('REDIS_URL', 'redis://127.0.0.1:6379');

@@ -26,7 +26,7 @@ Use this prompt to review a pull request. Replace `{PR_URL}` with the actual PR 
 1. **Security vulnerabilities** - injection, auth bypass, data exposure, secrets
 2. **Logic bugs** - code that will produce incorrect behavior
 3. **Edge cases** - unhandled scenarios that will crash or corrupt data
-4. **Missing tests** - changed behavior without test coverage
+4. **Missing test coverage** - new/changed behavior with no tests (see Step 2.5)
 
 ### Do NOT Flag
 
@@ -73,7 +73,7 @@ You are performing a code review for this pull request: `{PR_URL}`
 - [ ] Does this introduce a security vulnerability? (injection, auth bypass, data exposure, hardcoded secrets)
 - [ ] Is there a logic bug that will cause wrong behavior?
 - [ ] Are there unhandled edge cases that could crash or corrupt data?
-- [ ] Does changed behavior have test coverage?
+- [ ] Does changed behavior have test coverage? (see Step 2.5)
 
 **Check If PR Touches These Areas:**
 
@@ -87,6 +87,21 @@ You are performing a code review for this pull request: `{PR_URL}`
 | Logging | No secrets/PII in logs | §12 |
 
 **Reference:** [AppExchange Security Review Checklist](../../../docs/security-review-materials/APPEXCHANGE-SECURITY-REVIEW-CHECKLIST.md)
+
+### Step 2.5: Evaluate Test Coverage
+
+**Do NOT just ask "where are the tests?"** Actively verify coverage:
+
+1. **Identify what changed** - List files/functions with new or modified behavior
+2. **Search for existing tests** - For each changed file `src/path/file.ts`:
+   - Look for `src/path/file.spec.ts`, `src/path/file.test.ts`
+   - Grep test files for imports/references to the modified functions
+   - Check if existing tests exercise the changed code paths
+3. **Evaluate coverage**:
+   - ✅ **OK:** Tests exist (in PR or codebase) that cover the changed behavior
+   - ✅ **OK:** Refactoring with no behavior change, existing tests still pass
+   - ⚠️ **Flag:** New functionality with no tests anywhere
+   - ⚠️ **Flag:** Behavior change with no tests covering the new behavior
 
 ### Step 3: Provide Feedback
 
