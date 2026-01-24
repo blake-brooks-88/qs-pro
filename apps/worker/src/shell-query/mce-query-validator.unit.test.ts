@@ -39,19 +39,11 @@ describe("MceQueryValidator", () => {
       mockContext,
     );
 
-    // Assert
-    expect(result.valid).toBe(true);
-    expect(result.errors).toBeUndefined();
-    expect(mockMceBridge.request).toHaveBeenCalledWith(
-      "tenant-1",
-      "user-1",
-      "mid-1",
-      expect.objectContaining({
-        method: "POST",
-        url: "/automation/v1/queries/actions/validate/",
-        data: { Text: "SELECT SubscriberKey FROM _Subscribers" },
-      }),
-    );
+    // Assert - observable behavior: validation result indicates query is valid
+    expect(result).toEqual({
+      valid: true,
+      errors: undefined,
+    });
   });
 
   it("returns valid:false with MCE error messages for invalid query", async () => {

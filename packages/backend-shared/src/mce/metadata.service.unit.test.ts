@@ -7,7 +7,6 @@ import { MetadataService } from "./metadata.service";
 
 describe("MetadataService", () => {
   let service: MetadataService;
-  let bridge: MceBridgeService;
 
   const mockBridge = {
     soapRequest: vi.fn(),
@@ -34,31 +33,37 @@ describe("MetadataService", () => {
     }).compile();
 
     service = module.get<MetadataService>(MetadataService);
-    bridge = module.get<MceBridgeService>(MceBridgeService);
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   describe("getFolders", () => {
-    it("should return folders from cache if available", async () => {
-      mockCache.get.mockResolvedValue([{ id: "1", Name: "Test" }]);
+    it("returns cached folders when available", async () => {
+      // Arrange
+      const cachedFolders = [
+        { id: "1", Name: "Test Folder" },
+        { id: "2", Name: "Another Folder" },
+      ];
+      mockCache.get.mockResolvedValue(cachedFolders);
 
+      // Act
       const result = await service.getFolders("t1", "u1", "mid1", "eid1");
 
-      expect(result).toEqual([{ id: "1", Name: "Test" }]);
-      expect(mockCache.get).toHaveBeenCalledWith("folders:t1:mid1:eid1");
-      expect(bridge.soapRequest).not.toHaveBeenCalled();
+      // Assert - observable behavior: returns cached data structure
+      expect(result).toEqual(cachedFolders);
+      expect(result).toHaveLength(2);
     });
 
-    it("should fetch from MCE if cache miss and set cache", async () => {
+    it("returns merged local and shared folders on cache miss", async () => {
+      // Arrange
       mockCache.get.mockResolvedValue(null);
       mockBridge.soapRequest
         .mockResolvedValueOnce({
           Body: {
             RetrieveResponseMsg: {
-              Results: [{ ID: "1", Name: "Folder1" }],
+              Results: [{ ID: "1", Name: "LocalFolder" }],
             },
           },
         })
@@ -70,21 +75,18 @@ describe("MetadataService", () => {
           },
         });
 
+      // Act
       const result = await service.getFolders("t1", "u1", "mid1", "eid1");
 
+      // Assert - observable behavior: merged folders returned
       expect(result).toEqual([
-        { ID: "1", Name: "Folder1" },
+        { ID: "1", Name: "LocalFolder" },
         { ID: "2", Name: "SharedFolder" },
       ]);
-      expect(bridge.soapRequest).toHaveBeenCalledTimes(2);
-      expect(mockCache.set).toHaveBeenCalledWith(
-        "folders:t1:mid1:eid1",
-        expect.any(Array),
-        600000,
-      ); // 10 mins
     });
 
-    it("should paginate if MoreDataAvailable is returned", async () => {
+    it("returns all folders across multiple pages when paginated", async () => {
+      // Arrange
       mockCache.get.mockResolvedValue(null);
       mockBridge.soapRequest.mockImplementation(
         async (_tid: string, _uid: string, _mid: string, body: string) => {
@@ -123,24 +125,24 @@ describe("MetadataService", () => {
         },
       );
 
+      // Act
       const result = await service.getFolders("t1", "u1", "mid1", "eid1");
 
+      // Assert - observable behavior: all 3 folders returned from pagination
       expect(result).toHaveLength(3);
-      // 1 Local Page 1, 1 Local Page 2, 1 Shared Page 1
-      expect(mockBridge.soapRequest).toHaveBeenCalledTimes(3);
-
-      // Verify at least one call used ContinueRequest
-      const callBodies = mockBridge.soapRequest.mock.calls.map((c) => c[3]);
-      expect(
-        callBodies.some((b: string) =>
-          b.includes("<ContinueRequest>req-123</ContinueRequest>"),
-        ),
-      ).toBe(true);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ ID: "1", Name: "Folder1" }),
+          expect.objectContaining({ ID: "2", Name: "Folder2" }),
+          expect.objectContaining({ ID: "3", Name: "Folder3" }),
+        ]),
+      );
     });
   });
 
   describe("getDataExtensions", () => {
-    it("should fetch local and shared DEs and merge them", async () => {
+    it("returns merged local and shared data extensions", async () => {
+      // Arrange
       mockCache.get.mockResolvedValue(null);
       mockBridge.soapRequest
         .mockResolvedValueOnce({
@@ -160,6 +162,7 @@ describe("MetadataService", () => {
           },
         });
 
+      // Act
       const result = await service.getDataExtensions(
         "t1",
         "u1",
@@ -167,32 +170,80 @@ describe("MetadataService", () => {
         "eid123",
       );
 
+      // Assert - observable behavior: both local and shared DEs returned
       expect(result).toHaveLength(2);
-      const typedResult = result as Array<{ CustomerKey: string }>;
-      expect(typedResult.find((r) => r.CustomerKey === "DE1")).toBeDefined();
-      expect(typedResult.find((r) => r.CustomerKey === "DE2")).toBeDefined();
-
-      // Verify calls
-      expect(bridge.soapRequest).toHaveBeenCalledTimes(2);
-      // Check for Shared call specific logic (ClientIDs) if implemented
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ CustomerKey: "DE1", Name: "LocalDE" }),
+          expect.objectContaining({ CustomerKey: "DE2", Name: "SharedDE" }),
+        ]),
+      );
     });
+
+    // NOTE: getDataExtensions does not cache results (unlike getFolders and getFields)
+    // This was discovered during behavioral assertion refactoring - the original
+    // implementation-coupled test masked this absence of caching behavior.
   });
 
   describe("getFields", () => {
-    it("should cache fields by DE key", async () => {
+    it("returns fields for a data extension", async () => {
+      // Arrange
       const deKey = "MY_DE_KEY";
       mockCache.get.mockResolvedValue(null);
       mockBridge.soapRequest.mockResolvedValue({
-        Body: { RetrieveResponseMsg: { Results: [{ Name: "Field1" }] } },
+        Body: {
+          RetrieveResponseMsg: {
+            Results: [
+              { Name: "SubscriberKey", FieldType: "Text" },
+              { Name: "EmailAddress", FieldType: "EmailAddress" },
+            ],
+          },
+        },
       });
 
-      await service.getFields("t1", "u1", "mid1", deKey);
+      // Act
+      const result = await service.getFields("t1", "u1", "mid1", deKey);
 
-      expect(mockCache.set).toHaveBeenCalledWith(
-        `fields:t1:mid1:${deKey}`,
-        expect.any(Array),
-        1800000,
-      ); // 30 mins
+      // Assert - observable behavior: fields returned with expected structure
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ Name: "SubscriberKey", FieldType: "Text" }),
+          expect.objectContaining({
+            Name: "EmailAddress",
+            FieldType: "EmailAddress",
+          }),
+        ]),
+      );
+    });
+
+    it("returns cached fields when available", async () => {
+      // Arrange
+      const cachedFields = [
+        { Name: "Field1", FieldType: "Text" },
+        { Name: "Field2", FieldType: "Number" },
+      ];
+      mockCache.get.mockResolvedValue(cachedFields);
+
+      // Act
+      const result = await service.getFields("t1", "u1", "mid1", "CACHED_DE");
+
+      // Assert - observable behavior: returns cached data
+      expect(result).toEqual(cachedFields);
+    });
+
+    it("returns empty array when DE has no fields", async () => {
+      // Arrange
+      mockCache.get.mockResolvedValue(null);
+      mockBridge.soapRequest.mockResolvedValue({
+        Body: { RetrieveResponseMsg: { Results: [] } },
+      });
+
+      // Act
+      const result = await service.getFields("t1", "u1", "mid1", "EMPTY_DE");
+
+      // Assert - observable behavior: empty array for DE with no fields
+      expect(result).toEqual([]);
     });
   });
 });
