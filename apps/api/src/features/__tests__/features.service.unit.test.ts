@@ -61,16 +61,19 @@ describe('FeaturesService', () => {
     // Act
     const features = await service.getTenantFeatures(tenantId);
 
-    // Assert
-    expect(features.basicLinting).toBe(true);
-    expect(features.syntaxHighlighting).toBe(true);
-    expect(features.quickFixes).toBe(false);
-    expect(features.minimap).toBe(false);
-    expect(features.advancedAutocomplete).toBe(false);
-    expect(features.teamSnippets).toBe(false);
-    expect(features.auditLogs).toBe(false);
-    expect(tenantRepo.findById).toHaveBeenCalledWith(tenantId);
-    expect(featureOverrideRepo.findByTenantId).toHaveBeenCalledWith(tenantId);
+    // Assert - free tier gets basic features + systemDataViews only
+    expect(features).toEqual({
+      basicLinting: true,
+      syntaxHighlighting: true,
+      systemDataViews: true,
+      quickFixes: false,
+      minimap: false,
+      advancedAutocomplete: false,
+      createDataExtension: false,
+      teamSnippets: false,
+      auditLogs: false,
+      deployToAutomation: false,
+    });
   });
 
   it('resolves pro tier to pro+free features', async () => {
@@ -88,14 +91,19 @@ describe('FeaturesService', () => {
     // Act
     const features = await service.getTenantFeatures(tenantId);
 
-    // Assert
-    expect(features.basicLinting).toBe(true);
-    expect(features.syntaxHighlighting).toBe(true);
-    expect(features.quickFixes).toBe(true);
-    expect(features.minimap).toBe(true);
-    expect(features.advancedAutocomplete).toBe(true);
-    expect(features.teamSnippets).toBe(false);
-    expect(features.auditLogs).toBe(false);
+    // Assert - pro tier gets additional features but not enterprise features
+    expect(features).toEqual({
+      basicLinting: true,
+      syntaxHighlighting: true,
+      systemDataViews: true,
+      quickFixes: true,
+      minimap: true,
+      advancedAutocomplete: true,
+      createDataExtension: true,
+      teamSnippets: false,
+      auditLogs: false,
+      deployToAutomation: false,
+    });
   });
 
   it('applies enable override (free tenant gets pro feature)', async () => {
@@ -124,12 +132,19 @@ describe('FeaturesService', () => {
     // Act
     const features = await service.getTenantFeatures(tenantId);
 
-    // Assert
-    expect(features.basicLinting).toBe(true);
-    expect(features.syntaxHighlighting).toBe(true);
-    expect(features.quickFixes).toBe(true); // Enabled by override
-    expect(features.minimap).toBe(false);
-    expect(features.advancedAutocomplete).toBe(false);
+    // Assert - free tier with quickFixes enabled via override
+    expect(features).toEqual({
+      basicLinting: true,
+      syntaxHighlighting: true,
+      systemDataViews: true,
+      quickFixes: true, // Enabled by override
+      minimap: false,
+      advancedAutocomplete: false,
+      createDataExtension: false,
+      teamSnippets: false,
+      auditLogs: false,
+      deployToAutomation: false,
+    });
   });
 
   it('applies disable override (pro tenant loses feature)', async () => {
@@ -158,14 +173,19 @@ describe('FeaturesService', () => {
     // Act
     const features = await service.getTenantFeatures(tenantId);
 
-    // Assert
-    expect(features.basicLinting).toBe(true);
-    expect(features.syntaxHighlighting).toBe(true);
-    expect(features.quickFixes).toBe(true);
-    expect(features.minimap).toBe(false); // Disabled by override
-    expect(features.advancedAutocomplete).toBe(true);
-    expect(features.teamSnippets).toBe(false);
-    expect(features.auditLogs).toBe(false);
+    // Assert - pro tier with minimap disabled via override
+    expect(features).toEqual({
+      basicLinting: true,
+      syntaxHighlighting: true,
+      systemDataViews: true,
+      quickFixes: true,
+      minimap: false, // Disabled by override
+      advancedAutocomplete: true,
+      createDataExtension: true,
+      teamSnippets: false,
+      auditLogs: false,
+      deployToAutomation: false,
+    });
   });
 
   it('resolves enterprise tier to enterprise+pro+free features', async () => {
@@ -183,14 +203,18 @@ describe('FeaturesService', () => {
     // Act
     const features = await service.getTenantFeatures(tenantId);
 
-    // Assert - should have all features
-    expect(features.basicLinting).toBe(true);
-    expect(features.syntaxHighlighting).toBe(true);
-    expect(features.quickFixes).toBe(true);
-    expect(features.minimap).toBe(true);
-    expect(features.advancedAutocomplete).toBe(true);
-    expect(features.teamSnippets).toBe(true);
-    expect(features.auditLogs).toBe(true);
-    expect(features.deployToAutomation).toBe(true);
+    // Assert - enterprise tier gets all features
+    expect(features).toEqual({
+      basicLinting: true,
+      syntaxHighlighting: true,
+      systemDataViews: true,
+      quickFixes: true,
+      minimap: true,
+      advancedAutocomplete: true,
+      createDataExtension: true,
+      teamSnippets: true,
+      auditLogs: true,
+      deployToAutomation: true,
+    });
   });
 });

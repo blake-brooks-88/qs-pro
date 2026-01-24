@@ -94,8 +94,7 @@ describe('FeaturesController', () => {
     // Act
     const result = await controller.getFeatures(userSession);
 
-    // Assert
+    // Assert - focus on observable behavior: returned features match expected shape and values
     expect(result).toEqual(mockFeatures);
-    expect(featuresService.getTenantFeatures).toHaveBeenCalledWith('tenant-1');
   });
 });

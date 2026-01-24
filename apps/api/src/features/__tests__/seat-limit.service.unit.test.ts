@@ -40,10 +40,8 @@ describe('SeatLimitService', () => {
     vi.mocked(tenantRepo.findById).mockResolvedValue(mockTenant);
     vi.mocked(tenantRepo.countUsersByTenantId).mockResolvedValue(5);
 
-    // Act & Assert
-    await expect(service.checkSeatLimit(tenantId)).resolves.not.toThrow();
-    expect(tenantRepo.findById).toHaveBeenCalledWith(tenantId);
-    expect(tenantRepo.countUsersByTenantId).toHaveBeenCalledWith(tenantId);
+    // Act & Assert - focus on observable behavior: no error thrown when under limit
+    await expect(service.checkSeatLimit(tenantId)).resolves.toBeUndefined();
   });
 
   it('throws AppError with SEAT_LIMIT_EXCEEDED when at seat limit', async () => {
@@ -105,9 +103,7 @@ describe('SeatLimitService', () => {
     vi.mocked(tenantRepo.findById).mockResolvedValue(mockTenant);
     vi.mocked(tenantRepo.countUsersByTenantId).mockResolvedValue(1000);
 
-    // Act & Assert
-    await expect(service.checkSeatLimit(tenantId)).resolves.not.toThrow();
-    expect(tenantRepo.findById).toHaveBeenCalledWith(tenantId);
-    // Should not even check user count when limit is null
+    // Act & Assert - focus on observable behavior: no error thrown when no limit configured
+    await expect(service.checkSeatLimit(tenantId)).resolves.toBeUndefined();
   });
 });

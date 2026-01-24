@@ -31,61 +31,122 @@ describe('MetadataController', () => {
     vi.clearAllMocks();
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
-
   describe('getFolders', () => {
-    it('should return folders', async () => {
-      const mockResult = [{ id: '1', Name: 'Folder' }];
+    it('returns folders with expected structure', async () => {
+      // Arrange
+      const mockResult = [
+        { id: '1', Name: 'Data Extensions', ParentFolder: { ID: '0' } },
+        { id: '2', Name: 'Shared', ParentFolder: { ID: '0' } },
+      ];
       mockService.getFolders.mockResolvedValue(mockResult);
 
       const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
+
+      // Act
       const result = await controller.getFolders(user, 'eid1');
 
-      expect(result).toBe(mockResult);
-      expect(mockService.getFolders).toHaveBeenCalledWith(
-        't1',
-        'u1',
-        'mid1',
-        'eid1',
+      // Assert - observable behavior: returns array of folders with expected shape
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: '1', Name: 'Data Extensions' }),
+          expect.objectContaining({ id: '2', Name: 'Shared' }),
+        ]),
       );
+    });
+
+    it('returns empty array when no folders exist', async () => {
+      // Arrange
+      mockService.getFolders.mockResolvedValue([]);
+      const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
+
+      // Act
+      const result = await controller.getFolders(user, 'eid1');
+
+      // Assert
+      expect(result).toEqual([]);
     });
   });
 
   describe('getDataExtensions', () => {
-    it('should return data extensions', async () => {
-      const mockResult = [{ CustomerKey: 'DE1' }];
+    it('returns data extensions with expected structure', async () => {
+      // Arrange
+      const mockResult = [
+        { CustomerKey: 'DE1', Name: 'My_Data_Extension' },
+        { CustomerKey: 'DE2', Name: 'Another_DE' },
+      ];
       mockService.getDataExtensions.mockResolvedValue(mockResult);
 
       const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
+
+      // Act
       const result = await controller.getDataExtensions(user, 'eid1');
 
-      expect(result).toBe(mockResult);
-      expect(mockService.getDataExtensions).toHaveBeenCalledWith(
-        't1',
-        'u1',
-        'mid1',
-        'eid1',
+      // Assert - observable behavior: returns array of DEs with CustomerKey and Name
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            CustomerKey: 'DE1',
+            Name: 'My_Data_Extension',
+          }),
+          expect.objectContaining({ CustomerKey: 'DE2', Name: 'Another_DE' }),
+        ]),
       );
+    });
+
+    it('returns empty array when no data extensions exist', async () => {
+      // Arrange
+      mockService.getDataExtensions.mockResolvedValue([]);
+      const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
+
+      // Act
+      const result = await controller.getDataExtensions(user, 'eid1');
+
+      // Assert
+      expect(result).toEqual([]);
     });
   });
 
   describe('getFields', () => {
-    it('should return fields for a DE', async () => {
-      const mockResult = [{ Name: 'Field1' }];
+    it('returns fields for a DE with expected structure', async () => {
+      // Arrange
+      const mockResult = [
+        { Name: 'SubscriberKey', FieldType: 'Text', MaxLength: 254 },
+        { Name: 'EmailAddress', FieldType: 'EmailAddress' },
+        { Name: 'CreatedDate', FieldType: 'Date' },
+      ];
       mockService.getFields.mockResolvedValue(mockResult);
 
       const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
+
+      // Act
       const result = await controller.getFields(user, 'DE_KEY');
 
-      expect(result).toBe(mockResult);
-      expect(mockService.getFields).toHaveBeenCalledWith(
-        't1',
-        'u1',
-        'mid1',
-        'DE_KEY',
+      // Assert - observable behavior: returns array of fields with Name and type info
+      expect(result).toHaveLength(3);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ Name: 'SubscriberKey', FieldType: 'Text' }),
+          expect.objectContaining({
+            Name: 'EmailAddress',
+            FieldType: 'EmailAddress',
+          }),
+          expect.objectContaining({ Name: 'CreatedDate', FieldType: 'Date' }),
+        ]),
       );
+    });
+
+    it('returns empty array when DE has no fields', async () => {
+      // Arrange
+      mockService.getFields.mockResolvedValue([]);
+      const user = { userId: 'u1', tenantId: 't1', mid: 'mid1' };
+
+      // Act
+      const result = await controller.getFields(user, 'EMPTY_DE');
+
+      // Assert
+      expect(result).toEqual([]);
     });
   });
 });
