@@ -437,6 +437,12 @@ importers:
       eslint:
         specifier: ^9.39.2
         version: 9.39.2(jiti@2.6.1)
+      msw:
+        specifier: ^2.12.7
+        version: 2.12.7(@types/node@22.19.3)(typescript@5.9.3)
+      postgres:
+        specifier: ^3.4.3
+        version: 3.4.7
       supertest:
         specifier: ^7.0.0
         version: 7.1.4

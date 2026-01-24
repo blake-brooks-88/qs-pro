@@ -14,20 +14,11 @@ export default defineConfig({
     name: 'worker-integration',
     globals: true,
     environment: 'node',
-    include: ['test/**/*.integration.test.ts'],
+    include: ['test/**/*.integration.test.ts', 'src/**/*.integration.test.ts'],
+    setupFiles: ['./test/vitest-integration.setup.ts'],
+    hookTimeout: 60000, // 60s for beforeAll (app initialization with DB)
+    testTimeout: 30000, // 30s for individual tests
     root: './',
-    env: {
-      DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
-      REDIS_URL: 'redis://localhost:6379',
-      NODE_ENV: 'test',
-      LOG_FORMAT: 'text',
-      PORT: '3001',
-      ENCRYPTION_KEY:
-        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-      MCE_CLIENT_ID: 'test_client_id',
-      MCE_CLIENT_SECRET: 'test_client_secret',
-      ADMIN_API_KEY: 'test_api_key',
-    },
   },
   plugins: [
     swc.vite({
