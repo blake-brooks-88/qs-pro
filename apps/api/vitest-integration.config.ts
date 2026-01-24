@@ -14,7 +14,10 @@ export default defineConfig({
     name: 'api-integration',
     globals: true,
     environment: 'node',
-    include: ['test/**/*.integration.test.ts'],
+    include: ['test/**/*.integration.test.ts', 'src/**/*.integration.test.ts'],
+    setupFiles: ['./test/vitest-e2e.setup.ts'],
+    hookTimeout: 60000, // 60s for beforeAll (app initialization with DB)
+    testTimeout: 30000, // 30s for individual tests
     root: './',
   },
   plugins: [
