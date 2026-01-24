@@ -1,7 +1,8 @@
 import path from 'node:path';
 
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
   DatabaseModule,
   LoggerModule,
@@ -28,6 +29,15 @@ import { UsersModule } from './users/users.module';
       ],
     }),
     LoggerModule,
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          url: configService.get<string>('REDIS_URL', 'redis://localhost:6379'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
     DatabaseModule,
     AuthModule,
     UsersModule,

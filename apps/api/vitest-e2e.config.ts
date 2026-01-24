@@ -8,6 +8,8 @@ export default defineConfig({
     root: './',
     environment: 'node',
     setupFiles: ['./test/vitest-e2e.setup.ts'],
+    hookTimeout: 30000, // 30s for beforeAll (app initialization)
+    testTimeout: 30000, // 30s for individual tests
     server: {
       deps: {
         inline: ['@qpp/database'],
