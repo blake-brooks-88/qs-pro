@@ -56,6 +56,11 @@ export class ShellQueryService {
     snippetName?: string,
     tableMetadata?: TableMetadata,
   ): Promise<string> {
+    const normalizedSnippetName = snippetName?.trim();
+    const truncatedSnippetName = normalizedSnippetName
+      ? normalizedSnippetName.slice(0, 100)
+      : undefined;
+
     const runId = crypto.randomUUID();
     const sqlTextHash = crypto
       .createHash('sha256')
@@ -82,7 +87,7 @@ export class ShellQueryService {
       tenantId: context.tenantId,
       userId: context.userId,
       mid: context.mid,
-      snippetName,
+      snippetName: truncatedSnippetName,
       sqlTextHash,
       status: 'queued',
     });
@@ -101,7 +106,7 @@ export class ShellQueryService {
         runId,
         ...context,
         sqlText: encryptedSqlText,
-        snippetName,
+        snippetName: truncatedSnippetName,
         tableMetadata,
       },
       {

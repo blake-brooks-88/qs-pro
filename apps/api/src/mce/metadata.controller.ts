@@ -1,4 +1,11 @@
-import { Controller, Get, Query, UseFilters, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Query,
+  UseFilters,
+  UseGuards,
+} from '@nestjs/common';
 import { MetadataService, SessionGuard } from '@qpp/backend-shared';
 
 import type { UserSession } from '../common/decorators/current-user.decorator';
@@ -39,6 +46,9 @@ export class MetadataController {
 
   @Get('fields')
   async getFields(@CurrentUser() user: UserSession, @Query('key') key: string) {
+    if (typeof key !== 'string' || !key.trim()) {
+      throw new BadRequestException('key is required');
+    }
     return this.metadataService.getFields(
       user.tenantId,
       user.userId,

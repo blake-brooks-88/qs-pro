@@ -26,7 +26,9 @@ import { ShellQuerySseService } from './shell-query-sse.service';
 
 const createRunSchema = z.object({
   sqlText: z.string().min(1, 'SQL text is required').max(100_000),
-  snippetName: z.string().max(100).optional(),
+  // Snippet name is truncated to 100 chars server-side, but accept a larger input to
+  // preserve backward compatibility with callers that don't pre-trim.
+  snippetName: z.string().max(1000).optional(),
   tableMetadata: z
     .record(
       z.string().max(128),
