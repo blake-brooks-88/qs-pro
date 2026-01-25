@@ -34,6 +34,8 @@ import {
   extractTableReferences,
   getSharedFolderIds,
   getSqlCursorContext,
+  isInsideComment,
+  isInsideString,
 } from "@/features/editor-workspace/utils/sql-context";
 import type { SqlDiagnostic } from "@/features/editor-workspace/utils/sql-diagnostics";
 import { toMonacoMarkers } from "@/features/editor-workspace/utils/sql-diagnostics";
@@ -293,6 +295,13 @@ export function MonacoQueryEditor({
             const cursorIndex = model.getOffsetAt(position);
             const sqlContext = getSqlCursorContext(text, cursorIndex);
             const bracketRange = getBracketReplacementRange(model, position);
+
+            if (
+              isInsideString(text, cursorIndex) ||
+              isInsideComment(text, cursorIndex)
+            ) {
+              return { suggestions: [] };
+            }
 
             const isExplicitTrigger =
               completionContext.triggerKind ===
