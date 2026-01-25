@@ -48,18 +48,19 @@ function extractJwtFromUnknown(value: unknown): string | null {
   return trimmed && isProbablyJwt(trimmed) ? trimmed : null;
 }
 
-export function startEmbeddedJwtListener(): void {
-  if (listenerInitialized || typeof window === "undefined") {
+export function startEmbeddedJwtListener(targetWindow?: Window): void {
+  const win = targetWindow ?? (typeof window !== "undefined" ? window : null);
+  if (listenerInitialized || !win) {
     return;
   }
   listenerInitialized = true;
 
-  window.addEventListener("message", (event: MessageEvent) => {
+  win.addEventListener("message", (event: MessageEvent) => {
     // Only accept SSO JWTs from the parent MCE frame.
-    if (window.self === window.top) {
+    if (win.self === win.top) {
       return;
     }
-    if (event.source !== window.parent) {
+    if (event.source !== win.parent) {
       return;
     }
     if (!isAllowedMceOrigin(event.origin)) {

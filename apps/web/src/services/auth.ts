@@ -1,4 +1,5 @@
 import api from "@/services/api";
+import { useAuthStore } from "@/store/auth-store";
 
 export interface MeResponseDto {
   user: {
@@ -26,4 +27,12 @@ export async function loginWithJwt(jwt: string): Promise<void> {
     { jwt },
     { headers: { Accept: "application/json" } },
   );
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await api.get("/auth/logout");
+  } finally {
+    useAuthStore.getState().logout();
+  }
 }
