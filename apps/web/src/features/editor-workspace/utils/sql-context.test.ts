@@ -38,6 +38,24 @@ describe("getSqlCursorContext - characterization tests", () => {
     const context = getSqlCursorContext(sql, sql.length);
     expect(context.isAfterFromJoin).toBe(true);
   });
+
+  test("lastKeyword_AfterJoinKeyword_ReturnsJoin", () => {
+    const sql = "SELECT * FROM [A] JOIN ";
+    const context = getSqlCursorContext(sql, sql.length);
+    expect(context.lastKeyword).toBe("join");
+  });
+
+  test("lastKeyword_AfterGroupBy_ReturnsGroup", () => {
+    const sql = "SELECT * FROM [A] GROUP BY ";
+    const context = getSqlCursorContext(sql, sql.length);
+    expect(context.lastKeyword).toBe("group");
+  });
+
+  test("lastKeyword_AfterOrderBy_ReturnsOrder", () => {
+    const sql = "SELECT * FROM [A] ORDER BY ";
+    const context = getSqlCursorContext(sql, sql.length);
+    expect(context.lastKeyword).toBe("order");
+  });
 });
 
 describe("getSqlCursorContext - ENT. prefix edge cases", () => {

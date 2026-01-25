@@ -102,7 +102,7 @@ describe("MCE SQL Constants", () => {
 
   describe("MCE_SQL_UNSUPPORTED_FUNCTIONS", () => {
     test("includes known unsupported functions", () => {
-      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("openjson")).toBe(null);
+      expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("openjson")).toBeNull();
       expect(MCE_SQL_UNSUPPORTED_FUNCTIONS.get("try_convert")).toBe(
         "Use CONVERT() instead",
       );

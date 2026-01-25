@@ -72,6 +72,7 @@ const mockMonacoInstance = {
       Issue: 26,
     },
     CompletionTriggerKind: { Invoke: 0, TriggerCharacter: 1 },
+    CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
     IndentAction: { Indent: 1, Outdent: 3 },
   },
 };
@@ -430,6 +431,71 @@ describe("MonacoQueryEditor Component", () => {
   });
 
   describe("Autocomplete Registration", () => {
+    type CompletionSuggestion = { label?: string; sortText?: string };
+    type CompletionResult = { suggestions: CompletionSuggestion[] };
+
+    type CompletionProviderConfig = {
+      triggerCharacters?: string[];
+      provideCompletionItems: (
+        model: unknown,
+        position: { lineNumber: number; column: number },
+        context: { triggerKind: number },
+      ) => CompletionResult | Promise<CompletionResult>;
+    };
+
+    const getRegisteredCompletionProvider = (): CompletionProviderConfig => {
+      const call = mockMonacoInstance.languages.registerCompletionItemProvider
+        .mock.calls[0] as unknown[] | undefined;
+      if (!call) {
+        throw new Error("Completion provider was not registered");
+      }
+      const providerConfig = call[1] as CompletionProviderConfig | undefined;
+      if (!providerConfig) {
+        throw new Error("Completion provider was not registered");
+      }
+      return providerConfig;
+    };
+
+    const createSingleLineModel = (sql: string) => {
+      return {
+        getValue: () => sql,
+        getLineContent: () => sql,
+        getOffsetAt: ({ column }: { column: number }) => column - 1,
+        getPositionAt: (offset: number) => ({
+          lineNumber: 1,
+          column: offset + 1,
+        }),
+        getWordUntilPosition: ({ column }: { column: number }) => {
+          const cursorIndex = column - 1;
+          const textBefore = sql.slice(0, cursorIndex);
+          const match = /([A-Za-z0-9_]+)$/.exec(textBefore);
+          const word = match?.[1] ?? "";
+          return {
+            word,
+            startColumn: column - word.length,
+            endColumn: column,
+          };
+        },
+      };
+    };
+
+    const invokeCompletions = async (
+      sql: string,
+    ): Promise<CompletionResult> => {
+      const providerConfig = getRegisteredCompletionProvider();
+      const model = createSingleLineModel(sql);
+      return await Promise.resolve(
+        providerConfig.provideCompletionItems(
+          model,
+          { lineNumber: 1, column: sql.length + 1 },
+          {
+            triggerKind:
+              mockMonacoInstance.languages.CompletionTriggerKind.Invoke,
+          },
+        ),
+      );
+    };
+
     it("registers completion item provider for SQL language on mount", () => {
       const queryClient = createQueryClient();
 
@@ -477,14 +543,158 @@ describe("MonacoQueryEditor Component", () => {
         );
       }
 
-      const call =
-        mockMonacoInstance.languages.registerCompletionItemProvider.mock
-          .calls[0];
-      expect(call).toBeDefined();
-      const [, providerConfig] = call ?? [];
-      expect(providerConfig.triggerCharacters).toContain(".");
-      expect(providerConfig.triggerCharacters).toContain("[");
-      expect(providerConfig.triggerCharacters).toContain("_");
+      const providerConfig = getRegisteredCompletionProvider();
+      expect(providerConfig.triggerCharacters).toBeDefined();
+      expect(providerConfig.triggerCharacters ?? []).toContain(".");
+      expect(providerConfig.triggerCharacters ?? []).toContain("[");
+      expect(providerConfig.triggerCharacters ?? []).toContain("_");
+    });
+
+    it("does not provide dropdown completions inside a string literal", async () => {
+      const queryClient = createQueryClient();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      if (capturedOnMount) {
+        capturedOnMount(
+          mockEditorInstance as unknown as Parameters<OnMount>[0],
+          mockMonacoInstance as unknown as Parameters<OnMount>[1],
+        );
+      }
+
+      const result = await invokeCompletions(
+        "SELECT * FROM [A] WHERE name = 'AND",
+      );
+
+      expect(result.suggestions).toHaveLength(0);
+    });
+
+    it("does not provide dropdown completions inside a comment", async () => {
+      const queryClient = createQueryClient();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      if (capturedOnMount) {
+        capturedOnMount(
+          mockEditorInstance as unknown as Parameters<OnMount>[0],
+          mockMonacoInstance as unknown as Parameters<OnMount>[1],
+        );
+      }
+
+      const result = await invokeCompletions("SELECT * FROM [A] -- AND");
+
+      expect(result.suggestions).toHaveLength(0);
+    });
+
+    it("prioritizes contextual keywords after WHERE", async () => {
+      const queryClient = createQueryClient();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      if (capturedOnMount) {
+        capturedOnMount(
+          mockEditorInstance as unknown as Parameters<OnMount>[0],
+          mockMonacoInstance as unknown as Parameters<OnMount>[1],
+        );
+      }
+
+      const result = await invokeCompletions("SELECT * FROM [A] WHERE ");
+
+      const andKeyword = result.suggestions.find(
+        (suggestion) => suggestion.label === "AND",
+      );
+
+      expect(andKeyword).toBeDefined();
+      expect(andKeyword?.sortText).toBe("0-AND");
+    });
+
+    it("prioritizes contextual keywords after GROUP BY", async () => {
+      const queryClient = createQueryClient();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      if (capturedOnMount) {
+        capturedOnMount(
+          mockEditorInstance as unknown as Parameters<OnMount>[0],
+          mockMonacoInstance as unknown as Parameters<OnMount>[1],
+        );
+      }
+
+      const result = await invokeCompletions("SELECT * FROM [A] GROUP BY ");
+
+      const havingKeyword = result.suggestions.find(
+        (suggestion) => suggestion.label === "HAVING",
+      );
+
+      expect(havingKeyword).toBeDefined();
+      expect(havingKeyword?.sortText).toBe("0-HAVING");
+    });
+
+    it("prioritizes contextual keywords after ORDER BY", async () => {
+      const queryClient = createQueryClient();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      if (capturedOnMount) {
+        capturedOnMount(
+          mockEditorInstance as unknown as Parameters<OnMount>[0],
+          mockMonacoInstance as unknown as Parameters<OnMount>[1],
+        );
+      }
+
+      const result = await invokeCompletions("SELECT * FROM [A] ORDER BY ");
+
+      const ascKeyword = result.suggestions.find(
+        (suggestion) => suggestion.label === "ASC",
+      );
+
+      expect(ascKeyword).toBeDefined();
+      expect(ascKeyword?.sortText).toBe("0-ASC");
     });
 
     it("registers inline completion provider for SQL language", () => {

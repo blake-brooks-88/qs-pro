@@ -19,6 +19,20 @@ describe("autocomplete keyword helpers", () => {
     expect(contextualKeywords).toContain("BETWEEN");
   });
 
+  test("getContextualKeywords_AfterGroup_ReturnsPriorityKeywords", () => {
+    const contextualKeywords = getContextualKeywords("group");
+
+    expect(contextualKeywords).toContain("HAVING");
+    expect(contextualKeywords).toContain("ORDER BY");
+  });
+
+  test("getContextualKeywords_AfterOrder_ReturnsPriorityKeywords", () => {
+    const contextualKeywords = getContextualKeywords("order");
+
+    expect(contextualKeywords).toContain("ASC");
+    expect(contextualKeywords).toContain("DESC");
+  });
+
   test("getContextualKeywords_AfterSelect_ReturnsPriorityKeywords", () => {
     // Arrange
     const lastKeyword = "select";

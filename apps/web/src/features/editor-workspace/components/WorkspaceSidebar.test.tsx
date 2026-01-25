@@ -396,7 +396,11 @@ describe("WorkspaceSidebar", () => {
 
       // Find and click the expand button (first button in collapsed sidebar)
       const buttons = screen.getAllByRole("button");
-      await user.click(buttons[0]);
+      const expandButton = buttons[0];
+      if (!expandButton) {
+        throw new Error("Expand button not found");
+      }
+      await user.click(expandButton);
 
       expect(onToggle).toHaveBeenCalledTimes(1);
     });

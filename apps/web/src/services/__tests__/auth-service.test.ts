@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth-store";
 import { server } from "@/test/mocks/server";
 
-import { getMe, loginWithJwt, type MeResponseDto } from "../auth";
+import { getMe, loginWithJwt, logout, type MeResponseDto } from "../auth";
 
 describe("auth service", () => {
   beforeEach(() => {
@@ -179,6 +179,66 @@ describe("auth service", () => {
       ).rejects.toMatchObject({
         response: { status: 403 },
       });
+    });
+  });
+
+  describe("logout()", () => {
+    it("calls GET /auth/logout and clears auth store", async () => {
+      let called = false;
+
+      server.use(
+        http.get("/api/auth/logout", () => {
+          called = true;
+          return HttpResponse.json({ ok: true });
+        }),
+      );
+
+      useAuthStore.setState({
+        user: {
+          id: "user-1",
+          sfUserId: "sf-1",
+          email: "user@example.com",
+          name: "User",
+        },
+        tenant: { id: "tenant-1", eid: "eid-1", tssd: "tssd-1" },
+        csrfToken: "csrf-1",
+        isAuthenticated: true,
+      });
+
+      await logout();
+
+      expect(called).toBe(true);
+      expect(useAuthStore.getState()).toMatchObject({
+        user: null,
+        tenant: null,
+        csrfToken: null,
+        isAuthenticated: false,
+      });
+    });
+
+    it("clears auth store even when the server returns an error", async () => {
+      server.use(
+        http.get("/api/auth/logout", () => {
+          return HttpResponse.json({ error: "boom" }, { status: 500 });
+        }),
+      );
+
+      useAuthStore.setState({
+        user: {
+          id: "user-1",
+          sfUserId: "sf-1",
+          email: "user@example.com",
+          name: "User",
+        },
+        tenant: { id: "tenant-1", eid: "eid-1", tssd: "tssd-1" },
+        csrfToken: "csrf-1",
+        isAuthenticated: true,
+      });
+
+      await expect(logout()).rejects.toMatchObject({
+        response: { status: 500 },
+      });
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
     });
   });
 });

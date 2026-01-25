@@ -160,7 +160,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
 
       // Assert
       expect(suggestions.length).toBeLessThanOrEqual(MAX_SUGGESTIONS);
-      expect(suggestions.length).toBe(10); // MAX_SUGGESTIONS is 10
+      expect(suggestions).toHaveLength(10); // MAX_SUGGESTIONS is 10
     });
 
     test("buildDataExtensionSuggestions_WithFewerThanMaxResults_ReturnsAll", () => {
@@ -185,7 +185,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
       );
 
       // Assert
-      expect(suggestions.length).toBe(5);
+      expect(suggestions).toHaveLength(5);
     });
   });
 

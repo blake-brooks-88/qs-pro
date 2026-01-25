@@ -213,6 +213,41 @@ describe("useQueryExecution", () => {
     expect(result.current.status).toBe("ready");
   });
 
+  it("status failed sets errorMessage and resets running state", async () => {
+    server.use(
+      http.post("/api/runs", () => {
+        return HttpResponse.json(
+          { runId: "run-failed", status: "queued" },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const { result } = renderUseQueryExecution();
+
+    await act(async () => {
+      await result.current.execute("SELECT * FROM DE");
+    });
+
+    const eventSource = MockEventSource.getLatest();
+
+    await act(async () => {
+      eventSource.simulateMessage({
+        status: "failed",
+        message: "Query failed",
+        errorMessage: "Invalid syntax near FROM",
+        timestamp: new Date().toISOString(),
+        runId: "run-failed",
+      });
+    });
+
+    expect(result.current.status).toBe("failed");
+    expect(result.current.errorMessage).toBe("Invalid syntax near FROM");
+    expect(result.current.isRunning).toBe(false);
+    expect(mockSessionStorage.get("activeRunId")).toBeUndefined();
+    expect(eventSource.close).toHaveBeenCalled();
+  });
+
   it("cancel() calls POST /api/runs/:runId/cancel", async () => {
     let cancelCalled = false;
 

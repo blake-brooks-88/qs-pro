@@ -104,7 +104,7 @@ describe("AST Parser", () => {
     test("syntax_error_has_location_info", () => {
       const sql = "SELECT , FROM Contacts";
       const diagnostics = parseAndLint(sql);
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.startIndex).toBeGreaterThanOrEqual(0);
@@ -134,7 +134,7 @@ describe("AST Parser", () => {
     test("insert_statement_returns_error", () => {
       const sql = "INSERT INTO Contacts (Name) VALUES ('Test')";
       const diagnostics = parseAndLint(sql);
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -145,7 +145,7 @@ describe("AST Parser", () => {
     test("update_statement_returns_error", () => {
       const sql = "UPDATE Contacts SET Name = 'Test'";
       const diagnostics = parseAndLint(sql);
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -155,7 +155,7 @@ describe("AST Parser", () => {
     test("delete_statement_returns_error", () => {
       const sql = "DELETE FROM Contacts WHERE ID = 1";
       const diagnostics = parseAndLint(sql);
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -172,7 +172,7 @@ describe("AST Parser", () => {
         SELECT * FROM CTE
       `;
       const diagnostics = parseAndLint(sql);
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -198,7 +198,7 @@ describe("AST Parser", () => {
     test("limit_clause_returns_error", () => {
       const sql = "SELECT * FROM Contacts LIMIT 10";
       const diagnostics = parseAndLint(sql);
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -247,7 +247,7 @@ describe("AST Parser", () => {
     test("error_message_is_user_friendly", () => {
       const sql = "SELECT ,";
       const diagnostics = parseAndLint(sql);
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.message).not.toContain("Expected");
@@ -268,7 +268,7 @@ describe("AST Parser", () => {
       const sql = "SELECT * FROM My Data Extension";
       const diagnostics = parseAndLint(sql);
 
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -280,7 +280,7 @@ describe("AST Parser", () => {
       const sql = "SELECT * FROM My Very Long Name";
       const diagnostics = parseAndLint(sql);
 
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -291,7 +291,7 @@ describe("AST Parser", () => {
       const sql = "SELECT * FROM ENT.My Data Extension";
       const diagnostics = parseAndLint(sql);
 
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
@@ -302,7 +302,7 @@ describe("AST Parser", () => {
       const sql = "SELECT , FROM Contacts";
       const diagnostics = parseAndLint(sql);
 
-      expect(diagnostics.length).toBe(1);
+      expect(diagnostics).toHaveLength(1);
       const diagnostic = diagnostics[0];
       assertDefined(diagnostic);
       expect(diagnostic.severity).toBe("error");
