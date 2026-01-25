@@ -57,3 +57,10 @@ setIfMissing('COOKIE_PARTITIONED', 'true');
 
 // Redis connection (used by BullMQ and ioredis clients)
 setIfMissing('REDIS_URL', 'redis://127.0.0.1:6379');
+
+// PostgreSQL connection (used by Drizzle ORM)
+// Note: CI sets this explicitly; local dev uses docker-compose default
+setIfMissing(
+  'DATABASE_URL',
+  'postgres://qs_runtime:LRknfJDBSHdo7aGrL3BLjpccBrEyE7QX5gfChn9y@127.0.0.1:5432/qs_pro',
+);
