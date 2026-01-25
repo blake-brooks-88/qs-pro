@@ -310,8 +310,12 @@ describe("DataFolderService (integration)", () => {
 
       expect(callCount).toBe(2);
       expect(result).toHaveLength(2);
-      expect(result[0].name).toBe("Folder 1");
-      expect(result[1].name).toBe("Folder 2");
+      const folder1 = result[0];
+      const folder2 = result[1];
+      expect(folder1).toBeDefined();
+      expect(folder2).toBeDefined();
+      expect(folder1?.name).toBe("Folder 1");
+      expect(folder2?.name).toBe("Folder 2");
     });
 
     it("throws on SOAP error response", async () => {
