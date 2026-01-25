@@ -57,7 +57,8 @@ const TEST_USER_ID_1 = crypto.randomUUID();
 const TEST_USER_ID_2 = crypto.randomUUID();
 const TEST_MID_1 = "mid-sweeper-test-1";
 const TEST_MID_2 = "mid-sweeper-test-2";
-const TEST_EID = "eid-sweeper-test";
+const TEST_EID_1 = `eid-sweeper-test-${crypto.randomUUID()}`;
+const TEST_EID_2 = `eid-sweeper-test-${crypto.randomUUID()}`;
 const TEST_FOLDER_ID_1 = 999001; // Unique folder IDs
 const TEST_FOLDER_ID_2 = 999002;
 
@@ -265,8 +266,8 @@ describe("ShellQuerySweeper (integration)", () => {
     await sqlClient`
       INSERT INTO tenants (id, eid, tssd)
       VALUES
-        (${TEST_TENANT_ID_1}::uuid, ${TEST_EID}, ${TEST_TSSD}),
-        (${TEST_TENANT_ID_2}::uuid, ${`${TEST_EID}-2`}, ${TEST_TSSD})
+        (${TEST_TENANT_ID_1}::uuid, ${TEST_EID_1}, ${TEST_TSSD}),
+        (${TEST_TENANT_ID_2}::uuid, ${TEST_EID_2}, ${TEST_TSSD})
       ON CONFLICT (id) DO NOTHING
     `;
 

@@ -204,11 +204,27 @@ export class ShellQueryProcessor extends WorkerHost {
     let sqlText: string | null | undefined;
     try {
       sqlText = this.encryptionService.decrypt(encryptedSqlText);
-    } catch {
-      throw new UnrecoverableError("Failed to decrypt sqlText");
+    } catch (error) {
+      const decryptError = new AppError(ErrorCode.INTERNAL_ERROR, error, {
+        reason: "Failed to decrypt sqlText",
+      });
+      const unrecoverable = new UnrecoverableError(
+        "Failed to decrypt sqlText",
+      ) as UnrecoverableError & { cause?: unknown; code?: ErrorCode };
+      unrecoverable.cause = decryptError;
+      unrecoverable.code = decryptError.code;
+      throw unrecoverable;
     }
     if (!sqlText) {
-      throw new UnrecoverableError("Failed to decrypt sqlText");
+      const decryptError = new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+        reason: "Failed to decrypt sqlText",
+      });
+      const unrecoverable = new UnrecoverableError(
+        "Failed to decrypt sqlText",
+      ) as UnrecoverableError & { cause?: unknown; code?: ErrorCode };
+      unrecoverable.cause = decryptError;
+      unrecoverable.code = decryptError.code;
+      throw unrecoverable;
     }
     const sqlTextHash = crypto
       .createHash("sha256")
@@ -337,8 +353,16 @@ export class ShellQueryProcessor extends WorkerHost {
 
       this.logger.warn(`Execute job ${job.id} attempt failed: ${message}`);
 
-      if (isTerminal(error)) {
-        throw new UnrecoverableError(message);
+      if (error instanceof AppError && isTerminal(error)) {
+        const unrecoverable = new UnrecoverableError(
+          message,
+        ) as UnrecoverableError & {
+          cause?: unknown;
+          code?: ErrorCode;
+        };
+        unrecoverable.cause = error;
+        unrecoverable.code = error.code;
+        throw unrecoverable;
       }
       throw error;
     } finally {
@@ -727,8 +751,16 @@ export class ShellQueryProcessor extends WorkerHost {
 
       this.logger.warn(`Poll job ${job.id} attempt failed: ${message}`);
 
-      if (isTerminal(error)) {
-        throw new UnrecoverableError(message);
+      if (error instanceof AppError && isTerminal(error)) {
+        const unrecoverable = new UnrecoverableError(
+          message,
+        ) as UnrecoverableError & {
+          cause?: unknown;
+          code?: ErrorCode;
+        };
+        unrecoverable.cause = error;
+        unrecoverable.code = error.code;
+        throw unrecoverable;
       }
       throw error;
     } finally {

@@ -22,6 +22,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   DatabaseModule,
   EncryptionService,
+  ErrorCode,
   LoggerModule,
   MCE_AUTH_PROVIDER,
   type MceAuthProvider,
@@ -755,7 +756,14 @@ describe('ShellQueryProcessor (integration)', () => {
 
       const promise = processor.process(job as Job);
       await expect(promise).rejects.toThrow(UnrecoverableError);
-      await expect(promise).rejects.toThrow('Failed to decrypt sqlText');
+      await expect(promise).rejects.toMatchObject({
+        cause: expect.objectContaining({
+          code: ErrorCode.INTERNAL_ERROR,
+        }),
+      });
+      await expect(promise).rejects.toMatchObject({
+        code: ErrorCode.INTERNAL_ERROR,
+      });
     });
 
     it('wraps terminal errors in UnrecoverableError', async () => {
@@ -783,9 +791,13 @@ describe('ShellQueryProcessor (integration)', () => {
         sqlText: encryptedSql,
       });
 
-      await expect(processor.process(job as Job)).rejects.toThrow(
-        UnrecoverableError,
-      );
+      const promise = processor.process(job as Job);
+      await expect(promise).rejects.toThrow(UnrecoverableError);
+      await expect(promise).rejects.toMatchObject({
+        cause: expect.objectContaining({
+          code: ErrorCode.MCE_VALIDATION_FAILED,
+        }),
+      });
     });
 
     it('increments and decrements active jobs metric', async () => {
