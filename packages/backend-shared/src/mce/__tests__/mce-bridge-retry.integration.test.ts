@@ -174,8 +174,12 @@ describe("MceBridgeService retry logic (integration)", () => {
 
       // Verify refresh was called twice: once initially, once with forceRefresh
       expect(authState.refreshCalls).toHaveLength(2);
-      expect(authState.refreshCalls[0].forceRefresh).toBe(false);
-      expect(authState.refreshCalls[1].forceRefresh).toBe(true);
+      const firstCall = authState.refreshCalls[0];
+      const secondCall = authState.refreshCalls[1];
+      expect(firstCall).toBeDefined();
+      expect(secondCall).toBeDefined();
+      expect(firstCall?.forceRefresh).toBe(false);
+      expect(secondCall?.forceRefresh).toBe(true);
     });
 
     it("should NOT retry on 400 Bad Request", async () => {
@@ -388,8 +392,12 @@ describe("MceBridgeService retry logic (integration)", () => {
 
       // Verify refresh was called twice: once initially, once with forceRefresh
       expect(authState.refreshCalls).toHaveLength(2);
-      expect(authState.refreshCalls[0].forceRefresh).toBe(false);
-      expect(authState.refreshCalls[1].forceRefresh).toBe(true);
+      const firstSoapCall = authState.refreshCalls[0];
+      const secondSoapCall = authState.refreshCalls[1];
+      expect(firstSoapCall).toBeDefined();
+      expect(secondSoapCall).toBeDefined();
+      expect(firstSoapCall?.forceRefresh).toBe(false);
+      expect(secondSoapCall?.forceRefresh).toBe(true);
     });
 
     it("should throw MCE_AUTH_EXPIRED after both SOAP attempts fail with Login Failed", async () => {
@@ -642,7 +650,7 @@ describe("MceBridgeService retry logic (integration)", () => {
             const tokenMatch = body.match(
               /<fueloauth[^>]*>([^<]+)<\/fueloauth>/,
             );
-            if (tokenMatch) {
+            if (tokenMatch?.[1]) {
               capturedTokens.push(tokenMatch[1]);
             }
 
