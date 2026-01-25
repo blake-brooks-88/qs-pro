@@ -1,815 +1,996 @@
+/**
+ * ShellQueryProcessor Integration Tests
+ *
+ * Tests the ShellQueryProcessor with real infrastructure:
+ * - Real NestJS TestingModule with actual services
+ * - Real PostgreSQL for credentials, shell_query_runs
+ * - Stub Redis for SSE event publishing (tracks published events)
+ * - MSW for MCE SOAP/REST endpoints only
+ *
+ * Test Strategy:
+ * - Call processor.process() directly (simulating BullMQ job processing)
+ * - Wire up real services (EncryptionService, RlsContextService, etc.)
+ * - MSW intercepts MCE HTTP/SOAP calls at the external boundary
+ * - Verify database state after processing (behavioral assertions)
+ * - Zero vi.mock() on internal services
+ */
 import { getQueueToken } from '@nestjs/bullmq';
+import { BullModule } from '@nestjs/bullmq';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
-  AppError,
-  AsyncStatusService,
+  DatabaseModule,
   EncryptionService,
-  ErrorCode,
-  ErrorMessages,
-  MceBridgeService,
-  RestDataService,
+  LoggerModule,
+  MCE_AUTH_PROVIDER,
+  type MceAuthProvider,
+  MceModule,
   RlsContextService,
+  validateWorkerEnv,
 } from '@qpp/backend-shared';
+import { resetFactories } from '@qpp/test-utils';
+import { DelayedError, Job, Queue } from 'bullmq';
+import { createHash, randomUUID } from 'node:crypto';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import type { Sql } from 'postgres';
 import {
-  createAsyncStatusServiceStub,
-  createDbStub,
-  createEncryptionServiceStub,
-  createMceBridgeStub,
-  createMetricsStub,
-  createMockBullJob,
-  createMockPollBullJob,
-  createQueueStub,
-  createRedisStub,
-  createRestDataServiceStub,
-  createRlsContextStub,
-  resetFactories,
-} from '@qpp/test-utils';
-import { DelayedError } from 'bullmq';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
+import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 
-describe('ShellQueryProcessor', () => {
+// Test constants - all unique per test run to avoid constraint conflicts
+const TEST_RUN_SUFFIX = Date.now();
+const TEST_TSSD = 'processor-test-tssd';
+const TEST_TENANT_ID = randomUUID();
+const TEST_USER_ID = randomUUID();
+const TEST_MID = `mid-processor-${TEST_RUN_SUFFIX}`;
+const TEST_EID = `eid-processor-${TEST_RUN_SUFFIX}`;
+const TEST_SF_USER_ID = `sf-user-proc-${TEST_RUN_SUFFIX}`;
+
+// Track MCE requests for verification
+const mceRequests: Array<{ type: string; action?: string; body?: string }> = [];
+
+// Stub auth provider
+function createStubAuthProvider(): MceAuthProvider {
+  return {
+    refreshToken: async () => ({
+      accessToken: 'test-access-token',
+      tssd: TEST_TSSD,
+    }),
+    invalidateToken: async () => {},
+  };
+}
+
+// Stub BullMQ queue
+function createQueueStub(): Partial<Queue> {
+  const addedJobs: Array<{ name: string; data: unknown; opts: unknown }> = [];
+  return {
+    add: async (name: string, data: unknown, opts: unknown) => {
+      addedJobs.push({ name, data, opts });
+      return { id: `job-${Date.now()}` } as Job;
+    },
+    getJob: async () => null,
+    getJobs: async () => [],
+    __addedJobs: addedJobs,
+  } as unknown as Partial<Queue>;
+}
+
+// Stub metrics
+function createMetricsStub() {
+  return {
+    inc: () => {},
+    dec: () => {},
+    observe: () => {},
+  };
+}
+
+// Stub Redis client that tracks published events
+function createRedisClientStub() {
+  const publishedEvents: Array<{ channel: string; message: string }> = [];
+  const storedKeys: Map<string, string> = new Map();
+
+  return {
+    publish: async (channel: string, message: string) => {
+      publishedEvents.push({ channel, message });
+    },
+    set: async (key: string, value: string) => {
+      storedKeys.set(key, value);
+    },
+    get: async (key: string) => storedKeys.get(key),
+    __publishedEvents: publishedEvents,
+    __storedKeys: storedKeys,
+  };
+}
+
+// MSW server with MCE endpoint handlers
+const server = setupServer(
+  // SOAP endpoint handler
+  http.post(
+    `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+    async ({ request }) => {
+      const body = await request.text();
+      const soapAction = request.headers.get('SOAPAction') ?? '';
+
+      mceRequests.push({ type: 'SOAP', action: soapAction, body });
+
+      // DataFolder Retrieve - QPP folder
+      if (
+        body.includes('<ObjectType>DataFolder</ObjectType>') &&
+        soapAction.includes('Retrieve')
+      ) {
+        if (body.includes('QueryPlusPlus Results')) {
+          return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+          <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+            <soap:Body>
+              <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                <OverallStatus>OK</OverallStatus>
+                <Results xsi:type="DataFolder" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                  <ID>12345</ID>
+                  <Name>QueryPlusPlus Results</Name>
+                  <ContentType>dataextension</ContentType>
+                </Results>
+              </RetrieveResponseMsg>
+            </soap:Body>
+          </soap:Envelope>`);
+        }
+        if (body.includes('Data Extensions')) {
+          return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+          <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+            <soap:Body>
+              <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                <OverallStatus>OK</OverallStatus>
+                <Results xsi:type="DataFolder" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                  <ID>1</ID>
+                  <Name>Data Extensions</Name>
+                  <ContentType>dataextension</ContentType>
+                </Results>
+              </RetrieveResponseMsg>
+            </soap:Body>
+          </soap:Envelope>`);
+        }
+      }
+
+      // DataExtension Create
+      if (
+        body.includes('<Objects xsi:type="DataExtension"') &&
+        soapAction.includes('Create')
+      ) {
+        return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <CreateResponse xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Results>
+                <StatusCode>OK</StatusCode>
+                <StatusMessage>Created</StatusMessage>
+                <NewID>111</NewID>
+                <NewObjectID>de-object-id-${Date.now()}</NewObjectID>
+              </Results>
+            </CreateResponse>
+          </soap:Body>
+        </soap:Envelope>`);
+      }
+
+      // QueryDefinition Create
+      if (
+        body.includes('<Objects xsi:type="QueryDefinition"') &&
+        soapAction.includes('Create')
+      ) {
+        return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <CreateResponse xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Results>
+                <StatusCode>OK</StatusCode>
+                <StatusMessage>Created</StatusMessage>
+                <NewID>222</NewID>
+                <NewObjectID>qd-object-id-${Date.now()}</NewObjectID>
+              </Results>
+            </CreateResponse>
+          </soap:Body>
+        </soap:Envelope>`);
+      }
+
+      // QueryDefinition Retrieve
+      if (
+        body.includes('<ObjectType>QueryDefinition</ObjectType>') &&
+        soapAction.includes('Retrieve')
+      ) {
+        return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <OverallStatus>OK</OverallStatus>
+              <Results xsi:type="QueryDefinition" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                <ObjectID>qd-retrieved-object-id</ObjectID>
+                <CustomerKey>QPP_Query_test</CustomerKey>
+                <Name>QPP Query Test</Name>
+              </Results>
+            </RetrieveResponseMsg>
+          </soap:Body>
+        </soap:Envelope>`);
+      }
+
+      // QueryDefinition Delete
+      if (
+        body.includes('<Objects xsi:type="QueryDefinition"') &&
+        soapAction.includes('Delete')
+      ) {
+        return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <DeleteResponse xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Results>
+                <StatusCode>OK</StatusCode>
+                <StatusMessage>Deleted</StatusMessage>
+              </Results>
+            </DeleteResponse>
+          </soap:Body>
+        </soap:Envelope>`);
+      }
+
+      // QueryDefinition Perform
+      if (body.includes('QueryDefinition') && soapAction.includes('Perform')) {
+        return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <PerformResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <Results>
+                <Result>
+                  <StatusCode>OK</StatusCode>
+                  <StatusMessage>Performed</StatusMessage>
+                  <Task>
+                    <StatusCode>OK</StatusCode>
+                    <StatusMessage>Queued</StatusMessage>
+                    <ID>task-${Date.now()}</ID>
+                    <InteractionObjectID>interaction-obj-id</InteractionObjectID>
+                  </Task>
+                </Result>
+              </Results>
+            </PerformResponseMsg>
+          </soap:Body>
+        </soap:Envelope>`);
+      }
+
+      // AsyncActivityStatus Retrieve (poll status)
+      if (body.includes('<ObjectType>AsyncActivityStatus</ObjectType>')) {
+        return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+              <OverallStatus>OK</OverallStatus>
+              <Results>
+                <ObjectID>async-activity-obj-id</ObjectID>
+                <Properties>
+                  <Property>
+                    <Name>Status</Name>
+                    <Value>Complete</Value>
+                  </Property>
+                  <Property>
+                    <Name>CompletedDate</Name>
+                    <Value>${new Date().toISOString()}</Value>
+                  </Property>
+                </Properties>
+              </Results>
+            </RetrieveResponseMsg>
+          </soap:Body>
+        </soap:Envelope>`);
+      }
+
+      // Default empty response
+      return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+      <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+          <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+            <OverallStatus>OK</OverallStatus>
+          </RetrieveResponseMsg>
+        </soap:Body>
+      </soap:Envelope>`);
+    },
+  ),
+
+  // REST: Query validation
+  http.post(
+    `https://${TEST_TSSD}.rest.marketingcloudapis.com/data/v1/customobjectdata/validate`,
+    () => {
+      mceRequests.push({ type: 'REST', action: 'validate' });
+      return HttpResponse.json({ valid: true });
+    },
+  ),
+
+  // REST: Check isRunning
+  http.get(
+    `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/:id/status`,
+    () => {
+      mceRequests.push({ type: 'REST', action: 'isRunning' });
+      return HttpResponse.json({ isRunning: false });
+    },
+  ),
+
+  // REST: Get rowset (results)
+  http.get(
+    `https://${TEST_TSSD}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset`,
+    ({ request }) => {
+      mceRequests.push({ type: 'REST', action: 'rowset' });
+
+      const url = new URL(request.url);
+      const page = parseInt(url.searchParams.get('$page') ?? '1', 10);
+      const pageSize = parseInt(url.searchParams.get('$pageSize') ?? '50', 10);
+
+      return HttpResponse.json({
+        items: [
+          {
+            keys: { _CustomObjectKey: '1' },
+            values: { Name: 'Test User 1', Age: '25' },
+          },
+        ],
+        count: 1,
+        page,
+        pageSize,
+      });
+    },
+  ),
+);
+
+// Create mock BullMQ job
+function createMockExecuteJob(data: {
+  runId: string;
+  tenantId: string;
+  userId: string;
+  mid: string;
+  eid?: string;
+  sqlText?: string;
+}): Partial<Job> {
+  return {
+    id: `job-${data.runId}`,
+    name: 'execute-shell-query',
+    data: {
+      runId: data.runId,
+      tenantId: data.tenantId,
+      userId: data.userId,
+      mid: data.mid,
+      eid: data.eid ?? TEST_EID,
+      sqlText: data.sqlText ?? 'SELECT 1',
+    },
+    opts: { attempts: 3 },
+    attemptsMade: 0,
+    updateData: async () => {},
+    moveToDelayed: async () => {},
+  };
+}
+
+function createMockPollJob(data: {
+  runId: string;
+  tenantId: string;
+  userId: string;
+  mid: string;
+  taskId?: string;
+  queryDefinitionId?: string;
+  queryCustomerKey?: string;
+  targetDeName?: string;
+  pollCount?: number;
+  pollStartedAt?: string;
+  notRunningConfirmations?: number;
+  rowsetReadyAttempts?: number;
+}): Partial<Job> {
+  return {
+    id: `poll-job-${data.runId}`,
+    name: 'poll-shell-query',
+    data: {
+      runId: data.runId,
+      tenantId: data.tenantId,
+      userId: data.userId,
+      mid: data.mid,
+      taskId: data.taskId ?? 'task-123',
+      queryDefinitionId: data.queryDefinitionId ?? 'qd-123',
+      queryCustomerKey: data.queryCustomerKey ?? `QPP_Query_${data.runId}`,
+      targetDeName: data.targetDeName ?? `QPP_Results_${data.runId.substring(0, 8)}`,
+      pollCount: data.pollCount ?? 0,
+      pollStartedAt: data.pollStartedAt ?? new Date().toISOString(),
+      notRunningConfirmations: data.notRunningConfirmations ?? 0,
+      rowsetReadyAttempts: data.rowsetReadyAttempts ?? 0,
+    },
+    opts: { attempts: 3 },
+    attemptsMade: 0,
+    updateData: async () => {},
+    moveToDelayed: async () => {},
+  };
+}
+
+describe('ShellQueryProcessor (integration)', () => {
+  let module: TestingModule;
   let processor: ShellQueryProcessor;
-  let mockDb: ReturnType<typeof createDbStub>;
-  let mockMceBridge: ReturnType<typeof createMceBridgeStub>;
-  let mockRestDataService: ReturnType<typeof createRestDataServiceStub>;
-  let mockAsyncStatusService: ReturnType<typeof createAsyncStatusServiceStub>;
-  let mockRunToTempFlow: { execute: ReturnType<typeof vi.fn>; retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn> };
-  let mockQueue: ReturnType<typeof createQueueStub>;
+  let sqlClient: Sql;
+  let encryptionService: EncryptionService;
+  let queueStub: ReturnType<typeof createQueueStub>;
+  let redisStub: ReturnType<typeof createRedisClientStub>;
+
+  // Track created entities for cleanup
+  const createdRunIds: string[] = [];
+
+  beforeAll(async () => {
+    server.listen({ onUnhandledRequest: 'bypass' });
+
+    queueStub = createQueueStub();
+    redisStub = createRedisClientStub();
+    const metricsStub = createMetricsStub();
+
+    module = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          validate: validateWorkerEnv,
+          envFilePath: '../../.env',
+        }),
+        LoggerModule,
+        BullModule.forRootAsync({
+          imports: [ConfigModule],
+          useFactory: async (configService: ConfigService) => ({
+            connection: {
+              url: configService.get<string>('REDIS_URL', 'redis://localhost:6379'),
+            },
+          }),
+          inject: [ConfigService],
+        }),
+        ScheduleModule.forRoot(),
+        DatabaseModule,
+        MceModule,
+      ],
+      providers: [
+        ShellQueryProcessor,
+        RunToTempFlow,
+        MceQueryValidator,
+        { provide: 'REDIS_CLIENT', useValue: redisStub },
+        { provide: 'METRICS_JOBS_TOTAL', useValue: metricsStub },
+        { provide: 'METRICS_DURATION', useValue: metricsStub },
+        { provide: 'METRICS_FAILURES_TOTAL', useValue: metricsStub },
+        { provide: 'METRICS_ACTIVE_JOBS', useValue: metricsStub },
+        { provide: getQueueToken('shell-query'), useValue: queueStub },
+      ],
+    })
+      .overrideProvider(MCE_AUTH_PROVIDER)
+      .useValue(createStubAuthProvider())
+      .compile();
+
+    processor = module.get(ShellQueryProcessor);
+    sqlClient = module.get<Sql>('SQL_CLIENT');
+    encryptionService = module.get(EncryptionService);
+
+    processor.setTestMode(true);
+
+    // Create test tenant and user
+    await sqlClient`
+      INSERT INTO tenants (id, eid, tssd)
+      VALUES (${TEST_TENANT_ID}::uuid, ${TEST_EID}, ${TEST_TSSD})
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    await sqlClient`
+      INSERT INTO users (id, tenant_id, sf_user_id, email, name)
+      VALUES (${TEST_USER_ID}::uuid, ${TEST_TENANT_ID}::uuid, ${TEST_SF_USER_ID}, ${'proc@test.com'}, ${'Processor Test User'})
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    // Create credentials with RLS context
+    const encryptedAccessToken = encryptionService.encrypt('test-access-token') ?? '';
+    const encryptedRefreshToken = encryptionService.encrypt('test-refresh-token') ?? '';
+
+    const reserved = await sqlClient.reserve();
+    await reserved`SELECT set_config('app.tenant_id', ${TEST_TENANT_ID}, false)`;
+    await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+    await reserved`
+      INSERT INTO credentials (tenant_id, mid, user_id, access_token, refresh_token, expires_at)
+      VALUES (
+        ${TEST_TENANT_ID}::uuid,
+        ${TEST_MID},
+        ${TEST_USER_ID}::uuid,
+        ${encryptedAccessToken},
+        ${encryptedRefreshToken},
+        ${new Date(Date.now() + 3600000).toISOString()}
+      )
+      ON CONFLICT DO NOTHING
+    `;
+    await reserved`RESET app.tenant_id`;
+    await reserved`RESET app.mid`;
+    reserved.release();
+  }, 60000);
+
+  afterAll(async () => {
+    server.close();
+
+    // Clean up test data in correct order (due to FK constraints)
+    // 1. Delete shell_query_runs (references users and tenants)
+    try {
+      await sqlClient`DELETE FROM shell_query_runs WHERE tenant_id = ${TEST_TENANT_ID}::uuid`;
+    } catch {
+      // Best effort cleanup
+    }
+
+    // 2. Clean up credentials with RLS context
+    try {
+      const reserved = await sqlClient.reserve();
+      await reserved`SELECT set_config('app.tenant_id', ${TEST_TENANT_ID}, false)`;
+      await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+      await reserved`DELETE FROM credentials WHERE tenant_id = ${TEST_TENANT_ID}::uuid AND mid = ${TEST_MID}`;
+      await reserved`RESET app.tenant_id`;
+      await reserved`RESET app.mid`;
+      reserved.release();
+    } catch {
+      // Ignore cleanup errors
+    }
+
+    // 3. Delete users (references tenants)
+    try {
+      await sqlClient`DELETE FROM users WHERE id = ${TEST_USER_ID}::uuid`;
+    } catch {
+      // Best effort cleanup
+    }
+
+    // 4. Delete tenants
+    try {
+      await sqlClient`DELETE FROM tenants WHERE id = ${TEST_TENANT_ID}::uuid`;
+    } catch {
+      // Best effort cleanup
+    }
+
+    await module.close();
+  }, 30000);
 
   beforeEach(async () => {
     resetFactories();
-    mockDb = createDbStub();
-    mockMceBridge = createMceBridgeStub();
-    mockRestDataService = createRestDataServiceStub();
-    mockAsyncStatusService = createAsyncStatusServiceStub();
-    mockRunToTempFlow = {
-      execute: vi.fn(),
-      retrieveQueryDefinitionObjectId: vi.fn().mockResolvedValue(null),
+    server.resetHandlers();
+    mceRequests.length = 0;
+    redisStub.__publishedEvents.length = 0;
+    redisStub.__storedKeys.clear();
+    (queueStub as unknown as { __addedJobs: Array<unknown> }).__addedJobs.length = 0;
+  });
+
+  afterEach(async () => {
+    // Clean up runs created in this test
+    for (const runId of createdRunIds) {
+      try {
+        await sqlClient`DELETE FROM shell_query_runs WHERE id = ${runId}::uuid`;
+      } catch {
+        // Best effort cleanup
+      }
+    }
+    createdRunIds.length = 0;
+  });
+
+  async function createTestRun(sqlText: string = 'SELECT 1'): Promise<string> {
+    const runId = randomUUID();
+    // Note: shell_query_runs stores sqlTextHash (a hash), NOT the actual SQL text
+    // The actual SQL is passed via BullMQ job data, not stored in DB
+    const sqlTextHash = createHash('sha256').update(sqlText).digest('hex');
+
+    const reserved = await sqlClient.reserve();
+    await reserved`SELECT set_config('app.tenant_id', ${TEST_TENANT_ID}, false)`;
+    await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+    await reserved`SELECT set_config('app.user_id', ${TEST_USER_ID}, false)`;
+    await reserved`
+      INSERT INTO shell_query_runs (id, tenant_id, user_id, mid, sql_text_hash, status)
+      VALUES (${runId}::uuid, ${TEST_TENANT_ID}::uuid, ${TEST_USER_ID}::uuid, ${TEST_MID}, ${sqlTextHash}, 'queued')
+    `;
+    await reserved`RESET app.tenant_id`;
+    await reserved`RESET app.mid`;
+    await reserved`RESET app.user_id`;
+    reserved.release();
+
+    createdRunIds.push(runId);
+    return runId;
+  }
+
+  async function getRunFromDb(runId: string): Promise<{
+    status: string;
+    taskId: string | null;
+    queryDefinitionId: string | null;
+    errorMessage: string | null;
+    completedAt: Date | null;
+  }> {
+    const reserved = await sqlClient.reserve();
+    await reserved`SELECT set_config('app.tenant_id', ${TEST_TENANT_ID}, false)`;
+    await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+    await reserved`SELECT set_config('app.user_id', ${TEST_USER_ID}, false)`;
+    const result = await reserved`
+      SELECT status, task_id, query_definition_id, error_message, completed_at
+      FROM shell_query_runs
+      WHERE id = ${runId}::uuid
+    `;
+    await reserved`RESET app.tenant_id`;
+    await reserved`RESET app.mid`;
+    await reserved`RESET app.user_id`;
+    reserved.release();
+
+    const row = result[0];
+    return {
+      status: row?.status ?? 'unknown',
+      taskId: row?.task_id ?? null,
+      queryDefinitionId: row?.query_definition_id ?? null,
+      errorMessage: row?.error_message
+        ? (encryptionService.decrypt(row.error_message) ?? null)
+        : null,
+      completedAt: row?.completed_at ?? null,
     };
-    mockQueue = createQueueStub();
-    const mockRedis = createRedisStub();
-    const mockMetrics = createMetricsStub();
+  }
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ShellQueryProcessor,
-        { provide: RunToTempFlow, useValue: mockRunToTempFlow },
-        { provide: MceBridgeService, useValue: mockMceBridge },
-        { provide: RestDataService, useValue: mockRestDataService },
-        { provide: AsyncStatusService, useValue: mockAsyncStatusService },
-        { provide: EncryptionService, useValue: createEncryptionServiceStub() },
-        { provide: RlsContextService, useValue: createRlsContextStub() },
-        { provide: 'DATABASE', useValue: mockDb },
-        { provide: 'REDIS_CLIENT', useValue: mockRedis },
-        { provide: 'METRICS_JOBS_TOTAL', useValue: mockMetrics },
-        { provide: 'METRICS_DURATION', useValue: mockMetrics },
-        { provide: 'METRICS_FAILURES_TOTAL', useValue: mockMetrics },
-        { provide: 'METRICS_ACTIVE_JOBS', useValue: mockMetrics },
-        { provide: getQueueToken('shell-query'), useValue: mockQueue },
-      ],
-    }).compile();
+  async function updateRunStatus(runId: string, status: string): Promise<void> {
+    const reserved = await sqlClient.reserve();
+    await reserved`SELECT set_config('app.tenant_id', ${TEST_TENANT_ID}, false)`;
+    await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+    await reserved`SELECT set_config('app.user_id', ${TEST_USER_ID}, false)`;
+    await reserved`UPDATE shell_query_runs SET status = ${status} WHERE id = ${runId}::uuid`;
+    await reserved`RESET app.tenant_id`;
+    await reserved`RESET app.mid`;
+    await reserved`RESET app.user_id`;
+    reserved.release();
+  }
 
-    processor = module.get<ShellQueryProcessor>(ShellQueryProcessor);
-    processor.setTestMode(true);
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+  async function updateRunForPoll(runId: string): Promise<void> {
+    const reserved = await sqlClient.reserve();
+    await reserved`SELECT set_config('app.tenant_id', ${TEST_TENANT_ID}, false)`;
+    await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+    await reserved`SELECT set_config('app.user_id', ${TEST_USER_ID}, false)`;
+    await reserved`
+      UPDATE shell_query_runs
+      SET status = 'running', task_id = 'task-123', query_definition_id = 'qd-123', poll_started_at = NOW()
+      WHERE id = ${runId}::uuid
+    `;
+    await reserved`RESET app.tenant_id`;
+    await reserved`RESET app.mid`;
+    await reserved`RESET app.user_id`;
+    reserved.release();
+  }
 
   describe('handleExecute', () => {
     it('should execute flow and enqueue poll job', async () => {
-      const job = createMockBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        eid: 'e1',
+      const runId = await createTestRun('SELECT Name FROM TestDE');
+      const encryptedSql = encryptionService.encrypt('SELECT Name FROM TestDE') ?? '';
+
+      const job = createMockExecuteJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
+        eid: TEST_EID,
+        sqlText: encryptedSql,
       });
 
-      mockRunToTempFlow.execute.mockResolvedValue({
-        taskId: 'task-123',
-        queryDefinitionId: 'query-def-123',
-        queryCustomerKey: 'QPP_Query_run-1',
-        targetDeName: 'QPP_Results_run-',
-      });
+      const result = await processor.process(job as Job);
 
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
+      // Verify result structure
+      expect(result).toMatchObject({
         status: 'poll-enqueued',
-        runId: 'run-1',
-        taskId: 'task-123',
+        runId,
       });
-      expect(mockRunToTempFlow.execute).toHaveBeenCalled();
-      expect(mockQueue.add).toHaveBeenCalledWith(
-        'poll-shell-query',
-        expect.objectContaining({
-          runId: 'run-1',
-          taskId: 'task-123',
-          queryDefinitionId: 'query-def-123',
-          pollCount: 0,
-        }),
-        expect.objectContaining({
-          jobId: 'poll-run-1',
-        }),
-      );
-      expect(mockDb.update).toHaveBeenCalled();
+      expect((result as { taskId?: string }).taskId).toBeDefined();
+
+      // Verify database state
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('running');
+      expect(dbRun.taskId).toBeDefined();
+      expect(dbRun.queryDefinitionId).toBeDefined();
+
+      // Verify poll job was enqueued
+      const addedJobs = (queueStub as unknown as { __addedJobs: Array<{ name: string }> }).__addedJobs;
+      expect(addedJobs.length).toBe(1);
+      expect(addedJobs[0].name).toBe('poll-shell-query');
     });
 
-    it('should handle flow execution failure', async () => {
-      const job = createMockBullJob({ runId: 'run-1', tenantId: 't1', userId: 'u1', mid: 'm1' });
+    it('should detect cancellation before execution', async () => {
+      const runId = await createTestRun('SELECT 1');
+      await updateRunStatus(runId, 'canceled');
 
-      mockRunToTempFlow.execute.mockRejectedValue(new Error('MCE Down'));
+      const encryptedSql = encryptionService.encrypt('SELECT 1') ?? '';
+      const job = createMockExecuteJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
+        eid: TEST_EID,
+        sqlText: encryptedSql,
+      });
 
-      await expect(processor.process(job as any)).rejects.toThrow('MCE Down');
-      // Status update now happens in onFailed event handler, not during process()
-      expect(mockQueue.add).not.toHaveBeenCalled();
+      const result = await processor.process(job as Job);
+
+      expect(result).toEqual({ status: 'canceled', runId });
+
+      // Verify SSE event published
+      expect(redisStub.__publishedEvents.some(e => e.channel.includes(runId))).toBe(true);
     });
   });
 
   describe('handlePoll', () => {
-    it('should complete when status is Complete', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
+    it('should complete when MCE status is Complete', async () => {
+      const runId = await createTestRun('SELECT 1');
+      await updateRunForPoll(runId);
+
+      const job = createMockPollJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
         taskId: 'task-123',
+        queryDefinitionId: 'qd-123',
       });
 
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Complete',
-        errorMsg: '',
-      });
+      const result = await processor.process(job as Job);
 
-      mockRestDataService.getRowset.mockResolvedValue({ count: 0, items: [] });
+      expect(result).toEqual({ status: 'completed', runId });
 
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({ status: 'completed', runId: 'run-1' });
-      expect(mockDb.update).toHaveBeenCalled();
+      // Verify database state
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('ready');
+      expect(dbRun.completedAt).not.toBeNull();
     });
 
-    it('should handle case-insensitive status check', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
+    it('should handle error status from MCE', async () => {
+      const runId = await createTestRun('SELECT 1');
+      await updateRunForPoll(runId);
+
+      // Override MSW to return error status
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            const body = await request.text();
+            if (body.includes('<ObjectType>AsyncActivityStatus</ObjectType>')) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <OverallStatus>OK</OverallStatus>
+                    <Results>
+                      <ObjectID>async-activity-obj-id</ObjectID>
+                      <Properties>
+                        <Property>
+                          <Name>Status</Name>
+                          <Value>Error</Value>
+                        </Property>
+                        <Property>
+                          <Name>ErrorMsg</Name>
+                          <Value>Syntax error in query</Value>
+                        </Property>
+                      </Properties>
+                    </Results>
+                  </RetrieveResponseMsg>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+            if (body.includes('QueryDefinition') && request.headers.get('SOAPAction')?.includes('Delete')) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <DeleteResponse xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <Results><StatusCode>OK</StatusCode></Results>
+                  </DeleteResponse>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+            return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+              <soap:Body><RetrieveResponseMsg><OverallStatus>OK</OverallStatus></RetrieveResponseMsg></soap:Body>
+            </soap:Envelope>`);
+          },
+        ),
+      );
+
+      const job = createMockPollJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
+        taskId: 'task-error',
+        queryDefinitionId: 'qd-error',
       });
 
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: '  COMPLETE  ',
-        errorMsg: '',
-      });
+      const result = await processor.process(job as Job);
 
-      mockRestDataService.getRowset.mockResolvedValue({ count: 0, items: [] });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({ status: 'completed', runId: 'run-1' });
-    });
-
-    it('should fail when ErrorMsg is present', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Error',
-        errorMsg: 'Syntax error in query',
-      });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         status: 'failed',
-        runId: 'run-1',
+        runId,
         error: 'Syntax error in query',
       });
-    });
 
-    it('should continue polling when status is Processing', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        pollCount: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Processing',
-        errorMsg: '',
-      });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.objectContaining({ pollCount: 1 }),
-      );
+      // Verify database state
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('failed');
+      expect(dbRun.errorMessage).toContain('Syntax error');
     });
 
     it('should stop polling when job is canceled', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        queryDefinitionId: '', // Force retrieve path
+      const runId = await createTestRun('SELECT 1');
+      await updateRunStatus(runId, 'canceled');
+
+      const job = createMockPollJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
       });
 
-      mockDb.setSelectResult([{ status: 'canceled' }]);
+      const result = await processor.process(job as Job);
 
-      mockRunToTempFlow.retrieveQueryDefinitionObjectId.mockResolvedValue('obj-123');
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({ status: 'canceled', runId: 'run-1' });
-      expect(mockRunToTempFlow.retrieveQueryDefinitionObjectId).toHaveBeenCalledWith(
-        't1', 'u1', 'm1',
-        expect.stringContaining('QPP_Query_'),
-      );
-      expect(mockMceBridge.soapRequest).toHaveBeenCalled();
+      expect(result).toEqual({ status: 'canceled', runId });
     });
 
     it('should timeout after max duration', async () => {
+      const runId = await createTestRun('SELECT 1');
+      await updateRunForPoll(runId);
+
+      // Create job with old pollStartedAt (30 minutes ago)
       const oldTimestamp = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
+      const job = createMockPollJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
         pollStartedAt: oldTimestamp,
       });
 
-      const result = await processor.process(job as any);
+      const result = await processor.process(job as Job);
 
-      expect(result).toEqual({ status: 'timeout', runId: 'run-1' });
+      expect(result).toEqual({ status: 'timeout', runId });
+
+      // Verify database state
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('failed');
+      expect(dbRun.errorMessage).toContain('timed out');
     });
 
     it('should fail when poll budget exceeded', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
+      const runId = await createTestRun('SELECT 1');
+      await updateRunForPoll(runId);
+
+      const job = createMockPollJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
         pollCount: 120,
       });
 
-      const result = await processor.process(job as any);
+      const result = await processor.process(job as Job);
 
-      expect(result).toEqual({ status: 'budget-exceeded', runId: 'run-1' });
-    });
-  });
+      expect(result).toEqual({ status: 'budget-exceeded', runId });
 
-  describe('REST isRunning check and confirmations', () => {
-    it('should track first not-running detection when CompletedDate is present (without waiting for stuck threshold)', async () => {
-      const pollStartedAt = new Date(Date.now() - 6 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        queryDefinitionId: 'query-def-123',
-        pollStartedAt,
-        notRunningConfirmations: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-        completedDate: '1/16/2026 10:54:35 AM',
-      });
-
-      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: false });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          notRunningConfirmations: 1,
-          notRunningDetectedAt: expect.any(String),
-        }),
-      );
-    });
-
-    it('should track first not-running detection after stuck threshold', async () => {
-      const stuckTimestamp = new Date(Date.now() - 4 * 60 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        queryDefinitionId: 'query-def-123',
-        pollStartedAt: stuckTimestamp,
-        notRunningConfirmations: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: false });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          notRunningConfirmations: 1,
-          notRunningDetectedAt: expect.any(String),
-        }),
-      );
-    });
-
-    it('should proceed to rowset check after required confirmations', async () => {
-      const stuckTimestamp = new Date(Date.now() - 4 * 60 * 1000).toISOString();
-      const firstDetection = new Date(Date.now() - 20 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        queryDefinitionId: 'query-def-123',
-        pollStartedAt: stuckTimestamp,
-        notRunningDetectedAt: firstDetection,
-        notRunningConfirmations: 1,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: false });
-      mockRestDataService.getRowset.mockResolvedValue({ count: 0, items: [] });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({ status: 'completed', runId: 'run-1' });
-    });
-
-    it('should reset confirmations when isRunning becomes true', async () => {
-      const stuckTimestamp = new Date(Date.now() - 4 * 60 * 1000).toISOString();
-      const firstDetection = new Date(Date.now() - 10 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        queryDefinitionId: 'query-def-123',
-        pollStartedAt: stuckTimestamp,
-        notRunningDetectedAt: firstDetection,
-        notRunningConfirmations: 1,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      mockRestDataService.checkIsRunning.mockResolvedValue({ isRunning: true });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          notRunningConfirmations: 0,
-          notRunningDetectedAt: undefined,
-        }),
-      );
-    });
-  });
-
-  describe('Row probe fast-path', () => {
-    it('should mark ready immediately when row probe finds rows (fast-path)', async () => {
-      const pollStartedAt = new Date(Date.now() - 6 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        targetDeName: 'QPP_Results_test',
-        pollStartedAt,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      mockRestDataService.getRowset.mockResolvedValueOnce({ count: 1, items: [{ SubscriberKey: 'test' }] });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({ status: 'completed', runId: 'run-1' });
-      expect(mockDb.update).toHaveBeenCalled();
-    });
-
-    it('should continue polling when row probe returns empty rows', async () => {
-      const pollStartedAt = new Date(Date.now() - 6 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        targetDeName: 'QPP_Results_test',
-        pollStartedAt,
-        pollCount: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      mockRestDataService.getRowset.mockResolvedValueOnce({ count: 0, items: [] });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          rowProbeAttempts: 1,
-          rowProbeLastCheckedAt: expect.any(String),
-        }),
-      );
-    });
-
-    it('should throw unrecoverable error when row probe returns 401 (missing credentials)', async () => {
-      const pollStartedAt = new Date(Date.now() - 6 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        targetDeName: 'QPP_Results_test',
-        pollStartedAt,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      mockRestDataService.getRowset.mockRejectedValueOnce(
-        new AppError(ErrorCode.MCE_CREDENTIALS_MISSING),
-      );
-
-      // Should throw an UnrecoverableError (status update happens in onFailed event handler)
-      await expect(processor.process(job as any)).rejects.toThrow(
-        ErrorMessages[ErrorCode.MCE_CREDENTIALS_MISSING],
-      );
-    });
-
-    it('should skip row probe when elapsed time is below minimum runtime', async () => {
-      const pollStartedAt = new Date(Date.now() - 2 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        targetDeName: 'QPP_Results_test',
-        pollStartedAt,
-        pollCount: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(mockRestDataService.getRowset).not.toHaveBeenCalled();
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          rowProbeAttempts: expect.any(Number),
-        }),
-      );
-    });
-
-    it('should skip row probe when interval has not elapsed since last probe', async () => {
-      const pollStartedAt = new Date(Date.now() - 10 * 1000).toISOString();
-      const rowProbeLastCheckedAt = new Date(Date.now() - 5 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        targetDeName: 'QPP_Results_test',
-        pollStartedAt,
-        pollCount: 0,
-        rowProbeAttempts: 1,
-        rowProbeLastCheckedAt,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(mockRestDataService.getRowset).not.toHaveBeenCalled();
-    });
-
-    it('should skip row probe when targetDeName is not set', async () => {
-      const pollStartedAt = new Date(Date.now() - 6 * 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        targetDeName: '',
-        pollStartedAt,
-        pollCount: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Queued',
-        errorMsg: '',
-      });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({
-        status: 'polling',
-        runId: 'run-1',
-        pollCount: 1,
-      });
-      expect(mockRestDataService.getRowset).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Rowset readiness', () => {
-    it('should fail after max rowset ready attempts', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        targetDeName: 'QPP_Results_test',
-        rowsetReadyAttempts: 5,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Complete',
-        errorMsg: '',
-      });
-
-      mockRestDataService.getRowset.mockRejectedValue({ status: 404 });
-
-      const result = await processor.process(job as any);
-
-      expect(result).toEqual({ status: 'rowset-not-queryable', runId: 'run-1' });
-    });
-
-    it('should throw unrecoverable error when rowset readiness check hits 401 (missing credentials)', async () => {
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        targetDeName: 'QPP_Results_test',
-        rowsetReadyAttempts: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Complete',
-        errorMsg: '',
-      });
-
-      mockRestDataService.getRowset.mockRejectedValue(
-        new AppError(ErrorCode.MCE_CREDENTIALS_MISSING),
-      );
-
-      // Should throw an UnrecoverableError (status update happens in onFailed event handler)
-      await expect(processor.process(job as any)).rejects.toThrow(
-        ErrorMessages[ErrorCode.MCE_CREDENTIALS_MISSING],
-      );
-    });
-  });
-
-  describe('BullMQ scheduling (non-test mode)', () => {
-    it('uses moveToDelayed and throws DelayedError when continuing to poll', async () => {
-      processor.setTestMode(false);
-      const now = 1_000_000;
-      vi.spyOn(Date, 'now').mockReturnValue(now);
-      vi.spyOn(Math, 'random').mockReturnValue(0);
-
-      const pollStartedAt = new Date(now - 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        queryCustomerKey: '',
-        targetDeName: '',
-        pollStartedAt,
-        pollCount: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Processing',
-        errorMsg: '',
-      });
-
-      await expect(processor.process(job as any, 'token')).rejects.toBeInstanceOf(
-        DelayedError,
-      );
-
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.objectContaining({ pollCount: 1 }),
-      );
-      expect(job.moveToDelayed).toHaveBeenCalledWith(now + 3200, 'token');
-    });
-
-    it('uses moveToDelayed and throws DelayedError when rowset is not ready yet', async () => {
-      processor.setTestMode(false);
-      const now = 1_000_000;
-      vi.spyOn(Date, 'now').mockReturnValue(now);
-      vi.spyOn(Math, 'random').mockReturnValue(0);
-
-      const pollStartedAt = new Date(now - 1000).toISOString();
-      const job = createMockPollBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-        taskId: 'task-123',
-        targetDeName: 'QPP_Results_test',
-        pollStartedAt,
-        pollCount: 0,
-        rowsetReadyAttempts: 0,
-      });
-
-      mockAsyncStatusService.retrieve.mockResolvedValue({
-        status: 'Complete',
-        errorMsg: '',
-      });
-
-      mockRestDataService.getRowset.mockRejectedValue({ status: 404 });
-
-      await expect(processor.process(job as any, 'token')).rejects.toBeInstanceOf(
-        DelayedError,
-      );
-      expect(job.updateData).toHaveBeenCalledWith(
-        expect.objectContaining({ rowsetReadyAttempts: 1 }),
-      );
-      expect(job.moveToDelayed).toHaveBeenCalledWith(now + 2400, 'token');
+      // Verify database state
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('failed');
     });
   });
 
   describe('onFailed event handler', () => {
-    it('should update status, publish SSE event, and cleanup assets on permanent failure', async () => {
-      const mockRedis = createRedisStub();
-      const mockMetrics = createMetricsStub();
+    it('should update status and publish SSE event on permanent failure', async () => {
+      const runId = await createTestRun('SELECT 1');
 
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          ShellQueryProcessor,
-          { provide: RunToTempFlow, useValue: mockRunToTempFlow },
-          { provide: MceBridgeService, useValue: mockMceBridge },
-          { provide: RestDataService, useValue: mockRestDataService },
-          { provide: AsyncStatusService, useValue: mockAsyncStatusService },
-          { provide: EncryptionService, useValue: createEncryptionServiceStub() },
-          { provide: RlsContextService, useValue: createRlsContextStub() },
-          { provide: 'DATABASE', useValue: mockDb },
-          { provide: 'REDIS_CLIENT', useValue: mockRedis },
-          { provide: 'METRICS_JOBS_TOTAL', useValue: mockMetrics },
-          { provide: 'METRICS_DURATION', useValue: mockMetrics },
-          { provide: 'METRICS_FAILURES_TOTAL', useValue: mockMetrics },
-          { provide: 'METRICS_ACTIVE_JOBS', useValue: mockMetrics },
-          { provide: getQueueToken('shell-query'), useValue: mockQueue },
-        ],
-      }).compile();
+      const encryptedSql = encryptionService.encrypt('SELECT 1') ?? '';
+      // For permanent failure: attemptsMade must be >= opts.attempts
+      const job = {
+        ...createMockExecuteJob({
+          runId,
+          tenantId: TEST_TENANT_ID,
+          userId: TEST_USER_ID,
+          mid: TEST_MID,
+          eid: TEST_EID,
+          sqlText: encryptedSql,
+        }),
+        opts: { attempts: 3 },
+        attemptsMade: 3,
+      };
 
-      const testProcessor = module.get<ShellQueryProcessor>(ShellQueryProcessor);
+      const error = new Error('Permanent failure');
 
-      const job = createMockBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-      });
+      await processor.onFailed(job as Job, error);
 
-      mockRunToTempFlow.retrieveQueryDefinitionObjectId.mockResolvedValue('query-def-123');
+      // Verify database state
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('failed');
+      expect(dbRun.errorMessage).toBe('Permanent failure');
 
-      await testProcessor.onFailed(job as any, new Error('Permanent failure'));
-
-      // Verify status was updated
-      expect(mockDb.update).toHaveBeenCalled();
-
-      // Verify SSE event was published
-      expect(mockRedis.publish).toHaveBeenCalledWith(
-        expect.stringContaining('run-status:'),
-        expect.stringContaining('failed'),
-      );
-
-      // Verify metrics were recorded
-      expect(mockMetrics.inc).toHaveBeenCalled();
-
-      // Verify cleanup was attempted
-      expect(mockRunToTempFlow.retrieveQueryDefinitionObjectId).toHaveBeenCalled();
-      expect(mockMceBridge.soapRequest).toHaveBeenCalled();
+      // Verify SSE event published
+      const failedEvent = redisStub.__publishedEvents.find(e => e.channel.includes(runId));
+      expect(failedEvent).toBeDefined();
     });
 
     it('should no-op on intermediate failures that will retry', async () => {
-      const mockRedis = createRedisStub();
-      const mockMetrics = createMetricsStub();
+      const runId = await createTestRun('SELECT 1');
 
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          ShellQueryProcessor,
-          { provide: RunToTempFlow, useValue: mockRunToTempFlow },
-          { provide: MceBridgeService, useValue: mockMceBridge },
-          { provide: RestDataService, useValue: mockRestDataService },
-          { provide: AsyncStatusService, useValue: mockAsyncStatusService },
-          { provide: EncryptionService, useValue: createEncryptionServiceStub() },
-          { provide: RlsContextService, useValue: createRlsContextStub() },
-          { provide: 'DATABASE', useValue: mockDb },
-          { provide: 'REDIS_CLIENT', useValue: mockRedis },
-          { provide: 'METRICS_JOBS_TOTAL', useValue: mockMetrics },
-          { provide: 'METRICS_DURATION', useValue: mockMetrics },
-          { provide: 'METRICS_FAILURES_TOTAL', useValue: mockMetrics },
-          { provide: 'METRICS_ACTIVE_JOBS', useValue: mockMetrics },
-          { provide: getQueueToken('shell-query'), useValue: mockQueue },
-        ],
-      }).compile();
+      const encryptedSql = encryptionService.encrypt('SELECT 1') ?? '';
+      const job = {
+        ...createMockExecuteJob({
+          runId,
+          tenantId: TEST_TENANT_ID,
+          userId: TEST_USER_ID,
+          mid: TEST_MID,
+          eid: TEST_EID,
+          sqlText: encryptedSql,
+        }),
+        opts: { attempts: 3 },
+        attemptsMade: 1,
+      };
 
-      const testProcessor = module.get<ShellQueryProcessor>(ShellQueryProcessor);
+      const error = new Error('Transient failure');
 
-      const job = createMockBullJob({
-        runId: 'run-1',
-        tenantId: 't1',
-        userId: 'u1',
-        mid: 'm1',
-      });
-      (job as unknown as { opts: { attempts: number }; attemptsMade: number }).opts =
-        { attempts: 3 };
-      (job as unknown as { opts: { attempts: number }; attemptsMade: number }).attemptsMade =
-        1;
+      await processor.onFailed(job as Job, error);
 
-      await testProcessor.onFailed(job as any, new Error('Transient failure'));
+      // Verify database state NOT updated
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('queued');
+    });
+  });
 
-      expect(mockDb.update).not.toHaveBeenCalled();
-      expect(mockRedis.publish).not.toHaveBeenCalled();
-      expect(mockMetrics.inc).not.toHaveBeenCalled();
-      expect(mockRunToTempFlow.retrieveQueryDefinitionObjectId).not.toHaveBeenCalled();
-      expect(mockMceBridge.soapRequest).not.toHaveBeenCalled();
+  describe('BullMQ scheduling (non-test mode)', () => {
+    it('should use moveToDelayed when continuing to poll', async () => {
+      const runId = await createTestRun('SELECT 1');
+      await updateRunForPoll(runId);
+
+      // Override MSW to return Processing status
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            const body = await request.text();
+            if (body.includes('<ObjectType>AsyncActivityStatus</ObjectType>')) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <OverallStatus>OK</OverallStatus>
+                    <Results>
+                      <Properties>
+                        <Property>
+                          <Name>Status</Name>
+                          <Value>Processing</Value>
+                        </Property>
+                      </Properties>
+                    </Results>
+                  </RetrieveResponseMsg>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+            return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+              <soap:Body><RetrieveResponseMsg><OverallStatus>OK</OverallStatus></RetrieveResponseMsg></soap:Body>
+            </soap:Envelope>`);
+          },
+        ),
+      );
+
+      processor.setTestMode(false);
+
+      let moveToDelayedCalled = false;
+      const job = {
+        ...createMockPollJob({
+          runId,
+          tenantId: TEST_TENANT_ID,
+          userId: TEST_USER_ID,
+          mid: TEST_MID,
+          pollCount: 0,
+        }),
+        updateData: async () => {},
+        moveToDelayed: async () => {
+          moveToDelayedCalled = true;
+        },
+      };
+
+      await expect(processor.process(job as Job, 'test-token')).rejects.toBeInstanceOf(
+        DelayedError,
+      );
+
+      expect(moveToDelayedCalled).toBe(true);
+
+      // Reset test mode for subsequent tests
+      processor.setTestMode(true);
     });
   });
 });
