@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,13 +9,14 @@ import {
 } from "./db-context";
 import { RlsContextService } from "./rls-context.service";
 
-vi.mock("@qpp/database", () => ({
-  createDatabaseFromClient: vi.fn().mockReturnValue({ mock: "db" }),
-}));
-
 describe("RlsContextService", () => {
   let service: RlsContextService;
   let mockReservedSql: ReturnType<typeof createMockReservedSql>;
+  const createDatabaseFromClient = vi
+    .fn()
+    .mockReturnValue({ mock: "db" } as unknown as PostgresJsDatabase<
+      Record<string, unknown>
+    >);
 
   function createMockReservedSql() {
     const configCalls: Array<{ key: string; value: string }> = [];
@@ -73,6 +75,10 @@ describe("RlsContextService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RlsContextService,
+        {
+          provide: "CREATE_DATABASE_FROM_CLIENT",
+          useValue: createDatabaseFromClient,
+        },
         {
           provide: "SQL_CLIENT",
           useValue: mockSqlClient,
