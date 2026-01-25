@@ -90,6 +90,27 @@ function buildAliasMap(
   return aliasMap;
 }
 
+function getSubselectFromFromItem(expr: unknown): AstStatement | null {
+  if (!expr || typeof expr !== "object") {
+    return null;
+  }
+
+  // Some dialects/structures return the subselect directly as the expr.
+  if ((expr as { type?: unknown }).type === "select") {
+    return expr as AstStatement;
+  }
+
+  // Derived tables are represented as an object with an `ast` property.
+  const nested = (expr as { ast?: unknown }).ast;
+  if (nested && typeof nested === "object") {
+    if ((nested as { type?: unknown }).type === "select") {
+      return nested as AstStatement;
+    }
+  }
+
+  return null;
+}
+
 function extractTablesFromFrom(from: FromTable | FromTable[] | null): string[] {
   const tables: string[] = [];
   if (!from) {
@@ -102,8 +123,9 @@ function extractTablesFromFrom(from: FromTable | FromTable[] | null): string[] {
     if (item.table) {
       tables.push(normalizeTableName(item.table));
     }
-    if (item.expr && item.expr.type === "select") {
-      const subTables = extractTablesFromFrom(item.expr.from ?? null);
+    const subSelect = getSubselectFromFromItem(item.expr);
+    if (subSelect) {
+      const subTables = extractTablesFromFrom(subSelect.from ?? null);
       tables.push(...subTables);
     }
   }

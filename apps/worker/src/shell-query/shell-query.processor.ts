@@ -201,7 +201,12 @@ export class ShellQueryProcessor extends WorkerHost {
       mid,
       sqlText: encryptedSqlText,
     } = job.data;
-    const sqlText = this.encryptionService.decrypt(encryptedSqlText);
+    let sqlText: string | null | undefined;
+    try {
+      sqlText = this.encryptionService.decrypt(encryptedSqlText);
+    } catch {
+      throw new UnrecoverableError("Failed to decrypt sqlText");
+    }
     if (!sqlText) {
       throw new UnrecoverableError("Failed to decrypt sqlText");
     }
