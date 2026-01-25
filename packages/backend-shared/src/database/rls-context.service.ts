@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { createDatabaseFromClient } from "@qpp/database";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { Sql } from "postgres";
 
 import {
@@ -12,7 +12,13 @@ import {
 export class RlsContextService {
   private readonly logger = new Logger(RlsContextService.name);
 
-  constructor(@Inject("SQL_CLIENT") private readonly sql: Sql) {}
+  constructor(
+    @Inject("SQL_CLIENT") private readonly sql: Sql,
+    @Inject("CREATE_DATABASE_FROM_CLIENT")
+    private readonly createDatabaseFromClient: (
+      client: Sql,
+    ) => PostgresJsDatabase<Record<string, unknown>>,
+  ) {}
 
   private makeDrizzleCompatibleSql(reserved: Sql): Sql {
     // postgres.js `reserve()` returns a Sql tag function without `.options`, but
@@ -56,7 +62,7 @@ export class RlsContextService {
       await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
       await reserved`SELECT set_config('app.mid', ${mid}, false)`;
 
-      const db = createDatabaseFromClient(
+      const db = this.createDatabaseFromClient(
         this.makeDrizzleCompatibleSql(reserved),
       );
 
@@ -107,7 +113,7 @@ export class RlsContextService {
       await reserved`SELECT set_config('app.mid', ${mid}, false)`;
       await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
 
-      const db = createDatabaseFromClient(
+      const db = this.createDatabaseFromClient(
         this.makeDrizzleCompatibleSql(reserved),
       );
 

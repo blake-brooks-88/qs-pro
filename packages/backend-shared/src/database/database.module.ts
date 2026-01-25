@@ -12,6 +12,10 @@ type Database = ReturnType<typeof createDatabaseFromClient>;
 @Module({
   providers: [
     {
+      provide: "CREATE_DATABASE_FROM_CLIENT",
+      useValue: createDatabaseFromClient,
+    },
+    {
       provide: "SQL_CLIENT",
       useFactory: (configService: ConfigService) => {
         const logger = new Logger("DatabaseModule");
