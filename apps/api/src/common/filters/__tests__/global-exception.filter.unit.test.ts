@@ -85,6 +85,7 @@ describe('GlobalExceptionFilter', () => {
         'application/problem+json',
       );
       expect(response.json()).toMatchObject({
+        code: ErrorCode.MCE_VALIDATION_FAILED,
         type: 'urn:qpp:error:mce-validation-failed',
         title: 'Query Validation Failed',
         status: 400,
@@ -102,6 +103,7 @@ describe('GlobalExceptionFilter', () => {
 
       expect(response.statusCode).toBe(502);
       expect(response.json()).toMatchObject({
+        code: ErrorCode.MCE_SERVER_ERROR,
         type: 'urn:qpp:error:mce-server-error',
         title: 'MCE Server Error',
         status: 502,

@@ -87,7 +87,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private classifyException(exception: unknown, path: string): ProblemDetails {
     // 1. Domain errors (AppError)
     if (exception instanceof AppError) {
-      return appErrorToProblemDetails(exception, path);
+      return {
+        ...appErrorToProblemDetails(exception, path),
+        code: exception.code,
+      } as ProblemDetails & { code: string };
     }
 
     // 2. NestJS HttpExceptions (BadRequest, NotFound, Unauthorized, etc.)

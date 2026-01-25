@@ -21,7 +21,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
-import { EncryptionService } from '@qpp/backend-shared';
+import { EncryptionService, ErrorCode } from '@qpp/backend-shared';
 import { Queue } from 'bullmq';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -483,7 +483,9 @@ describe('ShellQueryService (integration)', () => {
       // 11th run should fail with rate limit
       await expect(
         service.createRun(context, 'SELECT * FROM RateLimitTest'),
-      ).rejects.toThrow(/Too many requests/i);
+      ).rejects.toMatchObject({
+        code: ErrorCode.RATE_LIMIT_EXCEEDED,
+      });
 
       // Clean up the 10 runs we created
       for (const runId of runIds) {
@@ -704,7 +706,7 @@ describe('ShellQueryService (integration)', () => {
       await expect(
         service.getRunStatus(fakeRunId, testTenantId, testMid, testUserId),
       ).rejects.toMatchObject({
-        code: 'RESOURCE_NOT_FOUND',
+        code: ErrorCode.RESOURCE_NOT_FOUND,
       });
     });
   });
@@ -801,7 +803,7 @@ describe('ShellQueryService (integration)', () => {
       await expect(
         service.cancelRun(fakeRunId, testTenantId, testMid, testUserId),
       ).rejects.toMatchObject({
-        code: 'RESOURCE_NOT_FOUND',
+        code: ErrorCode.RESOURCE_NOT_FOUND,
       });
     });
   });
@@ -813,7 +815,7 @@ describe('ShellQueryService (integration)', () => {
       await expect(
         service.getResults(fakeRunId, testTenantId, testUserId, testMid, 1),
       ).rejects.toMatchObject({
-        code: 'RESOURCE_NOT_FOUND',
+        code: ErrorCode.RESOURCE_NOT_FOUND,
       });
     });
 
@@ -823,7 +825,7 @@ describe('ShellQueryService (integration)', () => {
       await expect(
         service.getResults(runId, testTenantId, testUserId, testMid, 1),
       ).rejects.toMatchObject({
-        code: 'INVALID_STATE',
+        code: ErrorCode.INVALID_STATE,
       });
     });
 
@@ -886,7 +888,7 @@ describe('ShellQueryService (integration)', () => {
       await expect(
         service.getResults(runId, testTenantId, testUserId, testMid, 1),
       ).rejects.toMatchObject({
-        code: 'INVALID_STATE',
+        code: ErrorCode.INVALID_STATE,
         context: {
           status: 'failed',
           statusMessage: errorMessage,

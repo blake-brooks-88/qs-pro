@@ -7,14 +7,13 @@ import {
   HttpStatus,
   Inject,
   InternalServerErrorException,
-  NotFoundException,
   Param,
   Post,
   Query,
   Sse,
   UseGuards,
 } from '@nestjs/common';
-import { AppError, SessionGuard } from '@qpp/backend-shared';
+import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import type { Observable } from 'rxjs';
 import { z } from 'zod';
 
@@ -129,7 +128,10 @@ export class ShellQueryController {
       user.userId,
     );
     if (!run) {
-      throw new NotFoundException('Run not found');
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'streamEvents',
+        runId,
+      });
     }
 
     return this.shellQuerySse.streamRunEvents(runId, user.userId);
