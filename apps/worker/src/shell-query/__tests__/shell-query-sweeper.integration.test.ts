@@ -227,7 +227,7 @@ describe("ShellQuerySweeper (integration)", () => {
   }
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: "warn" });
+    server.listen({ onUnhandledRequest: 'error' });
 
     module = await Test.createTestingModule({
       imports: [

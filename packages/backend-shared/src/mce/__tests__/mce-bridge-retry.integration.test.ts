@@ -86,7 +86,7 @@ describe("MceBridgeService retry logic (integration)", () => {
   let authState: AuthProviderState;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: "warn" });
+    server.listen({ onUnhandledRequest: "error" });
   });
 
   beforeEach(async () => {

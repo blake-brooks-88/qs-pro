@@ -78,7 +78,7 @@ describe('OAuth State Expiry (integration)', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'warn' });
+    server.listen({ onUnhandledRequest: 'error' });
 
     process.env.MCE_TSSD = TEST_TSSD;
 

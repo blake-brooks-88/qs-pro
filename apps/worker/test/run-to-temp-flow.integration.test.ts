@@ -276,7 +276,7 @@ describe('RunToTempFlow (integration)', () => {
   let rlsContext: RlsContextService;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'warn' });
+    server.listen({ onUnhandledRequest: 'error' });
 
     module = await Test.createTestingModule({
       imports: [

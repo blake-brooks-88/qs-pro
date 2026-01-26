@@ -286,7 +286,7 @@ describe('Shell Query Cancellation (integration)', () => {
   }
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'warn' });
+    server.listen({ onUnhandledRequest: 'error' });
 
     // Create a stub Queue that doesn't need real Redis for this test
     const mockQueue = {

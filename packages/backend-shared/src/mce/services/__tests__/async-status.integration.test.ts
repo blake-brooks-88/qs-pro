@@ -104,7 +104,7 @@ describe("AsyncStatusService (integration)", () => {
   let service: AsyncStatusService;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: "warn" });
+    server.listen({ onUnhandledRequest: "error" });
 
     module = await Test.createTestingModule({
       providers: [

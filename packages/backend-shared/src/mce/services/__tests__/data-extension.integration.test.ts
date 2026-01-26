@@ -139,7 +139,7 @@ describe("DataExtensionService (integration)", () => {
   let service: DataExtensionService;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: "warn" });
+    server.listen({ onUnhandledRequest: "error" });
 
     module = await Test.createTestingModule({
       providers: [

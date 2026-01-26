@@ -449,7 +449,7 @@ describe('ShellQueryProcessor (integration)', () => {
   const createdRunIds: string[] = [];
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'warn' });
+    server.listen({ onUnhandledRequest: 'error' });
 
     queueStub = createQueueStub();
     redisStub = createRedisClientStub();

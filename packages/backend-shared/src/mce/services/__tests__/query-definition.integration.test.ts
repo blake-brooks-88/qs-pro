@@ -131,7 +131,7 @@ describe("QueryDefinitionService (integration)", () => {
   let service: QueryDefinitionService;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: "warn" });
+    server.listen({ onUnhandledRequest: "error" });
 
     module = await Test.createTestingModule({
       providers: [

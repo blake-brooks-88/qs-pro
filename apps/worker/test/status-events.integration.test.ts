@@ -408,7 +408,7 @@ describe('Status Events (integration)', () => {
   }
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'warn' });
+    server.listen({ onUnhandledRequest: 'error' });
 
     queueStub = createQueueStub();
     redisStub = createRedisClientStub();
