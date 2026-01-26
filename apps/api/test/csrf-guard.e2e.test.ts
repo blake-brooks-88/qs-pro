@@ -176,10 +176,10 @@ describe('CSRF Guard (e2e)', () => {
       // CSRF guard passed if we didn't get a 401 with CSRF-related rejection
       expect(response.status).not.toBe(401);
 
-      // If we got an error response, verify it's not a CSRF rejection
-      if (response.status >= 400 && response.body?.detail) {
-        expect(response.body.detail).not.toMatch(/CSRF/i);
-      }
+      // Verify error detail (if any) is not a CSRF rejection
+      const detail =
+        typeof response.body?.detail === 'string' ? response.body.detail : '';
+      expect(detail).not.toMatch(/CSRF/i);
     });
 
     it('should allow GET requests without CSRF token', async () => {
