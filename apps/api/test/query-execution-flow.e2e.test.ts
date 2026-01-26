@@ -16,7 +16,11 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
-import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
+import {
+  EncryptionService,
+  getReservedSqlFromContext,
+  RlsContextService,
+} from '@qpp/backend-shared';
 import { Job, Queue, Worker } from 'bullmq';
 import * as jose from 'jose';
 import { http, HttpResponse } from 'msw';
@@ -502,22 +506,26 @@ describe('Query Execution Flow (e2e)', () => {
     workerInstance = new Worker(
       'shell-query',
       async (job: Job) => {
-        const { runId, tenantId, userId, mid, sqlText } = job.data;
-
-        // Decrypt sqlText
-        const decryptedSqlText = encryptionService.decrypt(sqlText);
-        if (!decryptedSqlText) {
-          throw new Error('Failed to decrypt sqlText');
-        }
+        const { runId, tenantId, userId, mid } = job.data;
 
         if (job.name === 'execute-shell-query') {
+          // Only execute-shell-query jobs have sqlText to decrypt
+          const { sqlText } = job.data;
+          const decryptedSqlText = encryptionService.decrypt(sqlText);
+          if (!decryptedSqlText) {
+            throw new Error('Failed to decrypt sqlText');
+          }
           // Check cancellation
           const isCanceled = await rlsContext.runWithUserContext(
             tenantId,
             mid,
             userId,
             async () => {
-              const result = await sqlClient`
+              const reservedSql = getReservedSqlFromContext();
+              if (!reservedSql) {
+                throw new Error('No reserved SQL in context');
+              }
+              const result = await reservedSql`
                 SELECT status FROM shell_query_runs WHERE id = ${runId}::uuid
               `;
               return result[0]?.status === 'canceled';
@@ -535,7 +543,11 @@ describe('Query Execution Flow (e2e)', () => {
             mid,
             userId,
             async () => {
-              await sqlClient`
+              const reservedSql = getReservedSqlFromContext();
+              if (!reservedSql) {
+                throw new Error('No reserved SQL in context');
+              }
+              await reservedSql`
               UPDATE shell_query_runs
               SET status = 'running', started_at = NOW()
               WHERE id = ${runId}::uuid
@@ -558,7 +570,11 @@ describe('Query Execution Flow (e2e)', () => {
             mid,
             userId,
             async () => {
-              await sqlClient`
+              const reservedSql = getReservedSqlFromContext();
+              if (!reservedSql) {
+                throw new Error('No reserved SQL in context');
+              }
+              await reservedSql`
               UPDATE shell_query_runs
               SET task_id = ${result.taskId},
                   query_definition_id = ${result.queryDefinitionId},
@@ -602,7 +618,11 @@ describe('Query Execution Flow (e2e)', () => {
             mid,
             userId,
             async () => {
-              const result = await sqlClient`
+              const reservedSql = getReservedSqlFromContext();
+              if (!reservedSql) {
+                throw new Error('No reserved SQL in context');
+              }
+              const result = await reservedSql`
                 SELECT status FROM shell_query_runs WHERE id = ${runId}::uuid
               `;
               return result[0]?.status === 'canceled';
@@ -624,7 +644,11 @@ describe('Query Execution Flow (e2e)', () => {
               mid,
               userId,
               async () => {
-                await sqlClient`
+                const reservedSql = getReservedSqlFromContext();
+                if (!reservedSql) {
+                  throw new Error('No reserved SQL in context');
+                }
+                await reservedSql`
                 UPDATE shell_query_runs
                 SET status = 'failed', error_message = ${encryptedError}, completed_at = NOW()
                 WHERE id = ${runId}::uuid
@@ -642,7 +666,11 @@ describe('Query Execution Flow (e2e)', () => {
             mid,
             userId,
             async () => {
-              await sqlClient`
+              const reservedSql = getReservedSqlFromContext();
+              if (!reservedSql) {
+                throw new Error('No reserved SQL in context');
+              }
+              await reservedSql`
               UPDATE shell_query_runs
               SET status = 'ready', completed_at = NOW()
               WHERE id = ${runId}::uuid
@@ -734,7 +762,7 @@ describe('Query Execution Flow (e2e)', () => {
     }
 
     // Clean up test data
-    // 1. Delete shell_query_runs
+    // 1. Delete shell_query_runs by tracked runs first (most reliable)
     for (const run of createdRuns) {
       try {
         const reserved = await sqlClient.reserve();
@@ -781,7 +809,30 @@ describe('Query Execution Flow (e2e)', () => {
       }
     }
 
-    // 4. Delete users and tenants (not RLS-protected)
+    // 4. Delete any remaining credentials for users (auth flow creates these automatically)
+    // The credentials table has RLS, so we must set context before querying/deleting
+    // Extract unique mids from created runs and combine with default mid
+    const uniqueMids = new Set(createdRuns.map((r) => r.mid));
+    uniqueMids.add('mid-query-flow'); // Always include default mid
+    for (const tenantId of createdTenantIds) {
+      for (const mid of uniqueMids) {
+        for (const userId of createdUserIds) {
+          try {
+            const reserved = await sqlClient.reserve();
+            await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+            await reserved`SELECT set_config('app.mid', ${mid}, false)`;
+            await reserved`DELETE FROM credentials WHERE user_id = ${userId}::uuid`;
+            await reserved`RESET app.tenant_id`;
+            await reserved`RESET app.mid`;
+            reserved.release();
+          } catch {
+            // Best effort - RLS may block if wrong context
+          }
+        }
+      }
+    }
+
+    // 5. Delete users and tenants (not RLS-protected)
     if (createdUserIds.length > 0) {
       await sqlClient`DELETE FROM users WHERE id = ANY(${createdUserIds}::uuid[])`;
     }
