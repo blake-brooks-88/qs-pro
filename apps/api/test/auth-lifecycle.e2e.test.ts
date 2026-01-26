@@ -78,7 +78,19 @@ describe('Auth Lifecycle (e2e)', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({
+      onUnhandledRequest(request, print) {
+        const url = new URL(request.url);
+
+        // Allow localhost requests to pass through to the test server
+        if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
+          return;
+        }
+
+        // Error on unhandled external requests (catches accidental real API calls)
+        print.error();
+      },
+    });
 
     process.env.MCE_TSSD = TEST_TSSD;
 

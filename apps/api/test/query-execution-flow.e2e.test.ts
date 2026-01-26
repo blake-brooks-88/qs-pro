@@ -420,7 +420,19 @@ describe('Query Execution Flow (e2e)', () => {
   const createdTenantSettings: Array<{ tenantId: string; mid: string }> = [];
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({
+      onUnhandledRequest(request, print) {
+        const url = new URL(request.url);
+
+        // Allow localhost requests to pass through to the test server
+        if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
+          return;
+        }
+
+        // Error on unhandled external requests (catches accidental real API calls)
+        print.error();
+      },
+    });
 
     process.env.MCE_TSSD = 'test-tssd';
 
