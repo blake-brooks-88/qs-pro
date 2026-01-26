@@ -20,7 +20,9 @@ import {
   type RowsetResponse,
 } from "@qpp/backend-shared";
 import {
+  and,
   eq,
+  notInArray,
   type PostgresJsDatabase,
   shellQueryRuns,
   type ShellQueryRunStatus,
@@ -1116,7 +1118,12 @@ export class ShellQueryProcessor extends WorkerHost {
         await this.db
           .update(shellQueryRuns)
           .set({ status, ...processedExtra })
-          .where(eq(shellQueryRuns.id, runId));
+          .where(
+            and(
+              eq(shellQueryRuns.id, runId),
+              notInArray(shellQueryRuns.status, ['canceled', 'failed', 'ready']),
+            ),
+          );
       },
     );
   }

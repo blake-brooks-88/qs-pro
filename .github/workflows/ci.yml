@@ -36,7 +36,9 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/qs_pro_test
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/qs_pro_test
+      DATABASE_URL_MIGRATIONS: postgresql://qs_migrate:migrate_pass@localhost:5432/qs_pro_test
+      DATABASE_URL: postgresql://qs_runtime:runtime_pass@localhost:5432/qs_pro_test
       REDIS_URL: redis://localhost:6379
 
     steps:
@@ -50,6 +52,25 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Create database roles
+        run: |
+          psql "$POSTGRES_URL" <<'SQL'
+          CREATE ROLE qs_migrate LOGIN PASSWORD 'migrate_pass';
+          CREATE ROLE qs_runtime LOGIN PASSWORD 'runtime_pass';
+
+          GRANT CONNECT ON DATABASE qs_pro_test TO qs_migrate;
+          GRANT CONNECT ON DATABASE qs_pro_test TO qs_runtime;
+          GRANT CREATE ON DATABASE qs_pro_test TO qs_migrate;
+
+          GRANT USAGE, CREATE ON SCHEMA public TO qs_migrate;
+          GRANT USAGE ON SCHEMA public TO qs_runtime;
+
+          ALTER DEFAULT PRIVILEGES FOR ROLE qs_migrate IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO qs_runtime;
+          ALTER DEFAULT PRIVILEGES FOR ROLE qs_migrate IN SCHEMA public
+            GRANT USAGE, SELECT ON SEQUENCES TO qs_runtime;
+          SQL
 
       - name: Build packages
         run: pnpm -r --filter "./packages/**" build
