@@ -95,6 +95,33 @@ export class ShellQueryProcessor extends WorkerHost {
     return this.handleExecute(job as Job<ShellQueryJob>);
   }
 
+  @OnWorkerEvent("completed")
+  async onCompleted(job: Job<AnyShellQueryJob>): Promise<void> {
+    try {
+      const strippedData = { ...job.data };
+
+      if ("sqlText" in strippedData) {
+        strippedData.sqlText = "[stripped]";
+      }
+
+      if ("tableMetadata" in strippedData) {
+        strippedData.tableMetadata = undefined;
+      }
+
+      await job.updateData(strippedData);
+
+      this.logger.debug(
+        { jobId: job.id, runId: strippedData.runId },
+        "Stripped payload from completed job",
+      );
+    } catch (error) {
+      this.logger.warn(
+        { jobId: job.id, error },
+        "Failed to strip payload from completed job",
+      );
+    }
+  }
+
   @OnWorkerEvent("failed")
   async onFailed(
     job: Job<ShellQueryJob | PollShellQueryJob>,
@@ -1135,7 +1162,7 @@ export class ShellQueryProcessor extends WorkerHost {
     runId: string,
     queryDefinitionId?: string,
   ) {
-    const queryKey = buildQueryCustomerKey(runId);
+    const queryKey = buildQueryCustomerKey(userId);
 
     this.logger.log(`Attempting cleanup for run ${runId}`);
 
