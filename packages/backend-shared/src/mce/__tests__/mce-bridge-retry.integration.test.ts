@@ -701,7 +701,7 @@ describe("MceBridgeService retry logic (integration)", () => {
       expect(result.Body.Fault.faultstring).toBe("Login Failed");
     });
 
-    it("should handle HTTP error in SOAP request without retry", async () => {
+    it("should fail after max retries exhausted on persistent 5xx SOAP errors", async () => {
       let soapCallCount = 0;
 
       server.use(
@@ -724,8 +724,10 @@ describe("MceBridgeService retry logic (integration)", () => {
         ),
       ).rejects.toThrow(AppError);
 
-      // Verify NO retry
-      expect(soapCallCount).toBe(1);
+      // Verify retries happened (default maxRetries=3 means 4 total attempts)
+      expect(soapCallCount).toBe(4);
+
+      // Verify NO auth invalidation (transient retry, not auth retry)
       expect(authState.invalidateCalls).toHaveLength(0);
     });
   });
@@ -819,6 +821,103 @@ describe("MceBridgeService retry logic (integration)", () => {
       expect(capturedTokens).toHaveLength(2);
       expect(capturedTokens[0]).toBe("initial-access-token");
       expect(capturedTokens[1]).toBe("refreshed-access-token");
+    });
+  });
+
+  describe("SOAP timeout and transient retry", () => {
+    it("should forward timeout to SOAP axios request", async () => {
+      let receivedTimeout: number | undefined;
+
+      const axiosSpy = vi
+        .spyOn(axios, "request")
+        .mockImplementation(async (config) => {
+          receivedTimeout = config?.timeout;
+          return {
+            data: `<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><Response><Status>OK</Status></Response></soap:Body></soap:Envelope>`,
+          };
+        });
+
+      try {
+        await mceBridgeService.soapRequest(
+          TEST_TENANT_ID,
+          TEST_USER_ID,
+          TEST_MID,
+          "<Test/>",
+          "Test",
+          MCE_TIMEOUTS.STATUS_POLL,
+        );
+
+        expect(receivedTimeout).toBe(MCE_TIMEOUTS.STATUS_POLL);
+      } finally {
+        axiosSpy.mockRestore();
+      }
+    });
+
+    it("should use default timeout for SOAP when not specified", async () => {
+      let receivedTimeout: number | undefined;
+
+      const axiosSpy = vi
+        .spyOn(axios, "request")
+        .mockImplementation(async (config) => {
+          receivedTimeout = config?.timeout;
+          return {
+            data: `<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><Response><Status>OK</Status></Response></soap:Body></soap:Envelope>`,
+          };
+        });
+
+      try {
+        await mceBridgeService.soapRequest(
+          TEST_TENANT_ID,
+          TEST_USER_ID,
+          TEST_MID,
+          "<Test/>",
+          "Test",
+        );
+
+        expect(receivedTimeout).toBe(MCE_TIMEOUTS.DEFAULT);
+      } finally {
+        axiosSpy.mockRestore();
+      }
+    });
+
+    it("should retry SOAP on 5xx transient error and succeed on second attempt", async () => {
+      let soapCallCount = 0;
+
+      const soapSuccessResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <Response><Status>OK</Status></Response>
+  </soap:Body>
+</soap:Envelope>`;
+
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          () => {
+            soapCallCount++;
+            if (soapCallCount === 1) {
+              return HttpResponse.json(
+                { message: "Internal Server Error" },
+                { status: 502 },
+              );
+            }
+            return HttpResponse.xml(soapSuccessResponse);
+          },
+        ),
+      );
+
+      const result = await mceBridgeService.soapRequest<{
+        Body: { Response: { Status: string } };
+      }>(TEST_TENANT_ID, TEST_USER_ID, TEST_MID, "<Test/>", "Test");
+
+      // Verify retry happened via withRetry (transient error retry)
+      expect(soapCallCount).toBe(2);
+
+      // Verify successful result
+      expect(result.Body.Response.Status).toBe("OK");
+
+      // Verify NO auth invalidation was called (this is transient retry, not auth retry)
+      expect(authState.invalidateCalls).toHaveLength(0);
     });
   });
 });
