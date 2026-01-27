@@ -36,3 +36,6 @@ export type {
 
 // Error handling
 export { ErrorCode, ErrorMessages } from "./errors/index.js";
+
+// Testing utilities
+export { assertDefined } from "./testing/index.js";

@@ -15,7 +15,6 @@
  *
  * Requires a running PostgreSQL instance (see vitest-integration.config.ts).
  */
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { ConfigModule } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import {
@@ -45,10 +44,10 @@ import {
 } from "vitest";
 
 import { ErrorCode } from "../common/errors";
-import { getDbFromContext } from "../database/db-context";
 import { createDbProxy } from "../database/db-proxy";
 import { RlsContextService } from "../database/rls-context.service";
 import { EncryptionService } from "../encryption";
+import { assertDefined, getContextDb } from "../testing";
 import { AuthService } from "./auth.service";
 import { SeatLimitService } from "./seat-limit.service";
 
@@ -302,7 +301,7 @@ describe("AuthService Integration", () => {
         result.tenant.id,
         AUTH_TEST_MID,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           const [cred] = await contextDb
             .select()
             .from(credentials)
@@ -373,7 +372,7 @@ describe("AuthService Integration", () => {
         result.tenant.id,
         uniqueMid,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           const [c] = await contextDb
             .select()
             .from(credentials)
@@ -470,7 +469,7 @@ describe("AuthService Integration", () => {
         result.tenant.id,
         uniqueMid,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           const [c] = await contextDb
             .select()
             .from(credentials)
@@ -558,18 +557,20 @@ describe("AuthService Integration", () => {
       const uniqueMid = "auth-integ-mid-refresh-cached";
 
       // Create tenant
-      const [tenant] = await db
+      const [tenantRow] = await db
         .insert(tenants)
         .values({ eid: uniqueEid, tssd: AUTH_TEST_TSSD })
         .returning();
-      createdTenantIds.push(tenant!.id);
+      const tenant = assertDefined(tenantRow, "Tenant insert failed");
+      createdTenantIds.push(tenant.id);
 
       // Create user
-      const [user] = await db
+      const [userRow] = await db
         .insert(users)
-        .values({ sfUserId: uniqueSfUserId, tenantId: tenant!.id })
+        .values({ sfUserId: uniqueSfUserId, tenantId: tenant.id })
         .returning();
-      createdUserIds.push(user!.id);
+      const user = assertDefined(userRow, "User insert failed");
+      createdUserIds.push(user.id);
 
       // Encrypt tokens
       const encryptedAccessToken = encryptionService.encrypt(
@@ -583,13 +584,13 @@ describe("AuthService Integration", () => {
       const futureExpiry = new Date(Date.now() + 3600 * 1000); // +1 hour
 
       await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           await contextDb.insert(credentials).values({
-            tenantId: tenant!.id,
-            userId: user!.id,
+            tenantId: tenant.id,
+            userId: user.id,
             mid: uniqueMid,
             accessToken: encryptedAccessToken,
             refreshToken: encryptedRefreshToken,
@@ -603,12 +604,12 @@ describe("AuthService Integration", () => {
 
       // Call refreshToken within RLS context - should return cached
       const result = await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
         async () =>
           authService.refreshToken(
-            tenant!.id,
-            user!.id,
+            tenant.id,
+            user.id,
             uniqueMid,
             false, // forceRefresh = false
           ),
@@ -629,18 +630,20 @@ describe("AuthService Integration", () => {
       const uniqueMid = "auth-integ-mid-refresh-expired";
 
       // Create tenant
-      const [tenant] = await db
+      const [tenantRow] = await db
         .insert(tenants)
         .values({ eid: uniqueEid, tssd: AUTH_TEST_TSSD })
         .returning();
-      createdTenantIds.push(tenant!.id);
+      const tenant = assertDefined(tenantRow, "Tenant insert failed");
+      createdTenantIds.push(tenant.id);
 
       // Create user
-      const [user] = await db
+      const [userRow] = await db
         .insert(users)
-        .values({ sfUserId: uniqueSfUserId, tenantId: tenant!.id })
+        .values({ sfUserId: uniqueSfUserId, tenantId: tenant.id })
         .returning();
-      createdUserIds.push(user!.id);
+      const user = assertDefined(userRow, "User insert failed");
+      createdUserIds.push(user.id);
 
       // Encrypt tokens
       const encryptedAccessToken = encryptionService.encrypt(
@@ -654,13 +657,13 @@ describe("AuthService Integration", () => {
       const pastExpiry = new Date(Date.now() - 3600 * 1000); // -1 hour
 
       await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           await contextDb.insert(credentials).values({
-            tenantId: tenant!.id,
-            userId: user!.id,
+            tenantId: tenant.id,
+            userId: user.id,
             mid: uniqueMid,
             accessToken: encryptedAccessToken,
             refreshToken: encryptedRefreshToken,
@@ -698,10 +701,10 @@ describe("AuthService Integration", () => {
 
       // Call refreshToken within RLS context - should refresh from MCE
       const result = await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
         async () =>
-          authService.refreshToken(tenant!.id, user!.id, uniqueMid, false),
+          authService.refreshToken(tenant.id, user.id, uniqueMid, false),
       );
 
       // Verify new token returned
@@ -722,18 +725,20 @@ describe("AuthService Integration", () => {
       const uniqueMid = "auth-integ-mid-refresh-fail";
 
       // Create tenant
-      const [tenant] = await db
+      const [tenantRow] = await db
         .insert(tenants)
         .values({ eid: uniqueEid, tssd: AUTH_TEST_TSSD })
         .returning();
-      createdTenantIds.push(tenant!.id);
+      const tenant = assertDefined(tenantRow, "Tenant insert failed");
+      createdTenantIds.push(tenant.id);
 
       // Create user
-      const [user] = await db
+      const [userRow] = await db
         .insert(users)
-        .values({ sfUserId: uniqueSfUserId, tenantId: tenant!.id })
+        .values({ sfUserId: uniqueSfUserId, tenantId: tenant.id })
         .returning();
-      createdUserIds.push(user!.id);
+      const user = assertDefined(userRow, "User insert failed");
+      createdUserIds.push(user.id);
 
       // Encrypt tokens
       const encryptedAccessToken = encryptionService.encrypt(
@@ -747,13 +752,13 @@ describe("AuthService Integration", () => {
       const pastExpiry = new Date(Date.now() - 3600 * 1000);
 
       await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           await contextDb.insert(credentials).values({
-            tenantId: tenant!.id,
-            userId: user!.id,
+            tenantId: tenant.id,
+            userId: user.id,
             mid: uniqueMid,
             accessToken: encryptedAccessToken,
             refreshToken: encryptedRefreshToken,
@@ -777,11 +782,8 @@ describe("AuthService Integration", () => {
 
       // Call refreshToken within RLS context - should throw MCE_AUTH_EXPIRED
       await expect(
-        rlsContextService.runWithTenantContext(
-          tenant!.id,
-          uniqueMid,
-          async () =>
-            authService.refreshToken(tenant!.id, user!.id, uniqueMid, false),
+        rlsContextService.runWithTenantContext(tenant.id, uniqueMid, async () =>
+          authService.refreshToken(tenant.id, user.id, uniqueMid, false),
         ),
       ).rejects.toMatchObject({
         code: ErrorCode.MCE_AUTH_EXPIRED,
@@ -795,26 +797,25 @@ describe("AuthService Integration", () => {
       const uniqueMid = "auth-integ-mid-no-creds";
 
       // Create tenant
-      const [tenant] = await db
+      const [tenantRow] = await db
         .insert(tenants)
         .values({ eid: uniqueEid, tssd: AUTH_TEST_TSSD })
         .returning();
-      createdTenantIds.push(tenant!.id);
+      const tenant = assertDefined(tenantRow, "Tenant insert failed");
+      createdTenantIds.push(tenant.id);
 
       // Create user
-      const [user] = await db
+      const [userRow] = await db
         .insert(users)
-        .values({ sfUserId: uniqueSfUserId, tenantId: tenant!.id })
+        .values({ sfUserId: uniqueSfUserId, tenantId: tenant.id })
         .returning();
-      createdUserIds.push(user!.id);
+      const user = assertDefined(userRow, "User insert failed");
+      createdUserIds.push(user.id);
 
       // Call refreshToken within RLS context without any credentials
       await expect(
-        rlsContextService.runWithTenantContext(
-          tenant!.id,
-          uniqueMid,
-          async () =>
-            authService.refreshToken(tenant!.id, user!.id, uniqueMid, false),
+        rlsContextService.runWithTenantContext(tenant.id, uniqueMid, async () =>
+          authService.refreshToken(tenant.id, user.id, uniqueMid, false),
         ),
       ).rejects.toMatchObject({
         code: ErrorCode.MCE_CREDENTIALS_MISSING,
@@ -830,18 +831,20 @@ describe("AuthService Integration", () => {
       const uniqueMid = "auth-integ-mid-invalidate";
 
       // Create tenant
-      const [tenant] = await db
+      const [tenantRow] = await db
         .insert(tenants)
         .values({ eid: uniqueEid, tssd: AUTH_TEST_TSSD })
         .returning();
-      createdTenantIds.push(tenant!.id);
+      const tenant = assertDefined(tenantRow, "Tenant insert failed");
+      createdTenantIds.push(tenant.id);
 
       // Create user
-      const [user] = await db
+      const [userRow] = await db
         .insert(users)
-        .values({ sfUserId: uniqueSfUserId, tenantId: tenant!.id })
+        .values({ sfUserId: uniqueSfUserId, tenantId: tenant.id })
         .returning();
-      createdUserIds.push(user!.id);
+      const user = assertDefined(userRow, "User insert failed");
+      createdUserIds.push(user.id);
 
       // Encrypt tokens
       const encryptedAccessToken = encryptionService.encrypt(
@@ -855,13 +858,13 @@ describe("AuthService Integration", () => {
       const futureExpiry = new Date(Date.now() + 3600 * 1000);
 
       await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           await contextDb.insert(credentials).values({
-            tenantId: tenant!.id,
-            userId: user!.id,
+            tenantId: tenant.id,
+            userId: user.id,
             mid: uniqueMid,
             accessToken: encryptedAccessToken,
             refreshToken: encryptedRefreshToken,
@@ -872,24 +875,23 @@ describe("AuthService Integration", () => {
 
       // Call invalidateToken within RLS context
       await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
-        async () =>
-          authService.invalidateToken(tenant!.id, user!.id, uniqueMid),
+        async () => authService.invalidateToken(tenant.id, user.id, uniqueMid),
       );
 
       // Query credentials directly via RLS context
       const cred = await rlsContextService.runWithTenantContext(
-        tenant!.id,
+        tenant.id,
         uniqueMid,
         async () => {
-          const contextDb = getDbFromContext()!;
+          const contextDb = getContextDb();
           const [c] = await contextDb
             .select()
             .from(credentials)
             .where(
               and(
-                eq(credentials.userId, user!.id),
+                eq(credentials.userId, user.id),
                 eq(credentials.mid, uniqueMid),
               ),
             );
@@ -913,26 +915,25 @@ describe("AuthService Integration", () => {
       const uniqueMid = "auth-integ-mid-invalidate-none";
 
       // Create tenant
-      const [tenant] = await db
+      const [tenantRow] = await db
         .insert(tenants)
         .values({ eid: uniqueEid, tssd: AUTH_TEST_TSSD })
         .returning();
-      createdTenantIds.push(tenant!.id);
+      const tenant = assertDefined(tenantRow, "Tenant insert failed");
+      createdTenantIds.push(tenant.id);
 
       // Create user
-      const [user] = await db
+      const [userRow] = await db
         .insert(users)
-        .values({ sfUserId: uniqueSfUserId, tenantId: tenant!.id })
+        .values({ sfUserId: uniqueSfUserId, tenantId: tenant.id })
         .returning();
-      createdUserIds.push(user!.id);
+      const user = assertDefined(userRow, "User insert failed");
+      createdUserIds.push(user.id);
 
       // Call invalidateToken within RLS context - should not throw
       await expect(
-        rlsContextService.runWithTenantContext(
-          tenant!.id,
-          uniqueMid,
-          async () =>
-            authService.invalidateToken(tenant!.id, user!.id, uniqueMid),
+        rlsContextService.runWithTenantContext(tenant.id, uniqueMid, async () =>
+          authService.invalidateToken(tenant.id, user.id, uniqueMid),
         ),
       ).resolves.toBeUndefined();
     });
