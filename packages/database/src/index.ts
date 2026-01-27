@@ -7,7 +7,9 @@ export const createDatabase = (connectionString: string) => {
 };
 
 export const createSqlClient = (connectionString: string) =>
-  postgres(connectionString);
+  postgres(connectionString, {
+    max: parseInt(process.env.DB_POOL_SIZE ?? "10", 10),
+  });
 
 export const createDatabaseFromClient = (client: ReturnType<typeof postgres>) =>
   drizzle(client);
