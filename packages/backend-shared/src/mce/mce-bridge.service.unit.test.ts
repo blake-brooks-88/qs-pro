@@ -88,6 +88,7 @@ describe("MceBridgeService", () => {
             Authorization: "Bearer valid-token",
           }),
         }),
+        undefined, // timeout parameter (optional, defaults in MceHttpClient)
       );
       expect(response).toEqual({ success: true });
     });
@@ -237,8 +238,9 @@ describe("MceBridgeService", () => {
       }
     });
 
-    it("should throw MCE_SERVER_ERROR for 500", async () => {
+    it("should retry 5xx via withRetry then throw MCE_SERVER_ERROR after exhausting retries", async () => {
       // MceHttpClient throws AppError with MCE_SERVER_ERROR for 500
+      // withRetry will retry this (maxRetries=3 means 4 total attempts)
       mockHttpClient.request.mockRejectedValue(
         new AppError(ErrorCode.MCE_SERVER_ERROR),
       );
@@ -252,7 +254,10 @@ describe("MceBridgeService", () => {
         // eslint-disable-next-line vitest/no-conditional-expect -- verifying error properties after catching
         expect((error as AppError).code).toBe(ErrorCode.MCE_SERVER_ERROR);
       }
-    });
+
+      // Verify withRetry attempted 4 times (1 initial + 3 retries)
+      expect(mockHttpClient.request).toHaveBeenCalledTimes(4);
+    }, 30000); // Extended timeout for retry delays
 
     it("should pass through AppError from AuthService", async () => {
       const authError = new AppError(ErrorCode.MCE_CREDENTIALS_MISSING);
