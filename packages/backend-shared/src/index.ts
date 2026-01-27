@@ -20,6 +20,12 @@ export {
 export * from "./database/database.module";
 export * from "./database/db-context";
 export * from "./database/rls-context.service";
+export {
+  calculateRetryDelay,
+  parseRetryAfter,
+  type RetryConfig,
+  withRetry,
+} from "./mce/http-retry.util";
 export { MCE_TIMEOUTS, type MceOperationType } from "./mce/http-timeout.config";
 export * from "./mce/mce.module";
 export {
