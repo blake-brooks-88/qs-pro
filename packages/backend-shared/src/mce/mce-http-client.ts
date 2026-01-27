@@ -3,6 +3,7 @@ import axios, { AxiosRequestConfig } from "axios";
 
 import { AppError } from "../common/errors/app-error";
 import { ErrorCode } from "../common/errors/error-codes";
+import { MCE_TIMEOUTS } from "./http-timeout.config";
 
 const MAX_STATUS_MESSAGE_LENGTH = 500;
 
@@ -29,9 +30,18 @@ function stripQueryString(url: string | undefined): string | undefined {
  */
 @Injectable()
 export class MceHttpClient {
-  async request<T>(config: AxiosRequestConfig): Promise<T> {
+  /**
+   * Execute HTTP request with timeout support.
+   *
+   * @param config - Axios request configuration
+   * @param timeout - Request timeout in milliseconds (defaults to MCE_TIMEOUTS.DEFAULT)
+   */
+  async request<T>(
+    config: AxiosRequestConfig,
+    timeout: number = MCE_TIMEOUTS.DEFAULT,
+  ): Promise<T> {
     try {
-      const response = await axios.request<T>(config);
+      const response = await axios.request<T>({ ...config, timeout });
       return response.data;
     } catch (error) {
       throw this.translateError(error);
@@ -41,6 +51,14 @@ export class MceHttpClient {
   private translateError(error: unknown): AppError {
     if (error instanceof AppError) {
       return error;
+    }
+
+    // Handle timeout errors (ECONNABORTED from axios)
+    if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
+      return new AppError(ErrorCode.MCE_SERVER_ERROR, error, {
+        operation: stripQueryString(error.config?.url),
+        statusMessage: "Request timed out",
+      });
     }
 
     if (axios.isAxiosError(error) && error.response) {
@@ -68,6 +86,8 @@ export class MceHttpClient {
         return ErrorCode.MCE_AUTH_EXPIRED;
       case 403:
         return ErrorCode.MCE_FORBIDDEN;
+      case 429:
+        return ErrorCode.MCE_RATE_LIMITED;
       default:
         return status >= 500
           ? ErrorCode.MCE_SERVER_ERROR
