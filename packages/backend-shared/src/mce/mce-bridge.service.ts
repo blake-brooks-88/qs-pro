@@ -3,6 +3,7 @@ import axios, { AxiosRequestConfig } from "axios";
 
 import { AppError, ErrorCode } from "../common/errors";
 import { withRetry } from "./http-retry.util";
+import { MCE_TIMEOUTS } from "./http-timeout.config";
 import { MCE_AUTH_PROVIDER, MceAuthProvider } from "./mce-auth.provider";
 import { MceHttpClient } from "./mce-http-client";
 import { parseSoapXml } from "./soap-xml.util";
@@ -87,7 +88,14 @@ export class MceBridgeService {
   }
 
   /**
-   * Helper for SOAP requests with retry-on-auth-failure logic
+   * SOAP request with internal auth retry (Login Failed fault) and transient error resilience.
+   * After retry fails, throws AppError with MCE_AUTH_EXPIRED.
+   *
+   * Retry behavior:
+   * - 429/5xx errors → withRetry handles with exponential backoff
+   * - Login Failed fault → internal auth refresh logic (not part of withRetry)
+   *
+   * @param timeout - Operation-specific timeout in milliseconds (defaults to MCE_TIMEOUTS.DEFAULT)
    */
   async soapRequest<T = unknown>(
     tenantId: string,
@@ -95,6 +103,7 @@ export class MceBridgeService {
     mid: string,
     soapBody: string,
     soapAction: string,
+    timeout: number = MCE_TIMEOUTS.DEFAULT,
   ): Promise<T> {
     const baseRequest = async (forceRefresh: boolean) => {
       const { accessToken, tssd } = await this.authProvider.refreshToken(
@@ -115,6 +124,7 @@ export class MceBridgeService {
           SOAPAction: soapAction,
         },
         data: envelope,
+        timeout,
       });
 
       const parsed =
@@ -125,30 +135,32 @@ export class MceBridgeService {
       return { raw: response.data, parsed };
     };
 
-    let first: { raw: unknown; parsed: unknown };
-    try {
-      first = await baseRequest(false);
-    } catch (error) {
-      this.handleError(error);
-      throw error;
-    }
-
-    if (this.isSoapLoginFailedFault(first.raw, first.parsed)) {
-      await this.authProvider.invalidateToken(tenantId, userId, mid);
-      let second: { raw: unknown; parsed: unknown };
+    return withRetry(async () => {
+      let first: { raw: unknown; parsed: unknown };
       try {
-        second = await baseRequest(true);
+        first = await baseRequest(false);
       } catch (error) {
         this.handleError(error);
         throw error;
       }
-      if (this.isSoapLoginFailedFault(second.raw, second.parsed)) {
-        throw new AppError(ErrorCode.MCE_AUTH_EXPIRED);
-      }
-      return second.parsed as T;
-    }
 
-    return first.parsed as T;
+      if (this.isSoapLoginFailedFault(first.raw, first.parsed)) {
+        await this.authProvider.invalidateToken(tenantId, userId, mid);
+        let second: { raw: unknown; parsed: unknown };
+        try {
+          second = await baseRequest(true);
+        } catch (error) {
+          this.handleError(error);
+          throw error;
+        }
+        if (this.isSoapLoginFailedFault(second.raw, second.parsed)) {
+          throw new AppError(ErrorCode.MCE_AUTH_EXPIRED);
+        }
+        return second.parsed as T;
+      }
+
+      return first.parsed as T;
+    });
   }
 
   private isSoapLoginFailedFault(raw: unknown, parsed: unknown): boolean {
@@ -197,6 +209,13 @@ export class MceBridgeService {
       throw error;
     }
 
+    // Handle timeout errors (ECONNABORTED from axios)
+    if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
+      throw new AppError(ErrorCode.MCE_SERVER_ERROR, error, {
+        statusMessage: "Request timed out",
+      });
+    }
+
     if (axios.isAxiosError(error) && error.response) {
       const { status } = error.response;
       const code = this.mapStatusToErrorCode(status);
@@ -215,6 +234,8 @@ export class MceBridgeService {
         return ErrorCode.MCE_AUTH_EXPIRED; // Already retried internally
       case 403:
         return ErrorCode.MCE_FORBIDDEN;
+      case 429:
+        return ErrorCode.MCE_RATE_LIMITED;
       default:
         if (status >= 500) {
           return ErrorCode.MCE_SERVER_ERROR;
