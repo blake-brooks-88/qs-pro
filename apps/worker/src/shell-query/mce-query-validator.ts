@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { AppError, MceBridgeService } from "@qpp/backend-shared";
+import { AppError, MceBridgeService, MCE_TIMEOUTS } from "@qpp/backend-shared";
 import * as crypto from "crypto";
 
 export interface ValidationResult {
@@ -46,6 +46,7 @@ export class MceQueryValidator {
           url: "/automation/v1/queries/actions/validate/",
           data: { Text: sqlText },
         },
+        MCE_TIMEOUTS.METADATA,
       );
 
       if (response.queryValid) {

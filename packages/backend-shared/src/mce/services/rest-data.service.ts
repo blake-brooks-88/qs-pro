@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
+import { MCE_TIMEOUTS } from "../http-timeout.config";
 import { MceBridgeService } from "../mce-bridge.service";
 import {
   buildIsRunningRequest,
@@ -25,6 +26,7 @@ export class RestDataService {
       userId,
       mid,
       request,
+      MCE_TIMEOUTS.DATA_RETRIEVAL,
     );
     return response;
   }
@@ -41,6 +43,7 @@ export class RestDataService {
       userId,
       mid,
       request,
+      MCE_TIMEOUTS.STATUS_POLL,
     );
     return response;
   }
