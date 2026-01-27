@@ -58,28 +58,31 @@ export class RlsContextService {
 
     const reserved = await this.sql.reserve();
     try {
-      // Postgres does not allow bind parameters in `SET ... = ...`; use set_config instead.
-      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
-      await reserved`SELECT set_config('app.mid', ${mid}, false)`;
+      // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
+      await reserved`BEGIN`;
+      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await reserved`SELECT set_config('app.mid', ${mid}, true)`;
 
       const db = this.createDatabaseFromClient(
         this.makeDrizzleCompatibleSql(reserved),
       );
 
-      return await runWithDbContext(db, fn, reserved);
+      const result = await runWithDbContext(db, fn, reserved);
+
+      await reserved`COMMIT`;
+      return result;
     } catch (error) {
+      try {
+        await reserved`ROLLBACK`;
+      } catch {
+        // Best-effort rollback
+      }
       this.logger.error(
         "Failed to run with tenant context",
         error instanceof Error ? error.stack : String(error),
       );
       throw error;
     } finally {
-      try {
-        await reserved`RESET app.tenant_id`;
-        await reserved`RESET app.mid`;
-      } catch {
-        // Best-effort cleanup; connection is released regardless.
-      }
       reserved.release();
     }
   }
@@ -94,44 +97,40 @@ export class RlsContextService {
     const existingReservedSql = getReservedSqlFromContext();
 
     if (existing && existingReservedSql) {
-      // Reuse the existing reserved connection to ensure set_config applies to queries.
-      await existingReservedSql`SELECT set_config('app.user_id', ${userId}, false)`;
-      try {
-        return await fn();
-      } finally {
-        try {
-          await existingReservedSql`RESET app.user_id`;
-        } catch {
-          // Best-effort cleanup
-        }
-      }
+      // Reuse the existing reserved connection within the same transaction.
+      // set_config with true (local) applies to current transaction only.
+      await existingReservedSql`SELECT set_config('app.user_id', ${userId}, true)`;
+      return fn();
     }
 
     const reserved = await this.sql.reserve();
     try {
-      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
-      await reserved`SELECT set_config('app.mid', ${mid}, false)`;
-      await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
+      // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
+      await reserved`BEGIN`;
+      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await reserved`SELECT set_config('app.mid', ${mid}, true)`;
+      await reserved`SELECT set_config('app.user_id', ${userId}, true)`;
 
       const db = this.createDatabaseFromClient(
         this.makeDrizzleCompatibleSql(reserved),
       );
 
-      return await runWithDbContext(db, fn, reserved);
+      const result = await runWithDbContext(db, fn, reserved);
+
+      await reserved`COMMIT`;
+      return result;
     } catch (error) {
+      try {
+        await reserved`ROLLBACK`;
+      } catch {
+        // Best-effort rollback
+      }
       this.logger.error(
         "Failed to run with user context",
         error instanceof Error ? error.stack : String(error),
       );
       throw error;
     } finally {
-      try {
-        await reserved`RESET app.tenant_id`;
-        await reserved`RESET app.mid`;
-        await reserved`RESET app.user_id`;
-      } catch {
-        // Best-effort cleanup
-      }
       reserved.release();
     }
   }
