@@ -1,16 +1,10 @@
-import { Controller, Get, Inject } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { Controller, Get } from '@nestjs/common';
 
 import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(
-    private readonly appService: AppService,
-    @Inject('DATABASE')
-    private readonly db: PostgresJsDatabase<Record<string, never>>,
-  ) {}
+  constructor(private readonly appService: AppService) {}
 
   @Get()
   getHello(): string {
@@ -19,20 +13,6 @@ export class AppController {
 
   @Get('/health')
   async getHealth() {
-    const result: { status: string; timestamp: string; db: string } = {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      db: 'unknown',
-    };
-
-    try {
-      await this.db.execute(sql`SELECT 1`);
-      result.db = 'up';
-    } catch {
-      result.db = 'down';
-      result.status = 'degraded';
-    }
-
-    return result;
+    return this.appService.checkDatabaseHealth();
   }
 }
