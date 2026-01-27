@@ -493,6 +493,7 @@ describe('RunToTempFlow (integration)', () => {
       expect(result.taskId).toBe(expectedTaskId);
       expect(result.queryDefinitionId).toBe(expectedQdObjectId);
       expect(result.queryCustomerKey).toContain('QPP_Query_');
+      expect(result.queryCustomerKey).toContain(TEST_USER_ID.substring(0, 26)); // userId-based key
       expect(result.targetDeName).toContain('QPP_');
 
       // Verify MCE calls sequence
@@ -904,6 +905,163 @@ describe('RunToTempFlow (integration)', () => {
       expect(deleteIndex).toBeGreaterThan(-1);
       expect(createIndex).toBeGreaterThan(-1);
       expect(deleteIndex).toBeLessThan(createIndex);
+    });
+  });
+
+  describe('Query Activity reuse', () => {
+    it('should reuse Query Activity for same user across runs (userId-based key)', async () => {
+      const runId1 = crypto.randomUUID();
+      const runId2 = crypto.randomUUID();
+
+      // Track QD customerKeys used in create requests
+      const qdCustomerKeys: string[] = [];
+
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/actions/validate/`,
+          async () => {
+            return HttpResponse.json({ queryValid: true });
+          },
+        ),
+
+        http.post(`https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`, async ({ request }) => {
+          const body = await request.text();
+          const requestType = detectSoapRequestType(body);
+
+          // Extract customerKey from QD create request
+          if (requestType === 'QueryDefinition-Create') {
+            const keyMatch = body.match(/<CustomerKey>([^<]+)<\/CustomerKey>/);
+            if (keyMatch) {
+              qdCustomerKeys.push(keyMatch[1]);
+            }
+          }
+
+          switch (requestType) {
+            case 'DataFolder-Retrieve':
+              if (body.includes('QueryPlusPlus Results')) {
+                return HttpResponse.xml(buildRetrieveDataFolderResponse([{ id: 12345, name: 'QueryPlusPlus Results' }]));
+              }
+              return HttpResponse.xml(buildEmptyRetrieveResponse());
+
+            case 'DataExtension-Create':
+              return HttpResponse.xml(buildCreateDataExtensionResponse(`de-${Date.now()}`));
+
+            case 'DataExtension-Delete':
+              return HttpResponse.xml(buildDeleteResponse());
+
+            case 'QueryDefinition-Retrieve':
+              return HttpResponse.xml(buildEmptyRetrieveResponse());
+
+            case 'QueryDefinition-Create':
+              return HttpResponse.xml(buildCreateQueryDefinitionResponse(`qd-${Date.now()}`));
+
+            case 'QueryDefinition-Delete':
+              return HttpResponse.xml(buildDeleteResponse());
+
+            case 'QueryDefinition-Perform':
+              return HttpResponse.xml(buildPerformQueryDefinitionResponse(`task-${Date.now()}`));
+
+            default:
+              return HttpResponse.xml(buildEmptyRetrieveResponse());
+          }
+        }),
+      );
+
+      // Execute first run
+      const job1 = createTestJob({ runId: runId1, sqlText: 'SELECT Name FROM TestDE' });
+      const result1 = await runToTempFlow.execute(job1);
+
+      // Execute second run with SAME user but DIFFERENT runId
+      const job2 = createTestJob({ runId: runId2, sqlText: 'SELECT Email FROM TestDE' });
+      const result2 = await runToTempFlow.execute(job2);
+
+      // Both runs should use the SAME Query Activity customerKey (based on userId)
+      expect(qdCustomerKeys.length).toBe(2);
+      expect(qdCustomerKeys[0]).toBe(qdCustomerKeys[1]);
+      expect(qdCustomerKeys[0]).toContain('QPP_Query_');
+      expect(qdCustomerKeys[0]).toContain(TEST_USER_ID.substring(0, 26));
+
+      // Both results should have the same queryCustomerKey
+      expect(result1.queryCustomerKey).toBe(result2.queryCustomerKey);
+
+      // But temp DE names should be DIFFERENT (runId-based, no collision)
+      expect(result1.targetDeName).not.toBe(result2.targetDeName);
+      expect(result1.targetDeName).toContain(runId1.substring(0, 8));
+      expect(result2.targetDeName).toContain(runId2.substring(0, 8));
+    });
+
+    it('should use different Query Activity keys for different users', async () => {
+      const user1Id = crypto.randomUUID();
+      const user2Id = crypto.randomUUID();
+
+      // Track QD customerKeys used in create requests
+      const qdCustomerKeys: string[] = [];
+
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/actions/validate/`,
+          async () => {
+            return HttpResponse.json({ queryValid: true });
+          },
+        ),
+
+        http.post(`https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`, async ({ request }) => {
+          const body = await request.text();
+          const requestType = detectSoapRequestType(body);
+
+          // Extract customerKey from QD create request
+          if (requestType === 'QueryDefinition-Create') {
+            const keyMatch = body.match(/<CustomerKey>([^<]+)<\/CustomerKey>/);
+            if (keyMatch) {
+              qdCustomerKeys.push(keyMatch[1]);
+            }
+          }
+
+          switch (requestType) {
+            case 'DataFolder-Retrieve':
+              if (body.includes('QueryPlusPlus Results')) {
+                return HttpResponse.xml(buildRetrieveDataFolderResponse([{ id: 12345, name: 'QueryPlusPlus Results' }]));
+              }
+              return HttpResponse.xml(buildEmptyRetrieveResponse());
+
+            case 'DataExtension-Create':
+              return HttpResponse.xml(buildCreateDataExtensionResponse(`de-${Date.now()}`));
+
+            case 'DataExtension-Delete':
+              return HttpResponse.xml(buildDeleteResponse());
+
+            case 'QueryDefinition-Retrieve':
+              return HttpResponse.xml(buildEmptyRetrieveResponse());
+
+            case 'QueryDefinition-Create':
+              return HttpResponse.xml(buildCreateQueryDefinitionResponse(`qd-${Date.now()}`));
+
+            case 'QueryDefinition-Delete':
+              return HttpResponse.xml(buildDeleteResponse());
+
+            case 'QueryDefinition-Perform':
+              return HttpResponse.xml(buildPerformQueryDefinitionResponse(`task-${Date.now()}`));
+
+            default:
+              return HttpResponse.xml(buildEmptyRetrieveResponse());
+          }
+        }),
+      );
+
+      // Execute run for user 1
+      const job1 = createTestJob({ userId: user1Id, sqlText: 'SELECT Name FROM TestDE' });
+      const result1 = await runToTempFlow.execute(job1);
+
+      // Execute run for user 2
+      const job2 = createTestJob({ userId: user2Id, sqlText: 'SELECT Name FROM TestDE' });
+      const result2 = await runToTempFlow.execute(job2);
+
+      // Different users should have DIFFERENT Query Activity customerKeys
+      expect(qdCustomerKeys.length).toBe(2);
+      expect(qdCustomerKeys[0]).not.toBe(qdCustomerKeys[1]);
+      expect(result1.queryCustomerKey).not.toBe(result2.queryCustomerKey);
+      expect(result1.queryCustomerKey).toContain(user1Id.substring(0, 26));
+      expect(result2.queryCustomerKey).toContain(user2Id.substring(0, 26));
     });
   });
 });
