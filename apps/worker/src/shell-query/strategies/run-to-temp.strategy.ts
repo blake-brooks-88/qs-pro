@@ -114,7 +114,7 @@ export class RunToTempFlow implements IFlowStrategy {
       inferredSchema,
     );
 
-    const queryCustomerKey = buildQueryCustomerKey(runId);
+    const queryCustomerKey = buildQueryCustomerKey(userId);
     const queryIds = await this.createQueryDefinition(
       job,
       queryCustomerKey,
