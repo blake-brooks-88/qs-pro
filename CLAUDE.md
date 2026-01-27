@@ -154,9 +154,9 @@ pnpm db:migrate                    # Run migrations
 pnpm test                          # Run all tests
 pnpm -r test                       # Workspace-wide test
 pnpm --filter api test             # API tests only
-pnpm --filter @qpp/web test     # Web tests only
+pnpm --filter @qpp/web test        # Web tests only
+pnpm --filter worker test          # Worker tests only
 pnpm --filter api test:e2e         # API e2e tests
-# Note: apps/worker currently has no tests
 
 # Linting and type checking
 pnpm lint                          # Lint all packages
