@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import axios, { AxiosRequestConfig } from "axios";
 
 import { AppError, ErrorCode } from "../common/errors";
+import { withRetry } from "./http-retry.util";
 import { MCE_AUTH_PROVIDER, MceAuthProvider } from "./mce-auth.provider";
 import { MceHttpClient } from "./mce-http-client";
 import { parseSoapXml } from "./soap-xml.util";
@@ -29,14 +30,21 @@ export class MceBridgeService {
   }
 
   /**
-   * REST request with internal 401 retry (token refresh).
+   * REST request with internal 401 retry (token refresh) and transient error resilience.
    * After retry fails, throws AppError with MCE_AUTH_EXPIRED.
+   *
+   * Retry behavior:
+   * - 429/5xx errors → withRetry handles with exponential backoff
+   * - 401 errors → internal auth refresh logic (not part of withRetry)
+   *
+   * @param timeout - Operation-specific timeout in milliseconds (defaults to MCE_TIMEOUTS.DEFAULT)
    */
   async request<T = unknown>(
     tenantId: string,
     userId: string,
     mid: string,
     config: AxiosRequestConfig,
+    timeout?: number,
   ): Promise<T> {
     const makeRequest = async (forceRefresh: boolean): Promise<T> => {
       const { accessToken, tssd } = await this.authProvider.refreshToken(
@@ -47,30 +55,35 @@ export class MceBridgeService {
       );
       const baseUrl = `https://${tssd}.rest.marketingcloudapis.com`;
 
-      return this.httpClient.request<T>({
-        ...config,
-        baseURL: config.baseURL ?? baseUrl,
-        headers: {
-          ...config.headers,
-          Authorization: `Bearer ${accessToken}`,
+      return this.httpClient.request<T>(
+        {
+          ...config,
+          baseURL: config.baseURL ?? baseUrl,
+          headers: {
+            ...config.headers,
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
-      });
+        timeout,
+      );
     };
 
-    try {
-      return await makeRequest(false);
-    } catch (error) {
-      // MceHttpClient already translates errors to AppError
-      // Check for auth expiry and retry once
-      if (
-        error instanceof AppError &&
-        error.code === ErrorCode.MCE_AUTH_EXPIRED
-      ) {
-        await this.authProvider.invalidateToken(tenantId, userId, mid);
-        return await makeRequest(true);
+    return withRetry(async () => {
+      try {
+        return await makeRequest(false);
+      } catch (error) {
+        // MceHttpClient already translates errors to AppError
+        // Check for auth expiry and retry once (not part of transient retry)
+        if (
+          error instanceof AppError &&
+          error.code === ErrorCode.MCE_AUTH_EXPIRED
+        ) {
+          await this.authProvider.invalidateToken(tenantId, userId, mid);
+          return await makeRequest(true);
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   /**
