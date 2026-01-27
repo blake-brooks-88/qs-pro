@@ -2,6 +2,7 @@ import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Inject, Injectable } from "@nestjs/common";
 import * as cacheManager from "cache-manager";
 
+import { MCE_TIMEOUTS } from "./http-timeout.config";
 import { MceBridgeService } from "./mce-bridge.service";
 import {
   buildContinueRequest,
@@ -90,6 +91,7 @@ export class MetadataService {
         mid,
         soapBody,
         "Retrieve",
+        MCE_TIMEOUTS.METADATA,
       )) as MceSoapResponse;
 
       const retrieveResponse = response?.Body?.RetrieveResponseMsg;
@@ -188,6 +190,7 @@ export class MetadataService {
         mid,
         soapBody,
         "Retrieve",
+        MCE_TIMEOUTS.METADATA,
       )) as MceSoapResponse;
 
       const retrieveResponse = response?.Body?.RetrieveResponseMsg;
@@ -227,6 +230,7 @@ export class MetadataService {
       mid,
       soapBody,
       "Retrieve",
+      MCE_TIMEOUTS.METADATA,
     )) as MceSoapResponse;
     const results = response?.Body?.RetrieveResponseMsg?.Results ?? [];
     const fields = Array.isArray(results) ? results : [results];

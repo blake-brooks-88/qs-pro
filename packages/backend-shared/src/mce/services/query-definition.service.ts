@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { AppError, ErrorCode } from "../../common/errors";
+import { MCE_TIMEOUTS } from "../http-timeout.config";
 import { MceBridgeService } from "../mce-bridge.service";
 import { mceSoapFailure } from "../mce-errors";
 import {
@@ -54,6 +55,7 @@ export class QueryDefinitionService {
       mid,
       soapBody,
       "Retrieve",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const msg = response.Body?.RetrieveResponseMsg;
@@ -172,6 +174,7 @@ export class QueryDefinitionService {
         mid,
         initialSoapBody,
         "Retrieve",
+        MCE_TIMEOUTS.METADATA,
       );
     currentRequestId = processResponse(firstResponse);
     page++;
@@ -191,6 +194,7 @@ export class QueryDefinitionService {
         mid,
         continueBody,
         "Retrieve",
+        MCE_TIMEOUTS.METADATA,
       );
       currentRequestId = processResponse(response);
       page++;
@@ -213,6 +217,7 @@ export class QueryDefinitionService {
       mid,
       soapBody,
       "Create",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const result = response.Body?.CreateResponse?.Results;
@@ -250,6 +255,7 @@ export class QueryDefinitionService {
       mid,
       soapBody,
       "Perform",
+      MCE_TIMEOUTS.QUEUE_JOB,
     );
 
     const result = response.Body?.PerformResponseMsg?.Results?.Result;
@@ -289,6 +295,7 @@ export class QueryDefinitionService {
       mid,
       soapBody,
       "Delete",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const result = response.Body?.DeleteResponse?.Results;

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
+import { MCE_TIMEOUTS } from "../http-timeout.config";
 import { MceBridgeService } from "../mce-bridge.service";
 import { buildRetrieveAsyncActivityStatus } from "../soap/request-bodies";
 import { SoapAsyncStatusResponse } from "../soap/types";
@@ -28,6 +29,7 @@ export class AsyncStatusService {
       mid,
       soapBody,
       "Retrieve",
+      MCE_TIMEOUTS.STATUS_POLL,
     );
 
     const result = response.Body?.RetrieveResponseMsg?.Results;

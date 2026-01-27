@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { AppError, ErrorCode } from "../../common/errors";
+import { MCE_TIMEOUTS } from "../http-timeout.config";
 import { MceBridgeService } from "../mce-bridge.service";
 import { mceSoapFailure } from "../mce-errors";
 import {
@@ -72,6 +73,7 @@ export class DataExtensionService {
         mid,
         soapBody,
         "Retrieve",
+        MCE_TIMEOUTS.METADATA,
       );
 
       const msg = response.Body?.RetrieveResponseMsg;
@@ -121,6 +123,7 @@ export class DataExtensionService {
       mid,
       soapBody,
       "Retrieve",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const msg = response.Body?.RetrieveResponseMsg;
@@ -177,6 +180,7 @@ export class DataExtensionService {
       mid,
       soapBody,
       "Retrieve",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const msg = response.Body?.RetrieveResponseMsg;
@@ -217,6 +221,7 @@ export class DataExtensionService {
       mid,
       soapBody,
       "Create",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const result = response.Body?.CreateResponse?.Results;
@@ -254,6 +259,7 @@ export class DataExtensionService {
       mid,
       soapBody,
       "Delete",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const result = response.Body?.DeleteResponse?.Results;

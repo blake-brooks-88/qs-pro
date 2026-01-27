@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { AppError, ErrorCode } from "../../common/errors";
+import { MCE_TIMEOUTS } from "../http-timeout.config";
 import { MceBridgeService } from "../mce-bridge.service";
 import { mceSoapFailure } from "../mce-errors";
 import {
@@ -55,6 +56,7 @@ export class DataFolderService {
         mid,
         soapBody,
         "Retrieve",
+        MCE_TIMEOUTS.METADATA,
       );
 
       const msg = response.Body?.RetrieveResponseMsg;
@@ -110,6 +112,7 @@ export class DataFolderService {
       mid,
       soapBody,
       "Create",
+      MCE_TIMEOUTS.METADATA,
     );
 
     const result = response.Body?.CreateResponse?.Results;
