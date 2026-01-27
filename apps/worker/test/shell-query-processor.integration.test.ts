@@ -339,7 +339,7 @@ const server = setupServer(
 
   // REST: Check isRunning
   http.get(
-    `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/:id/status`,
+    `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/:id/actions/isrunning/`,
     () => {
       mceRequests.push({ type: 'REST', action: 'isRunning' });
       return HttpResponse.json({ isRunning: false });
@@ -1021,7 +1021,7 @@ describe('ShellQueryProcessor (integration)', () => {
       // Force REST 400 so the worker falls back to SOAP retrieval by customerKey.
       server.use(
         http.get(
-          `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/:id/status`,
+          `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/:id/actions/isrunning/`,
           () => {
             mceRequests.push({ type: 'REST', action: 'isRunning' });
             return HttpResponse.json({ message: 'Bad Request' }, { status: 400 });

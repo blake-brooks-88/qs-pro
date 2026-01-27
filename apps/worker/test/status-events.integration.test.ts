@@ -293,6 +293,12 @@ const server = setupServer(
     },
   ),
 
+  // REST: Query validation
+  http.post(
+    `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/actions/validate/`,
+    () => HttpResponse.json({ queryValid: true }),
+  ),
+
   // REST: Get rowset (results)
   http.get(
     `https://${TEST_TSSD}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset`,
@@ -317,7 +323,7 @@ const server = setupServer(
 
   // REST: isRunning check
   http.get(
-    `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/:id/status`,
+    `https://${TEST_TSSD}.rest.marketingcloudapis.com/automation/v1/queries/:id/actions/isrunning/`,
     () => HttpResponse.json({ isRunning: false }),
   ),
 );
