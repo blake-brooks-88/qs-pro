@@ -2,6 +2,7 @@ import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppError, ErrorCode } from "../common/errors";
+import { MCE_TIMEOUTS } from "./http-timeout.config";
 import { MceHttpClient } from "./mce-http-client";
 
 vi.mock("axios");
@@ -96,6 +97,91 @@ describe("MceHttpClient", () => {
       await expect(client.request({ url: "/test" })).rejects.toMatchObject({
         code: ErrorCode.MCE_SERVER_ERROR,
       });
+    });
+  });
+
+  describe("timeout behavior", () => {
+    it("applies DEFAULT timeout when none specified", async () => {
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({ url: "/test" });
+
+      expect(axios.request).toHaveBeenCalledWith(
+        expect.objectContaining({ timeout: MCE_TIMEOUTS.DEFAULT }),
+      );
+    });
+
+    it("uses custom timeout when provided", async () => {
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+      const customTimeout = 60_000;
+
+      await client.request({ url: "/test" }, customTimeout);
+
+      expect(axios.request).toHaveBeenCalledWith(
+        expect.objectContaining({ timeout: customTimeout }),
+      );
+    });
+
+    it("translates ECONNABORTED to MCE_SERVER_ERROR with timeout message", async () => {
+      const timeoutError = {
+        isAxiosError: true,
+        code: "ECONNABORTED",
+        config: { url: "/data/v1/async/status" },
+      };
+      vi.mocked(axios.request).mockRejectedValue(timeoutError);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      const error = (await client
+        .request({ url: "/data/v1/async/status" })
+        .catch((e) => e)) as AppError;
+
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.code).toBe(ErrorCode.MCE_SERVER_ERROR);
+      expect(error.context?.statusMessage).toBe("Request timed out");
+    });
+
+    it("includes operation URL in timeout error context", async () => {
+      const testUrl = "/data/v1/async/query/12345/status";
+      const timeoutError = {
+        isAxiosError: true,
+        code: "ECONNABORTED",
+        config: { url: testUrl },
+      };
+      vi.mocked(axios.request).mockRejectedValue(timeoutError);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      const error = (await client
+        .request({ url: testUrl })
+        .catch((e) => e)) as AppError;
+
+      expect(error.context?.operation).toBe(testUrl);
+    });
+
+    it("strips query string from URL in timeout error context", async () => {
+      const urlWithQuery = "/data/v1/async/query?token=secret&page=1";
+      const timeoutError = {
+        isAxiosError: true,
+        code: "ECONNABORTED",
+        config: { url: urlWithQuery },
+      };
+      vi.mocked(axios.request).mockRejectedValue(timeoutError);
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      const error = (await client
+        .request({ url: urlWithQuery })
+        .catch((e) => e)) as AppError;
+
+      expect(error.context?.operation).toBe("/data/v1/async/query");
+    });
+
+    it("uses MCE_TIMEOUTS.DATA_RETRIEVAL for large data operations", async () => {
+      vi.mocked(axios.request).mockResolvedValue({ data: { rows: [] } });
+
+      await client.request({ url: "/rowset" }, MCE_TIMEOUTS.DATA_RETRIEVAL);
+
+      expect(axios.request).toHaveBeenCalledWith(
+        expect.objectContaining({ timeout: 120_000 }),
+      );
     });
   });
 });
