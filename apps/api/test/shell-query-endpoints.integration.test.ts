@@ -248,6 +248,19 @@ describe('Shell query endpoints (integration)', () => {
     expect(res.json().status).toBe(400);
   });
 
+  it('returns 400 for sqlText exceeding max length', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/runs',
+      headers: { cookie, 'x-csrf-token': csrfToken },
+      payload: { sqlText: 'x'.repeat(100_001) },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().type).toBe('urn:qpp:error:http-400');
+    expect(res.json().status).toBe(400);
+  });
+
   it('returns RESOURCE_NOT_FOUND for unknown run results', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -301,5 +314,31 @@ describe('Shell query endpoints (integration)', () => {
     expect(res.statusCode).toBe(429);
     expect(res.json().type).toBe('urn:qpp:error:rate-limit-exceeded');
     expect(res.json().code).toBe(ErrorCode.RATE_LIMIT_EXCEEDED);
+  });
+
+  it('returns MCE_SERVER_ERROR when MCE API returns 5xx during results fetch', async () => {
+    const runId = await insertRun('ready');
+
+    server.use(
+      http.get(
+        `https://${TEST_TSSD}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:deName/rowset`,
+        () => {
+          return HttpResponse.json(
+            { message: 'Internal Server Error' },
+            { status: 500 },
+          );
+        },
+      ),
+    );
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/runs/${runId}/results?page=1`,
+      headers: { cookie },
+    });
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json().type).toBe('urn:qpp:error:mce-server-error');
+    expect(res.json().code).toBe(ErrorCode.MCE_SERVER_ERROR);
   });
 });
