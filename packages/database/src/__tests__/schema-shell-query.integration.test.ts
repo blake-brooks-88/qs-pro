@@ -24,11 +24,13 @@ describe("Shell Query Engine Schema", () => {
   async function withRlsContext<T>(fn: () => Promise<T>): Promise<T> {
     await client`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
     await client`SELECT set_config('app.user_id', ${userId}, false)`;
+    await client`SELECT set_config('app.mid', ${mid}, false)`;
     try {
       return await fn();
     } finally {
       await client`RESET app.tenant_id`;
       await client`RESET app.user_id`;
+      await client`RESET app.mid`;
     }
   }
 
