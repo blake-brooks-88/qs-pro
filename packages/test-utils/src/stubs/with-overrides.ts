@@ -7,4 +7,3 @@ export function withOverrides<T extends object>(
   }
   return Object.assign(base, overrides);
 }
-

@@ -4,6 +4,8 @@ import { assertSafeRuntimeDatabaseUrl } from "./db-url.guard";
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalMigrateUser = process.env.QS_DB_MIGRATE_USER;
+const originalPgUser = process.env.PGUSER;
+const originalPostgresUser = process.env.POSTGRES_USER;
 
 afterEach(() => {
   process.env.NODE_ENV = originalNodeEnv;
@@ -11,6 +13,16 @@ afterEach(() => {
     delete process.env.QS_DB_MIGRATE_USER;
   } else {
     process.env.QS_DB_MIGRATE_USER = originalMigrateUser;
+  }
+  if (originalPgUser === undefined) {
+    delete process.env.PGUSER;
+  } else {
+    process.env.PGUSER = originalPgUser;
+  }
+  if (originalPostgresUser === undefined) {
+    delete process.env.POSTGRES_USER;
+  } else {
+    process.env.POSTGRES_USER = originalPostgresUser;
   }
 });
 
@@ -57,10 +69,31 @@ describe("assertSafeRuntimeDatabaseUrl", () => {
     ).toThrow(/DATABASE_URL user 'custom_migrate'/);
   });
 
-  it("does not throw when connection string cannot be parsed", () => {
+  it("throws in production when connection string cannot be parsed", () => {
     process.env.NODE_ENV = "production";
 
-    expect(() => assertSafeRuntimeDatabaseUrl("not-a-url")).not.toThrow();
+    expect(() => assertSafeRuntimeDatabaseUrl("not-a-url")).toThrow(
+      /unparseable DATABASE_URL/i,
+    );
+  });
+
+  it("throws in production when DATABASE_URL has no username", () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.PGUSER;
+    delete process.env.POSTGRES_USER;
+
+    expect(() =>
+      assertSafeRuntimeDatabaseUrl("postgres://localhost:5432/qs_pro"),
+    ).toThrow(/explicit DATABASE_URL user/i);
+  });
+
+  it("uses PGUSER when DATABASE_URL has no username", () => {
+    process.env.NODE_ENV = "production";
+    process.env.PGUSER = "qs_runtime";
+
+    expect(() =>
+      assertSafeRuntimeDatabaseUrl("postgres://localhost:5432/qs_pro"),
+    ).not.toThrow();
   });
 
   it.each([

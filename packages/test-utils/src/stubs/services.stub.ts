@@ -3,9 +3,9 @@
  * Consolidated from: apps/api/test/stubs/index.ts + apps/worker/test/stubs/index.ts
  */
 
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
-import { withOverrides } from './with-overrides';
+import { withOverrides } from "./with-overrides";
 
 /** RLS Context stub interface */
 export interface RlsContextStub {
@@ -101,7 +101,7 @@ export function createRlsContextStub(
 export function createQueueStub(overrides?: Partial<QueueStub>): QueueStub {
   return withOverrides(
     {
-      add: vi.fn().mockResolvedValue({ id: 'job-1' }),
+      add: vi.fn().mockResolvedValue({ id: "job-1" }),
       getJob: vi.fn().mockResolvedValue(null),
       remove: vi.fn().mockResolvedValue(undefined),
     },
@@ -118,11 +118,11 @@ export function createShellQueryServiceStub(
 ): ShellQueryServiceStub {
   return withOverrides(
     {
-    createRun: vi.fn().mockResolvedValue('run-123'),
-    getRun: vi.fn(),
-    getRunStatus: vi.fn(),
-    getResults: vi.fn().mockResolvedValue({ items: [] }),
-    cancelRun: vi.fn().mockResolvedValue({ status: 'canceled' }),
+      createRun: vi.fn().mockResolvedValue("run-123"),
+      getRun: vi.fn(),
+      getRunStatus: vi.fn(),
+      getResults: vi.fn().mockResolvedValue({ items: [] }),
+      cancelRun: vi.fn().mockResolvedValue({ status: "canceled" }),
     },
     overrides,
   );
@@ -137,10 +137,10 @@ export function createShellQueryRunRepoStub(
 ): ShellQueryRunRepoStub {
   return withOverrides(
     {
-    createRun: vi.fn().mockResolvedValue(undefined),
-    findRun: vi.fn().mockResolvedValue(null),
-    markCanceled: vi.fn().mockResolvedValue(undefined),
-    countActiveRuns: vi.fn().mockResolvedValue(0),
+      createRun: vi.fn().mockResolvedValue(undefined),
+      findRun: vi.fn().mockResolvedValue(null),
+      markCanceled: vi.fn().mockResolvedValue(undefined),
+      countActiveRuns: vi.fn().mockResolvedValue(0),
     },
     overrides,
   );
@@ -156,7 +156,7 @@ export function createShellQuerySseServiceStub(
 ): ShellQuerySseServiceStub {
   return withOverrides(
     {
-    streamRunEvents: vi.fn().mockReturnValue({ subscribe: vi.fn() }),
+      streamRunEvents: vi.fn().mockReturnValue({ subscribe: vi.fn() }),
     },
     overrides,
   );
@@ -172,12 +172,12 @@ export function createEncryptionServiceStub(
 ): EncryptionServiceStub {
   return withOverrides(
     {
-    encrypt: vi.fn((value: string | null | undefined) =>
-      value ? `encrypted:${value}` : value,
-    ),
-    decrypt: vi.fn((value: string | null | undefined) =>
-      value?.startsWith('encrypted:') ? value.slice(10) : value,
-    ),
+      encrypt: vi.fn((value: string | null | undefined) =>
+        value ? `encrypted:${value}` : value,
+      ),
+      decrypt: vi.fn((value: string | null | undefined) =>
+        value?.startsWith("encrypted:") ? value.slice(10) : value,
+      ),
     },
     overrides,
   );
@@ -187,12 +187,14 @@ export function createEncryptionServiceStub(
  * Create a stub for metrics (Prometheus counters/histograms)
  * Source: apps/worker/test/stubs
  */
-export function createMetricsStub(overrides?: Partial<MetricsStub>): MetricsStub {
+export function createMetricsStub(
+  overrides?: Partial<MetricsStub>,
+): MetricsStub {
   return withOverrides(
     {
-    inc: vi.fn(),
-    dec: vi.fn(),
-    observe: vi.fn(),
+      inc: vi.fn(),
+      dec: vi.fn(),
+      observe: vi.fn(),
     },
     overrides,
   );
@@ -207,7 +209,7 @@ export function createTenantRepoStub(
 ): TenantRepoStub {
   return withOverrides(
     {
-      findById: vi.fn().mockResolvedValue({ eid: 'eid-1' }),
+      findById: vi.fn().mockResolvedValue({ eid: "eid-1" }),
     },
     overrides,
   );

@@ -7,9 +7,9 @@
  * - Worker version: get/set operations
  */
 
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
-import { withOverrides } from './with-overrides';
+import { withOverrides } from "./with-overrides";
 
 /** Redis stub interface for test assertions */
 export interface RedisStub {
@@ -33,22 +33,22 @@ export interface RedisStub {
 export function createRedisStub(overrides?: Partial<RedisStub>): RedisStub {
   return withOverrides(
     {
-    publish: vi.fn().mockResolvedValue(undefined),
-    subscribe: vi.fn().mockResolvedValue(undefined),
-    duplicate: vi.fn().mockReturnValue({
+      publish: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn().mockResolvedValue(undefined),
-      quit: vi.fn().mockResolvedValue(undefined),
+      duplicate: vi.fn().mockReturnValue({
+        subscribe: vi.fn().mockResolvedValue(undefined),
+        quit: vi.fn().mockResolvedValue(undefined),
+        on: vi.fn(),
+        off: vi.fn(),
+      }),
       on: vi.fn(),
       off: vi.fn(),
-    }),
-    on: vi.fn(),
-    off: vi.fn(),
-    quit: vi.fn().mockResolvedValue(undefined),
-    incr: vi.fn().mockResolvedValue(1),
-    decr: vi.fn().mockResolvedValue(0),
-    expire: vi.fn().mockResolvedValue(1),
-    get: vi.fn().mockResolvedValue(null),
-    set: vi.fn().mockResolvedValue('OK'),
+      quit: vi.fn().mockResolvedValue(undefined),
+      incr: vi.fn().mockResolvedValue(1),
+      decr: vi.fn().mockResolvedValue(0),
+      expire: vi.fn().mockResolvedValue(1),
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue("OK"),
     },
     overrides,
   );

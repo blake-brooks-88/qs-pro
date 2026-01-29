@@ -1,5 +1,5 @@
 # Block qs_migrate in production source code (security check)
-if grep -r 'qs_migrate' apps/*/src/**/*.ts 2>/dev/null | grep -v 'test' | grep -v '.guard.ts'; then
+if grep -R --include='*.ts' -n 'qs_migrate' apps/*/src 2>/dev/null | grep -v 'test' | grep -v '.guard.ts'; then
   echo "ERROR: qs_migrate should not appear in production source code" >&2
   exit 1
 fi

@@ -7,9 +7,9 @@
  * - API version: _whereResult pattern
  */
 
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
-import { withOverrides } from './with-overrides';
+import { withOverrides } from "./with-overrides";
 
 /** Database stub interface for test assertions */
 export interface DbStub {
