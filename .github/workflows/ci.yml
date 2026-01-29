@@ -91,13 +91,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc \
-            "SELECT CASE WHEN (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user) THEN 1 ELSE 0 END" \
-            | grep -qx '0'
+          runtime_privileged=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc \
+            "SELECT CASE WHEN (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user) THEN 1 ELSE 0 END")
+          if [ "$runtime_privileged" != "0" ]; then
+            echo "ERROR: Runtime role (DATABASE_URL) must not have SUPERUSER or BYPASSRLS" >&2
+            exit 1
+          fi
 
-          psql "$DATABASE_URL_MIGRATIONS" -v ON_ERROR_STOP=1 -tAc \
-            "SELECT CASE WHEN (SELECT rolbypassrls AND NOT rolsuper FROM pg_roles WHERE rolname = current_user) THEN 1 ELSE 0 END" \
-            | grep -qx '1'
+          migrate_correct=$(psql "$DATABASE_URL_MIGRATIONS" -v ON_ERROR_STOP=1 -tAc \
+            "SELECT CASE WHEN (SELECT rolbypassrls AND NOT rolsuper FROM pg_roles WHERE rolname = current_user) THEN 1 ELSE 0 END")
+          if [ "$migrate_correct" != "1" ]; then
+            echo "ERROR: Migrations role (DATABASE_URL_MIGRATIONS) must have BYPASSRLS but not SUPERUSER" >&2
+            exit 1
+          fi
 
       - name: Build packages
         run: pnpm -r --filter "./packages/**" build

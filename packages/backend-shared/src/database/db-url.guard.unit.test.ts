@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { assertSafeRuntimeDatabaseUrl } from "./db-url.guard";
+import {
+  assertSafeRuntimeDatabaseRole,
+  assertSafeRuntimeDatabaseUrl,
+} from "./db-url.guard";
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalMigrateUser = process.env.QS_DB_MIGRATE_USER;
@@ -114,5 +117,100 @@ describe("assertSafeRuntimeDatabaseUrl", () => {
         `postgres://${user}:pass@localhost:5432/qs_pro`,
       ),
     ).toThrow(/Superuser\/admin roles bypass row-level security/);
+  });
+});
+
+describe("assertSafeRuntimeDatabaseRole", () => {
+  type RoleFlags = { rolsuper: boolean | null; rolbypassrls: boolean | null };
+  type MembershipResult = { rolname: string };
+
+  function createMockSql(
+    roleFlags: RoleFlags[],
+    membershipResults: MembershipResult[] = [],
+  ) {
+    let callCount = 0;
+    return (() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve(roleFlags);
+      }
+      return Promise.resolve(membershipResults);
+    }) as unknown as Parameters<typeof assertSafeRuntimeDatabaseRole>[0];
+  }
+
+  it("does not throw outside production", async () => {
+    process.env.NODE_ENV = "development";
+
+    const mockSql = createMockSql([{ rolsuper: true, rolbypassrls: true }]);
+
+    await expect(
+      assertSafeRuntimeDatabaseRole(mockSql),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not throw in production when role has no privileged flags and no privileged membership", async () => {
+    process.env.NODE_ENV = "production";
+
+    const mockSql = createMockSql(
+      [{ rolsuper: false, rolbypassrls: false }],
+      [],
+    );
+
+    await expect(
+      assertSafeRuntimeDatabaseRole(mockSql),
+    ).resolves.toBeUndefined();
+  });
+
+  it("throws in production when role has SUPERUSER", async () => {
+    process.env.NODE_ENV = "production";
+
+    const mockSql = createMockSql([{ rolsuper: true, rolbypassrls: false }]);
+
+    await expect(assertSafeRuntimeDatabaseRole(mockSql)).rejects.toThrow(
+      /privileged DATABASE_URL role.*SUPERUSER or BYPASSRLS/,
+    );
+  });
+
+  it("throws in production when role has BYPASSRLS", async () => {
+    process.env.NODE_ENV = "production";
+
+    const mockSql = createMockSql([{ rolsuper: false, rolbypassrls: true }]);
+
+    await expect(assertSafeRuntimeDatabaseRole(mockSql)).rejects.toThrow(
+      /privileged DATABASE_URL role.*SUPERUSER or BYPASSRLS/,
+    );
+  });
+
+  it("throws in production when role has both SUPERUSER and BYPASSRLS", async () => {
+    process.env.NODE_ENV = "production";
+
+    const mockSql = createMockSql([{ rolsuper: true, rolbypassrls: true }]);
+
+    await expect(assertSafeRuntimeDatabaseRole(mockSql)).rejects.toThrow(
+      /privileged DATABASE_URL role.*SUPERUSER or BYPASSRLS/,
+    );
+  });
+
+  it("throws in production when role lookup returns empty result", async () => {
+    process.env.NODE_ENV = "production";
+
+    const mockSql = createMockSql([]);
+
+    await expect(assertSafeRuntimeDatabaseRole(mockSql)).rejects.toThrow(
+      /unable to verify database role privileges/,
+    );
+  });
+
+  it("throws in production when role is member of a privileged role", async () => {
+    process.env.NODE_ENV = "production";
+
+    const mockSql = createMockSql(
+      [{ rolsuper: false, rolbypassrls: false }],
+      [{ rolname: "admin_group" }],
+    );
+
+    await expect(assertSafeRuntimeDatabaseRole(mockSql)).rejects.toThrow(
+      /member of privileged role 'admin_group'/,
+    );
   });
 });
