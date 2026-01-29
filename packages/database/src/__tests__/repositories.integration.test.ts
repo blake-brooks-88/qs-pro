@@ -142,10 +142,14 @@ describe("RLS Tenant Isolation", () => {
     db = drizzle(client);
     credRepo = new DrizzleCredentialsRepository(db);
 
-    // Create two tenants
+    // Create two tenants (upsert to handle leftover data from failed runs)
     const [tenant1] = await db
       .insert(tenants)
       .values({ eid: RLS_TEST_EID_1, tssd: "rls-stack-1" })
+      .onConflictDoUpdate({
+        target: tenants.eid,
+        set: { tssd: "rls-stack-1" },
+      })
       .returning();
     if (!tenant1) {
       throw new Error("Tenant 1 insert failed");
@@ -155,13 +159,17 @@ describe("RLS Tenant Isolation", () => {
     const [tenant2] = await db
       .insert(tenants)
       .values({ eid: RLS_TEST_EID_2, tssd: "rls-stack-2" })
+      .onConflictDoUpdate({
+        target: tenants.eid,
+        set: { tssd: "rls-stack-2" },
+      })
       .returning();
     if (!tenant2) {
       throw new Error("Tenant 2 insert failed");
     }
     tenant2Id = tenant2.id;
 
-    // Create users for each tenant
+    // Create users for each tenant (upsert to handle leftover data from failed runs)
     const [user1] = await db
       .insert(users)
       .values({
@@ -169,6 +177,10 @@ describe("RLS Tenant Isolation", () => {
         tenantId: tenant1Id,
         email: "rls-user1@test.com",
         name: "RLS User 1",
+      })
+      .onConflictDoUpdate({
+        target: users.sfUserId,
+        set: { tenantId: tenant1Id, email: "rls-user1@test.com" },
       })
       .returning();
     if (!user1) {
@@ -183,6 +195,10 @@ describe("RLS Tenant Isolation", () => {
         tenantId: tenant2Id,
         email: "rls-user2@test.com",
         name: "RLS User 2",
+      })
+      .onConflictDoUpdate({
+        target: users.sfUserId,
+        set: { tenantId: tenant2Id, email: "rls-user2@test.com" },
       })
       .returning();
     if (!user2) {
@@ -214,46 +230,68 @@ describe("RLS Tenant Isolation", () => {
     });
     await resetRlsContext();
 
-    // Create feature overrides for both tenants (requires RLS context)
+    // Create feature overrides for both tenants (upsert to handle leftover data)
     await setRlsContext(tenant1Id, RLS_TEST_MID_1);
-    await db.insert(tenantFeatureOverrides).values({
-      tenantId: tenant1Id,
-      featureKey: "rls-test-feature-1",
-      enabled: true,
-    });
+    await db
+      .insert(tenantFeatureOverrides)
+      .values({
+        tenantId: tenant1Id,
+        featureKey: "rls-test-feature-1",
+        enabled: true,
+      })
+      .onConflictDoUpdate({
+        target: [
+          tenantFeatureOverrides.tenantId,
+          tenantFeatureOverrides.featureKey,
+        ],
+        set: { enabled: true },
+      });
     await resetRlsContext();
 
     await setRlsContext(tenant2Id, RLS_TEST_MID_2);
-    await db.insert(tenantFeatureOverrides).values({
-      tenantId: tenant2Id,
-      featureKey: "rls-test-feature-2",
-      enabled: false,
-    });
+    await db
+      .insert(tenantFeatureOverrides)
+      .values({
+        tenantId: tenant2Id,
+        featureKey: "rls-test-feature-2",
+        enabled: false,
+      })
+      .onConflictDoUpdate({
+        target: [
+          tenantFeatureOverrides.tenantId,
+          tenantFeatureOverrides.featureKey,
+        ],
+        set: { enabled: false },
+      });
     await resetRlsContext();
   });
 
   afterAll(async () => {
     // Cleanup in FK order: credentials → feature_overrides → users → tenants
-    // Need RLS context to delete credentials
-    await setRlsContext(tenant1Id, RLS_TEST_MID_1);
-    await db.delete(credentials).where(eq(credentials.userId, user1Id));
-    await db
-      .delete(tenantFeatureOverrides)
-      .where(eq(tenantFeatureOverrides.tenantId, tenant1Id));
-    await resetRlsContext();
+    // Delete by tenantId to catch all data including leftovers from failed runs
+    if (tenant1Id) {
+      await setRlsContext(tenant1Id, RLS_TEST_MID_1);
+      await db.delete(credentials).where(eq(credentials.tenantId, tenant1Id));
+      await db
+        .delete(tenantFeatureOverrides)
+        .where(eq(tenantFeatureOverrides.tenantId, tenant1Id));
+      await resetRlsContext();
 
-    await setRlsContext(tenant2Id, RLS_TEST_MID_2);
-    await db.delete(credentials).where(eq(credentials.userId, user2Id));
-    await db
-      .delete(tenantFeatureOverrides)
-      .where(eq(tenantFeatureOverrides.tenantId, tenant2Id));
-    await resetRlsContext();
+      await db.delete(users).where(eq(users.tenantId, tenant1Id));
+      await db.delete(tenants).where(eq(tenants.id, tenant1Id));
+    }
 
-    // Users and tenants don't have RLS
-    await db.delete(users).where(eq(users.tenantId, tenant1Id));
-    await db.delete(users).where(eq(users.tenantId, tenant2Id));
-    await db.delete(tenants).where(eq(tenants.id, tenant1Id));
-    await db.delete(tenants).where(eq(tenants.id, tenant2Id));
+    if (tenant2Id) {
+      await setRlsContext(tenant2Id, RLS_TEST_MID_2);
+      await db.delete(credentials).where(eq(credentials.tenantId, tenant2Id));
+      await db
+        .delete(tenantFeatureOverrides)
+        .where(eq(tenantFeatureOverrides.tenantId, tenant2Id));
+      await resetRlsContext();
+
+      await db.delete(users).where(eq(users.tenantId, tenant2Id));
+      await db.delete(tenants).where(eq(tenants.id, tenant2Id));
+    }
 
     await client.end();
   });
