@@ -78,6 +78,13 @@
       "when": 1769730354495,
       "tag": "0010_broken_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1769730398993,
+      "tag": "0011_rls_folders_saved_queries",
+      "breakpoints": true
     }
   ]
 }
