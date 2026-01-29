@@ -154,7 +154,10 @@ export class ShellQueryService {
     };
 
     if (run.status === 'failed' && run.errorMessage) {
-      const decryptedError = this.encryptionService.decrypt(run.errorMessage);
+      const decryptedError = this.tryDecrypt(run.errorMessage, {
+        operation: 'getRunStatus',
+        runId: run.id,
+      });
       if (decryptedError) {
         response.errorMessage = decryptedError;
       }
@@ -184,7 +187,10 @@ export class ShellQueryService {
           operation: 'getResults',
           status: run.status,
           statusMessage: run.errorMessage
-            ? (this.encryptionService.decrypt(run.errorMessage) ?? undefined)
+            ? this.tryDecrypt(run.errorMessage, {
+                operation: 'getResults',
+                runId: run.id,
+              })
             : undefined,
         });
       }
@@ -288,5 +294,20 @@ export class ShellQueryService {
     await this.runRepo.markCanceled(runId, tenantId, mid, userId);
 
     return { status: 'canceled', runId };
+  }
+
+  private tryDecrypt(
+    value: string,
+    context: { operation: string; runId: string },
+  ): string | undefined {
+    try {
+      return this.encryptionService.decrypt(value) ?? undefined;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      this.logger.warn(
+        `Failed to decrypt shell query field (operation=${context.operation}, runId=${context.runId}): ${message}`,
+      );
+      return undefined;
+    }
   }
 }

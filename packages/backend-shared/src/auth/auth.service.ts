@@ -599,10 +599,10 @@ export class AuthService {
     mid: string,
     forceRefresh: boolean,
   ): Promise<RefreshTokenResult> {
-    const creds = await this.credRepo.findByUserTenantMid(
-      userId,
+    const creds = await this.rlsContext.runWithTenantContext(
       tenantId,
       mid,
+      () => this.credRepo.findByUserTenantMid(userId, tenantId, mid),
     );
     if (!creds) {
       this.logger.warn({
