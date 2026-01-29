@@ -37,6 +37,8 @@ jobs:
 
     env:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/qs_pro_test
+      # DATABASE_URL_MIGRATIONS is for migrations + test cleanup only (qs_migrate has BYPASSRLS).
+      # Application runtime uses DATABASE_URL (qs_runtime) and must NOT use qs_migrate.
       DATABASE_URL_MIGRATIONS: postgresql://qs_migrate:migrate_pass@localhost:5432/qs_pro_test
       DATABASE_URL: postgresql://qs_runtime:runtime_pass@localhost:5432/qs_pro_test
       REDIS_URL: redis://localhost:6379
@@ -56,6 +58,8 @@ jobs:
       - name: Create database roles
         run: |
           psql "$POSTGRES_URL" <<'SQL'
+          -- qs_migrate has BYPASSRLS so it is intended ONLY for migrations + test cleanup.
+          -- Application runtime must use a non-BYPASSRLS role (qs_runtime).
           CREATE ROLE qs_migrate LOGIN PASSWORD 'migrate_pass' BYPASSRLS;
           CREATE ROLE qs_runtime LOGIN PASSWORD 'runtime_pass';
 
@@ -71,6 +75,13 @@ jobs:
           ALTER DEFAULT PRIVILEGES FOR ROLE qs_migrate IN SCHEMA public
             GRANT USAGE, SELECT ON SEQUENCES TO qs_runtime;
           SQL
+
+      - name: Validate DATABASE_URL uses runtime role
+        run: |
+          if echo "$DATABASE_URL" | grep -q 'qs_migrate'; then
+            echo "ERROR: DATABASE_URL must not use qs_migrate" >&2
+            exit 1
+          fi
 
       - name: Build packages
         run: pnpm -r --filter "./packages/**" build
