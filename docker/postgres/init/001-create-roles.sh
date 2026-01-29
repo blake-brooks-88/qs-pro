@@ -18,6 +18,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQ
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${QS_DB_MIGRATE_USER}') THEN
+    -- IMPORTANT: The migrations role bypasses RLS and is intended ONLY for schema migrations
+    -- and test/CI cleanup. Never use this role for application runtime credentials.
     CREATE ROLE ${QS_DB_MIGRATE_USER} LOGIN PASSWORD '${QS_DB_MIGRATE_PASSWORD}' BYPASSRLS;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${QS_DB_RUNTIME_USER}') THEN
