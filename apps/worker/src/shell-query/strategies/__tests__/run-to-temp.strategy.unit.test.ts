@@ -99,7 +99,10 @@ describe("RunToTempFlow", () => {
         { provide: "DATABASE", useValue: dbStub },
         { provide: DataExtensionService, useValue: dataExtensionServiceStub },
         { provide: DataFolderService, useValue: dataFolderServiceStub },
-        { provide: QueryDefinitionService, useValue: queryDefinitionServiceStub },
+        {
+          provide: QueryDefinitionService,
+          useValue: queryDefinitionServiceStub,
+        },
       ],
     }).compile();
 
@@ -263,16 +266,13 @@ describe("RunToTempFlow", () => {
       });
 
       // Mock delete to succeed (existing DE found)
-      dataExtensionServiceStub.delete =
-        vi.fn().mockResolvedValue(undefined);
+      dataExtensionServiceStub.delete = vi.fn().mockResolvedValue(undefined);
 
       // Act
       await flow.execute(job);
 
       // Assert
-      expect(
-        dataExtensionServiceStub.delete,
-      ).toHaveBeenCalled();
+      expect(dataExtensionServiceStub.delete).toHaveBeenCalled();
       expect(dataExtensionServiceStub.create).toHaveBeenCalled();
     });
 
@@ -284,8 +284,9 @@ describe("RunToTempFlow", () => {
       });
 
       // Mock delete to fail (DE doesn't exist or other error)
-      dataExtensionServiceStub.delete =
-        vi.fn().mockRejectedValue(new Error("DE not found"));
+      dataExtensionServiceStub.delete = vi
+        .fn()
+        .mockRejectedValue(new Error("DE not found"));
 
       // Act
       const result = await flow.execute(job);
@@ -477,8 +478,9 @@ describe("RunToTempFlow", () => {
       });
 
       // Mock deletion to fail
-      dataExtensionServiceStub.delete =
-        vi.fn().mockRejectedValue(new Error("Cleanup failed"));
+      dataExtensionServiceStub.delete = vi
+        .fn()
+        .mockRejectedValue(new Error("Cleanup failed"));
 
       // Act - should not throw
       const result = await flow.execute(job);

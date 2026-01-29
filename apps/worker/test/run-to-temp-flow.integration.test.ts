@@ -29,7 +29,7 @@ import {
   RlsContextService,
   validateWorkerEnv,
 } from '@qpp/backend-shared';
-import { resetFactories } from '@qpp/test-utils';
+import { externalOnlyOnUnhandledRequest, resetFactories } from '@qpp/test-utils';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { Sql } from 'postgres';
@@ -276,7 +276,7 @@ describe('RunToTempFlow (integration)', () => {
   let rlsContext: RlsContextService;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     module = await Test.createTestingModule({
       imports: [

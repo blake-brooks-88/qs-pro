@@ -34,6 +34,7 @@ import {
   MceModule,
   validateWorkerEnv,
 } from "@qpp/backend-shared";
+import { externalOnlyOnUnhandledRequest } from "@qpp/test-utils";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import type { Sql } from "postgres";
@@ -55,6 +56,8 @@ const TEST_TENANT_ID_1 = crypto.randomUUID();
 const TEST_TENANT_ID_2 = crypto.randomUUID();
 const TEST_USER_ID_1 = crypto.randomUUID();
 const TEST_USER_ID_2 = crypto.randomUUID();
+const TEST_SF_USER_ID_1 = `sf-sweeper-${crypto.randomUUID()}`;
+const TEST_SF_USER_ID_2 = `sf-sweeper-${crypto.randomUUID()}`;
 const TEST_MID_1 = "mid-sweeper-test-1";
 const TEST_MID_2 = "mid-sweeper-test-2";
 const TEST_EID_1 = `eid-sweeper-test-${crypto.randomUUID()}`;
@@ -176,6 +179,18 @@ function detectRequestType(body: string): "Retrieve" | "Delete" | "Other" {
   return "Other";
 }
 
+const defaultSoapHandler = http.post(
+  `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+  async ({ request }) => {
+    const body = await request.text();
+    const requestType = detectRequestType(body);
+    if (requestType === "Delete") {
+      return HttpResponse.xml(buildDeleteResponse());
+    }
+    return HttpResponse.xml(buildEmptyRetrieveResponse());
+  },
+);
+
 describe("ShellQuerySweeper (integration)", () => {
   let module: TestingModule;
   let sweeper: ShellQuerySweeper;
@@ -227,7 +242,7 @@ describe("ShellQuerySweeper (integration)", () => {
   }
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: "error" });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     module = await Test.createTestingModule({
       imports: [
@@ -275,8 +290,8 @@ describe("ShellQuerySweeper (integration)", () => {
     await sqlClient`
       INSERT INTO users (id, sf_user_id, tenant_id, email, name)
       VALUES
-        (${TEST_USER_ID_1}::uuid, 'sf-sweeper-1', ${TEST_TENANT_ID_1}::uuid, 'sweeper1@test.com', 'Sweeper User 1'),
-        (${TEST_USER_ID_2}::uuid, 'sf-sweeper-2', ${TEST_TENANT_ID_2}::uuid, 'sweeper2@test.com', 'Sweeper User 2')
+        (${TEST_USER_ID_1}::uuid, ${TEST_SF_USER_ID_1}, ${TEST_TENANT_ID_1}::uuid, 'sweeper1@test.com', 'Sweeper User 1'),
+        (${TEST_USER_ID_2}::uuid, ${TEST_SF_USER_ID_2}, ${TEST_TENANT_ID_2}::uuid, 'sweeper2@test.com', 'Sweeper User 2')
       ON CONFLICT (id) DO NOTHING
     `;
   }, 60000);
@@ -305,6 +320,7 @@ describe("ShellQuerySweeper (integration)", () => {
 
   beforeEach(async () => {
     server.resetHandlers();
+    server.use(defaultSoapHandler);
 
     // Clean up tenant_settings and credentials before each test
     try {

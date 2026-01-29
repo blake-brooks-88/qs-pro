@@ -30,7 +30,7 @@ import {
   RlsContextService,
   validateWorkerEnv,
 } from '@qpp/backend-shared';
-import { resetFactories } from '@qpp/test-utils';
+import { externalOnlyOnUnhandledRequest, resetFactories } from '@qpp/test-utils';
 import { DelayedError, Job, Queue, UnrecoverableError } from 'bullmq';
 import { createHash, randomUUID } from 'node:crypto';
 import { http, HttpResponse } from 'msw';
@@ -449,7 +449,7 @@ describe('ShellQueryProcessor (integration)', () => {
   const createdRunIds: string[] = [];
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     queueStub = createQueueStub();
     redisStub = createRedisClientStub();

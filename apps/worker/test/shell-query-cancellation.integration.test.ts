@@ -33,6 +33,7 @@ import {
   MceBridgeService,
   RlsContextService,
 } from '@qpp/backend-shared';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { Sql } from 'postgres';
@@ -286,7 +287,7 @@ describe('Shell Query Cancellation (integration)', () => {
   }
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     // Create a stub Queue that doesn't need real Redis for this test
     const mockQueue = {

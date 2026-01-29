@@ -27,7 +27,7 @@ import {
   MceModule,
   validateWorkerEnv,
 } from '@qpp/backend-shared';
-import { resetFactories } from '@qpp/test-utils';
+import { externalOnlyOnUnhandledRequest, resetFactories } from '@qpp/test-utils';
 import { Job, Queue } from 'bullmq';
 import { createHash, randomUUID } from 'node:crypto';
 import { http, HttpResponse } from 'msw';
@@ -414,7 +414,7 @@ describe('Status Events (integration)', () => {
   }
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     queueStub = createQueueStub();
     redisStub = createRedisClientStub();
