@@ -56,7 +56,7 @@ jobs:
       - name: Create database roles
         run: |
           psql "$POSTGRES_URL" <<'SQL'
-          CREATE ROLE qs_migrate LOGIN PASSWORD 'migrate_pass';
+          CREATE ROLE qs_migrate LOGIN PASSWORD 'migrate_pass' BYPASSRLS;
           CREATE ROLE qs_runtime LOGIN PASSWORD 'runtime_pass';
 
           GRANT CONNECT ON DATABASE qs_pro_test TO qs_migrate;

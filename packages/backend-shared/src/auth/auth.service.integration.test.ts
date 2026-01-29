@@ -123,11 +123,14 @@ if (!connectionString) {
   );
 }
 
-// Superuser connection for cleanup (bypasses RLS)
-// Construct from individual env vars or use direct postgres credentials
-const POSTGRES_USER = process.env.POSTGRES_USER ?? "postgres";
-const POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD ?? "password";
-const superuserConnectionString = `postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${process.env.POSTGRES_DB ?? "qs_pro"}`;
+// Migrations connection for cleanup (qs_migrate user bypasses RLS)
+const migrationsConnectionString = process.env.DATABASE_URL_MIGRATIONS;
+if (!migrationsConnectionString) {
+  throw new Error(
+    "DATABASE_URL_MIGRATIONS environment variable is required for integration tests. " +
+      "See .env.example for setup instructions.",
+  );
+}
 
 /**
  * Helper to create a valid JWT for testing handleJwtLogin.
@@ -184,10 +187,10 @@ describe("AuthService Integration", () => {
     sqlClient = postgres(connectionString, { max: 5 });
     db = drizzle(sqlClient);
 
-    // Create superuser connection for cleanup (bypasses RLS)
-    superuserClient = postgres(superuserConnectionString, { max: 1 });
+    // Create migrations connection for cleanup (qs_migrate bypasses RLS)
+    superuserClient = postgres(migrationsConnectionString, { max: 1 });
 
-    // Clean up any leftover test data from previous runs using superuser (bypasses RLS)
+    // Clean up any leftover test data from previous runs
     await superuserClient`DELETE FROM credentials WHERE mid LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM users WHERE sf_user_id LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM tenants WHERE eid LIKE 'auth-integ-%'`;
@@ -254,7 +257,7 @@ describe("AuthService Integration", () => {
   });
 
   afterAll(async () => {
-    // Clean up test data using superuser (bypasses RLS)
+    // Clean up test data (qs_migrate user bypasses RLS)
     await superuserClient`DELETE FROM credentials WHERE mid LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM users WHERE sf_user_id LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM tenants WHERE eid LIKE 'auth-integ-%'`;
