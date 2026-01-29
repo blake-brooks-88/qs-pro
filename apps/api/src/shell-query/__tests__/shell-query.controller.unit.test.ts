@@ -3,10 +3,9 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import { ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import {
   createMockUserSession,
-  createShellQueryRunRepoStub,
   createShellQueryServiceStub,
   createShellQuerySseServiceStub,
   createTenantRepoStub,
@@ -130,7 +129,7 @@ describe('ShellQueryController', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      shellQueryService.getRunStatus = vi.fn().mockResolvedValue(mockStatus);
+      shellQueryService.getRunStatus.mockResolvedValue(mockStatus);
 
       // Act
       await controller.getRunStatus(runId, user);
@@ -154,7 +153,7 @@ describe('ShellQueryController', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      shellQueryService.getRunStatus = vi.fn().mockResolvedValue(mockStatus);
+      shellQueryService.getRunStatus.mockResolvedValue(mockStatus);
 
       // Act
       const result = await controller.getRunStatus(runId, user);

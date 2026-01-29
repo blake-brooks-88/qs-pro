@@ -21,6 +21,7 @@ import {
   getReservedSqlFromContext,
   RlsContextService,
 } from '@qpp/backend-shared';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import { Job, Queue, Worker } from 'bullmq';
 import * as jose from 'jose';
 import { http, HttpResponse } from 'msw';
@@ -40,6 +41,22 @@ import {
 
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/configure-app';
+
+function getRedisConnectionFromEnv(): {
+  host: string;
+  port: number;
+  db: number;
+} {
+  const url = getRequiredEnv('REDIS_URL');
+  const parsed = new URL(url);
+  const dbFromPath = parsed.pathname.replace('/', '');
+  const db = dbFromPath ? Number.parseInt(dbFromPath, 10) : 0;
+  return {
+    host: parsed.hostname || '127.0.0.1',
+    port: parsed.port ? Number.parseInt(parsed.port, 10) : 6379,
+    db: Number.isFinite(db) ? db : 0,
+  };
+}
 
 function getRequiredEnv(key: string): string {
   // eslint-disable-next-line security/detect-object-injection -- `key` is a trusted string, not user input
@@ -408,8 +425,9 @@ const server = setupServer(
  */
 async function cleanupTestPollution(): Promise<void> {
   // 1. Obliterate BullMQ queue (clears ALL jobs including active/stalled)
+  const { host, port, db } = getRedisConnectionFromEnv();
   const tempQueue = new Queue('shell-query', {
-    connection: { host: '127.0.0.1', port: 6379 },
+    connection: { host, port, db },
   });
   try {
     await tempQueue.obliterate({ force: true });
@@ -510,19 +528,7 @@ describe('Query Execution Flow (e2e)', () => {
     // Clean pollution from previous test runs before app initialization
     await cleanupTestPollution();
 
-    server.listen({
-      onUnhandledRequest(request, print) {
-        const url = new URL(request.url);
-
-        // Allow localhost requests to pass through to the test server
-        if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
-          return;
-        }
-
-        // Error on unhandled external requests (catches accidental real API calls)
-        print.error();
-      },
-    });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = 'test-tssd';
 
@@ -589,6 +595,7 @@ describe('Query Execution Flow (e2e)', () => {
 
     // Create the worker processor inline to test BullMQ job processing
     // This simulates the worker app's ShellQueryProcessor
+    const { host, port, db } = getRedisConnectionFromEnv();
     workerInstance = new Worker(
       'shell-query',
       async (job: Job) => {
@@ -772,8 +779,9 @@ describe('Query Execution Flow (e2e)', () => {
       },
       {
         connection: {
-          host: '127.0.0.1',
-          port: 6379,
+          host,
+          port,
+          db,
         },
         concurrency: 5,
       },

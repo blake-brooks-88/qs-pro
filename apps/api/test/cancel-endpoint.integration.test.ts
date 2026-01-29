@@ -24,6 +24,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import * as jose from 'jose';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -96,7 +97,7 @@ describe('Cancel Endpoint (integration)', () => {
   const createdRunIds: string[] = [];
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = TEST_TSSD;
 

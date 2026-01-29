@@ -3,6 +3,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import * as jose from 'jose';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -78,19 +79,7 @@ describe('Auth Lifecycle (e2e)', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    server.listen({
-      onUnhandledRequest(request, print) {
-        const url = new URL(request.url);
-
-        // Allow localhost requests to pass through to the test server
-        if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
-          return;
-        }
-
-        // Error on unhandled external requests (catches accidental real API calls)
-        print.error();
-      },
-    });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = TEST_TSSD;
 

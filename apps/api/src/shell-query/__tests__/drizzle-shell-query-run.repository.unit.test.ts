@@ -28,13 +28,12 @@ describe('DrizzleShellQueryRunRepository', () => {
     dbStub = createDbStub();
     rlsContextStub = createRlsContextStub();
 
+    type RepoCtorArgs = ConstructorParameters<
+      typeof DrizzleShellQueryRunRepository
+    >;
     repository = new DrizzleShellQueryRunRepository(
-      dbStub as unknown as Parameters<
-        (typeof DrizzleShellQueryRunRepository)['prototype']['constructor']
-      >[0],
-      rlsContextStub as unknown as Parameters<
-        (typeof DrizzleShellQueryRunRepository)['prototype']['constructor']
-      >[1],
+      dbStub as unknown as RepoCtorArgs[0],
+      rlsContextStub as unknown as RepoCtorArgs[1],
     );
   });
 

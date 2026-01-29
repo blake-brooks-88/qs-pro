@@ -12,6 +12,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ErrorCode } from '@qpp/backend-shared';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import * as jose from 'jose';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -81,7 +82,7 @@ describe('Shell query endpoints (integration)', () => {
   const createdRunIds: string[] = [];
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = TEST_TSSD;
 

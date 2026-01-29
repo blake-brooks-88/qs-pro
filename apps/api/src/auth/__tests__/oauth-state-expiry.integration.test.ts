@@ -18,6 +18,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { agent as superagent } from 'supertest';
@@ -78,7 +79,7 @@ describe('OAuth State Expiry (integration)', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = TEST_TSSD;
 

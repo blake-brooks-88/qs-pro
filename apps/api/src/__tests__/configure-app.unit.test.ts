@@ -60,6 +60,23 @@ function createMockApp() {
     }),
   };
 
+  type MockApp = Omit<
+    NestFastifyApplication,
+    | 'get'
+    | 'register'
+    | 'setGlobalPrefix'
+    | 'useGlobalFilters'
+    | 'getHttpAdapter'
+  > & {
+    setGlobalPrefix: ReturnType<typeof vi.fn>;
+    useGlobalFilters: ReturnType<typeof vi.fn>;
+    register: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+    getHttpAdapter: ReturnType<typeof vi.fn>;
+    _hooks: typeof hooks;
+    _fastifyInstance: typeof fastifyInstance;
+  };
+
   const mockApp = {
     setGlobalPrefix: vi.fn(),
     useGlobalFilters: vi.fn(),
@@ -72,10 +89,7 @@ function createMockApp() {
     _fastifyInstance: fastifyInstance,
   };
 
-  return mockApp as unknown as NestFastifyApplication & {
-    _hooks: typeof hooks;
-    _fastifyInstance: typeof fastifyInstance;
-  };
+  return mockApp as unknown as MockApp;
 }
 
 describe('configureApp', () => {
@@ -189,7 +203,10 @@ describe('configureApp', () => {
 
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
 
       // Act
@@ -207,7 +224,10 @@ describe('configureApp', () => {
 
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
 
       // Act
@@ -225,7 +245,10 @@ describe('configureApp', () => {
 
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
       const mockSession = {
         get: vi.fn((key: string) => (key === 'mid' ? 'mid-123' : undefined)),
@@ -250,7 +273,10 @@ describe('configureApp', () => {
 
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
       const mockSession = {
         get: vi.fn((key: string) =>
@@ -280,7 +306,10 @@ describe('configureApp', () => {
 
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
       const mockSession = {
         get: vi.fn((key: string) => {
@@ -347,7 +376,10 @@ describe('configureApp', () => {
       const options: ConfigureAppOptions = { rls: true };
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
       const onceHandlers: Record<string, () => void> = {};
       const mockReplyRaw = {
@@ -382,7 +414,11 @@ describe('configureApp', () => {
       );
 
       // Trigger cleanup
-      onceHandlers['finish']();
+      const finishHandler = onceHandlers['finish'];
+      if (!finishHandler) {
+        throw new Error('Expected finish cleanup handler to be registered');
+      }
+      finishHandler();
       await new Promise((resolve) => setTimeout(resolve, 20));
 
       expect(mockReserved.release).toHaveBeenCalled();
@@ -393,7 +429,10 @@ describe('configureApp', () => {
       const options: ConfigureAppOptions = { rls: true };
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
       const onceHandlers: Record<string, () => void> = {};
       const mockReplyRaw = {
@@ -428,7 +467,11 @@ describe('configureApp', () => {
       );
 
       // Trigger cleanup
-      onceHandlers['close']();
+      const closeHandler = onceHandlers['close'];
+      if (!closeHandler) {
+        throw new Error('Expected close cleanup handler to be registered');
+      }
+      closeHandler();
       await new Promise((resolve) => setTimeout(resolve, 20));
 
       expect(mockReserved.release).toHaveBeenCalled();
@@ -439,7 +482,10 @@ describe('configureApp', () => {
       const options: ConfigureAppOptions = { rls: true };
       await configureApp(mockApp, options);
 
-      const hook = mockApp._hooks.onRequest[0];
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
       const done = vi.fn();
       const onceHandlers: Record<string, () => void> = {};
       const mockReplyRaw = {
@@ -474,7 +520,11 @@ describe('configureApp', () => {
       );
 
       // Trigger cleanup
-      onceHandlers['error']();
+      const errorHandler = onceHandlers['error'];
+      if (!errorHandler) {
+        throw new Error('Expected error cleanup handler to be registered');
+      }
+      errorHandler();
       await new Promise((resolve) => setTimeout(resolve, 20));
 
       expect(mockReserved.release).toHaveBeenCalled();

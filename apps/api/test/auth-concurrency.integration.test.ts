@@ -22,6 +22,7 @@ import {
   ITenantRepository,
   IUserRepository,
 } from '@qpp/database';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import postgres from 'postgres';
@@ -80,15 +81,23 @@ describe('Auth Concurrency (integration)', () => {
   let rlsContext: RlsContextService;
   let encryptionService: EncryptionService;
 
-  // Direct database access for test data setup (raw SQL bypasses RLS)
+  // Direct database access for cleanup (RLS still applies unless the role bypasses it)
   let client: postgres.Sql;
 
-  // Track created entities for cleanup
-  const createdTenantEids: string[] = [];
-  const createdUserSfIds: string[] = [];
+  type CreatedAuthContext = {
+    tenantId: string;
+    userId: string;
+    mid: string;
+    tenantEid: string;
+  };
+
+  // Track created entities for cleanup (avoid FK violations: credentials -> users -> tenants)
+  const createdAuthContexts: CreatedAuthContext[] = [];
+  const createdUserIds = new Set<string>();
+  const createdTenantEids = new Set<string>();
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = TEST_TSSD;
 
@@ -132,16 +141,29 @@ describe('Auth Concurrency (integration)', () => {
     server.close();
 
     // Clean up test data (FK order: credentials -> users -> tenants)
-    // Use raw SQL to bypass RLS policies that would hide rows
     try {
-      for (const sfUserId of createdUserSfIds) {
-        // Get user ID first, then delete credentials, then user
-        const [user] =
-          await client`SELECT id FROM users WHERE sf_user_id = ${sfUserId}`;
-        if (user?.id) {
-          await client`DELETE FROM credentials WHERE user_id = ${user.id}`;
-          await client`DELETE FROM users WHERE id = ${user.id}`;
+      for (const ctx of createdAuthContexts) {
+        const reserved = await client.reserve();
+        try {
+          await reserved`BEGIN`;
+          await reserved`SELECT set_config('app.tenant_id', ${ctx.tenantId}, true)`;
+          await reserved`SELECT set_config('app.mid', ${ctx.mid}, true)`;
+          await reserved`DELETE FROM credentials WHERE tenant_id = ${ctx.tenantId}::uuid AND user_id = ${ctx.userId}::uuid AND mid = ${ctx.mid}`;
+          await reserved`COMMIT`;
+        } catch (error) {
+          try {
+            await reserved`ROLLBACK`;
+          } catch {
+            // ignore rollback errors
+          }
+          throw error;
+        } finally {
+          reserved.release();
         }
+      }
+
+      for (const userId of createdUserIds) {
+        await client`DELETE FROM users WHERE id = ${userId}::uuid`;
       }
 
       for (const eid of createdTenantEids) {
@@ -166,8 +188,7 @@ describe('Auth Concurrency (integration)', () => {
       const uniqueSfUserId = `race-user-${Date.now()}`;
       const uniqueMid = `race-mid-${Date.now()}`;
 
-      createdTenantEids.push(uniqueEid);
-      createdUserSfIds.push(uniqueSfUserId);
+      createdTenantEids.add(uniqueEid);
 
       // Create tenant and user directly
       const tenant = await tenantRepo.upsert({
@@ -177,6 +198,14 @@ describe('Auth Concurrency (integration)', () => {
       const user = await userRepo.upsert({
         sfUserId: uniqueSfUserId,
         tenantId: tenant.id,
+      });
+
+      createdUserIds.add(user.id);
+      createdAuthContexts.push({
+        tenantId: tenant.id,
+        userId: user.id,
+        mid: uniqueMid,
+        tenantEid: uniqueEid,
       });
 
       // Create expired credentials to force refresh
@@ -255,8 +284,7 @@ describe('Auth Concurrency (integration)', () => {
       const uniqueSfUserId = `cached-user-${Date.now()}`;
       const uniqueMid = `cached-mid-${Date.now()}`;
 
-      createdTenantEids.push(uniqueEid);
-      createdUserSfIds.push(uniqueSfUserId);
+      createdTenantEids.add(uniqueEid);
 
       // Create tenant and user
       const tenant = await tenantRepo.upsert({
@@ -266,6 +294,14 @@ describe('Auth Concurrency (integration)', () => {
       const user = await userRepo.upsert({
         sfUserId: uniqueSfUserId,
         tenantId: tenant.id,
+      });
+
+      createdUserIds.add(user.id);
+      createdAuthContexts.push({
+        tenantId: tenant.id,
+        userId: user.id,
+        mid: uniqueMid,
+        tenantEid: uniqueEid,
       });
 
       // Create VALID credentials (not expired)
@@ -325,8 +361,7 @@ describe('Auth Concurrency (integration)', () => {
       const uniqueSfUserId = `sequential-user-${Date.now()}`;
       const uniqueMid = `sequential-mid-${Date.now()}`;
 
-      createdTenantEids.push(uniqueEid);
-      createdUserSfIds.push(uniqueSfUserId);
+      createdTenantEids.add(uniqueEid);
 
       // Create tenant and user
       const tenant = await tenantRepo.upsert({
@@ -336,6 +371,14 @@ describe('Auth Concurrency (integration)', () => {
       const user = await userRepo.upsert({
         sfUserId: uniqueSfUserId,
         tenantId: tenant.id,
+      });
+
+      createdUserIds.add(user.id);
+      createdAuthContexts.push({
+        tenantId: tenant.id,
+        userId: user.id,
+        mid: uniqueMid,
+        tenantEid: uniqueEid,
       });
 
       // Create expired credentials

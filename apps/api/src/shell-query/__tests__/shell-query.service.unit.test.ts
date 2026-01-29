@@ -1,7 +1,6 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
-  AppError,
   EncryptionService,
   ErrorCode,
   RestDataService,
@@ -15,7 +14,7 @@ import {
   createShellQueryRunRepoStub,
   resetFactories,
 } from '@qpp/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ShellQueryService } from '../shell-query.service';
 

@@ -1,16 +1,20 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { createMockUserSession } from '@qpp/test-utils';
 import { describe, expect, it } from 'vitest';
 
-import { CurrentUser, UserSession } from '../current-user.decorator';
+import type { UserSession } from '../current-user.decorator';
+import { CurrentUser } from '../current-user.decorator';
 
 type DecoratorFactory = (data: unknown, ctx: ExecutionContext) => UserSession;
 
 function getDecoratorFactory(): DecoratorFactory {
   class TestController {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    test(@CurrentUser() value: UserSession) {}
+    test(@CurrentUser() value: UserSession) {
+      // Keep the parameter "used" for TS noUnusedParameters.
+      void value;
+    }
   }
 
   const metadata = Reflect.getMetadata(
@@ -18,8 +22,15 @@ function getDecoratorFactory(): DecoratorFactory {
     TestController,
     'test',
   ) as Record<string, { factory: DecoratorFactory }>;
-  const key = Object.keys(metadata)[0] as string;
-  return metadata[key].factory;
+  const key = Object.keys(metadata)[0];
+  if (!key) {
+    throw new Error('Expected CurrentUser decorator metadata to exist');
+  }
+  const entry = metadata[key];
+  if (!entry) {
+    throw new Error('Expected CurrentUser decorator metadata entry to exist');
+  }
+  return entry.factory;
 }
 
 function createMockExecutionContext(user: unknown): ExecutionContext {

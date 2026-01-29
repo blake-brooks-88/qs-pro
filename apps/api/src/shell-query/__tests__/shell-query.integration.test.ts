@@ -22,6 +22,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EncryptionService, ErrorCode } from '@qpp/backend-shared';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import { Queue } from 'bullmq';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -115,7 +116,7 @@ describe('ShellQueryService (integration)', () => {
   const createdRunIds: string[] = [];
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = TEST_TSSD;
 
@@ -189,7 +190,7 @@ describe('ShellQueryService (integration)', () => {
           ${testMid},
           ${encryptedAccessToken},
           ${encryptedRefreshToken},
-          ${new Date(Date.now() + 60 * 60 * 1000)}
+          ${new Date(Date.now() + 60 * 60 * 1000).toISOString()}
         )
       `;
       await reserved`RESET app.tenant_id`;
@@ -390,12 +391,7 @@ describe('ShellQueryService (integration)', () => {
       const runId = await service.createRun(context, sqlText, snippetName);
       createdRunIds.push(runId);
 
-      // Wait briefly for job to be added
-      await new Promise((r) => setTimeout(r, 100));
-
-      // Verify job was added to queue
-      const jobs = await shellQueryQueue.getJobs(['waiting', 'active']);
-      const job = jobs.find((j) => j.data.runId === runId);
+      const job = await shellQueryQueue.getJob(runId);
 
       expect(job).toBeDefined();
       expect(job?.data.tenantId).toBe(testTenantId);
@@ -456,11 +452,7 @@ describe('ShellQueryService (integration)', () => {
       const runId = await service.createRun(context, sqlText);
       createdRunIds.push(runId);
 
-      // Wait briefly for job to be added
-      await new Promise((r) => setTimeout(r, 100));
-
-      const jobs = await shellQueryQueue.getJobs(['waiting', 'active']);
-      const job = jobs.find((j) => j.data.runId === runId);
+      const job = await shellQueryQueue.getJob(runId);
 
       // Verify sqlText is encrypted (not plaintext)
       expect(job?.data.sqlText).not.toBe(sqlText);

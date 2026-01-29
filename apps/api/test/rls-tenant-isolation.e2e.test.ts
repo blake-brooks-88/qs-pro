@@ -4,6 +4,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ITenantRepository, IUserRepository } from '@qpp/database';
+import { externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
 import * as jose from 'jose';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -67,7 +68,7 @@ describe('RLS Tenant Isolation (e2e)', () => {
   const createdHistory: Array<{ historyId: string; tenantId: string }> = [];
 
   beforeAll(async () => {
-    server.listen();
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = 'test-tssd';
 

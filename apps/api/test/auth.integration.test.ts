@@ -32,11 +32,11 @@ import { AuthService, RlsContextService } from '@qpp/backend-shared';
 import {
   credentials,
   ICredentialsRepository,
-  IUserRepository,
   tenants,
   users,
 } from '@qpp/database';
-import { eq } from 'drizzle-orm';
+import { createTestIds, externalOnlyOnUnhandledRequest } from '@qpp/test-utils';
+import { and, eq } from 'drizzle-orm';
 import { drizzle, PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as jose from 'jose';
 import { http, HttpResponse } from 'msw';
@@ -94,7 +94,6 @@ describe('AuthService (integration)', () => {
   let app: NestFastifyApplication;
   let module: TestingModule;
   let authService: AuthService;
-  let userRepo: IUserRepository;
   let credRepo: ICredentialsRepository;
   let rlsContext: RlsContextService;
 
@@ -105,9 +104,10 @@ describe('AuthService (integration)', () => {
   // Track created entities for cleanup
   const createdTenantEids: string[] = [];
   const createdUserSfIds: string[] = [];
+  const createdMids: string[] = [];
 
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
     process.env.MCE_TSSD = TEST_TSSD;
 
@@ -137,7 +137,6 @@ describe('AuthService (integration)', () => {
 
     // Get services from the module
     authService = module.get<AuthService>(AuthService);
-    userRepo = module.get<IUserRepository>('USER_REPOSITORY');
     credRepo = module.get<ICredentialsRepository>('CREDENTIALS_REPOSITORY');
     rlsContext = module.get<RlsContextService>(RlsContextService);
 
@@ -149,11 +148,29 @@ describe('AuthService (integration)', () => {
   afterAll(async () => {
     server.close();
 
+    const uniqueMids = Array.from(new Set(createdMids));
+
     // Clean up test data (in FK order: credentials -> users -> tenants)
     for (const sfUserId of createdUserSfIds) {
-      const user = await userRepo.findBySfUserId(sfUserId);
-      if (user) {
-        await db.delete(credentials).where(eq(credentials.userId, user.id));
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.sfUserId, sfUserId));
+
+      if (user?.tenantId) {
+        for (const mid of uniqueMids) {
+          await client`SELECT set_config('app.tenant_id', ${user.tenantId}, false)`;
+          await client`SELECT set_config('app.mid', ${mid}, false)`;
+          await db
+            .delete(credentials)
+            .where(
+              and(
+                eq(credentials.userId, user.id),
+                eq(credentials.tenantId, user.tenantId),
+                eq(credentials.mid, mid),
+              ),
+            );
+        }
         await db.delete(users).where(eq(users.sfUserId, sfUserId));
       }
     }
@@ -210,6 +227,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       const jwt = await createValidJwt({
         user_id: uniqueSfUserId,
@@ -248,6 +266,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       const jwt = await createValidJwt({
         user_id: uniqueSfUserId,
@@ -330,6 +349,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       // Configure MSW to return specific user info
       server.use(
@@ -394,6 +414,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       const fallbackAuthCode = 'fallback-auth-code';
       const embeddedPayload = Buffer.from(
@@ -471,6 +492,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       server.use(
         http.get(
@@ -624,6 +646,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       // Configure MSW for this user
       server.use(
@@ -704,6 +727,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       // Configure MSW for this user
       server.use(
@@ -756,6 +780,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       // Configure MSW for this user
       server.use(
@@ -800,6 +825,119 @@ describe('AuthService (integration)', () => {
         ),
       ).rejects.toThrow();
     });
+
+    it('should return valid cached token without calling MCE', async () => {
+      const uniqueEid = `cached-token-eid-${Date.now()}`;
+      const uniqueSfUserId = `cached-token-user-${Date.now()}`;
+      const uniqueMid = `cached-token-mid-${Date.now()}`;
+
+      createdTenantEids.push(uniqueEid);
+      createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
+
+      server.use(
+        http.get(
+          `https://${TEST_TSSD}.auth.marketingcloudapis.com/v2/userinfo`,
+          () => {
+            return HttpResponse.json({
+              sub: uniqueSfUserId,
+              enterprise_id: uniqueEid,
+              member_id: uniqueMid,
+            });
+          },
+        ),
+      );
+
+      const callbackResult = await authService.handleCallback(
+        TEST_TSSD,
+        'cached-token-code',
+      );
+
+      let tokenEndpointCalled = false;
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.auth.marketingcloudapis.com/v2/token`,
+          () => {
+            tokenEndpointCalled = true;
+            return HttpResponse.json({
+              access_token: 'should-not-be-used',
+              refresh_token: 'should-not-be-used',
+              expires_in: 3600,
+              rest_instance_url: 'https://test-rest.com',
+              soap_instance_url: `https://${TEST_TSSD}.soap.marketingcloudapis.com`,
+              scope: 'read write',
+              token_type: 'Bearer',
+            });
+          },
+        ),
+      );
+
+      const refreshResult = await rlsContext.runWithTenantContext(
+        callbackResult.tenant.id,
+        uniqueMid,
+        () =>
+          authService.refreshToken(
+            callbackResult.tenant.id,
+            callbackResult.user.id,
+            uniqueMid,
+          ),
+      );
+
+      expect(tokenEndpointCalled).toBe(false);
+      expect(refreshResult.accessToken).toBeDefined();
+      expect(refreshResult.tssd).toBe(TEST_TSSD);
+    });
+
+    it('should throw MCE_CREDENTIALS_MISSING when credentials not found', async () => {
+      const uniqueEid = `no-creds-eid-${Date.now()}`;
+      const uniqueSfUserId = `no-creds-user-${Date.now()}`;
+      const uniqueMid = `no-creds-mid-${Date.now()}`;
+
+      createdTenantEids.push(uniqueEid);
+      createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
+
+      const [tenant] = await db
+        .insert(tenants)
+        .values({
+          eid: uniqueEid,
+          tssd: TEST_TSSD,
+          subscriptionTier: 'free',
+        })
+        .returning();
+      if (!tenant) {
+        throw new Error('Expected tenant insert to return row');
+      }
+
+      const [user] = await db
+        .insert(users)
+        .values({
+          sfUserId: uniqueSfUserId,
+          tenantId: tenant.id,
+        })
+        .returning();
+      if (!user) {
+        throw new Error('Expected user insert to return row');
+      }
+
+      await expect(
+        rlsContext.runWithTenantContext(tenant.id, uniqueMid, () =>
+          authService.refreshToken(tenant.id, user.id, uniqueMid),
+        ),
+      ).rejects.toMatchObject({ code: 'MCE_CREDENTIALS_MISSING' });
+    });
+
+    it('should throw MCE_CREDENTIALS_MISSING when tenant does not exist', async () => {
+      const { tenantId, userId, mid } = createTestIds({
+        mid: 'non-existent-mid',
+      });
+
+      await expect(
+        rlsContext.runWithTenantContext(tenantId, mid, () =>
+          authService.refreshToken(tenantId, userId, mid),
+        ),
+      ).rejects.toMatchObject({ code: 'MCE_CREDENTIALS_MISSING' });
+    });
   });
 
   describe('invalidateToken', () => {
@@ -810,6 +948,7 @@ describe('AuthService (integration)', () => {
 
       createdTenantEids.push(uniqueEid);
       createdUserSfIds.push(uniqueSfUserId);
+      createdMids.push(uniqueMid);
 
       // Configure MSW for this user
       server.use(
@@ -835,10 +974,10 @@ describe('AuthService (integration)', () => {
       const userId = callbackResult.user.id;
 
       // Verify credentials exist with future expiry
-      const initialCreds = await credRepo.findByUserTenantMid(
-        userId,
+      const initialCreds = await rlsContext.runWithTenantContext(
         tenantId,
         uniqueMid,
+        () => credRepo.findByUserTenantMid(userId, tenantId, uniqueMid),
       );
       expect(initialCreds).toBeDefined();
       expect(initialCreds?.expiresAt).toBeDefined();
@@ -850,13 +989,15 @@ describe('AuthService (integration)', () => {
       );
 
       // Invalidate token
-      await authService.invalidateToken(tenantId, userId, uniqueMid);
+      await rlsContext.runWithTenantContext(tenantId, uniqueMid, () =>
+        authService.invalidateToken(tenantId, userId, uniqueMid),
+      );
 
       // Verify credentials have epoch 0 expiry
-      const invalidatedCreds = await credRepo.findByUserTenantMid(
-        userId,
+      const invalidatedCreds = await rlsContext.runWithTenantContext(
         tenantId,
         uniqueMid,
+        () => credRepo.findByUserTenantMid(userId, tenantId, uniqueMid),
       );
       expect(invalidatedCreds).toBeDefined();
       if (!invalidatedCreds) {
@@ -866,12 +1007,14 @@ describe('AuthService (integration)', () => {
     });
 
     it('should handle invalidation of non-existent credentials gracefully', async () => {
+      const { tenantId, userId, mid } = createTestIds({
+        mid: 'non-existent-mid',
+      });
+
       // Should not throw when credentials don't exist
       await expect(
-        authService.invalidateToken(
-          'non-existent-tenant',
-          'non-existent-user',
-          'non-existent-mid',
+        rlsContext.runWithTenantContext(tenantId, mid, () =>
+          authService.invalidateToken(tenantId, userId, mid),
         ),
       ).resolves.not.toThrow();
     });

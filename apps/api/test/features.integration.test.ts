@@ -79,7 +79,7 @@ describe('FeaturesController (integration)', () => {
       try {
         const reserved = await sqlClient.reserve();
         try {
-          await reserved`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+          await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
           await reserved`
             DELETE FROM tenant_feature_overrides WHERE tenant_id = ${tenantId}::uuid
           `;
@@ -133,7 +133,7 @@ describe('FeaturesController (integration)', () => {
     // Insert two overrides under tenant RLS context.
     const reserved = await sqlClient.reserve();
     try {
-      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
       await reserved`
         INSERT INTO tenant_feature_overrides (tenant_id, feature_key, enabled)
         VALUES
