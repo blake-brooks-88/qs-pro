@@ -1,0 +1,116 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { SessionGuard } from '@qpp/backend-shared';
+import {
+  type CreateFolderDto,
+  CreateFolderSchema,
+  type UpdateFolderDto,
+  UpdateFolderSchema,
+} from '@qpp/shared-types';
+
+import { CsrfGuard } from '../auth/csrf.guard';
+import {
+  CurrentUser,
+  type UserSession,
+} from '../common/decorators/current-user.decorator';
+import { FoldersService } from './folders.service';
+
+@Controller('folders')
+@UseGuards(SessionGuard)
+export class FoldersController {
+  constructor(private readonly foldersService: FoldersService) {}
+
+  @Post()
+  @UseGuards(CsrfGuard)
+  async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
+    const result = CreateFolderSchema.safeParse(body);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+    const dto: CreateFolderDto = result.data;
+
+    const folder = await this.foldersService.create(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      dto,
+    );
+    return this.toResponse(folder);
+  }
+
+  @Get()
+  async findAll(@CurrentUser() user: UserSession) {
+    const folders = await this.foldersService.findAll(
+      user.tenantId,
+      user.mid,
+      user.userId,
+    );
+    return folders.map((f) => this.toResponse(f));
+  }
+
+  @Get(':id')
+  async findById(@CurrentUser() user: UserSession, @Param('id') id: string) {
+    const folder = await this.foldersService.findById(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      id,
+    );
+    return this.toResponse(folder);
+  }
+
+  @Patch(':id')
+  @UseGuards(CsrfGuard)
+  async update(
+    @CurrentUser() user: UserSession,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const result = UpdateFolderSchema.safeParse(body);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+    const dto: UpdateFolderDto = result.data;
+
+    const folder = await this.foldersService.update(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      id,
+      dto,
+    );
+    return this.toResponse(folder);
+  }
+
+  @Delete(':id')
+  @UseGuards(CsrfGuard)
+  async delete(@CurrentUser() user: UserSession, @Param('id') id: string) {
+    await this.foldersService.delete(user.tenantId, user.mid, user.userId, id);
+    return { success: true };
+  }
+
+  private toResponse(folder: {
+    id: string;
+    name: string;
+    parentId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: folder.id,
+      name: folder.name,
+      parentId: folder.parentId,
+      createdAt: folder.createdAt.toISOString(),
+      updatedAt: folder.updatedAt.toISOString(),
+    };
+  }
+}
