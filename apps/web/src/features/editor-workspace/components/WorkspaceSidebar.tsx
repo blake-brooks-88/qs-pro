@@ -18,6 +18,7 @@ import type {
 import { cn } from "@/lib/utils";
 
 import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
+import { QueryTreeView } from "./QueryTreeView";
 import {
   SidebarSearch,
   SidebarSearchResultItem,
@@ -439,79 +440,6 @@ export function WorkspaceSidebar({
     return focusedItemId === id && focusedItemType === type;
   };
 
-  const renderQueriesContent = (parentId: string | null, depth: number = 0) => {
-    const currentFolders = folders.filter(
-      (folder) => folder.parentId === parentId && folder.type === "library",
-    );
-
-    const visibleFolders = currentFolders.filter((f) =>
-      isVisible(f.id, "folder"),
-    );
-    const visibleQueries = savedQueries
-      .filter((query) => query.folderId === parentId)
-      .filter((q) => isVisible(q.id, "query"));
-
-    if (
-      focusedItemId &&
-      visibleFolders.length === 0 &&
-      visibleQueries.length === 0
-    ) {
-      return null;
-    }
-
-    return (
-      <div
-        className={cn(
-          "space-y-0.5",
-          depth > 0 && "ml-3 border-l border-border/50 pl-2",
-        )}
-      >
-        {visibleFolders.sort(sortByName).map((folder) => (
-          <div key={folder.id} className="space-y-0.5">
-            <div
-              className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-hover cursor-pointer group rounded"
-              title={folder.name}
-            >
-              <FolderIcon
-                size={16}
-                className="text-muted-foreground/60 group-hover:text-primary transition-colors shrink-0"
-              />
-              <span className="truncate">{folder.name}</span>
-            </div>
-            {renderQueriesContent(folder.id, depth + 1)}
-          </div>
-        ))}
-
-        {visibleQueries.sort(sortByName).map((query) => (
-          <button
-            key={query.id}
-            type="button"
-            onClick={() => onSelectQuery?.(query.id)}
-            title={query.name}
-            className={cn(
-              "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors",
-              focusedItemId === query.id
-                ? "bg-surface-hover text-foreground font-medium"
-                : "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
-            )}
-          >
-            <CodeFile
-              size={16}
-              weight="Linear"
-              className={cn(
-                "transition-colors shrink-0",
-                focusedItemId === query.id
-                  ? "text-foreground"
-                  : "text-secondary/60 group-hover:text-secondary",
-              )}
-            />
-            <span className="truncate">{query.name}</span>
-          </button>
-        ))}
-      </div>
-    );
-  };
-
   const renderFolderNode = (folder: Folder, depth: number) => {
     if (!isVisible(folder.id, "folder")) {
       return null;
@@ -756,20 +684,13 @@ export function WorkspaceSidebar({
       {/* Tree Content */}
       <div className="flex-1 overflow-y-auto p-2">
         <div className="space-y-1">
-          <div className="flex items-center justify-between px-2 py-1 mb-2">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              {activeTab === "de" ? "Data Extensions" : "Query Library"}
-            </span>
-            {activeTab === "queries" && (
-              <button
-                type="button"
-                onClick={() => onCreateFolder?.(null)}
-                className="text-xs font-bold text-primary hover:text-primary-400 underline decoration-primary/30 underline-offset-2 shrink-0"
-              >
-                + New Folder
-              </button>
-            )}
-          </div>
+          {activeTab === "de" && (
+            <div className="flex items-center justify-between px-2 py-1 mb-2">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Data Extensions
+              </span>
+            </div>
+          )}
 
           {activeTab === "de" ? (
             <>
@@ -792,7 +713,11 @@ export function WorkspaceSidebar({
                 ))}
             </>
           ) : (
-            renderQueriesContent(null)
+            <QueryTreeView
+              searchQuery={searchQuery}
+              onSelectQuery={(queryId) => onSelectQuery?.(queryId)}
+              onCreateFolder={() => onCreateFolder?.(null)}
+            />
           )}
         </div>
       </div>
