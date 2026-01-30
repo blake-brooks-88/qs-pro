@@ -89,6 +89,7 @@ interface MonacoQueryEditorProps {
   value: string;
   onChange: (value: string) => void;
   onSave?: () => void;
+  onSaveAs?: () => void;
   onRunRequest?: () => void;
   onCursorPositionChange?: (position: number) => void;
   diagnostics: SqlDiagnostic[];
@@ -102,6 +103,7 @@ export function MonacoQueryEditor({
   value,
   onChange,
   onSave,
+  onSaveAs,
   onRunRequest,
   onCursorPositionChange,
   diagnostics,
@@ -122,6 +124,8 @@ export function MonacoQueryEditor({
   const autoBracketRef = useRef(false);
   const onCursorPositionChangeRef = useRef(onCursorPositionChange);
   const diagnosticsRef = useRef(diagnostics);
+  const onSaveRef = useRef(onSave);
+  const onSaveAsRef = useRef(onSaveAs);
   const queryClient = useQueryClient();
 
   const debouncedValue = useDebouncedValue(value, 150);
@@ -263,6 +267,14 @@ export function MonacoQueryEditor({
   useEffect(() => {
     diagnosticsRef.current = diagnostics;
   }, [diagnostics]);
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
+  useEffect(() => {
+    onSaveAsRef.current = onSaveAs;
+  }, [onSaveAs]);
 
   const handleEditorMount: OnMount = useCallback(
     (editorInstance, monacoInstance) => {
@@ -929,14 +941,22 @@ export function MonacoQueryEditor({
         autoBracketRef.current = false;
       });
 
-      if (onSave) {
-        editorInstance.addCommand(
-          monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
-          () => {
-            onSave();
-          },
-        );
-      }
+      // Use refs to always get latest callbacks (avoids stale closure issues)
+      editorInstance.addCommand(
+        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
+        () => {
+          onSaveRef.current?.();
+        },
+      );
+
+      editorInstance.addCommand(
+        monacoInstance.KeyMod.CtrlCmd |
+          monacoInstance.KeyMod.Shift |
+          monacoInstance.KeyCode.KeyS,
+        () => {
+          onSaveAsRef.current?.();
+        },
+      );
 
       if (onRunRequest) {
         editorInstance.addCommand(
@@ -971,7 +991,6 @@ export function MonacoQueryEditor({
       getFieldsCount,
       getBracketReplacementRange,
       onRunRequest,
-      onSave,
       resolveDataExtension,
     ],
   );
