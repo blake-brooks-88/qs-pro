@@ -17,8 +17,8 @@ describe("useTabsStore", () => {
 
       const state = useTabsStore.getState();
       expect(state.tabs).toHaveLength(2);
-      expect(state.tabs[0].name).toBe("Untitled-1");
-      expect(state.tabs[1].name).toBe("Untitled-2");
+      expect(state.tabs.at(0)?.name).toBe("Untitled-1");
+      expect(state.tabs.at(1)?.name).toBe("Untitled-2");
     });
 
     it("sets new tab as active", () => {
@@ -28,14 +28,14 @@ describe("useTabsStore", () => {
 
     it("marks new tab as isNew", () => {
       useTabsStore.getState().createNewTab();
-      expect(useTabsStore.getState().tabs[0].isNew).toBe(true);
+      expect(useTabsStore.getState().tabs.at(0)?.isNew).toBe(true);
     });
 
     it("initializes new tab with empty content and not dirty", () => {
       useTabsStore.getState().createNewTab();
-      const tab = useTabsStore.getState().tabs[0];
-      expect(tab.content).toBe("");
-      expect(tab.isDirty).toBe(false);
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.content).toBe("");
+      expect(tab?.isDirty).toBe(false);
     });
   });
 
@@ -48,10 +48,10 @@ describe("useTabsStore", () => {
 
       const state = useTabsStore.getState();
       expect(state.tabs).toHaveLength(1);
-      expect(state.tabs[0].queryId).toBe("q1");
-      expect(state.tabs[0].name).toBe("My Query");
-      expect(state.tabs[0].content).toBe("SELECT 1");
-      expect(state.tabs[0].isNew).toBe(false);
+      expect(state.tabs.at(0)?.queryId).toBe("q1");
+      expect(state.tabs.at(0)?.name).toBe("My Query");
+      expect(state.tabs.at(0)?.content).toBe("SELECT 1");
+      expect(state.tabs.at(0)?.isNew).toBe(false);
     });
 
     it("switches to existing tab if query already open", () => {
@@ -75,7 +75,7 @@ describe("useTabsStore", () => {
 
     it("does not mark opened query as dirty", () => {
       useTabsStore.getState().openQuery("q1", "Query", "SELECT 1");
-      expect(useTabsStore.getState().tabs[0].isDirty).toBe(false);
+      expect(useTabsStore.getState().tabs.at(0)?.isDirty).toBe(false);
     });
   });
 
@@ -88,7 +88,7 @@ describe("useTabsStore", () => {
 
       const state = useTabsStore.getState();
       expect(state.tabs).toHaveLength(1);
-      expect(state.tabs[0].id).toBe("untitled-2");
+      expect(state.tabs.at(0)?.id).toBe("untitled-2");
     });
 
     it("selects next tab when closing active tab", () => {
@@ -163,9 +163,9 @@ describe("useTabsStore", () => {
 
       useTabsStore.getState().updateTabContent("query-q1", "SELECT 2");
 
-      const tab = useTabsStore.getState().tabs[0];
-      expect(tab.content).toBe("SELECT 2");
-      expect(tab.isDirty).toBe(true);
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.content).toBe("SELECT 2");
+      expect(tab?.isDirty).toBe(true);
     });
 
     it("marks new tabs as dirty when content changes", () => {
@@ -173,17 +173,17 @@ describe("useTabsStore", () => {
 
       useTabsStore.getState().updateTabContent("untitled-1", "SELECT 1");
 
-      expect(useTabsStore.getState().tabs[0].isDirty).toBe(true);
+      expect(useTabsStore.getState().tabs.at(0)?.isDirty).toBe(true);
     });
 
     it("clears dirty flag when content matches original for saved queries", () => {
       useTabsStore.getState().openQuery("q1", "Query", "SELECT 1");
       useTabsStore.getState().updateTabContent("query-q1", "SELECT 2");
-      expect(useTabsStore.getState().tabs[0].isDirty).toBe(true);
+      expect(useTabsStore.getState().tabs.at(0)?.isDirty).toBe(true);
 
       useTabsStore.getState().updateTabContent("query-q1", "SELECT 1");
 
-      expect(useTabsStore.getState().tabs[0].isDirty).toBe(false);
+      expect(useTabsStore.getState().tabs.at(0)?.isDirty).toBe(false);
     });
   });
 
@@ -195,10 +195,10 @@ describe("useTabsStore", () => {
       useTabsStore.getState().markTabSaved(tabId, "q123", "My Saved Query");
 
       const state = useTabsStore.getState();
-      expect(state.tabs[0].queryId).toBe("q123");
-      expect(state.tabs[0].name).toBe("My Saved Query");
-      expect(state.tabs[0].isDirty).toBe(false);
-      expect(state.tabs[0].isNew).toBe(false);
+      expect(state.tabs.at(0)?.queryId).toBe("q123");
+      expect(state.tabs.at(0)?.name).toBe("My Saved Query");
+      expect(state.tabs.at(0)?.isDirty).toBe(false);
+      expect(state.tabs.at(0)?.isNew).toBe(false);
       expect(state.activeTabId).toBe("query-q123");
     });
 
@@ -207,7 +207,7 @@ describe("useTabsStore", () => {
 
       useTabsStore.getState().markTabSaved(tabId, "q456", "Saved");
 
-      expect(useTabsStore.getState().tabs[0].id).toBe("query-q456");
+      expect(useTabsStore.getState().tabs.at(0)?.id).toBe("query-q456");
     });
   });
 
@@ -217,9 +217,9 @@ describe("useTabsStore", () => {
 
       useTabsStore.getState().renameTab("query-q1", "Renamed");
 
-      const tab = useTabsStore.getState().tabs[0];
-      expect(tab.name).toBe("Renamed");
-      expect(tab.isDirty).toBe(true);
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.name).toBe("Renamed");
+      expect(tab?.isDirty).toBe(true);
     });
   });
 
@@ -298,7 +298,7 @@ describe("useTabsStore", () => {
       const dirtyTabs = useTabsStore.getState().getDirtyTabs();
 
       expect(dirtyTabs).toHaveLength(1);
-      expect(dirtyTabs[0].id).toBe("untitled-1");
+      expect(dirtyTabs.at(0)?.id).toBe("untitled-1");
     });
   });
 
