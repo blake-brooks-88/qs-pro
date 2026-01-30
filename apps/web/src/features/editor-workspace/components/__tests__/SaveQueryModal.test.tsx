@@ -51,6 +51,22 @@ describe("SaveQueryModal", () => {
       http.get("/api/saved-queries/count", () =>
         HttpResponse.json({ count: 2 }),
       ),
+      http.get("/api/saved-queries", () =>
+        HttpResponse.json([
+          {
+            id: "existing-1",
+            name: "Existing Query",
+            folderId: null,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: "existing-2",
+            name: "Another Query",
+            folderId: null,
+            updatedAt: new Date().toISOString(),
+          },
+        ]),
+      ),
       http.get("/api/folders", () =>
         HttpResponse.json([
           { id: "folder-1", name: "My Queries", parentId: null },
@@ -352,6 +368,114 @@ describe("SaveQueryModal", () => {
 
       // Should show "Saving..." while request is in flight
       expect(screen.getByRole("button", { name: /saving/i })).toBeDisabled();
+    });
+  });
+
+  describe("duplicate name warning", () => {
+    it("shows warning when name matches existing query (case-insensitive)", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <SaveQueryModal isOpen={true} content="SELECT 1" onClose={vi.fn()} />,
+        { wrapper: createWrapper() },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/query name/i)).toBeInTheDocument();
+      });
+
+      // Type duplicate name in lowercase to test case-insensitivity
+      await user.type(screen.getByLabelText(/query name/i), "existing query");
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/a query with this name already exists/i),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("allows saving with duplicate name (non-blocking warning)", async () => {
+      const user = userEvent.setup();
+      const onSaveSuccess = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <SaveQueryModal
+          isOpen={true}
+          content="SELECT 1"
+          onClose={onClose}
+          onSaveSuccess={onSaveSuccess}
+        />,
+        { wrapper: createWrapper() },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/query name/i)).toBeInTheDocument();
+      });
+
+      // Type exact duplicate name
+      await user.type(screen.getByLabelText(/query name/i), "Existing Query");
+
+      // Warning should be visible
+      await waitFor(() => {
+        expect(
+          screen.getByText(/a query with this name already exists/i),
+        ).toBeInTheDocument();
+      });
+
+      // Save button should NOT be disabled due to warning (only disabled if empty)
+      const saveButton = screen.getByRole("button", {
+        name: /save to workspace/i,
+      });
+      expect(saveButton).not.toBeDisabled();
+
+      // Click save
+      await user.click(saveButton);
+
+      // Save should proceed despite warning
+      await waitFor(() => {
+        expect(onSaveSuccess).toHaveBeenCalledWith(
+          "new-query-id",
+          "Existing Query",
+        );
+        expect(onClose).toHaveBeenCalled();
+      });
+    });
+
+    it("warning disappears when name becomes unique", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <SaveQueryModal isOpen={true} content="SELECT 1" onClose={vi.fn()} />,
+        { wrapper: createWrapper() },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/query name/i)).toBeInTheDocument();
+      });
+
+      const nameInput = screen.getByLabelText(/query name/i);
+
+      // Type duplicate name
+      await user.type(nameInput, "Existing Query");
+
+      // Warning should be visible
+      await waitFor(() => {
+        expect(
+          screen.getByText(/a query with this name already exists/i),
+        ).toBeInTheDocument();
+      });
+
+      // Clear and type unique name
+      await user.clear(nameInput);
+      await user.type(nameInput, "Unique Query Name");
+
+      // Warning should disappear
+      await waitFor(() => {
+        expect(
+          screen.queryByText(/a query with this name already exists/i),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 });

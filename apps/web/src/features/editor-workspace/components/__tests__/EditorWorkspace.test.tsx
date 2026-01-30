@@ -21,11 +21,13 @@ vi.mock("../MonacoQueryEditor", () => ({
   MonacoQueryEditor: ({
     onChange,
     onSave,
+    onSaveAs,
     onRunRequest,
     value,
   }: {
     onChange?: (content: string) => void;
     onSave?: () => void;
+    onSaveAs?: () => void;
     onRunRequest?: () => void;
     value: string;
   }) => (
@@ -45,6 +47,9 @@ vi.mock("../MonacoQueryEditor", () => ({
           }
         }}
       />
+      <button onClick={onSaveAs} data-testid="editor-save-as-button">
+        Save As
+      </button>
     </div>
   ),
 }));
@@ -77,13 +82,21 @@ vi.mock("../WorkspaceSidebar", () => ({
   WorkspaceSidebar: ({
     isCollapsed,
     onToggle,
+    onSelectQuery,
   }: {
     isCollapsed: boolean;
     onToggle?: () => void;
+    onSelectQuery?: (id: string) => void;
   }) => (
     <div data-testid="mock-sidebar" data-collapsed={isCollapsed}>
       <button onClick={onToggle} data-testid="sidebar-toggle">
         {isCollapsed ? "Expand" : "Collapse"} Sidebar
+      </button>
+      <button
+        onClick={() => onSelectQuery?.("test-query-id")}
+        data-testid="sidebar-select-query"
+      >
+        Select Query
       </button>
     </div>
   ),
@@ -128,12 +141,14 @@ vi.mock("../QueryActivityModal", () => ({
 vi.mock("../SaveQueryModal", () => ({
   SaveQueryModal: ({
     isOpen,
+    initialName,
     onClose,
     onSaveSuccess,
     onSave,
   }: {
     isOpen: boolean;
     content: string;
+    initialName?: string;
     onClose: () => void;
     onSaveSuccess?: (queryId: string, name: string) => void;
     onSave?: (name: string, folderId: string) => void;
@@ -141,13 +156,14 @@ vi.mock("../SaveQueryModal", () => ({
     isOpen ? (
       <div data-testid="mock-save-modal" role="dialog">
         <h2>Save Query</h2>
+        <span data-testid="save-modal-initial-name">{initialName}</span>
         <button onClick={onClose} data-testid="save-modal-cancel">
           Cancel
         </button>
         <button
           onClick={() => {
-            onSaveSuccess?.("new-query-id", "Test Query");
-            onSave?.("Test Query", "folder-1");
+            onSaveSuccess?.("new-query-id", initialName ?? "Test Query");
+            onSave?.(initialName ?? "Test Query", "folder-1");
           }}
           data-testid="save-modal-confirm"
         >
@@ -188,6 +204,16 @@ vi.mock("../ConfirmationDialog", () => ({
         </button>
       </div>
     ) : null,
+}));
+
+// Mock QueryTabBar to make tab counting reliable in tests
+// The real QueryTabBar reads from Zustand store which complicates testing
+vi.mock("../QueryTabBar", () => ({
+  QueryTabBar: () => (
+    <div data-testid="mock-query-tab-bar">
+      <span>Query Tabs</span>
+    </div>
+  ),
 }));
 
 // Mock FeatureGate to always render children
@@ -244,10 +270,23 @@ vi.mock("@/features/editor-workspace/hooks/use-query-execution", () => ({
   useQueryExecution: () => mockQueryExecutionReturn,
 }));
 
+// Mock for useSavedQuery lazy loading - mutable so tests can control it
+let mockSavedQueryData: {
+  id: string;
+  name: string;
+  sqlText: string;
+  folderId: string | null;
+} | null = null;
+
 vi.mock("@/features/editor-workspace/hooks/use-saved-queries", () => ({
   useUpdateSavedQuery: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ id: "q1", name: "Updated Query" }),
     isPending: false,
+  }),
+  useSavedQuery: (id: string | undefined) => ({
+    data: id && mockSavedQueryData?.id === id ? mockSavedQueryData : undefined,
+    isLoading: false,
+    isError: false,
   }),
 }));
 
@@ -335,6 +374,7 @@ describe("EditorWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQueryExecutionReturn = { ...defaultMockQueryExecution };
+    mockSavedQueryData = null;
   });
 
   describe("tab lifecycle", () => {
@@ -928,6 +968,165 @@ describe("EditorWorkspace", () => {
       await waitFor(() => {
         const pulseIndicator = document.querySelector(".animate-pulse");
         expect(pulseIndicator).toBeNull();
+      });
+    });
+  });
+
+  describe("query opening from sidebar", () => {
+    it("opens saved query in new tab via lazy loading", async () => {
+      const user = userEvent.setup();
+      const onSelectQuery = vi.fn();
+
+      // Set up mock data for the query that will be loaded
+      mockSavedQueryData = {
+        id: "test-query-id",
+        name: "Test Query",
+        sqlText: "SELECT * FROM Test",
+        folderId: null,
+      };
+
+      renderEditorWorkspace({ onSelectQuery });
+
+      // Initially should show default "New Query" tab
+      await waitFor(() => {
+        expect(screen.getByText("New Query")).toBeInTheDocument();
+      });
+
+      // Click sidebar to select query
+      await user.click(screen.getByTestId("sidebar-select-query"));
+
+      // onSelectQuery callback should be called
+      expect(onSelectQuery).toHaveBeenCalledWith("test-query-id");
+
+      // The new tab should become active, showing "Test Query" in the active tab indicator
+      await waitFor(() => {
+        expect(screen.getByText("Test Query")).toBeInTheDocument();
+      });
+
+      // Editor should contain the query's SQL text
+      await waitFor(() => {
+        const editor = screen.getByTestId("editor-textarea");
+        expect(editor).toHaveValue("SELECT * FROM Test");
+      });
+    });
+
+    it("switches to existing tab when query is already open", async () => {
+      const user = userEvent.setup();
+      const onSelectQuery = vi.fn();
+      const onTabChange = vi.fn();
+
+      const initialTabs: QueryTab[] = [
+        { id: "tab-1", name: "New Query", content: "", isDirty: false },
+        {
+          id: "tab-2",
+          queryId: "test-query-id",
+          name: "Existing Query",
+          content: "SELECT 1",
+          isDirty: false,
+          isNew: false,
+        },
+      ];
+
+      renderEditorWorkspace({ initialTabs, onSelectQuery, onTabChange });
+
+      // First tab should be active initially (shows "New Query" in header)
+      await waitFor(() => {
+        expect(screen.getByText("New Query")).toBeInTheDocument();
+      });
+
+      // Editor should be empty (first tab's content)
+      const editor = screen.getByTestId("editor-textarea");
+      expect(editor).toHaveValue("");
+
+      // Click sidebar to select the query that's already open
+      await user.click(screen.getByTestId("sidebar-select-query"));
+
+      // Should switch to existing tab, showing "Existing Query" in header
+      await waitFor(() => {
+        expect(screen.getByText("Existing Query")).toBeInTheDocument();
+      });
+
+      // Editor should now show the existing query's content
+      await waitFor(() => {
+        expect(screen.getByTestId("editor-textarea")).toHaveValue("SELECT 1");
+      });
+
+      // onSelectQuery should NOT be called because query is already open
+      // (it's called, but the lazy fetch is not triggered - existing tab is used)
+      // No additional fetch should occur - just tab switch
+    });
+  });
+
+  describe("Save As flow", () => {
+    it("triggers modal with '(copy)' suffix in initial name", async () => {
+      const user = userEvent.setup();
+
+      const initialTabs: QueryTab[] = [
+        {
+          id: "tab-1",
+          queryId: "q1",
+          name: "My Query",
+          content: "SELECT 1",
+          isDirty: false,
+          isNew: false,
+        },
+      ];
+
+      renderEditorWorkspace({ initialTabs });
+
+      // Click the Save As button in the mock editor
+      await user.click(screen.getByTestId("editor-save-as-button"));
+
+      // Modal should open with "(copy)" suffix
+      await waitFor(() => {
+        expect(screen.getByTestId("mock-save-modal")).toBeInTheDocument();
+        expect(screen.getByTestId("save-modal-initial-name")).toHaveTextContent(
+          "My Query (copy)",
+        );
+      });
+    });
+
+    it("creates new tab for copy while keeping original open", async () => {
+      const user = userEvent.setup();
+
+      const initialTabs: QueryTab[] = [
+        {
+          id: "tab-1",
+          queryId: "q1",
+          name: "Original Query",
+          content: "SELECT 1",
+          isDirty: false,
+          isNew: false,
+        },
+      ];
+
+      renderEditorWorkspace({ initialTabs });
+
+      // Initially should show "Original Query" as active tab
+      await waitFor(() => {
+        expect(screen.getByText("Original Query")).toBeInTheDocument();
+      });
+
+      // Click the Save As button
+      await user.click(screen.getByTestId("editor-save-as-button"));
+
+      // Modal should open
+      await waitFor(() => {
+        expect(screen.getByTestId("mock-save-modal")).toBeInTheDocument();
+      });
+
+      // Confirm save (this triggers handleSaveAsSuccess with "Original Query (copy)" name)
+      await user.click(screen.getByTestId("save-modal-confirm"));
+
+      // Modal should be closed
+      await waitFor(() => {
+        expect(screen.queryByTestId("mock-save-modal")).not.toBeInTheDocument();
+      });
+
+      // The new tab (copy) should become active
+      // The mock returns initialName as the saved name, which is "Original Query (copy)"
+      await waitFor(() => {
+        expect(screen.getByText("Original Query (copy)")).toBeInTheDocument();
       });
     });
   });

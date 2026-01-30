@@ -359,6 +359,76 @@ describe("MonacoQueryEditor Component", () => {
       );
       expect(commentCall).toBeDefined();
     });
+
+    it("registers Cmd+Shift+S shortcut when onSaveAs is provided", () => {
+      const queryClient = createQueryClient();
+      const onSaveAs = vi.fn();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          onSaveAs={onSaveAs}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      if (capturedOnMount) {
+        capturedOnMount(
+          mockEditorInstance as unknown as Parameters<OnMount>[0],
+          mockMonacoInstance as unknown as Parameters<OnMount>[1],
+        );
+      }
+
+      const saveAsCall = mockEditorInstance.addCommand.mock.calls.find(
+        (call) =>
+          call[0] ===
+          (mockMonacoInstance.KeyMod.CtrlCmd |
+            mockMonacoInstance.KeyMod.Shift |
+            mockMonacoInstance.KeyCode.KeyS),
+      );
+      expect(saveAsCall).toBeDefined();
+    });
+
+    it("calls onSaveAs when Cmd+Shift+S shortcut is triggered", () => {
+      const queryClient = createQueryClient();
+      const onSaveAs = vi.fn();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          onSaveAs={onSaveAs}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      if (capturedOnMount) {
+        capturedOnMount(
+          mockEditorInstance as unknown as Parameters<OnMount>[0],
+          mockMonacoInstance as unknown as Parameters<OnMount>[1],
+        );
+      }
+
+      const saveAsCall = mockEditorInstance.addCommand.mock.calls.find(
+        (call) =>
+          call[0] ===
+          (mockMonacoInstance.KeyMod.CtrlCmd |
+            mockMonacoInstance.KeyMod.Shift |
+            mockMonacoInstance.KeyCode.KeyS),
+      );
+      if (saveAsCall) {
+        saveAsCall[1]();
+      }
+
+      expect(onSaveAs).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("Diagnostic Markers", () => {

@@ -1027,4 +1027,98 @@ describe("MonacoQueryEditor", () => {
       expect(mockInlineCompletionDisposable.dispose).toHaveBeenCalled();
     });
   });
+
+  describe("Keyboard Shortcut Registration", () => {
+    it("registers Cmd+Shift+S shortcut when onSaveAs is provided", () => {
+      // Arrange
+      const queryClient = createQueryClient();
+      const onSaveAs = vi.fn();
+
+      // Act
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          onSaveAs={onSaveAs}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+      triggerMount();
+
+      // Assert
+      const saveAsCall = mockEditorInstance.addCommand.mock.calls.find(
+        (call) =>
+          call[0] ===
+          (mockMonacoInstance.KeyMod.CtrlCmd |
+            mockMonacoInstance.KeyMod.Shift |
+            mockMonacoInstance.KeyCode.KeyS),
+      );
+      expect(saveAsCall).toBeDefined();
+    });
+
+    it("calls onSaveAs when Cmd+Shift+S shortcut is triggered", () => {
+      // Arrange
+      const queryClient = createQueryClient();
+      const onSaveAs = vi.fn();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          onSaveAs={onSaveAs}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+      triggerMount();
+
+      // Act
+      const saveAsCall = mockEditorInstance.addCommand.mock.calls.find(
+        (call) =>
+          call[0] ===
+          (mockMonacoInstance.KeyMod.CtrlCmd |
+            mockMonacoInstance.KeyMod.Shift |
+            mockMonacoInstance.KeyCode.KeyS),
+      );
+      if (saveAsCall) {
+        saveAsCall[1]();
+      }
+
+      // Assert
+      expect(onSaveAs).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not register Cmd+Shift+S shortcut when onSaveAs is not provided", () => {
+      // Arrange
+      const queryClient = createQueryClient();
+
+      // Act
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test]"
+          onChange={vi.fn()}
+          diagnostics={[]}
+          dataExtensions={[]}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+      triggerMount();
+
+      // Assert
+      const saveAsCall = mockEditorInstance.addCommand.mock.calls.find(
+        (call) =>
+          call[0] ===
+          (mockMonacoInstance.KeyMod.CtrlCmd |
+            mockMonacoInstance.KeyMod.Shift |
+            mockMonacoInstance.KeyCode.KeyS),
+      );
+      expect(saveAsCall).toBeUndefined();
+    });
+  });
 });
