@@ -19,6 +19,7 @@ import {
 import { useFolders } from "@/features/editor-workspace/hooks/use-folders";
 import {
   useCreateSavedQuery,
+  useSavedQueries,
   useSavedQueryCount,
 } from "@/features/editor-workspace/hooks/use-saved-queries";
 import { useSavedQueryLimit, useTier } from "@/hooks/use-tier";
@@ -62,8 +63,16 @@ export function SaveQueryModal({
   // Folder data
   const { data: folders = [] } = useFolders();
 
+  // Saved queries for duplicate name detection
+  const { data: queries = [] } = useSavedQueries();
+
   // Mutation
   const createQuery = useCreateSavedQuery();
+
+  // Duplicate name check (case-insensitive)
+  const isDuplicateName = queries.some(
+    (q) => q.name.toLowerCase() === name.trim().toLowerCase(),
+  );
 
   // Reset form when modal opens with new initial values
   useEffect(() => {
@@ -142,6 +151,11 @@ export function SaveQueryModal({
                 placeholder="e.g. Weekly Active Subscribers"
                 className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
+              {isDuplicateName ? (
+                <p className="text-xs text-amber-500 mt-1.5 flex items-center gap-1">
+                  <InfoCircle size={12} />A query with this name already exists
+                </p>
+              ) : null}
             </div>
 
             {/* Folder selector - Pro+ only */}
