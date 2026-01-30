@@ -39,3 +39,15 @@ export { ErrorCode, ErrorMessages } from "./errors/index.js";
 
 // Testing utilities
 export { assertDefined } from "./testing/index.js";
+
+// Folders
+export type {
+  CreateFolderDto,
+  FolderResponse,
+  UpdateFolderDto,
+} from "./folders.js";
+export {
+  CreateFolderSchema,
+  FolderResponseSchema,
+  UpdateFolderSchema,
+} from "./folders.js";
