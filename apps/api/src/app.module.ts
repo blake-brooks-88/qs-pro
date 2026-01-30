@@ -16,6 +16,7 @@ import { FeaturesModule } from './features/features.module';
 import { FoldersModule } from './folders/folders.module';
 import { MceModule } from './mce/mce.module';
 import { RedisModule } from './redis/redis.module';
+import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { ShellQueryModule } from './shell-query/shell-query.module';
 import { UsersModule } from './users/users.module';
 
@@ -47,6 +48,7 @@ import { UsersModule } from './users/users.module';
     ShellQueryModule,
     FeaturesModule,
     FoldersModule,
+    SavedQueriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -19,19 +19,12 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { EncryptionService } from '@qpp/backend-shared';
 import type { Sql } from 'postgres';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
-import { SavedQueriesService } from '../saved-queries.service';
 import { FoldersService } from '../../folders/folders.service';
+import { SavedQueriesService } from '../saved-queries.service';
 
 function getRequiredEnv(key: string): string {
   // eslint-disable-next-line security/detect-object-injection -- trusted string
@@ -90,6 +83,38 @@ describe('SavedQueriesService (integration)', () => {
     savedQueriesService = app.get(SavedQueriesService);
     foldersService = app.get(FoldersService);
     encryptionService = app.get(EncryptionService);
+
+    // Clean up any leftover test data from previous runs (BEFORE insert)
+    const existingTenant = await sqlClient`
+      SELECT id FROM tenants WHERE eid = ${TEST_EID} LIMIT 1
+    `;
+    if (existingTenant[0]) {
+      const existingTenantId = existingTenant[0].id;
+
+      // Get existing user to set RLS context
+      const existingUser = await sqlClient`
+        SELECT id FROM users WHERE tenant_id = ${existingTenantId}::uuid LIMIT 1
+      `;
+      const existingUserId = existingUser[0]?.id;
+
+      if (existingUserId) {
+        // Delete RLS-protected tables with proper context
+        const reserved = await sqlClient.reserve();
+        await reserved`SELECT set_config('app.tenant_id', ${existingTenantId}, false)`;
+        await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+        await reserved`SELECT set_config('app.user_id', ${existingUserId}, false)`;
+        await reserved`DELETE FROM saved_queries WHERE tenant_id = ${existingTenantId}::uuid`;
+        await reserved`DELETE FROM folders WHERE tenant_id = ${existingTenantId}::uuid`;
+        await reserved`RESET app.tenant_id`;
+        await reserved`RESET app.mid`;
+        await reserved`RESET app.user_id`;
+        reserved.release();
+      }
+
+      // Delete non-RLS-protected tables
+      await sqlClient`DELETE FROM users WHERE tenant_id = ${existingTenantId}::uuid`;
+      await sqlClient`DELETE FROM tenants WHERE id = ${existingTenantId}::uuid`;
+    }
 
     // Create test tenant
     const tenantResult = await sqlClient`
@@ -368,7 +393,12 @@ describe('SavedQueriesService (integration)', () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
 
       await expect(
-        savedQueriesService.findById(testTenantId, TEST_MID, testUserId, fakeId),
+        savedQueriesService.findById(
+          testTenantId,
+          TEST_MID,
+          testUserId,
+          fakeId,
+        ),
       ).rejects.toMatchObject({
         code: 'RESOURCE_NOT_FOUND',
       });
@@ -474,9 +504,15 @@ describe('SavedQueriesService (integration)', () => {
       createdSavedQueryIds.push(created.id);
 
       await expect(
-        savedQueriesService.update(testTenantId, TEST_MID, testUserId, created.id, {
-          folderId: '00000000-0000-0000-0000-000000000000',
-        }),
+        savedQueriesService.update(
+          testTenantId,
+          TEST_MID,
+          testUserId,
+          created.id,
+          {
+            folderId: '00000000-0000-0000-0000-000000000000',
+          },
+        ),
       ).rejects.toMatchObject({
         code: 'RESOURCE_NOT_FOUND',
       });
