@@ -51,3 +51,17 @@ export {
   FolderResponseSchema,
   UpdateFolderSchema,
 } from "./folders.js";
+
+// Saved Queries
+export type {
+  CreateSavedQueryDto,
+  SavedQueryListItem,
+  SavedQueryResponse,
+  UpdateSavedQueryDto,
+} from "./saved-queries.js";
+export {
+  CreateSavedQuerySchema,
+  SavedQueryListItemSchema,
+  SavedQueryResponseSchema,
+  UpdateSavedQuerySchema,
+} from "./saved-queries.js";

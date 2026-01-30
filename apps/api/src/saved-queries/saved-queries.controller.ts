@@ -1,0 +1,139 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { SessionGuard } from '@qpp/backend-shared';
+import {
+  CreateSavedQuerySchema,
+  type CreateSavedQueryDto,
+  UpdateSavedQuerySchema,
+  type UpdateSavedQueryDto,
+} from '@qpp/shared-types';
+
+import { CsrfGuard } from '../auth/csrf.guard';
+import {
+  CurrentUser,
+  type UserSession,
+} from '../common/decorators/current-user.decorator';
+
+import {
+  type DecryptedSavedQuery,
+  SavedQueriesService,
+} from './saved-queries.service';
+
+@Controller('saved-queries')
+@UseGuards(SessionGuard)
+export class SavedQueriesController {
+  constructor(private readonly savedQueriesService: SavedQueriesService) {}
+
+  @Post()
+  @UseGuards(CsrfGuard)
+  async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
+    const result = CreateSavedQuerySchema.safeParse(body);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+    const dto: CreateSavedQueryDto = result.data;
+
+    const query = await this.savedQueriesService.create(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      dto,
+    );
+    return this.toResponse(query);
+  }
+
+  @Get()
+  async findAll(@CurrentUser() user: UserSession) {
+    const queries = await this.savedQueriesService.findAll(
+      user.tenantId,
+      user.mid,
+      user.userId,
+    );
+    return queries.map((q) => this.toListItem(q));
+  }
+
+  @Get('count')
+  async count(@CurrentUser() user: UserSession) {
+    const count = await this.savedQueriesService.countByUser(
+      user.tenantId,
+      user.mid,
+      user.userId,
+    );
+    return { count };
+  }
+
+  @Get(':id')
+  async findById(@CurrentUser() user: UserSession, @Param('id') id: string) {
+    const query = await this.savedQueriesService.findById(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      id,
+    );
+    return this.toResponse(query);
+  }
+
+  @Patch(':id')
+  @UseGuards(CsrfGuard)
+  async update(
+    @CurrentUser() user: UserSession,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const result = UpdateSavedQuerySchema.safeParse(body);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+    const dto: UpdateSavedQueryDto = result.data;
+
+    const query = await this.savedQueriesService.update(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      id,
+      dto,
+    );
+    return this.toResponse(query);
+  }
+
+  @Delete(':id')
+  @UseGuards(CsrfGuard)
+  async delete(@CurrentUser() user: UserSession, @Param('id') id: string) {
+    await this.savedQueriesService.delete(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      id,
+    );
+    return { success: true };
+  }
+
+  private toResponse(query: DecryptedSavedQuery) {
+    return {
+      id: query.id,
+      name: query.name,
+      sqlText: query.sqlText,
+      folderId: query.folderId,
+      createdAt: query.createdAt.toISOString(),
+      updatedAt: query.updatedAt.toISOString(),
+    };
+  }
+
+  private toListItem(query: DecryptedSavedQuery) {
+    return {
+      id: query.id,
+      name: query.name,
+      folderId: query.folderId,
+      updatedAt: query.updatedAt.toISOString(),
+    };
+  }
+}
