@@ -1,5 +1,5 @@
 import swc from 'unplugin-swc';
-import { defineConfig } from 'vitest/config';
+import { coverageConfigDefaults, defineConfig } from 'vitest/config';
 
 /**
  * Integration test configuration for the API.
@@ -19,6 +19,12 @@ export default defineConfig({
     hookTimeout: 180000, // 180s for beforeAll/afterAll (app init + cleanup with DB)
     testTimeout: 60000, // 60s for individual tests (integration can be slow under coverage)
     root: './',
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
     coverage: {
       provider: 'v8',
       include: ['src/**'],
@@ -28,6 +34,7 @@ export default defineConfig({
         '**/test/**',
         '**/node_modules/**',
         '**/dist/**',
+        ...coverageConfigDefaults.exclude,
       ],
       reporter: ['text', 'json', 'json-summary', 'html'],
     },
