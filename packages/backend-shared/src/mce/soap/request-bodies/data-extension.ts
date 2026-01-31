@@ -54,6 +54,8 @@ export interface DataExtensionField {
   scale?: number;
   precision?: number;
   isPrimaryKey?: boolean;
+  isRequired?: boolean;
+  defaultValue?: string;
 }
 
 export interface CreateDataExtensionParams {
@@ -61,6 +63,9 @@ export interface CreateDataExtensionParams {
   customerKey: string;
   categoryId: number;
   fields: DataExtensionField[];
+  isSendable?: boolean;
+  sendableField?: string;
+  sendableFieldType?: string;
 }
 
 function buildFieldsXml(fields: DataExtensionField[]): string {
@@ -96,6 +101,14 @@ function buildFieldsXml(fields: DataExtensionField[]): string {
       }
 
       fieldXml += `
+      <IsRequired>${(field.isRequired ?? false) ? "true" : "false"}</IsRequired>`;
+
+      if (field.defaultValue !== undefined) {
+        fieldXml += `
+      <DefaultValue>${escapeXml(field.defaultValue)}</DefaultValue>`;
+      }
+
+      fieldXml += `
     </Field>`;
 
       return fieldXml;
@@ -107,18 +120,31 @@ export function buildCreateDataExtension(
   params: CreateDataExtensionParams,
 ): string {
   const fieldsXml = buildFieldsXml(params.fields);
+  const isSendable = params.isSendable ?? false;
+
+  let sendableXml = "";
+  if (isSendable && params.sendableField && params.sendableFieldType) {
+    sendableXml = `
+    <SendableDataExtensionField>
+      <Name>${escapeXml(params.sendableField)}</Name>
+      <FieldType>${escapeXml(params.sendableFieldType)}</FieldType>
+    </SendableDataExtensionField>
+    <SendableSubscriberField>
+      <Name>Subscriber Key</Name>
+    </SendableSubscriberField>`;
+  }
 
   return `<CreateRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
   <Objects xsi:type="DataExtension">
     <Name>${escapeXml(params.name)}</Name>
     <CustomerKey>${escapeXml(params.customerKey)}</CustomerKey>
     <CategoryID>${params.categoryId}</CategoryID>
-    <IsSendable>false</IsSendable>
+    <IsSendable>${isSendable ? "true" : "false"}</IsSendable>
     <DataRetentionPeriodLength>1</DataRetentionPeriodLength>
     <DataRetentionPeriod>Days</DataRetentionPeriod>
     <RowBasedRetention>false</RowBasedRetention>
     <ResetRetentionPeriodOnImport>false</ResetRetentionPeriodOnImport>
-    <DeleteAtEndOfRetentionPeriod>false</DeleteAtEndOfRetentionPeriod>
+    <DeleteAtEndOfRetentionPeriod>false</DeleteAtEndOfRetentionPeriod>${sendableXml}
     <Fields>
       ${fieldsXml}
     </Fields>

@@ -38,6 +38,9 @@ export interface CreateDataExtensionParams {
   name: string;
   customerKey: string;
   categoryId: number;
+  isSendable?: boolean;
+  sendableField?: string;
+  sendableFieldType?: string;
   fields: Array<{
     name: string;
     fieldType: string;
@@ -45,6 +48,8 @@ export interface CreateDataExtensionParams {
     scale?: number;
     precision?: number;
     isPrimaryKey?: boolean;
+    isRequired?: boolean;
+    defaultValue?: string;
   }>;
 }
 

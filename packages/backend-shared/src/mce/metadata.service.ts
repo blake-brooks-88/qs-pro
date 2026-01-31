@@ -4,6 +4,8 @@ import * as cacheManager from "cache-manager";
 
 import { MCE_TIMEOUTS } from "./http-timeout.config";
 import { MceBridgeService } from "./mce-bridge.service";
+import type { CreateDataExtensionParams } from "./services/data-extension.service";
+import { DataExtensionService } from "./services/data-extension.service";
 import {
   buildContinueRequest,
   buildRetrieveDataExtensionFields,
@@ -35,6 +37,7 @@ interface MceSoapResponse {
 export class MetadataService {
   constructor(
     private bridge: MceBridgeService,
+    private dataExtensionService: DataExtensionService,
     @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
   ) {}
 
@@ -239,5 +242,14 @@ export class MetadataService {
     await this.cacheManager.set(cacheKey, fields, 1800000);
 
     return fields;
+  }
+
+  async createDataExtension(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    params: CreateDataExtensionParams,
+  ): Promise<{ objectId: string }> {
+    return this.dataExtensionService.create(tenantId, userId, mid, params);
   }
 }
