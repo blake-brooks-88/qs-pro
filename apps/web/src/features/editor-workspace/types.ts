@@ -20,7 +20,7 @@ export type SFMCFieldType =
   | "Number"
   | "Date"
   | "Boolean"
-  | "Email"
+  | "EmailAddress"
   | "Phone"
   | "Decimal";
 
@@ -30,8 +30,11 @@ export interface DataExtensionField {
   name: string;
   type: SFMCFieldType;
   length?: number;
+  scale?: number;
+  precision?: number;
   isPrimaryKey: boolean;
   isNullable: boolean;
+  defaultValue?: string;
 }
 
 export interface DataExtension {
@@ -95,6 +98,9 @@ export interface QueryTab {
 export interface DataExtensionDraft {
   name: string;
   customerKey: string;
+  folderId: string;
+  isSendable: boolean;
+  subscriberKeyField?: string;
   fields: DataExtensionField[];
 }
 
