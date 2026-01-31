@@ -74,7 +74,7 @@ describe("Asterisk Expansion", () => {
     const mockFields: DataExtensionField[] = [
       {
         name: "EmailAddress",
-        type: "Email",
+        type: "EmailAddress",
         isPrimaryKey: true,
         isNullable: false,
       },
@@ -121,7 +121,7 @@ describe("Asterisk Expansion", () => {
     const mockFields: DataExtensionField[] = [
       {
         name: "EmailAddress",
-        type: "Email",
+        type: "EmailAddress",
         isPrimaryKey: true,
         isNullable: false,
       },
@@ -196,7 +196,7 @@ describe("Asterisk Expansion", () => {
     const mockFields: DataExtensionField[] = [
       {
         name: "Email Address",
-        type: "Email",
+        type: "EmailAddress",
         isPrimaryKey: true,
         isNullable: false,
       },
@@ -260,7 +260,7 @@ describe("Asterisk Expansion", () => {
         return [
           {
             name: "EmailAddress",
-            type: "Email" as const,
+            type: "EmailAddress" as const,
             isPrimaryKey: true,
             isNullable: false,
           },
@@ -320,7 +320,7 @@ describe("Asterisk Expansion", () => {
     const mockFields: DataExtensionField[] = [
       {
         name: "Email Address",
-        type: "Email",
+        type: "EmailAddress",
         isPrimaryKey: true,
         isNullable: false,
       },

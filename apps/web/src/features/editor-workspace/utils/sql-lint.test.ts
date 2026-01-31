@@ -142,7 +142,7 @@ describe("sql lint", () => {
         fields: [
           {
             name: "EmailAddress",
-            type: "Email",
+            type: "EmailAddress",
             isPrimaryKey: false,
             isNullable: true,
           },
@@ -158,7 +158,7 @@ describe("sql lint", () => {
         fields: [
           {
             name: "EmailAddress",
-            type: "Email",
+            type: "EmailAddress",
             isPrimaryKey: false,
             isNullable: true,
           },
@@ -192,7 +192,7 @@ describe("sql lint", () => {
         fields: [
           {
             name: "EmailAddress",
-            type: "Email",
+            type: "EmailAddress",
             isPrimaryKey: false,
             isNullable: true,
           },
@@ -208,7 +208,7 @@ describe("sql lint", () => {
         fields: [
           {
             name: "EmailAddress",
-            type: "Email",
+            type: "EmailAddress",
             isPrimaryKey: false,
             isNullable: true,
           },
@@ -242,7 +242,7 @@ describe("sql lint", () => {
         fields: [
           {
             name: "EmailAddress",
-            type: "Email",
+            type: "EmailAddress",
             isPrimaryKey: false,
             isNullable: true,
           },
@@ -263,7 +263,7 @@ describe("sql lint", () => {
         fields: [
           {
             name: "EmailAddress",
-            type: "Email",
+            type: "EmailAddress",
             isPrimaryKey: false,
             isNullable: true,
           },
