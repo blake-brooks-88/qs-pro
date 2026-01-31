@@ -644,6 +644,7 @@ describe('Query Execution Flow (e2e)', () => {
               UPDATE shell_query_runs
               SET status = 'running', started_at = NOW()
               WHERE id = ${runId}::uuid
+                AND status NOT IN ('canceled', 'failed', 'ready')
             `;
             },
           );
@@ -745,6 +746,7 @@ describe('Query Execution Flow (e2e)', () => {
                 UPDATE shell_query_runs
                 SET status = 'failed', error_message = ${encryptedError}, completed_at = NOW()
                 WHERE id = ${runId}::uuid
+                  AND status NOT IN ('canceled', 'failed', 'ready')
               `;
               },
             );
@@ -767,6 +769,7 @@ describe('Query Execution Flow (e2e)', () => {
               UPDATE shell_query_runs
               SET status = 'ready', completed_at = NOW()
               WHERE id = ${runId}::uuid
+                AND status NOT IN ('canceled', 'failed', 'ready')
             `;
             },
           );
