@@ -47,7 +47,7 @@
       "description": "Primary source of truth for all active subscribers.",
       "fields": [
         { "name": "SubscriberKey", "type": "Text", "length": 255, "isPrimaryKey": true, "isNullable": false },
-        { "name": "EmailAddress", "type": "Email", "length": 254, "isPrimaryKey": false, "isNullable": false },
+        { "name": "EmailAddress", "type": "EmailAddress", "length": 254, "isPrimaryKey": false, "isNullable": false },
         { "name": "OptInStatus", "type": "Boolean", "isPrimaryKey": false, "isNullable": true },
         { "name": "LastLogin", "type": "Date", "isPrimaryKey": false, "isNullable": true }
       ]
@@ -59,7 +59,7 @@
       "folderId": "f-5",
       "description": "Historical audit of all unsubscribed users.",
       "fields": [
-        { "name": "Email", "type": "Email", "length": 254, "isPrimaryKey": true, "isNullable": false },
+        { "name": "Email", "type": "EmailAddress", "length": 254, "isPrimaryKey": true, "isNullable": false },
         { "name": "UnsubscribeDate", "type": "Date", "isPrimaryKey": false, "isNullable": false },
         { "name": "Reason", "type": "Text", "length": 500, "isPrimaryKey": false, "isNullable": true }
       ]

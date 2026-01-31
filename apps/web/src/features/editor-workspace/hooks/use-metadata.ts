@@ -114,8 +114,8 @@ const FIELD_TYPE_MAP = new Map<string, SFMCFieldType>([
   ["Number", "Number"],
   ["Date", "Date"],
   ["Boolean", "Boolean"],
-  ["Email", "Email"],
-  ["EmailAddress", "Email"],
+  ["Email", "EmailAddress"],
+  ["EmailAddress", "EmailAddress"],
   ["Phone", "Phone"],
   ["Decimal", "Decimal"],
 ]);
