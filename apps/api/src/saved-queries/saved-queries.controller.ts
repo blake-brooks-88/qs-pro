@@ -11,10 +11,10 @@ import {
 } from '@nestjs/common';
 import { SessionGuard } from '@qpp/backend-shared';
 import {
-  CreateSavedQuerySchema,
   type CreateSavedQueryDto,
-  UpdateSavedQuerySchema,
+  CreateSavedQuerySchema,
   type UpdateSavedQueryDto,
+  UpdateSavedQuerySchema,
 } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
@@ -22,7 +22,6 @@ import {
   CurrentUser,
   type UserSession,
 } from '../common/decorators/current-user.decorator';
-
 import {
   type DecryptedSavedQuery,
   SavedQueriesService,
@@ -53,12 +52,17 @@ export class SavedQueriesController {
 
   @Get()
   async findAll(@CurrentUser() user: UserSession) {
-    const queries = await this.savedQueriesService.findAll(
+    const queries = await this.savedQueriesService.findAllListItems(
       user.tenantId,
       user.mid,
       user.userId,
     );
-    return queries.map((q) => this.toListItem(q));
+    return queries.map((q) => ({
+      id: q.id,
+      name: q.name,
+      folderId: q.folderId,
+      updatedAt: q.updatedAt.toISOString(),
+    }));
   }
 
   @Get('count')
@@ -124,15 +128,6 @@ export class SavedQueriesController {
       sqlText: query.sqlText,
       folderId: query.folderId,
       createdAt: query.createdAt.toISOString(),
-      updatedAt: query.updatedAt.toISOString(),
-    };
-  }
-
-  private toListItem(query: DecryptedSavedQuery) {
-    return {
-      id: query.id,
-      name: query.name,
-      folderId: query.folderId,
       updatedAt: query.updatedAt.toISOString(),
     };
   }

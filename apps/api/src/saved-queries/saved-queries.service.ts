@@ -5,10 +5,12 @@ import {
   ErrorCode,
   RlsContextService,
 } from '@qpp/backend-shared';
-import type { CreateSavedQueryDto, UpdateSavedQueryDto } from '@qpp/shared-types';
+import type {
+  CreateSavedQueryDto,
+  UpdateSavedQueryDto,
+} from '@qpp/shared-types';
 
 import type { FoldersRepository } from '../folders/folders.repository';
-
 import type {
   SavedQueriesRepository,
   SavedQuery,
@@ -41,35 +43,40 @@ export class SavedQueriesService {
     userId: string,
     dto: CreateSavedQueryDto,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(tenantId, mid, userId, async () => {
-      if (dto.folderId) {
-        const folder = await this.foldersRepository.findById(dto.folderId);
-        if (!folder) {
-          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-            operation: 'create_saved_query',
-            reason: `Folder not found: ${dto.folderId}`,
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        if (dto.folderId) {
+          const folder = await this.foldersRepository.findById(dto.folderId);
+          if (!folder) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'create_saved_query',
+              reason: `Folder not found: ${dto.folderId}`,
+            });
+          }
+        }
+
+        const sqlTextEncrypted = this.encryptionService.encrypt(dto.sqlText);
+        if (!sqlTextEncrypted) {
+          throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+            reason: 'Failed to encrypt SQL text',
           });
         }
-      }
 
-      const sqlTextEncrypted = this.encryptionService.encrypt(dto.sqlText);
-      if (!sqlTextEncrypted) {
-        throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
-          reason: 'Failed to encrypt SQL text',
+        const query = await this.savedQueriesRepository.create({
+          tenantId,
+          mid,
+          userId,
+          name: dto.name,
+          sqlTextEncrypted,
+          folderId: dto.folderId ?? null,
         });
-      }
 
-      const query = await this.savedQueriesRepository.create({
-        tenantId,
-        mid,
-        userId,
-        name: dto.name,
-        sqlTextEncrypted,
-        folderId: dto.folderId ?? null,
-      });
-
-      return this.decryptQuery(query);
-    });
+        return this.decryptQuery(query);
+      },
+    );
   }
 
   async findAll(
@@ -77,10 +84,38 @@ export class SavedQueriesService {
     mid: string,
     userId: string,
   ): Promise<DecryptedSavedQuery[]> {
-    return this.rlsContext.runWithUserContext(tenantId, mid, userId, async () => {
-      const queries = await this.savedQueriesRepository.findAll();
-      return queries.map((q) => this.decryptQuery(q));
-    });
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const queries = await this.savedQueriesRepository.findAll();
+        return queries.map((q) => this.decryptQuery(q));
+      },
+    );
+  }
+
+  async findAllListItems(
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<
+    { id: string; name: string; folderId: string | null; updatedAt: Date }[]
+  > {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const queries = await this.savedQueriesRepository.findAll();
+        return queries.map((q) => ({
+          id: q.id,
+          name: q.name,
+          folderId: q.folderId,
+          updatedAt: q.updatedAt,
+        }));
+      },
+    );
   }
 
   async findById(
@@ -89,16 +124,21 @@ export class SavedQueriesService {
     userId: string,
     id: string,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(tenantId, mid, userId, async () => {
-      const query = await this.savedQueriesRepository.findById(id);
-      if (!query) {
-        throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-          operation: 'find_saved_query',
-          reason: `Saved query not found: ${id}`,
-        });
-      }
-      return this.decryptQuery(query);
-    });
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const query = await this.savedQueriesRepository.findById(id);
+        if (!query) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'find_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+        return this.decryptQuery(query);
+      },
+    );
   }
 
   async update(
@@ -108,43 +148,51 @@ export class SavedQueriesService {
     id: string,
     dto: UpdateSavedQueryDto,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(tenantId, mid, userId, async () => {
-      if (dto.folderId) {
-        const folder = await this.foldersRepository.findById(dto.folderId);
-        if (!folder) {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        if (dto.folderId) {
+          const folder = await this.foldersRepository.findById(dto.folderId);
+          if (!folder) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'update_saved_query',
+              reason: `Folder not found: ${dto.folderId}`,
+            });
+          }
+        }
+
+        const updateParams: UpdateSavedQueryParams = {};
+        if (dto.name !== undefined) {
+          updateParams.name = dto.name;
+        }
+        if (dto.sqlText !== undefined) {
+          const sqlTextEncrypted = this.encryptionService.encrypt(dto.sqlText);
+          if (!sqlTextEncrypted) {
+            throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+              reason: 'Failed to encrypt SQL text',
+            });
+          }
+          updateParams.sqlTextEncrypted = sqlTextEncrypted;
+        }
+        if (dto.folderId !== undefined) {
+          updateParams.folderId = dto.folderId;
+        }
+
+        const query = await this.savedQueriesRepository.update(
+          id,
+          updateParams,
+        );
+        if (!query) {
           throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
             operation: 'update_saved_query',
-            reason: `Folder not found: ${dto.folderId}`,
+            reason: `Saved query not found: ${id}`,
           });
         }
-      }
-
-      const updateParams: UpdateSavedQueryParams = {};
-      if (dto.name !== undefined) {
-        updateParams.name = dto.name;
-      }
-      if (dto.sqlText !== undefined) {
-        const sqlTextEncrypted = this.encryptionService.encrypt(dto.sqlText);
-        if (!sqlTextEncrypted) {
-          throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
-            reason: 'Failed to encrypt SQL text',
-          });
-        }
-        updateParams.sqlTextEncrypted = sqlTextEncrypted;
-      }
-      if (dto.folderId !== undefined) {
-        updateParams.folderId = dto.folderId;
-      }
-
-      const query = await this.savedQueriesRepository.update(id, updateParams);
-      if (!query) {
-        throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-          operation: 'update_saved_query',
-          reason: `Saved query not found: ${id}`,
-        });
-      }
-      return this.decryptQuery(query);
-    });
+        return this.decryptQuery(query);
+      },
+    );
   }
 
   async delete(
@@ -153,18 +201,27 @@ export class SavedQueriesService {
     userId: string,
     id: string,
   ): Promise<void> {
-    return this.rlsContext.runWithUserContext(tenantId, mid, userId, async () => {
-      const deleted = await this.savedQueriesRepository.delete(id);
-      if (!deleted) {
-        throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-          operation: 'delete_saved_query',
-          reason: `Saved query not found: ${id}`,
-        });
-      }
-    });
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const deleted = await this.savedQueriesRepository.delete(id);
+        if (!deleted) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'delete_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+      },
+    );
   }
 
-  async countByUser(tenantId: string, mid: string, userId: string): Promise<number> {
+  async countByUser(
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<number> {
     return this.rlsContext.runWithUserContext(tenantId, mid, userId, () =>
       this.savedQueriesRepository.countByUser(),
     );

@@ -39,6 +39,14 @@ export const handlers = [
     return HttpResponse.json([]);
   }),
 
+  http.get("/api/saved-queries/count", () => {
+    return HttpResponse.json({ count: 0 });
+  }),
+
+  http.get("/api/auth/refresh", () => {
+    return HttpResponse.json({ success: true });
+  }),
+
   http.patch("/api/folders/:id", () => {
     return HttpResponse.json({ id: "1", name: "Updated", parentId: null });
   }),

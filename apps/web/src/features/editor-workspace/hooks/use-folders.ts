@@ -10,13 +10,14 @@ import api from "@/services/api";
 const FOLDERS_KEY = ["folders"] as const;
 
 // Query hook - fetch all folders
-export function useFolders() {
+export function useFolders(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: FOLDERS_KEY,
     queryFn: async () => {
       const response = await api.get<FolderResponse[]>("/folders");
       return response.data;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 

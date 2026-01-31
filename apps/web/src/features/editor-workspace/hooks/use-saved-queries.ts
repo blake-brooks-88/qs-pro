@@ -13,13 +13,14 @@ const SAVED_QUERY_KEY = (id: string) => ["saved-query", id] as const;
 const SAVED_QUERY_COUNT_KEY = ["saved-queries", "count"] as const;
 
 // Query hook - fetch all saved queries (list items without SQL text)
-export function useSavedQueries() {
+export function useSavedQueries(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: SAVED_QUERIES_KEY,
     queryFn: async () => {
       const response = await api.get<SavedQueryListItem[]>("/saved-queries");
       return response.data;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -41,13 +42,14 @@ export function useSavedQuery(id: string | undefined) {
 }
 
 // Query hook - fetch count for quota checking
-export function useSavedQueryCount() {
+export function useSavedQueryCount(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: SAVED_QUERY_COUNT_KEY,
     queryFn: async () => {
       const response = await api.get<{ count: number }>("/saved-queries/count");
       return response.data.count;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -121,7 +123,8 @@ export function useUpdateSavedQuery() {
                 ? {
                     ...q,
                     name: data.name ?? q.name,
-                    folderId: data.folderId ?? q.folderId,
+                    folderId:
+                      data.folderId !== undefined ? data.folderId : q.folderId,
                   }
                 : q,
             ),

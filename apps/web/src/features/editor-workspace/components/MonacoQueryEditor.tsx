@@ -949,14 +949,16 @@ export function MonacoQueryEditor({
         },
       );
 
-      editorInstance.addCommand(
-        monacoInstance.KeyMod.CtrlCmd |
-          monacoInstance.KeyMod.Shift |
-          monacoInstance.KeyCode.KeyS,
-        () => {
-          onSaveAsRef.current?.();
-        },
-      );
+      if (onSaveAs) {
+        editorInstance.addCommand(
+          monacoInstance.KeyMod.CtrlCmd |
+            monacoInstance.KeyMod.Shift |
+            monacoInstance.KeyCode.KeyS,
+          () => {
+            onSaveAsRef.current?.();
+          },
+        );
+      }
 
       if (onRunRequest) {
         editorInstance.addCommand(
@@ -991,6 +993,7 @@ export function MonacoQueryEditor({
       getFieldsCount,
       getBracketReplacementRange,
       onRunRequest,
+      onSaveAs,
       resolveDataExtension,
     ],
   );

@@ -55,16 +55,16 @@ export function SaveQueryModal({
   );
 
   // Quota and tier hooks
-  const { data: queryCount = 0 } = useSavedQueryCount();
+  const { data: queryCount = 0 } = useSavedQueryCount({ enabled: isOpen });
   const queryLimit = useSavedQueryLimit();
   const { tier } = useTier();
   const foldersEnabled = tier !== "free"; // Folders are Pro+ only
 
   // Folder data
-  const { data: folders = [] } = useFolders();
+  const { data: folders = [] } = useFolders({ enabled: isOpen });
 
   // Saved queries for duplicate name detection
-  const { data: queries = [] } = useSavedQueries();
+  const { data: queries = [] } = useSavedQueries({ enabled: isOpen });
 
   // Mutation
   const createQuery = useCreateSavedQuery();
@@ -99,8 +99,10 @@ export function SaveQueryModal({
       });
 
       onSaveSuccess?.(query.id, query.name);
-      // Legacy callback support
-      onSave?.(name.trim(), folderId ?? "");
+      // Only call legacy onSave if onSaveSuccess is NOT provided
+      if (!onSaveSuccess) {
+        onSave?.(name.trim(), folderId ?? "");
+      }
       onClose();
     } catch (error) {
       toast.error("Failed to save query", {
