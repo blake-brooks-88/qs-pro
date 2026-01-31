@@ -40,6 +40,7 @@ Thumbs.db
 
 # Testing
 coverage/
+coverage-*/
 .nyc_output
 
 # Docker
@@ -59,4 +60,6 @@ tmp/
 .playwright-mcp/
 .planning/
 .agent-os/
+.augment/
+agent-os/
 
