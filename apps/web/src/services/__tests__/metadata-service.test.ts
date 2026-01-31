@@ -180,7 +180,7 @@ describe("metadata service", () => {
         },
         {
           Name: "Email",
-          FieldType: "Email",
+          FieldType: "EmailAddress",
           MaxLength: 254,
           IsPrimaryKey: false,
           IsRequired: true,
