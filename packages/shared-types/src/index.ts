@@ -65,3 +65,16 @@ export {
   SavedQueryResponseSchema,
   UpdateSavedQuerySchema,
 } from "./saved-queries.js";
+
+// Data Extensions
+export type {
+  CreateDataExtensionDto,
+  DataExtensionFieldDto,
+} from "./data-extensions.js";
+export {
+  CreateDataExtensionSchema,
+  CUSTOMER_KEY_VALIDATION,
+  DataExtensionFieldSchema,
+  DE_NAME_VALIDATION,
+  FIELD_NAME_VALIDATION,
+} from "./data-extensions.js";
