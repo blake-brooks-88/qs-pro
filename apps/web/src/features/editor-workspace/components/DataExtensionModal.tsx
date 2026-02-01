@@ -27,6 +27,8 @@ import type {
 } from "@/features/editor-workspace/types";
 import { cn } from "@/lib/utils";
 
+import { FolderTreePicker } from "./FolderTreePicker";
+
 interface DataExtensionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -49,9 +51,12 @@ export function DataExtensionModal({
   const [subscriberKeyField, setSubscriberKeyField] = useState("");
   const [fields, setFields] = useState<DataExtensionField[]>([]);
 
-  // Filter folders to only data-extension type
+  // Filter folders to only data-extension type, excluding System Data Views
   const defolders = useMemo(
-    () => folders?.filter((f) => f.type === "data-extension") ?? [],
+    () =>
+      folders?.filter(
+        (f) => f.type === "data-extension" && !f.id.startsWith("sdv-"),
+      ) ?? [],
     [folders],
   );
 
@@ -260,19 +265,13 @@ export function DataExtensionModal({
             >
               Folder
             </label>
-            <select
+            <FolderTreePicker
               id="de-folder"
+              folders={defolders}
               value={folderId}
-              onChange={(event) => setFolderId(event.target.value)}
-              className="w-full bg-muted border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary cursor-pointer"
-            >
-              <option value="">Select a folder...</option>
-              {defolders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
+              onChange={setFolderId}
+              placeholder="Select a folder..."
+            />
           </div>
 
           {/* Sendable Toggle */}
