@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { DevTierSelector } from "@/components/dev/DevTierSelector";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { LaunchInstructionsPage } from "@/features/auth/launch-instructions-page";
@@ -246,7 +247,9 @@ function App() {
   }
 
   return (
-    <AppShell>
+    <AppShell
+      brandingExtra={import.meta.env.DEV ? <DevTierSelector /> : undefined}
+    >
       <EditorWorkspacePage />
       <Toaster />
     </AppShell>
