@@ -38,24 +38,26 @@ import { cn } from "@/lib/utils";
 
 import { FolderTreePicker } from "./FolderTreePicker";
 
-function toLocalDateString(date: Date): string {
-  const yyyy = String(date.getFullYear());
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function getTomorrowDateString(): string {
-  const now = new Date();
-  const tomorrow = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1,
-  );
-  return toLocalDateString(tomorrow);
-}
-
 const YYYY_MM_DD_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+const getTodayUtcDateString = (): string =>
+  new Date().toISOString().slice(0, 10);
+
+const isValidCalendarDate = (dateStr: string): boolean => {
+  const parts = dateStr.split("-").map(Number);
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+  if (year === undefined || month === undefined || day === undefined) {
+    return false;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+};
 
 type FieldErrorKey =
   | "name"
@@ -154,11 +156,11 @@ export function DataExtensionModal({
       return Number.isInteger(parsed) && parsed > 0 && parsed <= 999;
     }
 
-    const tomorrow = getTomorrowDateString();
+    const today = getTodayUtcDateString();
     return (
       YYYY_MM_DD_REGEX.test(retainUntil) &&
-      retainUntil >= tomorrow &&
-      retainUntil.length === 10
+      isValidCalendarDate(retainUntil) &&
+      retainUntil >= today
     );
   }, [isRetentionEnabled, retentionMode, periodLength, retainUntil]);
 
@@ -843,7 +845,7 @@ export function DataExtensionModal({
                       <DatePicker
                         id="retain-until"
                         value={retainUntil}
-                        min={getTomorrowDateString()}
+                        min={getTodayUtcDateString()}
                         onChange={setRetainUntil}
                         placeholder="YYYY-MM-DD"
                         className={cn(
@@ -917,7 +919,7 @@ export function DataExtensionModal({
                     <p className="text-[10px] text-destructive">
                       {retentionMode === "period"
                         ? "Retention length must be between 1 and 999."
-                        : "Retain-until date must be tomorrow or later."}
+                        : "Retain-until date must be today or later."}
                     </p>
                   ) : null}
                 </div>

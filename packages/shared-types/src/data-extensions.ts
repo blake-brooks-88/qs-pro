@@ -33,23 +33,25 @@ const FieldTypeEnum = z.enum([
   "Locale",
 ]);
 
-function toLocalDateString(date: Date): string {
-  const yyyy = String(date.getFullYear());
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 const YYYY_MM_DD_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-const getTomorrowDateString = (): string => {
-  const now = new Date();
-  const tomorrow = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1,
+const getTodayUtcDateString = (): string =>
+  new Date().toISOString().slice(0, 10);
+
+const isValidCalendarDate = (dateStr: string): boolean => {
+  const parts = dateStr.split("-").map(Number);
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+  if (year === undefined || month === undefined || day === undefined) {
+    return false;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
   );
-  return toLocalDateString(tomorrow);
 };
 
 export const DataRetentionPolicySchema = z.discriminatedUnion("type", [
@@ -66,9 +68,10 @@ export const DataRetentionPolicySchema = z.discriminatedUnion("type", [
     retainUntil: z
       .string()
       .regex(YYYY_MM_DD_REGEX, "Must be YYYY-MM-DD format")
+      .refine(isValidCalendarDate, "Must be a valid calendar date")
       .refine(
-        (d) => d >= getTomorrowDateString(),
-        "Retain until date must be tomorrow or later",
+        (d) => d >= getTodayUtcDateString(),
+        "Retain until date must be today or later",
       ),
     deleteType: z.enum(["individual", "all"]),
     resetOnImport: z.boolean(),
@@ -132,7 +135,23 @@ export const CreateDataExtensionSchema = z
       .min(1, "At least one field is required"),
   })
   .superRefine((data, ctx) => {
-    // subscriberKeyField is required when isSendable is true
+    const seenNames = new Set<string>();
+    for (let i = 0; i < data.fields.length; i++) {
+      const field = data.fields[i];
+      if (!field) {
+        continue;
+      }
+      const normalizedName = field.name.toLowerCase();
+      if (seenNames.has(normalizedName)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate field name "${field.name}" (field names are case-insensitive)`,
+          path: ["fields", i, "name"],
+        });
+      }
+      seenNames.add(normalizedName);
+    }
+
     if (data.isSendable && !data.subscriberKeyField) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
