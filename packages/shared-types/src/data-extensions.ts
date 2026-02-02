@@ -32,6 +32,49 @@ const FieldTypeEnum = z.enum([
   "Decimal",
 ]);
 
+function toLocalDateString(date: Date): string {
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+const YYYY_MM_DD_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+const getTomorrowDateString = (): string => {
+  const now = new Date();
+  const tomorrow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+  );
+  return toLocalDateString(tomorrow);
+};
+
+export const DataRetentionPolicySchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("period"),
+    periodLength: z.number().int().positive().max(999),
+    periodUnit: z.enum(["Days", "Weeks", "Months", "Years"]),
+    deleteType: z.enum(["individual", "all"]),
+    resetOnImport: z.boolean(),
+    deleteAtEnd: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("date"),
+    retainUntil: z
+      .string()
+      .regex(YYYY_MM_DD_REGEX, "Must be YYYY-MM-DD format")
+      .refine(
+        (d) => d >= getTomorrowDateString(),
+        "Retain until date must be tomorrow or later",
+      ),
+    deleteType: z.enum(["individual", "all"]),
+    resetOnImport: z.boolean(),
+    deleteAtEnd: z.boolean(),
+  }),
+]);
+
 // Data Extension Field Schema
 export const DataExtensionFieldSchema = z.object({
   name: z
@@ -68,8 +111,8 @@ export const CreateDataExtensionSchema = z
       ),
     customerKey: z
       .string()
-      .min(1, "Customer key is required")
-      .max(CUSTOMER_KEY_VALIDATION.maxLength, CUSTOMER_KEY_VALIDATION.message),
+      .max(CUSTOMER_KEY_VALIDATION.maxLength, CUSTOMER_KEY_VALIDATION.message)
+      .optional(),
     folderId: z
       .string()
       .regex(/^\d+$/, "Folder ID must be a numeric MCE folder ID"),
@@ -78,6 +121,7 @@ export const CreateDataExtensionSchema = z
       .string()
       .max(254, "Subscriber key field must be 254 characters or less")
       .optional(),
+    retention: DataRetentionPolicySchema.optional(),
     fields: z
       .array(DataExtensionFieldSchema)
       .min(1, "At least one field is required"),
@@ -125,4 +169,5 @@ export const CreateDataExtensionSchema = z
 
 // Types derived from schemas
 export type DataExtensionFieldDto = z.infer<typeof DataExtensionFieldSchema>;
+export type DataRetentionPolicy = z.infer<typeof DataRetentionPolicySchema>;
 export type CreateDataExtensionDto = z.infer<typeof CreateDataExtensionSchema>;
