@@ -30,6 +30,7 @@ const FIELD_TYPE_MAP: Record<string, SFMCFieldType> = {
   EmailAddress: "EmailAddress",
   Phone: "Phone",
   Decimal: "Decimal",
+  Locale: "Locale",
 };
 
 const mapFieldType = (value?: string): SFMCFieldType =>

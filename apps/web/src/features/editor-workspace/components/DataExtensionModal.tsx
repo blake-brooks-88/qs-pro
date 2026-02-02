@@ -1,7 +1,6 @@
 import {
-  CUSTOMER_KEY_VALIDATION,
+  CreateDataExtensionSchema,
   type DataRetentionPolicy,
-  DE_NAME_VALIDATION,
   FIELD_NAME_VALIDATION,
 } from "@qpp/shared-types";
 import {
@@ -13,6 +12,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
+  DataExtension,
   DataExtensionDraft,
   DataExtensionField,
   Folder,
@@ -49,12 +57,23 @@ function getTomorrowDateString(): string {
 
 const YYYY_MM_DD_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+type FieldErrorKey =
+  | "name"
+  | "type"
+  | "length"
+  | "precision"
+  | "scale"
+  | "defaultValue";
+
+type FieldErrors = Partial<Record<FieldErrorKey, string>>;
+
 interface DataExtensionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave?: (data: DataExtensionDraft) => void;
+  onSave?: (data: DataExtensionDraft) => Promise<void> | void;
   initialFields?: DataExtensionField[];
   folders?: Folder[];
+  dataExtensions?: DataExtension[];
 }
 
 export function DataExtensionModal({
@@ -63,6 +82,7 @@ export function DataExtensionModal({
   onSave,
   initialFields,
   folders,
+  dataExtensions,
 }: DataExtensionModalProps) {
   const [name, setName] = useState("");
   const [customerKey, setCustomerKey] = useState("");
@@ -70,6 +90,8 @@ export function DataExtensionModal({
   const [isSendable, setIsSendable] = useState(false);
   const [subscriberKeyField, setSubscriberKeyField] = useState("");
   const [fields, setFields] = useState<DataExtensionField[]>([]);
+  const [didAttemptSubmit, setDidAttemptSubmit] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [isRetentionEnabled, setIsRetentionEnabled] = useState(false);
   const [retentionMode, setRetentionMode] = useState<"period" | "date">(
@@ -121,26 +143,7 @@ export function DataExtensionModal({
     }
   }, [subscriberKeyField, subscriberKeyEligibleFields]);
 
-  // Validation helpers
-  const isNameValid = useMemo(() => {
-    const trimmed = name.trim();
-    return (
-      trimmed.length > 0 &&
-      trimmed.length <= 100 &&
-      !trimmed.startsWith("_") &&
-      !DE_NAME_VALIDATION.pattern.test(trimmed)
-    );
-  }, [name]);
-
-  const isFolderValid = folderId !== "";
-
-  const isSendableValid = useMemo(() => {
-    if (!isSendable) {
-      return true;
-    }
-    return subscriberKeyField !== "";
-  }, [isSendable, subscriberKeyField]);
-
+  // Validation (schema + targeted client-side rules)
   const isRetentionValid = useMemo(() => {
     if (!isRetentionEnabled) {
       return true;
@@ -196,8 +199,165 @@ export function DataExtensionModal({
     retentionMode,
   ]);
 
-  const isFormValid =
-    isNameValid && isFolderValid && isSendableValid && isRetentionValid;
+  const validation = useMemo(() => {
+    const trimmedName = name.trim();
+    const normalizedFields = fields.map(({ id: _id, ...field }) => ({
+      ...field,
+      name: field.name.trim(),
+      defaultValue: field.defaultValue?.trim() || undefined,
+    }));
+
+    const dto = {
+      name: trimmedName,
+      customerKey: customerKey.trim() || undefined,
+      folderId,
+      isSendable,
+      subscriberKeyField: isSendable ? subscriberKeyField : undefined,
+      retention: retentionPolicy,
+      fields: normalizedFields,
+    };
+
+    const parsed = CreateDataExtensionSchema.safeParse(dto);
+
+    const formErrors: Partial<
+      Record<
+        "name" | "customerKey" | "folderId" | "subscriberKeyField" | "fields",
+        string
+      >
+    > = {};
+    const fieldErrorsById: Record<string, FieldErrors> = {};
+
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const [root, maybeIndex, maybeKey] = issue.path;
+
+        if (root === "fields" && typeof maybeIndex === "number") {
+          const fieldId = fields[maybeIndex]?.id;
+          if (!fieldId) {
+            continue;
+          }
+          const key = (maybeKey as FieldErrorKey | undefined) ?? "name";
+          fieldErrorsById[fieldId] ??= {};
+          fieldErrorsById[fieldId][key] ??= issue.message;
+          continue;
+        }
+
+        if (root === "fields") {
+          formErrors.fields ??= issue.message;
+          continue;
+        }
+
+        if (
+          root === "name" ||
+          root === "customerKey" ||
+          root === "folderId" ||
+          root === "subscriberKeyField"
+        ) {
+          formErrors[root] ??= issue.message;
+        }
+      }
+    }
+
+    // Duplicate DE name (client-side, using cached metadata)
+    const normalizedExistingNames = new Set(
+      (dataExtensions ?? []).map((de) => de.name.trim().toLowerCase()),
+    );
+    if (trimmedName && normalizedExistingNames.has(trimmedName.toLowerCase())) {
+      formErrors.name ??= `A Data Extension named "${trimmedName}" already exists.`;
+    }
+
+    // Duplicate field names (case-insensitive)
+    const normalizedFieldNames = fields
+      .map((f) => f.name.trim().toLowerCase())
+      .filter(Boolean);
+    const fieldNameCounts = normalizedFieldNames.reduce<Map<string, number>>(
+      (acc, n) => {
+        acc.set(n, (acc.get(n) ?? 0) + 1);
+        return acc;
+      },
+      new Map(),
+    );
+    const duplicateNames = new Set(
+      [...fieldNameCounts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([n]) => n),
+    );
+
+    for (const f of fields) {
+      if (!f.id) {
+        continue;
+      }
+      const normalized = f.name.trim().toLowerCase();
+      if (normalized && duplicateNames.has(normalized)) {
+        const errs = (fieldErrorsById[f.id] ??= {});
+        errs.name ??= "Field name must be unique.";
+      }
+
+      if (
+        (f.type === "Text" ||
+          f.type === "EmailAddress" ||
+          f.type === "Phone") &&
+        (typeof f.length !== "number" || f.length <= 0)
+      ) {
+        const errs = (fieldErrorsById[f.id] ??= {});
+        errs.length ??= "Length is required for this field type.";
+      }
+
+      if (f.type === "Decimal") {
+        const errs = (fieldErrorsById[f.id] ??= {});
+        if (typeof f.precision !== "number") {
+          errs.precision ??= "Precision is required for Decimal.";
+        }
+        if (typeof f.scale !== "number") {
+          errs.scale ??= "Scale is required for Decimal.";
+        }
+        if (
+          typeof f.precision === "number" &&
+          typeof f.scale === "number" &&
+          f.scale > f.precision
+        ) {
+          errs.scale ??= "Scale must be less than or equal to precision.";
+        }
+      }
+
+      if (
+        (f.type === "EmailAddress" ||
+          f.type === "Phone" ||
+          f.type === "Locale") &&
+        f.defaultValue?.trim()
+      ) {
+        const errs = (fieldErrorsById[f.id] ??= {});
+        errs.defaultValue ??=
+          "Default values are not supported for this field type.";
+      }
+    }
+
+    const hasFieldErrors = Object.values(fieldErrorsById).some((errs) =>
+      Object.values(errs).some(Boolean),
+    );
+
+    const isSubmittable =
+      parsed.success &&
+      !hasFieldErrors &&
+      isRetentionValid &&
+      Object.values(formErrors).every((e) => !e);
+
+    return {
+      isSubmittable,
+      formErrors,
+      fieldErrorsById,
+    };
+  }, [
+    customerKey,
+    dataExtensions,
+    fields,
+    folderId,
+    isRetentionValid,
+    isSendable,
+    name,
+    retentionPolicy,
+    subscriberKeyField,
+  ]);
 
   const handleAddField = () => {
     setFields((prev) => [
@@ -206,7 +366,7 @@ export function DataExtensionModal({
         id: crypto.randomUUID(),
         name: "",
         type: "Text",
-        length: undefined,
+        length: 254,
         isPrimaryKey: false,
         isNullable: true,
       },
@@ -229,20 +389,38 @@ export function DataExtensionModal({
   };
 
   const handleSave = () => {
-    if (!isFormValid) {
+    setDidAttemptSubmit(true);
+    if (!validation.isSubmittable) {
       return;
     }
-    onSave?.({
+    if (!onSave || isSaving) {
+      return;
+    }
+
+    const draft: DataExtensionDraft = {
       name: name.trim(),
       customerKey: customerKey.trim() || undefined,
       folderId,
       isSendable,
       subscriberKeyField: isSendable ? subscriberKeyField : undefined,
       retention: retentionPolicy,
-      fields,
-    });
-    resetForm();
-    onClose();
+      fields: fields.map((f) => ({
+        ...f,
+        name: f.name.trim(),
+        defaultValue: f.defaultValue?.trim() || undefined,
+      })),
+    };
+
+    setIsSaving(true);
+    Promise.resolve(onSave(draft))
+      .then(() => {
+        resetForm();
+        onClose();
+      })
+      .catch(() => {
+        // Error presentation happens upstream (toast). Keep the dialog open and preserve state.
+      })
+      .finally(() => setIsSaving(false));
   };
 
   const resetForm = () => {
@@ -252,6 +430,7 @@ export function DataExtensionModal({
     setIsSendable(false);
     setSubscriberKeyField("");
     setFields([]);
+    setDidAttemptSubmit(false);
     setIsRetentionEnabled(false);
     setRetentionMode("period");
     setPeriodLength("30");
@@ -268,449 +447,503 @@ export function DataExtensionModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-3xl bg-card border-border">
-        <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
-              <Database size={24} weight="Bold" className="text-primary" />
-            </div>
-            <div>
-              <DialogTitle className="font-display text-xl font-bold">
-                Create Data Extension
-              </DialogTitle>
-              <p className="text-xs text-muted-foreground">
-                Define a new target table in Marketing Cloud
-              </p>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          {/* Metadata Section */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="de-name"
-                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-              >
-                Name
-              </label>
-              <input
-                id="de-name"
-                type="text"
-                placeholder="e.g. Master_Subscriber_Feed"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className={cn(
-                  "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
-                  name.trim() && !isNameValid
-                    ? "border-destructive"
-                    : "border-border",
-                )}
-              />
-              {name.trim() && !isNameValid && (
-                <p className="text-[10px] text-destructive">
-                  {name.trim().startsWith("_")
-                    ? "Name cannot start with underscore"
-                    : DE_NAME_VALIDATION.pattern.test(name.trim())
-                      ? DE_NAME_VALIDATION.message
-                      : "Name must be 1-100 characters"}
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <label
-                htmlFor="de-customer-key"
-                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-              >
-                Customer Key
-              </label>
-              <input
-                id="de-customer-key"
-                type="text"
-                placeholder="Optional - auto-generated if blank"
-                value={customerKey}
-                onChange={(event) => setCustomerKey(event.target.value)}
-                className={cn(
-                  "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
-                  customerKey.trim().length > CUSTOMER_KEY_VALIDATION.maxLength
-                    ? "border-destructive"
-                    : "border-border",
-                )}
-              />
-              {customerKey.trim().length >
-                CUSTOMER_KEY_VALIDATION.maxLength && (
-                <p className="text-[10px] text-destructive">
-                  {CUSTOMER_KEY_VALIDATION.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Folder Picker */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="de-folder"
-              className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-            >
-              Folder
-            </label>
-            <FolderTreePicker
-              id="de-folder"
-              folders={defolders}
-              value={folderId}
-              onChange={setFolderId}
-              placeholder="Select a folder..."
-            />
-          </div>
-
-          {/* Sendable Toggle */}
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-3">
-                <InfoCircle
-                  size={20}
-                  className="text-muted-foreground shrink-0"
-                />
-                <div>
-                  <p className="text-xs font-bold text-foreground">
-                    Sendable Data Extension
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Enable to use this DE as a sendable audience for email
-                    sends.
-                  </p>
-                </div>
+    <TooltipProvider>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent className="max-w-3xl bg-card border-border">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
+                <Database size={24} weight="Bold" className="text-primary" />
               </div>
-              <button
-                type="button"
-                onClick={() => setIsSendable(!isSendable)}
-                className="flex items-center gap-2"
-                aria-label="Toggle sendable"
-              >
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                  {isSendable ? "On" : "Off"}
-                </span>
-                <div
-                  className={cn(
-                    "w-8 h-4 rounded-full relative transition-colors",
-                    isSendable ? "bg-primary" : "bg-muted border border-border",
-                  )}
+              <div>
+                <DialogTitle className="font-display text-xl font-bold">
+                  Create Data Extension
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground">
+                  Define a new target table in Marketing Cloud
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Metadata Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="de-name"
+                  className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                 >
-                  <div
-                    className={cn(
-                      "absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all",
-                      isSendable
-                        ? "left-[18px] bg-white"
-                        : "left-0.5 bg-muted-foreground",
-                    )}
-                  />
-                </div>
-              </button>
+                  Name
+                </label>
+                <input
+                  id="de-name"
+                  type="text"
+                  placeholder="e.g. Master_Subscriber_Feed"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className={cn(
+                    "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
+                    (didAttemptSubmit || name.trim()) &&
+                      validation.formErrors.name
+                      ? "border-destructive"
+                      : "border-border",
+                  )}
+                />
+                {(didAttemptSubmit || name.trim()) &&
+                validation.formErrors.name ? (
+                  <p className="text-[10px] text-destructive">
+                    {validation.formErrors.name}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="de-customer-key"
+                  className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                >
+                  Customer Key
+                </label>
+                <input
+                  id="de-customer-key"
+                  type="text"
+                  placeholder="Optional - auto-generated if blank"
+                  value={customerKey}
+                  onChange={(event) => setCustomerKey(event.target.value)}
+                  className={cn(
+                    "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
+                    (didAttemptSubmit || customerKey.trim()) &&
+                      validation.formErrors.customerKey
+                      ? "border-destructive"
+                      : "border-border",
+                  )}
+                />
+                {(didAttemptSubmit || customerKey.trim()) &&
+                validation.formErrors.customerKey ? (
+                  <p className="text-[10px] text-destructive">
+                    {validation.formErrors.customerKey}
+                  </p>
+                ) : null}
+              </div>
             </div>
 
-            {/* Subscriber Key Field Selection */}
-            {isSendable ? (
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="subscriber-key-field"
-                    className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-                  >
-                    Subscriber Key Field
-                  </label>
-                  <select
-                    id="subscriber-key-field"
-                    value={subscriberKeyField}
-                    onChange={(event) =>
-                      setSubscriberKeyField(event.target.value)
-                    }
-                    className="w-full bg-muted border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary cursor-pointer"
-                  >
-                    <option value="">Select a field...</option>
-                    {subscriberKeyEligibleFields.map((f) => (
-                      <option key={f.id ?? f.name} value={f.name}>
-                        {f.name} ({f.type})
-                      </option>
-                    ))}
-                  </select>
-                  {subscriberKeyEligibleFields.length === 0 && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Add a Text or EmailAddress field to enable subscriber key
-                      selection.
+            {/* Folder Picker */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="de-folder"
+                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                Folder
+              </label>
+              <FolderTreePicker
+                id="de-folder"
+                folders={defolders}
+                value={folderId}
+                onChange={setFolderId}
+                placeholder="Select a folder..."
+                triggerClassName={
+                  didAttemptSubmit && validation.formErrors.folderId
+                    ? "border-destructive"
+                    : undefined
+                }
+              />
+              {didAttemptSubmit && validation.formErrors.folderId ? (
+                <p className="text-[10px] text-destructive">
+                  {validation.formErrors.folderId}
+                </p>
+              ) : null}
+            </div>
+
+            {/* Sendable Toggle */}
+            <div className="p-4 rounded-lg bg-muted/50 border border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex gap-3">
+                  <InfoCircle
+                    size={20}
+                    className="text-muted-foreground shrink-0"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-foreground">
+                      Sendable Data Extension
                     </p>
-                  )}
+                    <p className="text-[10px] text-muted-foreground">
+                      Enable to use this DE as a sendable audience for email
+                      sends.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Fields Editor */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Fields Configuration
-              </span>
-              <button
-                type="button"
-                onClick={handleAddField}
-                className="flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary-400 uppercase tracking-widest"
-              >
-                <AddCircle size={14} /> Add Field
-              </button>
-            </div>
-
-            <div className="max-h-[240px] overflow-y-auto space-y-2 pr-2">
-              {fields.length === 0 ? (
-                <div className="text-[11px] text-muted-foreground px-2 py-3 border border-dashed border-border rounded-lg text-center">
-                  No fields added yet. Use “Add Field” to define your schema.
-                </div>
-              ) : (
-                fields.map((field, index) => (
-                  <FieldRow
-                    key={field.id}
-                    field={field}
-                    onChange={(updates) => handleUpdateField(index, updates)}
-                    onRemove={() => handleRemoveField(index)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Retention Policy */}
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-3">
-                <InfoCircle
-                  size={20}
-                  className="text-muted-foreground shrink-0"
-                />
-                <div>
-                  <p className="text-xs font-bold text-foreground">
-                    Data Retention Policy
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Automatically purge records after a set period or date.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsRetentionEnabled(!isRetentionEnabled)}
-                className="flex items-center gap-2"
-                aria-label="Toggle retention policy"
-              >
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                  {isRetentionEnabled ? "On" : "Off"}
-                </span>
-                <div
-                  className={cn(
-                    "w-8 h-4 rounded-full relative transition-colors",
-                    isRetentionEnabled
-                      ? "bg-primary"
-                      : "bg-muted border border-border",
-                  )}
+                <button
+                  type="button"
+                  onClick={() => setIsSendable(!isSendable)}
+                  className="flex items-center gap-2"
+                  aria-label="Toggle sendable"
                 >
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                    {isSendable ? "On" : "Off"}
+                  </span>
                   <div
                     className={cn(
-                      "absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all",
-                      isRetentionEnabled
-                        ? "left-[18px] bg-white"
-                        : "left-0.5 bg-muted-foreground",
+                      "w-8 h-4 rounded-full relative transition-colors",
+                      isSendable
+                        ? "bg-primary"
+                        : "bg-muted border border-border",
                     )}
-                  />
+                  >
+                    <div
+                      className={cn(
+                        "absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all",
+                        isSendable
+                          ? "left-[18px] bg-white"
+                          : "left-0.5 bg-muted-foreground",
+                      )}
+                    />
+                  </div>
+                </button>
+              </div>
+
+              {/* Subscriber Key Field Selection */}
+              {isSendable ? (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="subscriber-key-field"
+                      className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                    >
+                      Subscriber Key Field
+                    </label>
+                    <select
+                      id="subscriber-key-field"
+                      value={subscriberKeyField}
+                      onChange={(event) =>
+                        setSubscriberKeyField(event.target.value)
+                      }
+                      className={cn(
+                        "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary cursor-pointer",
+                        didAttemptSubmit &&
+                          validation.formErrors.subscriberKeyField
+                          ? "border-destructive"
+                          : "border-border",
+                      )}
+                    >
+                      <option value="">Select a field...</option>
+                      {subscriberKeyEligibleFields.map((f) => (
+                        <option key={f.id ?? f.name} value={f.name}>
+                          {f.name} ({f.type})
+                        </option>
+                      ))}
+                    </select>
+                    {subscriberKeyEligibleFields.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Add a Text or EmailAddress field to enable subscriber
+                        key selection.
+                      </p>
+                    )}
+                    {didAttemptSubmit &&
+                    validation.formErrors.subscriberKeyField ? (
+                      <p className="text-[10px] text-destructive">
+                        {validation.formErrors.subscriberKeyField}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-              </button>
+              ) : null}
             </div>
 
-            {isRetentionEnabled ? (
-              <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex items-center gap-2 text-[11px] text-foreground">
-                    <input
-                      type="radio"
-                      name="retention-mode"
-                      value="period"
-                      checked={retentionMode === "period"}
-                      onChange={() => setRetentionMode("period")}
-                      className="accent-primary"
-                    />
-                    Period
-                  </label>
-                  <label className="flex items-center gap-2 text-[11px] text-foreground">
-                    <input
-                      type="radio"
-                      name="retention-mode"
-                      value="date"
-                      checked={retentionMode === "date"}
-                      onChange={() => setRetentionMode("date")}
-                      className="accent-primary"
-                    />
-                    Date
-                  </label>
-                </div>
+            {/* Fields Editor */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Fields Configuration
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAddField}
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary-400 uppercase tracking-widest"
+                >
+                  <AddCircle size={14} /> Add Field
+                </button>
+              </div>
 
-                {retentionMode === "period" ? (
-                  <div className="grid grid-cols-2 gap-4">
+              <div className="border border-border/50 rounded-lg overflow-hidden">
+                <div className="grid grid-cols-14 gap-2 bg-muted/40 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <div className="col-span-3">Field</div>
+                  <div className="col-span-3">Type</div>
+                  <div className="col-span-2 text-center">Len / P,S</div>
+                  <div className="col-span-3">Default</div>
+                  <div className="col-span-1 text-center">PK</div>
+                  <div className="col-span-1 text-center">Null</div>
+                  <div className="col-span-1 text-right"> </div>
+                </div>
+                <div className="max-h-[240px] overflow-y-auto space-y-2 p-2">
+                  {fields.length === 0 ? (
+                    <div className="text-[11px] text-muted-foreground px-2 py-3 border border-dashed border-border rounded-lg text-center">
+                      No fields added yet. Use “Add Field” to define your
+                      schema.
+                    </div>
+                  ) : (
+                    fields.map((field, index) => (
+                      <FieldRow
+                        key={field.id}
+                        field={field}
+                        onChange={(updates) =>
+                          handleUpdateField(index, updates)
+                        }
+                        onRemove={() => handleRemoveField(index)}
+                        errors={
+                          field.id
+                            ? validation.fieldErrorsById[field.id]
+                            : undefined
+                        }
+                        showErrors={didAttemptSubmit}
+                      />
+                    ))
+                  )}
+                </div>
+                {didAttemptSubmit && validation.formErrors.fields ? (
+                  <p className="px-2 pb-2 text-[10px] text-destructive">
+                    {validation.formErrors.fields}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Retention Policy */}
+            <div className="p-4 rounded-lg bg-muted/50 border border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex gap-3">
+                  <InfoCircle
+                    size={20}
+                    className="text-muted-foreground shrink-0"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-foreground">
+                      Data Retention Policy
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Automatically purge records after a set period or date.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRetentionEnabled(!isRetentionEnabled)}
+                  className="flex items-center gap-2"
+                  aria-label="Toggle retention policy"
+                >
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                    {isRetentionEnabled ? "On" : "Off"}
+                  </span>
+                  <div
+                    className={cn(
+                      "w-8 h-4 rounded-full relative transition-colors",
+                      isRetentionEnabled
+                        ? "bg-primary"
+                        : "bg-muted border border-border",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all",
+                        isRetentionEnabled
+                          ? "left-[18px] bg-white"
+                          : "left-0.5 bg-muted-foreground",
+                      )}
+                    />
+                  </div>
+                </button>
+              </div>
+
+              {isRetentionEnabled ? (
+                <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-[11px] text-foreground">
+                      <input
+                        type="radio"
+                        name="retention-mode"
+                        value="period"
+                        checked={retentionMode === "period"}
+                        onChange={() => setRetentionMode("period")}
+                        className="accent-primary"
+                      />
+                      Period
+                    </label>
+                    <label className="flex items-center gap-2 text-[11px] text-foreground">
+                      <input
+                        type="radio"
+                        name="retention-mode"
+                        value="date"
+                        checked={retentionMode === "date"}
+                        onChange={() => setRetentionMode("date")}
+                        className="accent-primary"
+                      />
+                      Date
+                    </label>
+                  </div>
+
+                  {retentionMode === "period" ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="retention-length"
+                          className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                        >
+                          Length
+                        </label>
+                        <input
+                          id="retention-length"
+                          type="number"
+                          min={1}
+                          max={999}
+                          value={periodLength}
+                          onChange={(event) =>
+                            setPeriodLength(event.target.value)
+                          }
+                          className={cn(
+                            "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
+                            isRetentionEnabled &&
+                              retentionMode === "period" &&
+                              !isRetentionValid
+                              ? "border-destructive"
+                              : "border-border",
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="retention-unit"
+                          className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                        >
+                          Unit
+                        </label>
+                        <select
+                          id="retention-unit"
+                          value={periodUnit}
+                          onChange={(event) =>
+                            setPeriodUnit(
+                              event.target.value as typeof periodUnit,
+                            )
+                          }
+                          className="w-full bg-muted border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary cursor-pointer"
+                        >
+                          <option value="Days">Days</option>
+                          <option value="Weeks">Weeks</option>
+                          <option value="Months">Months</option>
+                          <option value="Years">Years</option>
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="space-y-1.5">
                       <label
-                        htmlFor="retention-length"
+                        htmlFor="retain-until"
                         className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                       >
-                        Length
+                        Retain Until
                       </label>
-                      <input
-                        id="retention-length"
-                        type="number"
-                        min={1}
-                        max={999}
-                        value={periodLength}
-                        onChange={(event) =>
-                          setPeriodLength(event.target.value)
-                        }
+                      <DatePicker
+                        id="retain-until"
+                        value={retainUntil}
+                        min={getTomorrowDateString()}
+                        onChange={setRetainUntil}
+                        placeholder="YYYY-MM-DD"
                         className={cn(
                           "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
                           isRetentionEnabled &&
-                            retentionMode === "period" &&
+                            retentionMode === "date" &&
                             !isRetentionValid
                             ? "border-destructive"
                             : "border-border",
                         )}
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="retention-unit"
-                        className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-                      >
-                        Unit
+                  )}
+
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Deletion Behavior
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <label className="flex items-center gap-2 text-[11px] text-foreground">
+                        <input
+                          type="radio"
+                          name="retention-delete-type"
+                          value="individual"
+                          checked={deleteType === "individual"}
+                          onChange={() => setDeleteType("individual")}
+                          className="accent-primary"
+                        />
+                        Delete individual rows
                       </label>
-                      <select
-                        id="retention-unit"
-                        value={periodUnit}
-                        onChange={(event) =>
-                          setPeriodUnit(event.target.value as typeof periodUnit)
-                        }
-                        className="w-full bg-muted border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary cursor-pointer"
-                      >
-                        <option value="Days">Days</option>
-                        <option value="Weeks">Weeks</option>
-                        <option value="Months">Months</option>
-                        <option value="Years">Years</option>
-                      </select>
+                      <label className="flex items-center gap-2 text-[11px] text-foreground">
+                        <input
+                          type="radio"
+                          name="retention-delete-type"
+                          value="all"
+                          checked={deleteType === "all"}
+                          onChange={() => setDeleteType("all")}
+                          className="accent-primary"
+                        />
+                        Delete all rows at once
+                      </label>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="retain-until"
-                      className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-                    >
-                      Retain Until
-                    </label>
-                    <input
-                      id="retain-until"
-                      type="date"
-                      value={retainUntil}
-                      min={getTomorrowDateString()}
-                      onChange={(event) => setRetainUntil(event.target.value)}
-                      className={cn(
-                        "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
-                        isRetentionEnabled &&
-                          retentionMode === "date" &&
-                          !isRetentionValid
-                          ? "border-destructive"
-                          : "border-border",
-                      )}
-                    />
-                  </div>
-                )}
 
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Deletion Behavior
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex flex-wrap gap-6">
                     <label className="flex items-center gap-2 text-[11px] text-foreground">
                       <input
-                        type="radio"
-                        name="retention-delete-type"
-                        value="individual"
-                        checked={deleteType === "individual"}
-                        onChange={() => setDeleteType("individual")}
+                        type="checkbox"
+                        checked={resetOnImport}
+                        onChange={(event) =>
+                          setResetOnImport(event.target.checked)
+                        }
                         className="accent-primary"
                       />
-                      Delete individual rows
+                      Reset on import
                     </label>
                     <label className="flex items-center gap-2 text-[11px] text-foreground">
                       <input
-                        type="radio"
-                        name="retention-delete-type"
-                        value="all"
-                        checked={deleteType === "all"}
-                        onChange={() => setDeleteType("all")}
+                        type="checkbox"
+                        checked={deleteAtEnd}
+                        onChange={(event) =>
+                          setDeleteAtEnd(event.target.checked)
+                        }
                         className="accent-primary"
                       />
-                      Delete all rows at once
+                      Delete data extension at end
                     </label>
                   </div>
-                </div>
 
-                <div className="flex flex-wrap gap-6">
-                  <label className="flex items-center gap-2 text-[11px] text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={resetOnImport}
-                      onChange={(event) =>
-                        setResetOnImport(event.target.checked)
-                      }
-                      className="accent-primary"
-                    />
-                    Reset on import
-                  </label>
-                  <label className="flex items-center gap-2 text-[11px] text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={deleteAtEnd}
-                      onChange={(event) => setDeleteAtEnd(event.target.checked)}
-                      className="accent-primary"
-                    />
-                    Delete data extension at end
-                  </label>
+                  {!isRetentionValid ? (
+                    <p className="text-[10px] text-destructive">
+                      {retentionMode === "period"
+                        ? "Retention length must be between 1 and 999."
+                        : "Retain-until date must be tomorrow or later."}
+                    </p>
+                  ) : null}
                 </div>
-
-                {!isRetentionValid ? (
-                  <p className="text-[10px] text-destructive">
-                    {retentionMode === "period"
-                      ? "Retention length must be between 1 and 999."
-                      : "Retain-until date must be tomorrow or later."}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
-        </div>
 
-        <DialogFooter className="border-t border-border pt-4">
-          <Button
-            variant="ghost"
-            onClick={handleClose}
-            className="text-xs font-bold"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!isFormValid}
-            className="bg-primary hover:bg-primary-600 text-primary-foreground text-xs font-bold shadow-lg shadow-primary/20"
-          >
-            Create Data Extension
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="border-t border-border pt-4">
+            <Button
+              variant="ghost"
+              onClick={handleClose}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!validation.isSubmittable || isSaving}
+              className="bg-primary hover:bg-primary-600 text-primary-foreground text-xs font-bold shadow-lg shadow-primary/20"
+            >
+              {isSaving ? "Creating..." : "Create Data Extension"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
   );
 }
 
@@ -718,19 +951,51 @@ interface FieldRowProps {
   field: DataExtensionField;
   onChange: (updates: Partial<DataExtensionField>) => void;
   onRemove: () => void;
+  errors?: FieldErrors;
+  showErrors: boolean;
 }
 
-function FieldRow({ field, onChange, onRemove }: FieldRowProps) {
+function FieldRow({
+  field,
+  onChange,
+  onRemove,
+  errors,
+  showErrors,
+}: FieldRowProps) {
   const isDecimal = field.type === "Decimal";
+  const isDate = field.type === "Date";
+  const isCurrentDateDefault =
+    isDate && field.defaultValue?.trim().toLowerCase() === "now()";
+  const supportsLength =
+    field.type === "Text" ||
+    field.type === "EmailAddress" ||
+    field.type === "Phone";
+  const supportsDefaultValue =
+    field.type !== "EmailAddress" &&
+    field.type !== "Phone" &&
+    field.type !== "Locale";
+  const isBoolean = field.type === "Boolean";
 
   // Validate field name
   const isFieldNameInvalid =
     field.name.trim() !== "" &&
     FIELD_NAME_VALIDATION.pattern.test(field.name.trim());
 
+  const rowErrorMessages =
+    showErrors && errors ? Object.values(errors).filter(Boolean) : [];
+
+  const hasRowError =
+    (showErrors && errors && Object.values(errors).some(Boolean)) ||
+    isFieldNameInvalid;
+
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-14 gap-2 items-center bg-card p-2 rounded border border-border/50 hover:border-primary/50 transition-colors group">
+      <div
+        className={cn(
+          "grid grid-cols-14 gap-2 items-center bg-card p-2 rounded border hover:border-primary/50 transition-colors group",
+          hasRowError ? "border-destructive" : "border-border/50",
+        )}
+      >
         <div className="col-span-3">
           <input
             type="text"
@@ -739,21 +1004,36 @@ function FieldRow({ field, onChange, onRemove }: FieldRowProps) {
             placeholder="Field name"
             className={cn(
               "w-full bg-transparent text-xs focus:outline-none",
-              isFieldNameInvalid && "text-destructive",
+              (isFieldNameInvalid || (showErrors && errors?.name)) &&
+                "text-destructive",
             )}
           />
         </div>
         <div className="col-span-3">
-          <select
+          <Select
             value={field.type}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextType = event.target.value as SFMCFieldType;
               onChange({
-                type: event.target.value as SFMCFieldType,
-                scale: undefined,
-                precision: undefined,
-              })
-            }
-            className="w-full bg-transparent text-xs focus:outline-none cursor-pointer"
+                type: nextType,
+                length:
+                  nextType === "Text" ||
+                  nextType === "EmailAddress" ||
+                  nextType === "Phone"
+                    ? (field.length ?? 254)
+                    : undefined,
+                precision:
+                  nextType === "Decimal" ? (field.precision ?? 18) : undefined,
+                scale: nextType === "Decimal" ? (field.scale ?? 2) : undefined,
+                defaultValue: undefined,
+              });
+            }}
+            className={cn(
+              "h-7 w-full bg-muted text-foreground border rounded px-2 py-0 text-xs focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
+              showErrors && errors?.type
+                ? "border-destructive"
+                : "border-border",
+            )}
           >
             <option value="Text">Text</option>
             <option value="Number">Number</option>
@@ -762,38 +1042,179 @@ function FieldRow({ field, onChange, onRemove }: FieldRowProps) {
             <option value="Decimal">Decimal</option>
             <option value="EmailAddress">EmailAddress</option>
             <option value="Phone">Phone</option>
-          </select>
+            <option value="Locale">Locale</option>
+          </Select>
         </div>
         <div className="col-span-2">
-          <input
-            type="text"
-            value={field.length ?? ""}
-            onChange={(event) => {
-              const value = event.target.value;
-              const numericValue = Number(value);
-              onChange({
-                length:
-                  value && !Number.isNaN(numericValue)
-                    ? numericValue
-                    : undefined,
-              });
-            }}
-            placeholder="Len"
-            className="w-full bg-transparent text-xs text-center focus:outline-none"
-          />
+          {isDecimal ? (
+            <div className="grid grid-cols-2 gap-1">
+              <input
+                type="number"
+                aria-label="Precision"
+                min={1}
+                max={38}
+                value={field.precision ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  const numericValue = Number(value);
+                  onChange({
+                    precision:
+                      value && !Number.isNaN(numericValue)
+                        ? Math.min(38, Math.max(1, numericValue))
+                        : undefined,
+                  });
+                }}
+                placeholder="P"
+                className={cn(
+                  "h-7 w-full bg-muted border rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-primary",
+                  showErrors && errors?.precision
+                    ? "border-destructive"
+                    : "border-border",
+                )}
+              />
+              <input
+                type="number"
+                aria-label="Scale"
+                min={0}
+                max={18}
+                value={field.scale ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  const numericValue = Number(value);
+                  onChange({
+                    scale:
+                      value && !Number.isNaN(numericValue)
+                        ? Math.min(18, Math.max(0, numericValue))
+                        : undefined,
+                  });
+                }}
+                placeholder="S"
+                className={cn(
+                  "h-7 w-full bg-muted border rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-primary",
+                  showErrors && errors?.scale
+                    ? "border-destructive"
+                    : "border-border",
+                )}
+              />
+            </div>
+          ) : supportsLength ? (
+            <input
+              type="number"
+              min={1}
+              value={field.length ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                const numericValue = Number(value);
+                onChange({
+                  length:
+                    value && !Number.isNaN(numericValue)
+                      ? Math.max(1, numericValue)
+                      : undefined,
+                });
+              }}
+              placeholder="Len"
+              className={cn(
+                "h-7 w-full bg-muted border rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-primary",
+                showErrors && errors?.length
+                  ? "border-destructive"
+                  : "border-border",
+              )}
+            />
+          ) : (
+            <div className="h-7 w-full flex items-center justify-center text-[10px] text-muted-foreground">
+              —
+            </div>
+          )}
         </div>
         <div className="col-span-3">
-          <input
-            type="text"
-            value={field.defaultValue ?? ""}
-            onChange={(event) =>
-              onChange({
-                defaultValue: event.target.value || undefined,
-              })
-            }
-            placeholder="Default"
-            className="w-full bg-transparent text-xs focus:outline-none"
-          />
+          {isDate ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    defaultValue: isCurrentDateDefault ? undefined : "Now()",
+                  })
+                }
+                className={cn(
+                  "h-7 px-2 rounded border text-[10px] font-bold uppercase tracking-wider transition-colors",
+                  isCurrentDateDefault
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted text-foreground border-border hover:border-primary/60",
+                )}
+                aria-label="Toggle current date default"
+              >
+                Now
+              </button>
+              {isCurrentDateDefault ? (
+                <span className="text-[10px] text-muted-foreground">Now()</span>
+              ) : (
+                <input
+                  type="text"
+                  value={field.defaultValue ?? ""}
+                  onChange={(event) =>
+                    onChange({
+                      defaultValue: event.target.value || undefined,
+                    })
+                  }
+                  placeholder="Default"
+                  className={cn(
+                    "h-7 w-full bg-muted border rounded px-2 py-1 text-xs focus:outline-none focus:border-primary",
+                    showErrors && errors?.defaultValue
+                      ? "border-destructive"
+                      : "border-border",
+                  )}
+                />
+              )}
+            </div>
+          ) : supportsDefaultValue ? (
+            isBoolean ? (
+              <Select
+                value={field.defaultValue ?? ""}
+                onChange={(event) =>
+                  onChange({ defaultValue: event.target.value || undefined })
+                }
+                className={cn(
+                  "h-7 w-full bg-muted text-foreground border rounded px-2 py-0 text-xs focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
+                  showErrors && errors?.defaultValue
+                    ? "border-destructive"
+                    : "border-border",
+                )}
+              >
+                <option value=""> </option>
+                <option value="True">True</option>
+                <option value="False">False</option>
+              </Select>
+            ) : (
+              <input
+                type="text"
+                value={field.defaultValue ?? ""}
+                onChange={(event) =>
+                  onChange({
+                    defaultValue: event.target.value || undefined,
+                  })
+                }
+                placeholder="Default"
+                className={cn(
+                  "h-7 w-full bg-muted border rounded px-2 py-1 text-xs focus:outline-none focus:border-primary",
+                  showErrors && errors?.defaultValue
+                    ? "border-destructive"
+                    : "border-border",
+                )}
+              />
+            )
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="h-7 w-full flex items-center text-[10px] text-muted-foreground cursor-help">
+                  —
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Default values are not supported for this field type
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
         <div className="col-span-1 flex justify-center">
           <button
@@ -839,61 +1260,21 @@ function FieldRow({ field, onChange, onRemove }: FieldRowProps) {
         </div>
       </div>
 
-      {/* Decimal-specific scale/precision inputs */}
-      {isDecimal ? (
-        <div className="ml-4 flex items-center gap-4 text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <label htmlFor={`precision-${field.id}`}>Precision (1-38):</label>
-            <input
-              id={`precision-${field.id}`}
-              type="number"
-              min={1}
-              max={38}
-              value={field.precision ?? ""}
-              onChange={(event) => {
-                const value = event.target.value;
-                const numericValue = Number(value);
-                onChange({
-                  precision:
-                    value && !Number.isNaN(numericValue)
-                      ? Math.min(38, Math.max(1, numericValue))
-                      : undefined,
-                });
-              }}
-              placeholder="18"
-              className="w-14 bg-muted border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-primary"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor={`scale-${field.id}`}>Scale (0-18):</label>
-            <input
-              id={`scale-${field.id}`}
-              type="number"
-              min={0}
-              max={18}
-              value={field.scale ?? ""}
-              onChange={(event) => {
-                const value = event.target.value;
-                const numericValue = Number(value);
-                onChange({
-                  scale:
-                    value && !Number.isNaN(numericValue)
-                      ? Math.min(18, Math.max(0, numericValue))
-                      : undefined,
-                });
-              }}
-              placeholder="0"
-              className="w-14 bg-muted border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-      ) : null}
-
       {/* Field name validation error */}
       {isFieldNameInvalid ? (
         <p className="ml-4 text-[10px] text-destructive">
           {FIELD_NAME_VALIDATION.message}
         </p>
+      ) : null}
+
+      {rowErrorMessages.length > 0 ? (
+        <div className="ml-4 space-y-1">
+          {rowErrorMessages.map((m) => (
+            <p key={m} className="text-[10px] text-destructive">
+              {m}
+            </p>
+          ))}
+        </div>
       ) : null}
     </div>
   );

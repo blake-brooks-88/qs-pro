@@ -24,7 +24,8 @@ export type SFMCFieldType =
   | "Boolean"
   | "EmailAddress"
   | "Phone"
-  | "Decimal";
+  | "Decimal"
+  | "Locale";
 
 export interface DataExtensionField {
   /** Client-generated ID for React key prop when editing. Not persisted to server. */

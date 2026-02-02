@@ -341,15 +341,15 @@ export function EditorWorkspace({
       try {
         await createDataExtension(dto);
         toast.success(`Data Extension "${draft.name}" created`);
-        // Refresh data extensions list
-        await queryClient.invalidateQueries({
-          queryKey: metadataQueryKeys.dataExtensions(tenantId, eid),
-        });
+        const queryKey = metadataQueryKeys.dataExtensions(tenantId, eid);
+        await queryClient.invalidateQueries({ queryKey });
+        await queryClient.refetchQueries({ queryKey, type: "all" });
       } catch (error) {
         toast.error("Failed to create Data Extension", {
           description:
             error instanceof Error ? error.message : "An error occurred",
         });
+        throw error;
       }
     },
     [queryClient, tenantId, eid],
@@ -751,6 +751,7 @@ export function EditorWorkspace({
           onSave={handleSaveDataExtension}
           initialFields={inferredFields}
           folders={folders.filter((f) => f.type === "data-extension")}
+          dataExtensions={dataExtensions}
         />
 
         <QueryActivityModal

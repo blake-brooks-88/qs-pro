@@ -14,6 +14,7 @@ interface FolderTreePickerProps {
   value: string;
   onChange: (folderId: string) => void;
   placeholder?: string;
+  triggerClassName?: string;
 }
 
 export function FolderTreePicker({
@@ -22,6 +23,7 @@ export function FolderTreePicker({
   value,
   onChange,
   placeholder = "Select a folder...",
+  triggerClassName,
 }: FolderTreePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,6 +93,7 @@ export function FolderTreePicker({
           "focus:outline-none focus:border-primary",
           "hover:border-primary/50",
           !displayValue && "text-muted-foreground",
+          triggerClassName,
         )}
       >
         <span className="truncate">{displayValue ?? placeholder}</span>

@@ -187,6 +187,8 @@ describe("DataExtensionModal", () => {
       await user.type(nameInput, "My Data Extension");
       await user.type(customerKeyInput, "my_de_key");
       await selectFolder(user, "Data Extensions");
+      await user.click(screen.getByRole("button", { name: /add field/i }));
+      await user.type(screen.getByPlaceholderText("Field name"), "Id");
 
       // Assert
       const saveButton = screen.getByRole("button", {
