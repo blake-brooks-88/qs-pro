@@ -61,7 +61,7 @@ describe("DataExtension SOAP Request Builders", () => {
       });
 
       expect(xml).toContain(
-        "<RetainUntil>2026-06-30T00:00:00.000Z</RetainUntil>",
+        "<RetainUntil>2026-06-30T23:59:59.000Z</RetainUntil>",
       );
       expect(xml).toContain("<RowBasedRetention>false</RowBasedRetention>");
       expect(xml).toContain(

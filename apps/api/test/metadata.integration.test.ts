@@ -822,7 +822,7 @@ describe('Metadata Endpoints (integration)', () => {
       expect(lastSoapBody).toContain('<CategoryID>123</CategoryID>');
       expect(lastSoapBody).toContain('<Field xsi:type="DataExtensionField">');
       expect(lastSoapBody).toContain(
-        '<RetainUntil>2026-06-30T00:00:00.000Z</RetainUntil>',
+        '<RetainUntil>2026-06-30T23:59:59.000Z</RetainUntil>',
       );
     });
   });

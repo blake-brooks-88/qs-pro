@@ -67,9 +67,10 @@ function buildRetentionXml(retention: DataRetentionPolicy): string {
 	    <DeleteAtEndOfRetentionPeriod>${deleteAtEnd}</DeleteAtEndOfRetentionPeriod>`;
   }
 
-  // Use an explicit UTC midnight timestamp without relying on Date parsing,
+  // Use an explicit end-of-day UTC timestamp without relying on Date parsing,
   // which can throw for syntactically-valid but non-existent dates (e.g. 2026-02-30).
-  const retainUntilIso = `${retention.retainUntil}T00:00:00.000Z`;
+  // End-of-day avoids "today" becoming a timestamp in the past.
+  const retainUntilIso = `${retention.retainUntil}T23:59:59.000Z`;
   return `
 	    <RetainUntil>${escapeXml(retainUntilIso)}</RetainUntil>
 	    <RowBasedRetention>${rowBasedRetention ? "true" : "false"}</RowBasedRetention>

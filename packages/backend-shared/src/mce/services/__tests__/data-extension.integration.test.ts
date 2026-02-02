@@ -583,7 +583,7 @@ describe("DataExtensionService (integration)", () => {
       });
 
       expect(capturedBody).toContain(
-        "<RetainUntil>2026-06-30T00:00:00.000Z</RetainUntil>",
+        "<RetainUntil>2026-06-30T23:59:59.000Z</RetainUntil>",
       );
       expect(capturedBody).toContain(
         "<RowBasedRetention>false</RowBasedRetention>",
