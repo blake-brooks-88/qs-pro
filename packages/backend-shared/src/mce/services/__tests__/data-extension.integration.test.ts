@@ -505,6 +505,95 @@ describe("DataExtensionService (integration)", () => {
       expect(capturedBody).toContain("<IsPrimaryKey>true</IsPrimaryKey>");
       expect(capturedBody).toContain("<Name>Age</Name>");
       expect(capturedBody).toContain("<FieldType>Number</FieldType>");
+
+      expect(capturedBody).not.toContain("<DataRetentionPeriodLength>");
+      expect(capturedBody).not.toContain("<DataRetentionPeriod>");
+      expect(capturedBody).not.toContain("<RetainUntil>");
+      expect(capturedBody).not.toContain("<RowBasedRetention>");
+      expect(capturedBody).not.toContain("<ResetRetentionPeriodOnImport>");
+      expect(capturedBody).not.toContain("<DeleteAtEndOfRetentionPeriod>");
+    });
+
+    it("includes period-based retention XML when provided", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            capturedBody = await request.text();
+            return HttpResponse.xml(buildCreateResponse("new-de-object-id"));
+          },
+        ),
+      );
+
+      await service.create(TEST_TENANT_ID, TEST_USER_ID, TEST_MID, {
+        name: "New DE",
+        customerKey: "new-de-key",
+        categoryId: 12345,
+        retention: {
+          type: "period",
+          periodLength: 30,
+          periodUnit: "Days",
+          deleteType: "individual",
+          resetOnImport: false,
+          deleteAtEnd: false,
+        },
+        fields: [{ name: "Id", fieldType: "Number" }],
+      });
+
+      expect(capturedBody).toContain(
+        "<DataRetentionPeriodLength>30</DataRetentionPeriodLength>",
+      );
+      expect(capturedBody).toContain(
+        "<DataRetentionPeriod>Days</DataRetentionPeriod>",
+      );
+      expect(capturedBody).toContain(
+        "<RowBasedRetention>true</RowBasedRetention>",
+      );
+      expect(capturedBody).toContain(
+        "<ResetRetentionPeriodOnImport>false</ResetRetentionPeriodOnImport>",
+      );
+      expect(capturedBody).toContain(
+        "<DeleteAtEndOfRetentionPeriod>false</DeleteAtEndOfRetentionPeriod>",
+      );
+    });
+
+    it("includes date-based retention XML when provided", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            capturedBody = await request.text();
+            return HttpResponse.xml(buildCreateResponse("new-de-object-id"));
+          },
+        ),
+      );
+
+      await service.create(TEST_TENANT_ID, TEST_USER_ID, TEST_MID, {
+        name: "New DE",
+        customerKey: "new-de-key",
+        categoryId: 12345,
+        retention: {
+          type: "date",
+          retainUntil: "2026-06-30",
+          deleteType: "all",
+          resetOnImport: true,
+          deleteAtEnd: true,
+        },
+        fields: [{ name: "Id", fieldType: "Number" }],
+      });
+
+      expect(capturedBody).toContain(
+        "<RetainUntil>2026-06-30T00:00:00.000Z</RetainUntil>",
+      );
+      expect(capturedBody).toContain(
+        "<RowBasedRetention>false</RowBasedRetention>",
+      );
+      expect(capturedBody).toContain(
+        "<ResetRetentionPeriodOnImport>true</ResetRetentionPeriodOnImport>",
+      );
+      expect(capturedBody).toContain(
+        "<DeleteAtEndOfRetentionPeriod>true</DeleteAtEndOfRetentionPeriod>",
+      );
     });
 
     it("returns created objectId", async () => {

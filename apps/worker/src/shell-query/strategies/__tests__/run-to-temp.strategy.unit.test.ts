@@ -235,6 +235,14 @@ describe("RunToTempFlow", () => {
         expect.any(String),
         expect.any(String),
         expect.objectContaining({
+          retention: {
+            type: "period",
+            periodLength: 1,
+            periodUnit: "Days",
+            deleteType: "all",
+            resetOnImport: false,
+            deleteAtEnd: true,
+          },
           fields: expect.arrayContaining([
             expect.objectContaining({ name: "EmailAddress" }),
             expect.objectContaining({ name: "FirstName" }),
@@ -456,6 +464,14 @@ describe("RunToTempFlow", () => {
         expect.any(String),
         expect.any(String),
         expect.objectContaining({
+          retention: {
+            type: "period",
+            periodLength: 1,
+            periodUnit: "Days",
+            deleteType: "all",
+            resetOnImport: false,
+            deleteAtEnd: true,
+          },
           fields: expect.arrayContaining([
             expect.objectContaining({
               name: "EmailAddress",
