@@ -637,6 +637,7 @@ function applyFieldPropertyMapping(col: InternalColumnDef): InternalColumnDef {
     case "Boolean":
     case "EmailAddress":
     case "Phone":
+    case "Locale":
       // No extra properties needed
       break;
     default:
