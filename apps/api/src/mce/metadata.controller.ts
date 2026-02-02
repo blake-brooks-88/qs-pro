@@ -72,7 +72,17 @@ export class MetadataController {
       throw new BadRequestException(result.error.errors);
     }
 
-    const { folderId, subscriberKeyField, fields, ...rest } = result.data;
+    const {
+      folderId,
+      subscriberKeyField,
+      fields,
+      retention,
+      customerKey,
+      ...rest
+    } = result.data;
+
+    const finalCustomerKey =
+      customerKey?.trim() || crypto.randomUUID().toUpperCase();
 
     let sendableFieldType: string | undefined;
     if (subscriberKeyField) {
@@ -86,9 +96,11 @@ export class MetadataController {
       user.mid,
       {
         ...rest,
+        customerKey: finalCustomerKey,
         categoryId: parseInt(folderId, 10),
         sendableField: subscriberKeyField,
         sendableFieldType,
+        retention,
         fields: fields.map((f) => ({
           name: f.name,
           fieldType: f.type,

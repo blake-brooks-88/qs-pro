@@ -1,3 +1,5 @@
+import type { DataRetentionPolicy } from "@qpp/shared-types";
+
 export type FolderType = "library" | "data-extension";
 
 export interface Folder {
@@ -97,10 +99,11 @@ export interface QueryTab {
 
 export interface DataExtensionDraft {
   name: string;
-  customerKey: string;
+  customerKey?: string;
   folderId: string;
   isSendable: boolean;
   subscriberKeyField?: string;
+  retention?: DataRetentionPolicy;
   fields: DataExtensionField[];
 }
 

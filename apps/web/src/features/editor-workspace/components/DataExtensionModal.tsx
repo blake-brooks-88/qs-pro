@@ -1,5 +1,6 @@
 import {
   CUSTOMER_KEY_VALIDATION,
+  type DataRetentionPolicy,
   DE_NAME_VALIDATION,
   FIELD_NAME_VALIDATION,
 } from "@qpp/shared-types";
@@ -29,6 +30,25 @@ import { cn } from "@/lib/utils";
 
 import { FolderTreePicker } from "./FolderTreePicker";
 
+function toLocalDateString(date: Date): string {
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getTomorrowDateString(): string {
+  const now = new Date();
+  const tomorrow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+  );
+  return toLocalDateString(tomorrow);
+}
+
+const YYYY_MM_DD_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 interface DataExtensionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -50,6 +70,19 @@ export function DataExtensionModal({
   const [isSendable, setIsSendable] = useState(false);
   const [subscriberKeyField, setSubscriberKeyField] = useState("");
   const [fields, setFields] = useState<DataExtensionField[]>([]);
+
+  const [isRetentionEnabled, setIsRetentionEnabled] = useState(false);
+  const [retentionMode, setRetentionMode] = useState<"period" | "date">(
+    "period",
+  );
+  const [periodLength, setPeriodLength] = useState("30");
+  const [periodUnit, setPeriodUnit] = useState<
+    "Days" | "Weeks" | "Months" | "Years"
+  >("Days");
+  const [retainUntil, setRetainUntil] = useState("");
+  const [deleteType, setDeleteType] = useState<"individual" | "all">("all");
+  const [resetOnImport, setResetOnImport] = useState(false);
+  const [deleteAtEnd, setDeleteAtEnd] = useState(false);
 
   // Filter folders to only data-extension type, excluding System Data Views
   const defolders = useMemo(
@@ -99,13 +132,6 @@ export function DataExtensionModal({
     );
   }, [name]);
 
-  const isCustomerKeyValid = useMemo(() => {
-    const trimmed = customerKey.trim();
-    return (
-      trimmed.length > 0 && trimmed.length <= CUSTOMER_KEY_VALIDATION.maxLength
-    );
-  }, [customerKey]);
-
   const isFolderValid = folderId !== "";
 
   const isSendableValid = useMemo(() => {
@@ -115,8 +141,63 @@ export function DataExtensionModal({
     return subscriberKeyField !== "";
   }, [isSendable, subscriberKeyField]);
 
+  const isRetentionValid = useMemo(() => {
+    if (!isRetentionEnabled) {
+      return true;
+    }
+
+    if (retentionMode === "period") {
+      const parsed = Number.parseInt(periodLength, 10);
+      return Number.isInteger(parsed) && parsed > 0 && parsed <= 999;
+    }
+
+    const tomorrow = getTomorrowDateString();
+    return (
+      YYYY_MM_DD_REGEX.test(retainUntil) &&
+      retainUntil >= tomorrow &&
+      retainUntil.length === 10
+    );
+  }, [isRetentionEnabled, retentionMode, periodLength, retainUntil]);
+
+  const retentionPolicy = useMemo<DataRetentionPolicy | undefined>(() => {
+    if (!isRetentionEnabled || !isRetentionValid) {
+      return undefined;
+    }
+
+    const base = {
+      deleteType,
+      resetOnImport,
+      deleteAtEnd,
+    } as const;
+
+    if (retentionMode === "period") {
+      return {
+        type: "period",
+        periodLength: Number.parseInt(periodLength, 10),
+        periodUnit,
+        ...base,
+      };
+    }
+
+    return {
+      type: "date",
+      retainUntil,
+      ...base,
+    };
+  }, [
+    deleteAtEnd,
+    deleteType,
+    isRetentionEnabled,
+    isRetentionValid,
+    periodLength,
+    periodUnit,
+    resetOnImport,
+    retainUntil,
+    retentionMode,
+  ]);
+
   const isFormValid =
-    isNameValid && isCustomerKeyValid && isFolderValid && isSendableValid;
+    isNameValid && isFolderValid && isSendableValid && isRetentionValid;
 
   const handleAddField = () => {
     setFields((prev) => [
@@ -153,10 +234,11 @@ export function DataExtensionModal({
     }
     onSave?.({
       name: name.trim(),
-      customerKey: customerKey.trim(),
+      customerKey: customerKey.trim() || undefined,
       folderId,
       isSendable,
       subscriberKeyField: isSendable ? subscriberKeyField : undefined,
+      retention: retentionPolicy,
       fields,
     });
     resetForm();
@@ -170,6 +252,14 @@ export function DataExtensionModal({
     setIsSendable(false);
     setSubscriberKeyField("");
     setFields([]);
+    setIsRetentionEnabled(false);
+    setRetentionMode("period");
+    setPeriodLength("30");
+    setPeriodUnit("Days");
+    setRetainUntil("");
+    setDeleteType("all");
+    setResetOnImport(false);
+    setDeleteAtEnd(false);
   };
 
   const handleClose = () => {
@@ -239,17 +329,18 @@ export function DataExtensionModal({
               <input
                 id="de-customer-key"
                 type="text"
-                placeholder="External ID"
+                placeholder="Optional - auto-generated if blank"
                 value={customerKey}
                 onChange={(event) => setCustomerKey(event.target.value)}
                 className={cn(
                   "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
-                  customerKey.trim() && !isCustomerKeyValid
+                  customerKey.trim().length > CUSTOMER_KEY_VALIDATION.maxLength
                     ? "border-destructive"
                     : "border-border",
                 )}
               />
-              {customerKey.trim() && !isCustomerKeyValid && (
+              {customerKey.trim().length >
+                CUSTOMER_KEY_VALIDATION.maxLength && (
                 <p className="text-[10px] text-destructive">
                   {CUSTOMER_KEY_VALIDATION.message}
                 </p>
@@ -389,30 +480,216 @@ export function DataExtensionModal({
           </div>
 
           {/* Retention Policy */}
-          <div className="p-4 rounded-lg bg-muted/50 border border-border flex items-center justify-between">
-            <div className="flex gap-3">
-              <InfoCircle
-                size={20}
-                className="text-muted-foreground shrink-0"
-              />
-              <div>
-                <p className="text-xs font-bold text-foreground">
-                  Data Retention Policy
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  Automatically purge records or entire table after a set
-                  period.
-                </p>
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex gap-3">
+                <InfoCircle
+                  size={20}
+                  className="text-muted-foreground shrink-0"
+                />
+                <div>
+                  <p className="text-xs font-bold text-foreground">
+                    Data Retention Policy
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Automatically purge records after a set period or date.
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsRetentionEnabled(!isRetentionEnabled)}
+                className="flex items-center gap-2"
+                aria-label="Toggle retention policy"
+              >
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                  {isRetentionEnabled ? "On" : "Off"}
+                </span>
+                <div
+                  className={cn(
+                    "w-8 h-4 rounded-full relative transition-colors",
+                    isRetentionEnabled
+                      ? "bg-primary"
+                      : "bg-muted border border-border",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all",
+                      isRetentionEnabled
+                        ? "left-[18px] bg-white"
+                        : "left-0.5 bg-muted-foreground",
+                    )}
+                  />
+                </div>
+              </button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                Off
-              </span>
-              <div className="w-8 h-4 bg-muted border border-border rounded-full relative">
-                <div className="absolute left-0.5 top-0.5 w-2.5 h-2.5 bg-muted-foreground rounded-full" />
+
+            {isRetentionEnabled ? (
+              <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 text-[11px] text-foreground">
+                    <input
+                      type="radio"
+                      name="retention-mode"
+                      value="period"
+                      checked={retentionMode === "period"}
+                      onChange={() => setRetentionMode("period")}
+                      className="accent-primary"
+                    />
+                    Period
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] text-foreground">
+                    <input
+                      type="radio"
+                      name="retention-mode"
+                      value="date"
+                      checked={retentionMode === "date"}
+                      onChange={() => setRetentionMode("date")}
+                      className="accent-primary"
+                    />
+                    Date
+                  </label>
+                </div>
+
+                {retentionMode === "period" ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="retention-length"
+                        className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                      >
+                        Length
+                      </label>
+                      <input
+                        id="retention-length"
+                        type="number"
+                        min={1}
+                        max={999}
+                        value={periodLength}
+                        onChange={(event) =>
+                          setPeriodLength(event.target.value)
+                        }
+                        className={cn(
+                          "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
+                          isRetentionEnabled &&
+                            retentionMode === "period" &&
+                            !isRetentionValid
+                            ? "border-destructive"
+                            : "border-border",
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="retention-unit"
+                        className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                      >
+                        Unit
+                      </label>
+                      <select
+                        id="retention-unit"
+                        value={periodUnit}
+                        onChange={(event) =>
+                          setPeriodUnit(event.target.value as typeof periodUnit)
+                        }
+                        className="w-full bg-muted border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary cursor-pointer"
+                      >
+                        <option value="Days">Days</option>
+                        <option value="Weeks">Weeks</option>
+                        <option value="Months">Months</option>
+                        <option value="Years">Years</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="retain-until"
+                      className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                    >
+                      Retain Until
+                    </label>
+                    <input
+                      id="retain-until"
+                      type="date"
+                      value={retainUntil}
+                      min={getTomorrowDateString()}
+                      onChange={(event) => setRetainUntil(event.target.value)}
+                      className={cn(
+                        "w-full bg-muted border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary",
+                        isRetentionEnabled &&
+                          retentionMode === "date" &&
+                          !isRetentionValid
+                          ? "border-destructive"
+                          : "border-border",
+                      )}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Deletion Behavior
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-[11px] text-foreground">
+                      <input
+                        type="radio"
+                        name="retention-delete-type"
+                        value="individual"
+                        checked={deleteType === "individual"}
+                        onChange={() => setDeleteType("individual")}
+                        className="accent-primary"
+                      />
+                      Delete individual rows
+                    </label>
+                    <label className="flex items-center gap-2 text-[11px] text-foreground">
+                      <input
+                        type="radio"
+                        name="retention-delete-type"
+                        value="all"
+                        checked={deleteType === "all"}
+                        onChange={() => setDeleteType("all")}
+                        className="accent-primary"
+                      />
+                      Delete all rows at once
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 text-[11px] text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={resetOnImport}
+                      onChange={(event) =>
+                        setResetOnImport(event.target.checked)
+                      }
+                      className="accent-primary"
+                    />
+                    Reset on import
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={deleteAtEnd}
+                      onChange={(event) => setDeleteAtEnd(event.target.checked)}
+                      className="accent-primary"
+                    />
+                    Delete data extension at end
+                  </label>
+                </div>
+
+                {!isRetentionValid ? (
+                  <p className="text-[10px] text-destructive">
+                    {retentionMode === "period"
+                      ? "Retention length must be between 1 and 999."
+                      : "Retain-until date must be tomorrow or later."}
+                  </p>
+                ) : null}
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
 

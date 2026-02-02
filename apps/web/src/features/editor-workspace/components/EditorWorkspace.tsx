@@ -30,6 +30,7 @@ import {
   useUpdateSavedQuery,
 } from "@/features/editor-workspace/hooks/use-saved-queries";
 import type {
+  DataExtensionDraft,
   DataExtensionField,
   EditorWorkspaceProps,
   ExecutionResult,
@@ -325,21 +326,15 @@ export function EditorWorkspace({
   };
 
   const handleSaveDataExtension = useCallback(
-    async (draft: {
-      name: string;
-      customerKey: string;
-      folderId: string;
-      isSendable: boolean;
-      subscriberKeyField?: string;
-      fields: DataExtensionField[];
-    }) => {
+    async (draft: DataExtensionDraft) => {
       // Map DataExtensionDraft to CreateDataExtensionDto (strip client-side id from fields)
       const dto: CreateDataExtensionDto = {
         name: draft.name,
-        customerKey: draft.customerKey,
+        ...(draft.customerKey && { customerKey: draft.customerKey }),
         folderId: draft.folderId,
         isSendable: draft.isSendable,
         subscriberKeyField: draft.subscriberKeyField,
+        retention: draft.retention,
         fields: draft.fields.map(({ id: _id, ...field }) => field),
       };
 
