@@ -17,41 +17,15 @@ import {
   SoapDeleteResponse,
   SoapRetrieveResponse,
 } from "../soap/types";
+import type {
+  CreateDataExtensionParams,
+  DataExtension,
+  DataExtensionField,
+} from "../types/data-extension";
 
 const MAX_PAGES = 10;
 
-export interface DataExtension {
-  name: string;
-  customerKey: string;
-  objectId: string;
-}
-
-export interface DataExtensionField {
-  name: string;
-  fieldType: string;
-  maxLength?: number;
-  isPrimaryKey?: boolean;
-  isRequired?: boolean;
-}
-
-export interface CreateDataExtensionParams {
-  name: string;
-  customerKey: string;
-  categoryId: number;
-  isSendable?: boolean;
-  sendableField?: string;
-  sendableFieldType?: string;
-  fields: Array<{
-    name: string;
-    fieldType: string;
-    maxLength?: number;
-    scale?: number;
-    precision?: number;
-    isPrimaryKey?: boolean;
-    isRequired?: boolean;
-    defaultValue?: string;
-  }>;
-}
+export type { CreateDataExtensionParams, DataExtension, DataExtensionField };
 
 @Injectable()
 export class DataExtensionService {

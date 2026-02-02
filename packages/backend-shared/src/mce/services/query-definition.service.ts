@@ -17,25 +17,14 @@ import {
   SoapPerformResponse,
   SoapRetrieveResponse,
 } from "../soap/types";
+import type {
+  CreateQueryDefinitionParams,
+  QueryDefinition,
+} from "../types/query-definition";
 
 const MAX_PAGES = 10;
 
-export interface QueryDefinition {
-  objectId: string;
-  customerKey: string;
-  name: string;
-  categoryId?: number;
-}
-
-export interface CreateQueryDefinitionParams {
-  name: string;
-  customerKey: string;
-  categoryId: number;
-  targetId: string;
-  targetCustomerKey: string;
-  targetName: string;
-  queryText: string;
-}
+export type { CreateQueryDefinitionParams, QueryDefinition };
 
 @Injectable()
 export class QueryDefinitionService {
