@@ -30,6 +30,7 @@ const FieldTypeEnum = z.enum([
   "EmailAddress",
   "Phone",
   "Decimal",
+  "Locale",
 ]);
 
 function toLocalDateString(date: Date): string {
@@ -115,7 +116,11 @@ export const CreateDataExtensionSchema = z
       .optional(),
     folderId: z
       .string()
-      .regex(/^\d+$/, "Folder ID must be a numeric MCE folder ID"),
+      .regex(/^\d+$/, "Folder ID must be a numeric MCE folder ID")
+      .refine((value) => {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isSafeInteger(parsed) && parsed > 0;
+      }, "Folder ID must be a positive numeric MCE folder ID"),
     isSendable: z.boolean().default(false),
     subscriberKeyField: z
       .string()
