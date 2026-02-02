@@ -1,3 +1,5 @@
+import * as crypto from 'node:crypto';
+
 import {
   BadRequestException,
   Body,
@@ -81,6 +83,8 @@ export class MetadataController {
       ...rest
     } = result.data;
 
+    const categoryId = Number.parseInt(folderId, 10);
+
     const finalCustomerKey =
       customerKey?.trim() || crypto.randomUUID().toUpperCase();
 
@@ -97,7 +101,7 @@ export class MetadataController {
       {
         ...rest,
         customerKey: finalCustomerKey,
-        categoryId: parseInt(folderId, 10),
+        categoryId,
         sendableField: subscriberKeyField,
         sendableFieldType,
         retention,

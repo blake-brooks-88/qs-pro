@@ -138,6 +138,25 @@ const buildFieldsSoapResponse = (
 </soap:Envelope>`;
 };
 
+const buildCreateSoapResponse = (params: {
+  statusCode: string;
+  newObjectId?: string;
+  statusMessage?: string;
+}): string => {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <soap:Body>
+    <CreateResponse>
+      <Results>
+        <StatusCode>${params.statusCode}</StatusCode>
+        ${params.statusMessage ? `<StatusMessage>${params.statusMessage}</StatusMessage>` : ''}
+        ${params.newObjectId ? `<NewObjectID>${params.newObjectId}</NewObjectID>` : ''}
+      </Results>
+    </CreateResponse>
+  </soap:Body>
+</soap:Envelope>`;
+};
+
 // Default MSW handlers
 const defaultHandlers = [
   // Auth endpoints for JWT login
@@ -735,6 +754,76 @@ describe('Metadata Endpoints (integration)', () => {
 
       // SOAP call count should increase for different key
       expect(fieldsSoapCallCount).toBeGreaterThan(countAfterFirst);
+    });
+  });
+
+  describe('POST /metadata/data-extensions', () => {
+    it('should create a data extension', async () => {
+      let lastSoapBody = '';
+
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            const body = await request.text();
+            if (body.includes('<CreateRequest') && body.includes('<Objects')) {
+              lastSoapBody = body;
+              return HttpResponse.xml(
+                buildCreateSoapResponse({
+                  statusCode: 'OK',
+                  newObjectId: 'new-de-object-id',
+                }),
+              );
+            }
+
+            // fall back to default handlers for retrieve flows
+            if (body.includes('<ObjectType>DataFolder</ObjectType>')) {
+              return HttpResponse.xml(buildFolderSoapResponse([]));
+            }
+            if (body.includes('<ObjectType>DataExtension</ObjectType>')) {
+              return HttpResponse.xml(buildDataExtensionSoapResponse([]));
+            }
+            if (body.includes('<ObjectType>DataExtensionField</ObjectType>')) {
+              return HttpResponse.xml(buildFieldsSoapResponse([]));
+            }
+
+            return HttpResponse.xml(buildFolderSoapResponse([]));
+          },
+        ),
+      );
+
+      const response = await authenticatedAgent
+        .post('/metadata/data-extensions')
+        .set('x-csrf-token', csrfToken)
+        .send({
+          name: 'My Test DE',
+          folderId: '123',
+          fields: [
+            {
+              name: 'SubscriberKey',
+              type: 'Text',
+              length: 254,
+              isPrimaryKey: true,
+              isNullable: false,
+            },
+          ],
+          retention: {
+            type: 'date',
+            retainUntil: '2026-06-30',
+            deleteType: 'all',
+            resetOnImport: true,
+            deleteAtEnd: false,
+          },
+        })
+        .expect(201);
+
+      expect(response.body).toEqual({ objectId: 'new-de-object-id' });
+      expect(lastSoapBody).toContain('<Objects xsi:type="DataExtension">');
+      expect(lastSoapBody).toContain('<CategoryID>123</CategoryID>');
+      expect(lastSoapBody).toContain('<Field xsi:type="DataExtensionField">');
+      expect(lastSoapBody).toContain(
+        '<RetainUntil>2026-06-30T00:00:00.000Z</RetainUntil>',
+      );
     });
   });
 });
