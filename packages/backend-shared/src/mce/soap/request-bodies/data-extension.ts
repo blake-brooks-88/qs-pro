@@ -1,3 +1,9 @@
+import type { DataRetentionPolicy } from "@qpp/shared-types";
+
+import type {
+  CreateDataExtensionField,
+  CreateDataExtensionParams,
+} from "../../types/data-extension";
 import { escapeXml } from "../helpers";
 
 export function buildRetrieveDataExtensionFieldsByCustomerKey(
@@ -47,28 +53,31 @@ export function buildRetrieveDataExtensionFields(
   return buildRetrieveDataExtensionFieldsByName(params.name);
 }
 
-export interface DataExtensionField {
-  name: string;
-  fieldType: string;
-  maxLength?: number;
-  scale?: number;
-  precision?: number;
-  isPrimaryKey?: boolean;
-  isRequired?: boolean;
-  defaultValue?: string;
+function buildRetentionXml(retention: DataRetentionPolicy): string {
+  const rowBasedRetention = retention.deleteType === "individual";
+  const resetOnImport = retention.resetOnImport ? "true" : "false";
+  const deleteAtEnd = retention.deleteAtEnd ? "true" : "false";
+
+  if (retention.type === "period") {
+    return `
+	    <DataRetentionPeriodLength>${retention.periodLength}</DataRetentionPeriodLength>
+	    <DataRetentionPeriod>${escapeXml(retention.periodUnit)}</DataRetentionPeriod>
+	    <RowBasedRetention>${rowBasedRetention ? "true" : "false"}</RowBasedRetention>
+	    <ResetRetentionPeriodOnImport>${resetOnImport}</ResetRetentionPeriodOnImport>
+	    <DeleteAtEndOfRetentionPeriod>${deleteAtEnd}</DeleteAtEndOfRetentionPeriod>`;
+  }
+
+  const retainUntilIso = new Date(
+    `${retention.retainUntil}T00:00:00.000Z`,
+  ).toISOString();
+  return `
+	    <RetainUntil>${escapeXml(retainUntilIso)}</RetainUntil>
+	    <RowBasedRetention>${rowBasedRetention ? "true" : "false"}</RowBasedRetention>
+	    <ResetRetentionPeriodOnImport>${resetOnImport}</ResetRetentionPeriodOnImport>
+	    <DeleteAtEndOfRetentionPeriod>${deleteAtEnd}</DeleteAtEndOfRetentionPeriod>`;
 }
 
-export interface CreateDataExtensionParams {
-  name: string;
-  customerKey: string;
-  categoryId: number;
-  fields: DataExtensionField[];
-  isSendable?: boolean;
-  sendableField?: string;
-  sendableFieldType?: string;
-}
-
-function buildFieldsXml(fields: DataExtensionField[]): string {
+function buildFieldsXml(fields: CreateDataExtensionField[]): string {
   return fields
     .map((field, index) => {
       const isPrimaryKey = field.isPrimaryKey ?? index === 0;
@@ -121,11 +130,14 @@ export function buildCreateDataExtension(
 ): string {
   const fieldsXml = buildFieldsXml(params.fields);
   const isSendable = params.isSendable ?? false;
+  const retentionXml = params.retention
+    ? buildRetentionXml(params.retention)
+    : "";
 
   let sendableXml = "";
   if (isSendable && params.sendableField && params.sendableFieldType) {
     sendableXml = `
-    <SendableDataExtensionField>
+	    <SendableDataExtensionField>
       <Name>${escapeXml(params.sendableField)}</Name>
       <FieldType>${escapeXml(params.sendableFieldType)}</FieldType>
     </SendableDataExtensionField>
@@ -140,11 +152,7 @@ export function buildCreateDataExtension(
     <CustomerKey>${escapeXml(params.customerKey)}</CustomerKey>
     <CategoryID>${params.categoryId}</CategoryID>
     <IsSendable>${isSendable ? "true" : "false"}</IsSendable>
-    <DataRetentionPeriodLength>1</DataRetentionPeriodLength>
-    <DataRetentionPeriod>Days</DataRetentionPeriod>
-    <RowBasedRetention>false</RowBasedRetention>
-    <ResetRetentionPeriodOnImport>false</ResetRetentionPeriodOnImport>
-    <DeleteAtEndOfRetentionPeriod>false</DeleteAtEndOfRetentionPeriod>${sendableXml}
+    ${retentionXml}${sendableXml}
     <Fields>
       ${fieldsXml}
     </Fields>
