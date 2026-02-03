@@ -33,6 +33,8 @@ export interface DataFolderServiceStub {
 /** Data Extension Service stub interface */
 export interface DataExtensionServiceStub {
   retrieve: ReturnType<typeof vi.fn>;
+  retrieveByName: ReturnType<typeof vi.fn>;
+  retrieveByCustomerKey: ReturnType<typeof vi.fn>;
   retrieveFields: ReturnType<typeof vi.fn>;
   create: ReturnType<typeof vi.fn>;
 }
@@ -128,6 +130,8 @@ export function createDataExtensionServiceStub(
   return withOverrides(
     {
       retrieve: vi.fn().mockResolvedValue(null),
+      retrieveByName: vi.fn().mockResolvedValue(null),
+      retrieveByCustomerKey: vi.fn().mockResolvedValue(null),
       retrieveFields: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue({ objectId: "de-obj-1" }),
     },
