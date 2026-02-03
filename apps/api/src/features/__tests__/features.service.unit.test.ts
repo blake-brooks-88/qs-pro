@@ -73,6 +73,7 @@ describe('FeaturesService', () => {
       teamSnippets: false,
       auditLogs: false,
       deployToAutomation: false,
+      runToTargetDE: false,
     });
   });
 
@@ -103,6 +104,7 @@ describe('FeaturesService', () => {
       teamSnippets: false,
       auditLogs: false,
       deployToAutomation: false,
+      runToTargetDE: true,
     });
   });
 
@@ -144,6 +146,7 @@ describe('FeaturesService', () => {
       teamSnippets: false,
       auditLogs: false,
       deployToAutomation: false,
+      runToTargetDE: false,
     });
   });
 
@@ -185,6 +188,7 @@ describe('FeaturesService', () => {
       teamSnippets: false,
       auditLogs: false,
       deployToAutomation: false,
+      runToTargetDE: true,
     });
   });
 
@@ -215,6 +219,7 @@ describe('FeaturesService', () => {
       teamSnippets: true,
       auditLogs: true,
       deployToAutomation: true,
+      runToTargetDE: true,
     });
   });
 

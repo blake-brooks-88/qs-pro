@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { FeaturesService } from '../features/features.service';
 import { ShellQueryService } from './shell-query.service';
 import { ShellQuerySseService } from './shell-query-sse.service';
 
@@ -28,6 +29,7 @@ const createRunSchema = z.object({
   // Snippet name is truncated to 100 chars server-side, but accept a larger input to
   // preserve backward compatibility with callers that don't pre-trim.
   snippetName: z.string().max(1000).optional(),
+  targetDeCustomerKey: z.string().trim().min(1).max(200).optional(),
   tableMetadata: z
     .record(
       z.string().max(128),
@@ -57,6 +59,7 @@ export class ShellQueryController {
   constructor(
     private readonly shellQueryService: ShellQueryService,
     private readonly shellQuerySse: ShellQuerySseService,
+    private readonly featuresService: FeaturesService,
     @Inject('TENANT_REPOSITORY') private tenantRepo: TenantRepository,
   ) {}
 
@@ -68,7 +71,20 @@ export class ShellQueryController {
       throw new BadRequestException(result.error.errors);
     }
 
-    const { sqlText, snippetName, tableMetadata } = result.data;
+    const { sqlText, snippetName, targetDeCustomerKey, tableMetadata } =
+      result.data;
+
+    if (targetDeCustomerKey) {
+      const features = await this.featuresService.getTenantFeatures(
+        user.tenantId,
+      );
+      if (!features.runToTargetDE) {
+        throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+          operation: 'runToTargetDE',
+          reason: 'Run to Target DE requires Pro subscription',
+        });
+      }
+    }
 
     try {
       // Fetch EID for the current tenant
@@ -88,6 +104,7 @@ export class ShellQueryController {
         sqlText,
         snippetName,
         tableMetadata,
+        targetDeCustomerKey,
       );
 
       return { runId, status: 'queued' };

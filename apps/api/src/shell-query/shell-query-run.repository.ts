@@ -10,6 +10,7 @@ export interface CreateShellQueryRunParams {
   userId: string;
   mid: string;
   snippetName?: string;
+  targetDeCustomerKey?: string;
   sqlTextHash: string;
   status: ShellQueryRunStatus;
 }

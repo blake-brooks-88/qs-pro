@@ -55,6 +55,7 @@ export class ShellQueryService {
     sqlText: string,
     snippetName?: string,
     tableMetadata?: TableMetadata,
+    targetDeCustomerKey?: string,
   ): Promise<string> {
     const normalizedSnippetName = snippetName?.trim();
     const truncatedSnippetName = normalizedSnippetName
@@ -88,6 +89,7 @@ export class ShellQueryService {
       userId: context.userId,
       mid: context.mid,
       snippetName: truncatedSnippetName,
+      targetDeCustomerKey,
       sqlTextHash,
       status: 'queued',
     });
@@ -108,6 +110,7 @@ export class ShellQueryService {
         sqlText: encryptedSqlText,
         snippetName: truncatedSnippetName,
         tableMetadata,
+        targetDeCustomerKey,
       },
       {
         attempts: 2,
@@ -201,8 +204,10 @@ export class ShellQueryService {
     }
 
     // Proxy to MCE REST Rowset API
-    // The DE name follows the convention: QPP_[SnippetName]_[Hash]
-    const deName = buildQppResultsDataExtensionName(run.id, run.snippetName);
+    // Use target DE if specified, otherwise temp DE naming convention
+    const deKey =
+      run.targetDeCustomerKey ??
+      buildQppResultsDataExtensionName(run.id, run.snippetName);
 
     const pageSize = 50;
 
@@ -213,7 +218,7 @@ export class ShellQueryService {
         tenantId,
         userId,
         mid,
-        deName,
+        deKey,
         page,
         pageSize,
       );
