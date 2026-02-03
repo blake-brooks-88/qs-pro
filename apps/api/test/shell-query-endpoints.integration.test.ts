@@ -342,4 +342,102 @@ describe('Shell query endpoints (integration)', () => {
     expect(res.json().type).toBe('urn:qpp:error:mce-server-error');
     expect(res.json().code).toBe(ErrorCode.MCE_SERVER_ERROR);
   });
+
+  describe('run-to-target feature flag', () => {
+    async function enableRunToTargetDE() {
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+        await reserved`
+          INSERT INTO tenant_feature_overrides (tenant_id, feature_key, enabled)
+          VALUES (${tenantId}::uuid, ${'runToTargetDE'}, ${true})
+          ON CONFLICT (tenant_id, feature_key) DO UPDATE SET enabled = ${true}
+        `;
+        await reserved`RESET app.tenant_id`;
+      } finally {
+        reserved.release();
+      }
+    }
+
+    async function disableRunToTargetDE() {
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+        await reserved`
+          DELETE FROM tenant_feature_overrides
+          WHERE tenant_id = ${tenantId}::uuid AND feature_key = ${'runToTargetDE'}
+        `;
+        await reserved`RESET app.tenant_id`;
+      } finally {
+        reserved.release();
+      }
+    }
+
+    async function cleanupActiveRuns() {
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+        await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+        await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
+        await reserved`
+          DELETE FROM shell_query_runs
+          WHERE tenant_id = ${tenantId}::uuid
+            AND user_id = ${userId}::uuid
+            AND status IN ('queued', 'running')
+        `;
+        await reserved`RESET app.tenant_id`;
+        await reserved`RESET app.mid`;
+        await reserved`RESET app.user_id`;
+      } finally {
+        reserved.release();
+      }
+    }
+
+    beforeEach(async () => {
+      await cleanupActiveRuns();
+    });
+
+    afterEach(async () => {
+      await disableRunToTargetDE();
+    });
+
+    it('returns 201 when targetDeCustomerKey provided and feature enabled', async () => {
+      await enableRunToTargetDE();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/runs',
+        headers: { cookie, 'x-csrf-token': csrfToken },
+        payload: {
+          sqlText: 'SELECT 1',
+          targetDeCustomerKey: 'MyTargetDE',
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const json = res.json();
+      expect(json.runId).toBeDefined();
+      expect(json.status).toBe('queued');
+
+      createdRunIds.push(json.runId);
+    });
+
+    it('returns FEATURE_NOT_ENABLED when targetDeCustomerKey provided and feature disabled', async () => {
+      await disableRunToTargetDE();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/runs',
+        headers: { cookie, 'x-csrf-token': csrfToken },
+        payload: {
+          sqlText: 'SELECT 1',
+          targetDeCustomerKey: 'MyTargetDE',
+        },
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json().type).toBe('urn:qpp:error:feature-not-enabled');
+      expect(res.json().code).toBe(ErrorCode.FEATURE_NOT_ENABLED);
+    });
+  });
 });
