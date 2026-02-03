@@ -222,6 +222,18 @@ vi.mock("../QueryTabBar", () => ({
   ),
 }));
 
+// Mock schema-inferrer for "Create DE From Query" flow
+vi.mock("../utils/schema-inferrer", () => ({
+  inferSchemaFromQuery: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock metadata-fetcher for "Create DE From Query" flow
+vi.mock("../utils/metadata-fetcher", () => ({
+  createMetadataFetcher: vi.fn().mockReturnValue({
+    getFieldsForTable: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
 // Mock FeatureGate to always render children
 vi.mock("@/components/FeatureGate", () => ({
   FeatureGate: ({ children }: { children: ReactNode }) => <>{children}</>,

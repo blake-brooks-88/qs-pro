@@ -1,3 +1,4 @@
+import type { CreateQueryDefinitionParams } from "../../types/query-definition";
 import { escapeXml } from "../helpers";
 
 export function buildRetrieveQueryDefinition(customerKey: string): string {
@@ -13,16 +14,6 @@ export function buildRetrieveQueryDefinition(customerKey: string): string {
     </Filter>
   </RetrieveRequest>
 </RetrieveRequestMsg>`;
-}
-
-export interface CreateQueryDefinitionParams {
-  name: string;
-  customerKey: string;
-  categoryId: number;
-  targetId: string;
-  targetCustomerKey: string;
-  targetName: string;
-  queryText: string;
 }
 
 export function buildCreateQueryDefinition(

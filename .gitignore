@@ -58,6 +58,9 @@ tmp/
 # Local dev tools
 .dev/
 .playwright-mcp/
+.playwright-cli/
+playwright-cli
+playwright-mcp-config.json
 .planning/
 .agent-os/
 .augment/

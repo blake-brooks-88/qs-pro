@@ -1,10 +1,8 @@
+import type {
+  CreateDataFolderParams,
+  RetrieveDataFolderParams,
+} from "../../types/data-folder";
 import { escapeXml } from "../helpers";
-
-export interface RetrieveDataFolderParams {
-  name?: string;
-  contentType?: string;
-  clientId?: string;
-}
 
 export function buildRetrieveDataFolder(
   params: RetrieveDataFolderParams,
@@ -56,12 +54,6 @@ export function buildRetrieveDataFolder(
     ${filterXml}
   </RetrieveRequest>
 </RetrieveRequestMsg>`;
-}
-
-export interface CreateDataFolderParams {
-  name: string;
-  parentFolderId: number;
-  contentType: string;
 }
 
 export function buildCreateDataFolder(params: CreateDataFolderParams): string {

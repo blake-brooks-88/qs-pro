@@ -1,9 +1,11 @@
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Test, TestingModule } from "@nestjs/testing";
+import { createDataExtensionServiceStub } from "@qpp/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MceBridgeService } from "./mce-bridge.service";
 import { MetadataService } from "./metadata.service";
+import { DataExtensionService } from "./services/data-extension.service";
 
 describe("MetadataService", () => {
   let service: MetadataService;
@@ -24,6 +26,10 @@ describe("MetadataService", () => {
         {
           provide: MceBridgeService,
           useValue: mockBridge,
+        },
+        {
+          provide: DataExtensionService,
+          useValue: createDataExtensionServiceStub(),
         },
         {
           provide: CACHE_MANAGER,

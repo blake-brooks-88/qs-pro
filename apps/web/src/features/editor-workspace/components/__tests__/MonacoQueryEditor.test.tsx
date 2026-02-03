@@ -154,7 +154,12 @@ const createMockDataExtensions = (): DataExtension[] => [
     folderId: "folder-1",
     description: "Customer data",
     fields: [
-      { name: "Email", type: "Email", isPrimaryKey: true, isNullable: false },
+      {
+        name: "Email",
+        type: "EmailAddress",
+        isPrimaryKey: true,
+        isNullable: false,
+      },
       {
         name: "FirstName",
         type: "Text",
@@ -186,7 +191,7 @@ const createMockDataExtensions = (): DataExtension[] => [
       },
       {
         name: "CustomerEmail",
-        type: "Email",
+        type: "EmailAddress",
         isPrimaryKey: false,
         isNullable: false,
       },
@@ -205,7 +210,12 @@ const createMockDataExtensions = (): DataExtension[] => [
     folderId: "folder-2",
     description: "Contact preferences",
     fields: [
-      { name: "Email", type: "Email", isPrimaryKey: true, isNullable: false },
+      {
+        name: "Email",
+        type: "EmailAddress",
+        isPrimaryKey: true,
+        isNullable: false,
+      },
       {
         name: "OptIn",
         type: "Boolean",
@@ -217,7 +227,12 @@ const createMockDataExtensions = (): DataExtension[] => [
 ];
 
 const createMockFields = (): DataExtensionField[] => [
-  { name: "Email", type: "Email", isPrimaryKey: true, isNullable: false },
+  {
+    name: "Email",
+    type: "EmailAddress",
+    isPrimaryKey: true,
+    isNullable: false,
+  },
   {
     name: "FirstName",
     type: "Text",

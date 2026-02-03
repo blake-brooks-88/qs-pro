@@ -15,6 +15,7 @@ import {
   type PostgresJsDatabase,
   tenantSettings,
 } from "@qpp/database";
+import type { DataRetentionPolicy } from "@qpp/shared-types";
 
 import { MceQueryValidator } from "../mce-query-validator";
 import {
@@ -51,6 +52,15 @@ function safeRecordGet<V>(
   // eslint-disable-next-line security/detect-object-injection
   return record && Object.hasOwn(record, key) ? record[key] : undefined;
 }
+
+const TEMP_DE_RETENTION: DataRetentionPolicy = {
+  type: "period",
+  periodLength: 1,
+  periodUnit: "Days",
+  deleteType: "all",
+  resetOnImport: false,
+  deleteAtEnd: true,
+};
 
 @Injectable()
 export class RunToTempFlow implements IFlowStrategy {
@@ -323,6 +333,7 @@ export class RunToTempFlow implements IFlowStrategy {
         name: deName,
         customerKey: deName,
         categoryId: folderId,
+        retention: TEMP_DE_RETENTION,
         fields: schema.map((col, index) => ({
           name: col.Name,
           fieldType: this.mapFieldType(col.FieldType),

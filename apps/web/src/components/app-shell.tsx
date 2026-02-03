@@ -5,9 +5,14 @@ import { ThemeToggle } from "@/components/theme-toggle";
 interface AppShellProps {
   children: ReactNode;
   topNotice?: ReactNode;
+  brandingExtra?: ReactNode;
 }
 
-export function AppShell({ children, topNotice }: AppShellProps) {
+export function AppShell({
+  children,
+  topNotice,
+  brandingExtra,
+}: AppShellProps) {
   return (
     <div className="flex h-screen flex-col bg-background text-foreground font-sans">
       <header className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 relative z-10">
@@ -20,6 +25,7 @@ export function AppShell({ children, topNotice }: AppShellProps) {
           <span className="font-display font-bold text-base tracking-tight">
             Query<span className="text-primary">++</span>
           </span>
+          {brandingExtra}
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />

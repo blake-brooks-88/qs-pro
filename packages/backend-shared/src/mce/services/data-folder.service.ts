@@ -10,26 +10,15 @@ import {
   buildRetrieveDataFolder,
 } from "../soap/request-bodies";
 import { SoapCreateResponse, SoapRetrieveResponse } from "../soap/types";
+import type {
+  CreateDataFolderParams,
+  DataFolder,
+  RetrieveDataFolderParams,
+} from "../types/data-folder";
 
 const MAX_PAGES = 10;
 
-export interface DataFolder {
-  id: number;
-  name: string;
-  parentFolderId?: number;
-}
-
-export interface RetrieveDataFolderParams {
-  name?: string;
-  contentType?: string;
-  clientId?: string;
-}
-
-export interface CreateDataFolderParams {
-  name: string;
-  parentFolderId: number;
-  contentType: string;
-}
+export type { CreateDataFolderParams, DataFolder, RetrieveDataFolderParams };
 
 @Injectable()
 export class DataFolderService {

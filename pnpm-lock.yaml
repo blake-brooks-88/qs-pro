@@ -534,6 +534,9 @@ importers:
       '@qpp/eslint-config':
         specifier: workspace:^
         version: link:../eslint-config
+      '@qpp/test-utils':
+        specifier: workspace:^
+        version: link:../test-utils
       '@types/node':
         specifier: ^22.10.7
         version: 22.19.3

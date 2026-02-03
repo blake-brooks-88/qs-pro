@@ -36,6 +36,7 @@
   "devDependencies": {
     "@nestjs/testing": "^11.0.1",
     "@qpp/eslint-config": "workspace:^",
+    "@qpp/test-utils": "workspace:^",
     "@types/node": "^22.10.7",
     "eslint": "^9.18.0",
     "msw": "^2.12.7",

@@ -1,3 +1,4 @@
+import type { CreateDataExtensionDto } from "@qpp/shared-types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   AltArrowUp,
@@ -9,6 +10,7 @@ import {
   Play,
   Rocket,
 } from "@solar-icons/react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -21,12 +23,15 @@ import {
 import { toast } from "sonner";
 
 import { FeatureGate } from "@/components/FeatureGate";
+import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
 import { useQueryExecution } from "@/features/editor-workspace/hooks/use-query-execution";
 import {
   useSavedQuery,
   useUpdateSavedQuery,
 } from "@/features/editor-workspace/hooks/use-saved-queries";
 import type {
+  DataExtensionDraft,
+  DataExtensionField,
   EditorWorkspaceProps,
   ExecutionResult,
 } from "@/features/editor-workspace/types";
@@ -37,6 +42,7 @@ import {
 } from "@/features/editor-workspace/utils/sql-lint";
 import { useSqlDiagnostics } from "@/features/editor-workspace/utils/sql-lint/use-sql-diagnostics";
 import { cn } from "@/lib/utils";
+import { createDataExtension } from "@/services/metadata";
 import { useTabsStore } from "@/store/tabs-store";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
@@ -85,6 +91,12 @@ export function EditorWorkspace({
   const [isConfirmCloseOpen, setIsConfirmCloseOpen] = useState(false);
   const [tabToClose, setTabToClose] = useState<string | null>(null);
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
+  const [inferredFields, setInferredFields] = useState<DataExtensionField[]>(
+    [],
+  );
+
+  // TanStack Query client for metadata fetching
+  const queryClient = useQueryClient();
 
   // State for lazy-loading query content when opening from sidebar
   const [pendingQueryId, setPendingQueryId] = useState<string | null>(null);
@@ -292,10 +304,56 @@ export function EditorWorkspace({
     onToggleSidebar?.();
   };
 
-  const handleCreateDE = () => {
+  const handleCreateDE = async () => {
+    // Lazy load both inferrer and fetcher to avoid bundle impact
+    try {
+      const [{ inferSchemaFromQuery }, { createMetadataFetcher }] =
+        await Promise.all([
+          import("../utils/schema-inferrer"),
+          import("../utils/metadata-fetcher"),
+        ]);
+      const fetcher = createMetadataFetcher(queryClient, tenantId, eid);
+      const fields = await inferSchemaFromQuery(safeActiveTab.content, fetcher);
+      setInferredFields(fields);
+    } catch {
+      // Parsing failed - show empty modal
+      toast.error("Could not infer schema from query");
+      setInferredFields([]);
+    }
+
     setIsDEModalOpen(true);
     onCreateDE?.();
   };
+
+  const handleSaveDataExtension = useCallback(
+    async (draft: DataExtensionDraft) => {
+      // Map DataExtensionDraft to CreateDataExtensionDto (strip client-side id from fields)
+      const dto: CreateDataExtensionDto = {
+        name: draft.name,
+        ...(draft.customerKey && { customerKey: draft.customerKey }),
+        folderId: draft.folderId,
+        isSendable: draft.isSendable,
+        subscriberKeyField: draft.subscriberKeyField,
+        retention: draft.retention,
+        fields: draft.fields.map(({ id: _id, ...field }) => field),
+      };
+
+      try {
+        await createDataExtension(dto);
+        toast.success(`Data Extension "${draft.name}" created`);
+        const queryKey = metadataQueryKeys.dataExtensions(tenantId, eid);
+        await queryClient.invalidateQueries({ queryKey });
+        await queryClient.refetchQueries({ queryKey, type: "all" });
+      } catch (error) {
+        toast.error("Failed to create Data Extension", {
+          description:
+            error instanceof Error ? error.message : "An error occurred",
+        });
+        throw error;
+      }
+    },
+    [queryClient, tenantId, eid],
+  );
 
   const handleOpenQueryActivityModal = () => {
     setIsQueryActivityModalOpen(true);
@@ -686,7 +744,14 @@ export function EditorWorkspace({
         {/* Modals */}
         <DataExtensionModal
           isOpen={isDEModalOpen}
-          onClose={() => setIsDEModalOpen(false)}
+          onClose={() => {
+            setIsDEModalOpen(false);
+            setInferredFields([]);
+          }}
+          onSave={handleSaveDataExtension}
+          initialFields={inferredFields}
+          folders={folders.filter((f) => f.type === "data-extension")}
+          dataExtensions={dataExtensions}
         />
 
         <QueryActivityModal

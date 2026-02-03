@@ -1,3 +1,5 @@
+import type { CreateDataExtensionDto } from "@qpp/shared-types";
+
 import api from "@/services/api";
 import type {
   DataExtensionFieldResponseDto,
@@ -45,4 +47,14 @@ export async function getFields(
     { params: { key: customerKey } },
   );
   return data;
+}
+
+export async function createDataExtension(
+  data: CreateDataExtensionDto,
+): Promise<{ objectId: string }> {
+  const response = await api.post<{ objectId: string }>(
+    "/metadata/data-extensions",
+    data,
+  );
+  return response.data;
 }
