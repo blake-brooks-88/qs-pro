@@ -51,6 +51,7 @@ import {
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
+import { RunToTargetFlow } from '../src/shell-query/strategies/run-to-target.strategy';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import type { PollShellQueryJob, ShellQueryJob } from '../src/shell-query/shell-query.types';
 
@@ -327,6 +328,7 @@ describe('Shell Query Cancellation (integration)', () => {
       ],
       providers: [
         ShellQueryProcessor,
+        RunToTargetFlow,
         RunToTempFlow,
         MceQueryValidator,
         { provide: getQueueToken('shell-query'), useValue: mockQueue },

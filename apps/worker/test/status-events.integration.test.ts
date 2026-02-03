@@ -44,6 +44,7 @@ import {
 } from 'vitest';
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
+import { RunToTargetFlow } from '../src/shell-query/strategies/run-to-target.strategy';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 import { STATUS_MESSAGES, type RunStatus } from '../src/shell-query/shell-query.types';
@@ -443,6 +444,7 @@ describe('Status Events (integration)', () => {
       ],
       providers: [
         ShellQueryProcessor,
+        RunToTargetFlow,
         RunToTempFlow,
         MceQueryValidator,
         { provide: 'REDIS_CLIENT', useValue: redisStub },
