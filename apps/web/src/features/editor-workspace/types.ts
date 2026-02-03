@@ -56,6 +56,7 @@ export type ExecutionStatus =
   | "queued"
   | "running"
   | "creating_data_extension"
+  | "targeting_data_extension"
   | "validating_query"
   | "executing_query"
   | "fetching_results"

@@ -11,5 +11,6 @@ export interface FieldDefinition {
 export interface CreateRunRequest {
   sqlText: string;
   snippetName?: string;
+  targetDeCustomerKey?: string;
   tableMetadata?: TableMetadata;
 }

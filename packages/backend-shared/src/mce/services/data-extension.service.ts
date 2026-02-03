@@ -8,6 +8,7 @@ import {
   buildContinueRequest,
   buildCreateDataExtension,
   buildDeleteDataExtension,
+  buildRetrieveDataExtensionByCustomerKey,
   buildRetrieveDataExtensionByName,
   buildRetrieveDataExtensionFields,
   buildRetrieveDataExtensions,
@@ -110,6 +111,48 @@ export class DataExtensionService {
 
     if (status && status !== "OK" && status !== "MoreDataAvailable") {
       throw mceSoapFailure("RetrieveDataExtensionByName", status);
+    }
+
+    const rawResults = msg?.Results;
+    if (!rawResults) {
+      return null;
+    }
+
+    const items = Array.isArray(rawResults) ? rawResults : [rawResults];
+    const item = items[0];
+    if (!item) {
+      return null;
+    }
+
+    return {
+      name: String(item.Name ?? ""),
+      customerKey: String(item.CustomerKey ?? ""),
+      objectId: String(item.ObjectID ?? ""),
+    };
+  }
+
+  async retrieveByCustomerKey(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    customerKey: string,
+  ): Promise<DataExtension | null> {
+    const soapBody = buildRetrieveDataExtensionByCustomerKey(customerKey);
+
+    const response = await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+      tenantId,
+      userId,
+      mid,
+      soapBody,
+      "Retrieve",
+      MCE_TIMEOUTS.METADATA,
+    );
+
+    const msg = response.Body?.RetrieveResponseMsg;
+    const status = msg?.OverallStatus;
+
+    if (status && status !== "OK" && status !== "MoreDataAvailable") {
+      throw mceSoapFailure("RetrieveDataExtensionByCustomerKey", status);
     }
 
     const rawResults = msg?.Results;

@@ -50,6 +50,11 @@ const FEATURE_CONFIG: Record<
     description: "Track all query executions and changes for compliance.",
     tier: "enterprise",
   },
+  runToTargetDE: {
+    title: "Run to Target DE",
+    description: "Run query results directly to an existing Data Extension.",
+    tier: "pro",
+  },
 };
 
 export interface FeatureGateProps extends Pick<

@@ -48,6 +48,7 @@ import {
 } from 'vitest';
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
+import { RunToTargetFlow } from '../src/shell-query/strategies/run-to-target.strategy';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 
@@ -379,6 +380,7 @@ function createMockExecuteJob(data: {
   mid: string;
   eid?: string;
   sqlText?: string;
+  targetDeCustomerKey?: string;
 }): Partial<Job> {
   return {
     id: `job-${data.runId}`,
@@ -390,6 +392,7 @@ function createMockExecuteJob(data: {
       mid: data.mid,
       eid: data.eid ?? TEST_EID,
       sqlText: data.sqlText ?? 'SELECT 1',
+      targetDeCustomerKey: data.targetDeCustomerKey,
     },
     opts: { attempts: 3 },
     attemptsMade: 0,
@@ -406,7 +409,7 @@ function createMockPollJob(data: {
   taskId?: string;
   queryDefinitionId?: string;
   queryCustomerKey?: string;
-  targetDeName?: string;
+  targetDeCustomerKey?: string;
   pollCount?: number;
   pollStartedAt?: string;
   notRunningConfirmations?: number;
@@ -423,7 +426,7 @@ function createMockPollJob(data: {
       taskId: data.taskId ?? 'task-123',
       queryDefinitionId: data.queryDefinitionId ?? 'qd-123',
       queryCustomerKey: data.queryCustomerKey ?? `QPP_Query_${data.runId}`,
-      targetDeName: data.targetDeName ?? `QPP_Results_${data.runId.substring(0, 8)}`,
+      targetDeCustomerKey: data.targetDeCustomerKey ?? `QPP_Results_${data.runId.substring(0, 8)}`,
       pollCount: data.pollCount ?? 0,
       pollStartedAt: data.pollStartedAt ?? new Date().toISOString(),
       notRunningConfirmations: data.notRunningConfirmations ?? 0,
@@ -480,6 +483,7 @@ describe('ShellQueryProcessor (integration)', () => {
       providers: [
         ShellQueryProcessor,
         RunToTempFlow,
+        RunToTargetFlow,
         MceQueryValidator,
         { provide: 'REDIS_CLIENT', useValue: redisStub },
         { provide: 'METRICS_JOBS_TOTAL', useValue: metricsStub },
@@ -628,6 +632,7 @@ describe('ShellQueryProcessor (integration)', () => {
     status: string;
     taskId: string | null;
     queryDefinitionId: string | null;
+    targetDeCustomerKey: string | null;
     errorMessage: string | null;
     completedAt: Date | null;
   }> {
@@ -636,7 +641,7 @@ describe('ShellQueryProcessor (integration)', () => {
     await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
     await reserved`SELECT set_config('app.user_id', ${TEST_USER_ID}, false)`;
     const result = await reserved`
-      SELECT status, task_id, query_definition_id, error_message, completed_at
+      SELECT status, task_id, query_definition_id, target_de_customer_key, error_message, completed_at
       FROM shell_query_runs
       WHERE id = ${runId}::uuid
     `;
@@ -650,6 +655,7 @@ describe('ShellQueryProcessor (integration)', () => {
       status: row?.status ?? 'unknown',
       taskId: row?.task_id ?? null,
       queryDefinitionId: row?.query_definition_id ?? null,
+      targetDeCustomerKey: row?.target_de_customer_key ?? null,
       errorMessage: row?.error_message
         ? (encryptionService.decrypt(row.error_message) ?? null)
         : null,
@@ -817,6 +823,201 @@ describe('ShellQueryProcessor (integration)', () => {
 
       expect(metricsActiveJobsStub.inc).toHaveBeenCalledTimes(1);
       expect(metricsActiveJobsStub.dec).toHaveBeenCalledTimes(1);
+    });
+
+    it('routes to run-to-target strategy when targetDeCustomerKey is provided', async () => {
+      const runId = await createTestRun('SELECT Name FROM SourceDE');
+      const encryptedSql = encryptionService.encrypt('SELECT Name FROM SourceDE') ?? '';
+      const targetDeCustomerKey = 'ExistingTargetDE_CustomerKey';
+
+      // Add handler for DataExtension Retrieve by CustomerKey (target DE lookup)
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            const body = await request.text();
+            const soapAction = request.headers.get('SOAPAction') ?? '';
+
+            mceRequests.push({ type: 'SOAP', action: soapAction, body });
+
+            // DataExtension Retrieve by CustomerKey
+            if (
+              body.includes('<ObjectType>DataExtension</ObjectType>') &&
+              soapAction.includes('Retrieve') &&
+              body.includes(targetDeCustomerKey)
+            ) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <OverallStatus>OK</OverallStatus>
+                    <Results xsi:type="DataExtension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                      <ObjectID>target-de-object-id-123</ObjectID>
+                      <CustomerKey>${targetDeCustomerKey}</CustomerKey>
+                      <Name>ExistingTargetDE</Name>
+                    </Results>
+                  </RetrieveResponseMsg>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+
+            // DataFolder Retrieve - QPP folder
+            if (
+              body.includes('<ObjectType>DataFolder</ObjectType>') &&
+              soapAction.includes('Retrieve')
+            ) {
+              if (body.includes('QueryPlusPlus Results')) {
+                return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+                <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                  <soap:Body>
+                    <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                      <OverallStatus>OK</OverallStatus>
+                      <Results xsi:type="DataFolder" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <ID>12345</ID>
+                        <Name>QueryPlusPlus Results</Name>
+                        <ContentType>dataextension</ContentType>
+                      </Results>
+                    </RetrieveResponseMsg>
+                  </soap:Body>
+                </soap:Envelope>`);
+              }
+            }
+
+            // QueryDefinition Retrieve (for delete check)
+            if (
+              body.includes('<ObjectType>QueryDefinition</ObjectType>') &&
+              soapAction.includes('Retrieve')
+            ) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <OverallStatus>OK</OverallStatus>
+                  </RetrieveResponseMsg>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+
+            // QueryDefinition Delete
+            if (
+              body.includes('<Objects xsi:type="QueryDefinition"') &&
+              soapAction.includes('Delete')
+            ) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <DeleteResponse xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <Results><StatusCode>OK</StatusCode></Results>
+                  </DeleteResponse>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+
+            // QueryDefinition Create
+            if (
+              body.includes('<Objects xsi:type="QueryDefinition"') &&
+              soapAction.includes('Create')
+            ) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <CreateResponse xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <Results>
+                      <StatusCode>OK</StatusCode>
+                      <StatusMessage>Created</StatusMessage>
+                      <NewID>222</NewID>
+                      <NewObjectID>qd-object-id-target</NewObjectID>
+                    </Results>
+                  </CreateResponse>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+
+            // QueryDefinition Perform
+            if (body.includes('QueryDefinition') && soapAction.includes('Perform')) {
+              return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+              <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body>
+                  <PerformResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                    <Results>
+                      <Result>
+                        <StatusCode>OK</StatusCode>
+                        <StatusMessage>Performed</StatusMessage>
+                        <Task>
+                          <StatusCode>OK</StatusCode>
+                          <StatusMessage>Queued</StatusMessage>
+                          <ID>task-target-${Date.now()}</ID>
+                          <InteractionObjectID>interaction-obj-id</InteractionObjectID>
+                        </Task>
+                      </Result>
+                    </Results>
+                  </PerformResponseMsg>
+                </soap:Body>
+              </soap:Envelope>`);
+            }
+
+            // Default empty response
+            return HttpResponse.xml(`<?xml version="1.0" encoding="utf-8"?>
+            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+              <soap:Body>
+                <RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+                  <OverallStatus>OK</OverallStatus>
+                </RetrieveResponseMsg>
+              </soap:Body>
+            </soap:Envelope>`);
+          },
+        ),
+      );
+
+      const job = createMockExecuteJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
+        eid: TEST_EID,
+        sqlText: encryptedSql,
+        targetDeCustomerKey,
+      });
+
+      const result = await processor.process(job as Job);
+
+      // Verify result indicates poll was enqueued
+      expect(result).toMatchObject({
+        status: 'poll-enqueued',
+        runId,
+      });
+      expect((result as { taskId?: string }).taskId).toBeDefined();
+
+      // Verify database state shows running status
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('running');
+      expect(dbRun.taskId).toBeDefined();
+      expect(dbRun.queryDefinitionId).toBeDefined();
+
+      // Verify poll job was enqueued with targetDeCustomerKey
+      const addedJobs = (queueStub as unknown as { __addedJobs: Array<{ name: string; data: { targetDeCustomerKey?: string } }> }).__addedJobs;
+      expect(addedJobs.length).toBe(1);
+      expect(addedJobs[0].name).toBe('poll-shell-query');
+      expect(addedJobs[0].data.targetDeCustomerKey).toBe(targetDeCustomerKey);
+
+      // CRITICAL: Verify run-to-target path - NO DataExtension Create call
+      const deCreateCalls = mceRequests.filter(
+        (r) =>
+          r.type === 'SOAP' &&
+          (r.action ?? '').includes('Create') &&
+          (r.body ?? '').includes('<Objects xsi:type="DataExtension"'),
+      );
+      expect(deCreateCalls).toHaveLength(0);
+
+      // Verify target DE was retrieved by CustomerKey
+      const deRetrieveCalls = mceRequests.filter(
+        (r) =>
+          r.type === 'SOAP' &&
+          (r.action ?? '').includes('Retrieve') &&
+          (r.body ?? '').includes('<ObjectType>DataExtension</ObjectType>') &&
+          (r.body ?? '').includes(targetDeCustomerKey),
+      );
+      expect(deRetrieveCalls.length).toBeGreaterThan(0);
     });
   });
 
@@ -1009,6 +1210,75 @@ describe('ShellQueryProcessor (integration)', () => {
       expect(metricsActiveJobsStub.dec).toHaveBeenCalledTimes(1);
     });
 
+    it('completes via row probe with explicit targetDeCustomerKey (run-to-target path)', async () => {
+      const runId = await createTestRun('SELECT Name FROM SourceDE');
+      await updateRunForPoll(runId);
+
+      // Simulate MCE query still processing (row probe triggers)
+      asyncActivityStatusOverride = { status: 'Processing' };
+
+      // Explicit target DE key (not a generated QPP_Results_* temp key)
+      const targetDeCustomerKey = 'UserTargetDE_CustomerKey';
+
+      // Add handler to return rows for the target DE rowset request
+      server.use(
+        http.get(
+          `https://${TEST_TSSD}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset`,
+          ({ request }) => {
+            mceRequests.push({ type: 'REST', action: 'rowset' });
+
+            const url = new URL(request.url);
+            const page = parseInt(url.searchParams.get('$page') ?? '1', 10);
+            const pageSize = parseInt(url.searchParams.get('$pageSize') ?? '50', 10);
+
+            return HttpResponse.json({
+              items: [
+                {
+                  keys: { _CustomObjectKey: '1' },
+                  values: { Name: 'Result Row 1' },
+                },
+              ],
+              count: 1,
+              page,
+              pageSize,
+            });
+          },
+        ),
+      );
+
+      // Set pollStartedAt to exceed ROW_PROBE_MIN_RUNTIME_MS (5000ms)
+      const pollStartedAt = new Date(Date.now() - 7000).toISOString();
+      const job = createMockPollJob({
+        runId,
+        tenantId: TEST_TENANT_ID,
+        userId: TEST_USER_ID,
+        mid: TEST_MID,
+        pollStartedAt,
+        queryDefinitionId: 'qd-run-to-target',
+        targetDeCustomerKey,
+      });
+
+      const result = await processor.process(job as Job);
+
+      // Verify fast-path completion via row probe
+      expect(result).toEqual({ status: 'completed', runId });
+
+      // Verify database state reflects completion
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun.status).toBe('ready');
+      expect(dbRun.completedAt).not.toBeNull();
+
+      // Verify row probe request was made to the rowset endpoint
+      const rowsetRequests = mceRequests.filter(
+        (r) => r.type === 'REST' && r.action === 'rowset',
+      );
+      expect(rowsetRequests.length).toBeGreaterThan(0);
+
+      // Verify no full timeout wait occurred (immediate completion)
+      expect(metricsActiveJobsStub.inc).toHaveBeenCalledTimes(1);
+      expect(metricsActiveJobsStub.dec).toHaveBeenCalledTimes(1);
+    });
+
     it('uses REST isRunning check and persists queryDefinitionId via SOAP fallback when REST returns 400', async () => {
       const runId = await createTestRun('SELECT 1');
       await updateRunForPoll(runId);
@@ -1037,7 +1307,7 @@ describe('ShellQueryProcessor (integration)', () => {
         mid: TEST_MID,
         pollStartedAt,
         queryDefinitionId: '',
-        targetDeName: '',
+        targetDeCustomerKey: '',
       });
 
       const result = await processor.process(job as Job);
@@ -1070,7 +1340,7 @@ describe('ShellQueryProcessor (integration)', () => {
         userId: TEST_USER_ID,
         mid: TEST_MID,
         pollStartedAt,
-        targetDeName: '',
+        targetDeCustomerKey: '',
       });
 
       // Make updateData persist state between polls.

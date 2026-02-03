@@ -51,6 +51,7 @@ import {
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
+import { RunToTargetFlow } from '../src/shell-query/strategies/run-to-target.strategy';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import type { PollShellQueryJob, ShellQueryJob } from '../src/shell-query/shell-query.types';
 
@@ -247,7 +248,7 @@ describe('Shell Query Cancellation (integration)', () => {
       taskId: data.taskId ?? 'task-123',
       queryDefinitionId: data.queryDefinitionId ?? '',
       queryCustomerKey: data.queryCustomerKey ?? `QPP_Query_${data.runId ?? runId}`,
-      targetDeName: data.targetDeName ?? '',
+      targetDeCustomerKey: data.targetDeCustomerKey ?? '',
       pollCount: data.pollCount ?? 0,
       pollStartedAt: data.pollStartedAt ?? new Date().toISOString(),
       notRunningConfirmations: data.notRunningConfirmations ?? 0,
@@ -327,6 +328,7 @@ describe('Shell Query Cancellation (integration)', () => {
       ],
       providers: [
         ShellQueryProcessor,
+        RunToTargetFlow,
         RunToTempFlow,
         MceQueryValidator,
         { provide: getQueueToken('shell-query'), useValue: mockQueue },

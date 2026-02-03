@@ -47,6 +47,7 @@ import {
 } from 'vitest';
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
+import { RunToTargetFlow } from '../src/shell-query/strategies/run-to-target.strategy';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 import type { ShellQueryJob, PollShellQueryJob } from '../src/shell-query/shell-query.types';
@@ -343,6 +344,7 @@ describe('Job Payload Cleanup (integration)', () => {
       ],
       providers: [
         ShellQueryProcessor,
+        RunToTargetFlow,
         RunToTempFlow,
         MceQueryValidator,
         { provide: 'REDIS_CLIENT', useValue: redisStub },
@@ -574,7 +576,7 @@ describe('Job Payload Cleanup (integration)', () => {
           taskId: 'task-123',
           queryDefinitionId: 'qd-123',
           queryCustomerKey: `QPP_Query_${runId}`,
-          targetDeName: `QPP_Results_${runId.substring(0, 8)}`,
+          targetDeCustomerKey: `QPP_Results_${runId.substring(0, 8)}`,
           pollCount: 5,
           pollStartedAt: new Date().toISOString(),
           notRunningConfirmations: 0,

@@ -44,6 +44,7 @@ import {
 } from 'vitest';
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
+import { RunToTargetFlow } from '../src/shell-query/strategies/run-to-target.strategy';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 import { STATUS_MESSAGES, type RunStatus } from '../src/shell-query/shell-query.types';
@@ -363,7 +364,7 @@ function createMockPollJob(data: {
   taskId?: string;
   queryDefinitionId?: string;
   queryCustomerKey?: string;
-  targetDeName?: string;
+  targetDeCustomerKey?: string;
   pollCount?: number;
   pollStartedAt?: string;
 }): Partial<Job> {
@@ -378,7 +379,7 @@ function createMockPollJob(data: {
       taskId: data.taskId ?? 'task-123',
       queryDefinitionId: data.queryDefinitionId ?? 'qd-123',
       queryCustomerKey: data.queryCustomerKey ?? `QPP_Query_${data.runId}`,
-      targetDeName: data.targetDeName ?? `QPP_Results_${data.runId.substring(0, 8)}`,
+      targetDeCustomerKey: data.targetDeCustomerKey ?? `QPP_Results_${data.runId.substring(0, 8)}`,
       pollCount: data.pollCount ?? 0,
       pollStartedAt: data.pollStartedAt ?? new Date().toISOString(),
       notRunningConfirmations: 0,
@@ -443,6 +444,7 @@ describe('Status Events (integration)', () => {
       ],
       providers: [
         ShellQueryProcessor,
+        RunToTargetFlow,
         RunToTempFlow,
         MceQueryValidator,
         { provide: 'REDIS_CLIENT', useValue: redisStub },

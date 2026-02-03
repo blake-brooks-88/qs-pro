@@ -202,3 +202,21 @@ export function buildRetrieveDataExtensionByName(name: string): string {
   </RetrieveRequest>
 </RetrieveRequestMsg>`;
 }
+
+export function buildRetrieveDataExtensionByCustomerKey(
+  customerKey: string,
+): string {
+  return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+  <RetrieveRequest>
+    <ObjectType>DataExtension</ObjectType>
+    <Properties>ObjectID</Properties>
+    <Properties>CustomerKey</Properties>
+    <Properties>Name</Properties>
+    <Filter xsi:type="SimpleFilterPart">
+      <Property>CustomerKey</Property>
+      <SimpleOperator>equals</SimpleOperator>
+      <Value>${escapeXml(customerKey)}</Value>
+    </Filter>
+  </RetrieveRequest>
+</RetrieveRequestMsg>`;
+}

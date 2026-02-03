@@ -192,7 +192,7 @@ describe("RunToTempFlow", () => {
         taskId: "task-created-123",
         queryDefinitionId: "qd-created-123",
         queryCustomerKey: expect.stringContaining("QPP_Query_"),
-        targetDeName: expect.stringContaining("QPP_Results_"),
+        targetDeCustomerKey: expect.stringContaining("QPP_Results_"),
       });
     });
 

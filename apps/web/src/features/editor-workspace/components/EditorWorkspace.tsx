@@ -6,8 +6,6 @@ import {
   Database,
   Diskette,
   Download,
-  MenuDots,
-  Play,
   Rocket,
 } from "@solar-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,7 +49,9 @@ import { MonacoQueryEditor } from "./MonacoQueryEditor";
 import { QueryActivityModal } from "./QueryActivityModal";
 import { QueryTabBar } from "./QueryTabBar";
 import { ResultsPane } from "./ResultsPane";
+import { RunButtonDropdown } from "./RunButtonDropdown";
 import { SaveQueryModal } from "./SaveQueryModal";
+import { TargetDataExtensionModal } from "./TargetDataExtensionModal";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 
 export function EditorWorkspace({
@@ -91,6 +91,7 @@ export function EditorWorkspace({
   const [isConfirmCloseOpen, setIsConfirmCloseOpen] = useState(false);
   const [tabToClose, setTabToClose] = useState<string | null>(null);
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
+  const [isTargetDEModalOpen, setIsTargetDEModalOpen] = useState(false);
   const [inferredFields, setInferredFields] = useState<DataExtensionField[]>(
     [],
   );
@@ -451,6 +452,18 @@ export function EditorWorkspace({
     void cancel();
   }, [cancel]);
 
+  const handleRunToTarget = useCallback(() => {
+    setIsTargetDEModalOpen(true);
+  }, []);
+
+  const handleSelectTargetDE = useCallback(
+    (customerKey: string) => {
+      void execute(safeActiveTab.content, safeActiveTab.name, customerKey);
+      setIsTargetDEModalOpen(false);
+    },
+    [execute, safeActiveTab.content, safeActiveTab.name],
+  );
+
   const handleResultsResizeStart = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
@@ -487,7 +500,6 @@ export function EditorWorkspace({
 
   const isIdle = executionResult.status === "idle";
   const shouldShowResultsPane = !isIdle || isResultsOpen;
-  const isRunDisabled = hasBlockingDiagnostics || isRunning;
 
   return (
     <Tooltip.Provider delayDuration={400}>
@@ -522,61 +534,13 @@ export function EditorWorkspace({
           {/* Workspace Header / Toolbar */}
           <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 overflow-visible">
             <div className="flex items-center gap-4">
-              <div className="flex items-center">
-                <Tooltip.Root>
-                  <Tooltip.Trigger asChild>
-                    <span
-                      className={cn(
-                        "inline-flex",
-                        isRunDisabled && "cursor-not-allowed",
-                      )}
-                    >
-                      <button
-                        onClick={handleRunRequest}
-                        disabled={isRunDisabled}
-                        data-testid="run-button"
-                        className={cn(
-                          "flex items-center gap-2 bg-success text-success-foreground h-8 px-4 rounded-l-md text-xs font-bold transition-all shadow-lg shadow-success/20 active:scale-95",
-                          isRunDisabled
-                            ? "opacity-60 cursor-not-allowed shadow-none"
-                            : "hover:brightness-110",
-                        )}
-                      >
-                        {isRunning ? (
-                          <span
-                            className="h-4 w-4 animate-spin rounded-full border-2 border-success-foreground border-t-transparent"
-                            data-testid="run-spinner"
-                          />
-                        ) : (
-                          <Play size={16} weight="Bold" />
-                        )}
-                        RUN
-                      </button>
-                    </span>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Content
-                      className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
-                      sideOffset={5}
-                    >
-                      {runTooltipMessage}
-                      <Tooltip.Arrow className="fill-foreground" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-
-                <button
-                  className={cn(
-                    "h-8 px-2 bg-success brightness-90 text-success-foreground border-l border-black/10 rounded-r-md active:scale-95",
-                    isRunDisabled
-                      ? "opacity-60 cursor-not-allowed"
-                      : "hover:brightness-100",
-                  )}
-                  disabled={isRunDisabled}
-                >
-                  <MenuDots size={14} weight="Bold" />
-                </button>
-              </div>
+              <RunButtonDropdown
+                onRun={handleRunRequest}
+                onRunToTarget={handleRunToTarget}
+                isRunning={isRunning}
+                disabled={hasBlockingDiagnostics}
+                tooltipMessage={runTooltipMessage}
+              />
 
               <div className="h-4 w-px bg-border mx-1" />
 
@@ -763,6 +727,15 @@ export function EditorWorkspace({
             onCreateQueryActivity?.(draft);
             onDeploy?.(safeActiveTab.queryId ?? safeActiveTab.id);
           }}
+        />
+
+        <TargetDataExtensionModal
+          isOpen={isTargetDEModalOpen}
+          tenantId={tenantId}
+          dataExtensions={dataExtensions}
+          sqlText={safeActiveTab.content}
+          onClose={() => setIsTargetDEModalOpen(false)}
+          onSelect={handleSelectTargetDE}
         />
 
         <SaveQueryModal

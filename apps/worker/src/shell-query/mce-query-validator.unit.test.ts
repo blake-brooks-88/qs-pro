@@ -61,6 +61,21 @@ describe("MceQueryValidator", () => {
     expect(result.errors).toContain('Syntax error near "SELCT"');
   });
 
+  it("returns valid:false with MCE errors array when errorMessage is missing", async () => {
+    mockMceBridge.request.mockResolvedValue({
+      queryValid: false,
+      errors: ['Invalid object name "Master Subscriber"'],
+    });
+
+    const result = await validator.validateQuery(
+      "SELECT * FROM [Master Subscriber]",
+      mockContext,
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Invalid object name "Master Subscriber"');
+  });
+
   it("proceeds with execution (returns valid:true) on validation endpoint 5xx error", async () => {
     // Arrange
     const serverError = new Error("Internal Server Error");

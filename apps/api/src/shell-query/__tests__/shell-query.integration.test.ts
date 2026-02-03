@@ -312,6 +312,7 @@ describe('ShellQueryService (integration)', () => {
     options: {
       errorMessage?: string;
       snippetName?: string;
+      targetDeCustomerKey?: string;
     } = {},
   ): Promise<string> {
     const runId = crypto.randomUUID();
@@ -332,7 +333,7 @@ describe('ShellQueryService (integration)', () => {
       await reserved`
         INSERT INTO shell_query_runs (
           id, tenant_id, user_id, mid, status, sql_text_hash, snippet_name,
-          created_at, started_at, completed_at, error_message
+          target_de_customer_key, created_at, started_at, completed_at, error_message
         )
         VALUES (
           ${runId}::uuid,
@@ -342,6 +343,7 @@ describe('ShellQueryService (integration)', () => {
           ${status},
           ${sqlTextHash},
           ${options.snippetName ?? 'Test Query'},
+          ${options.targetDeCustomerKey ?? null},
           NOW(),
           ${startedAt}::timestamptz,
           ${completedAt}::timestamptz,
@@ -357,6 +359,16 @@ describe('ShellQueryService (integration)', () => {
     }
 
     return runId;
+  }
+
+  /**
+   * Helper to create a run with targetDeCustomerKey in DB.
+   */
+  async function createRunInDbWithTargetDe(
+    status: 'queued' | 'running' | 'ready' | 'failed' | 'canceled',
+    targetDeCustomerKey: string,
+  ): Promise<string> {
+    return createRunInDb(status, { targetDeCustomerKey });
   }
 
   describe('createRun', () => {
@@ -886,6 +898,85 @@ describe('ShellQueryService (integration)', () => {
           statusMessage: errorMessage,
         },
       });
+    });
+
+    it('should use targetDeCustomerKey for MCE rowset request', async () => {
+      const targetDeKey = 'My_Custom_Target_DE';
+      let requestedKey: string | null = null;
+
+      server.use(
+        http.get(
+          `https://${TEST_TSSD}.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset`,
+          ({ params }) => {
+            requestedKey = String(params.key);
+            return HttpResponse.json({
+              items: [
+                {
+                  keys: { _CustomObjectKey: '1' },
+                  values: { Name: 'Target User' },
+                },
+              ],
+              count: 1,
+              page: 1,
+              pageSize: 50,
+            });
+          },
+        ),
+      );
+
+      const runId = await createRunInDbWithTargetDe('ready', targetDeKey);
+
+      await service.getResults(runId, testTenantId, testUserId, testMid, 1);
+
+      expect(requestedKey).toBe(targetDeKey);
+    });
+  });
+
+  describe('createRun (targetDeCustomerKey)', () => {
+    async function cleanupActiveRuns() {
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
+        await reserved`SELECT set_config('app.mid', ${testMid}, false)`;
+        await reserved`SELECT set_config('app.user_id', ${testUserId}, false)`;
+        await reserved`
+          DELETE FROM shell_query_runs
+          WHERE tenant_id = ${testTenantId}::uuid
+            AND user_id = ${testUserId}::uuid
+            AND status IN ('queued', 'running')
+        `;
+        await reserved`RESET app.tenant_id`;
+        await reserved`RESET app.mid`;
+        await reserved`RESET app.user_id`;
+      } finally {
+        reserved.release();
+      }
+    }
+
+    beforeEach(async () => {
+      await cleanupActiveRuns();
+    });
+
+    it('should persist targetDeCustomerKey to database', async () => {
+      const context = createServiceContext();
+      const sqlText = 'SELECT Name FROM TargetDE';
+      const targetDeKey = 'My_Target_DE_Key';
+
+      const runId = await service.createRun(
+        context,
+        sqlText,
+        'Target DE Test',
+        undefined,
+        targetDeKey,
+      );
+      createdRunIds.push(runId);
+
+      const dbRun = await getRunFromDb(runId);
+      expect(dbRun).not.toBeNull();
+      if (!dbRun) {
+        throw new Error('Expected run to exist in database');
+      }
+      expect(dbRun.target_de_customer_key).toBe(targetDeKey);
     });
   });
 });

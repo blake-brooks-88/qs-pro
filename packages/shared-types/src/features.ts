@@ -20,6 +20,7 @@ export const FeatureKeySchema = z.enum([
   "createDataExtension",
   "deployToAutomation",
   "systemDataViews",
+  "runToTargetDE",
 ]);
 export type FeatureKey = z.infer<typeof FeatureKeySchema>;
 
@@ -42,6 +43,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, readonly FeatureKey[]> = {
     "advancedAutocomplete",
     "createDataExtension",
     "systemDataViews",
+    "runToTargetDE",
   ],
   enterprise: [
     "basicLinting",
@@ -54,6 +56,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, readonly FeatureKey[]> = {
     "auditLogs",
     "deployToAutomation",
     "systemDataViews",
+    "runToTargetDE",
   ],
 } as const;
 
