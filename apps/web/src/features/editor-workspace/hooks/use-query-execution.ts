@@ -72,7 +72,11 @@ interface UseQueryExecutionOptions {
 }
 
 interface UseQueryExecutionResult {
-  execute: (sqlText: string, snippetName?: string) => Promise<void>;
+  execute: (
+    sqlText: string,
+    snippetName?: string,
+    targetDeCustomerKey?: string,
+  ) => Promise<void>;
   cancel: () => Promise<void>;
   status: QueryExecutionStatus;
   isRunning: boolean;
@@ -247,7 +251,11 @@ export function useQueryExecution(
   );
 
   const execute = useCallback(
-    async (sqlText: string, snippetName?: string): Promise<void> => {
+    async (
+      sqlText: string,
+      snippetName?: string,
+      targetDeCustomerKey?: string,
+    ): Promise<void> => {
       setCurrentPage(1);
       if (runId) {
         queryClient.removeQueries({
@@ -262,7 +270,12 @@ export function useQueryExecution(
         const response = await api.post<{
           runId: string;
           status: QueryExecutionStatus;
-        }>("/runs", { sqlText, snippetName, tableMetadata });
+        }>("/runs", {
+          sqlText,
+          snippetName,
+          tableMetadata,
+          targetDeCustomerKey,
+        });
 
         const { runId: newRunId, status: newStatus } = response.data;
 
