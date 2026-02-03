@@ -32,6 +32,7 @@ const TERMINAL_CODES = new Set<ErrorCode>([
   ErrorCode.RESOURCE_NOT_FOUND,
   ErrorCode.INVALID_STATE,
   ErrorCode.VALIDATION_ERROR,
+  ErrorCode.FEATURE_NOT_ENABLED,
 
   // Infrastructure (misconfiguration won't fix itself)
   ErrorCode.CONFIG_ERROR,
@@ -144,6 +145,8 @@ export function getHttpStatus(code: ErrorCode): number {
       return 404;
     case ErrorCode.INVALID_STATE:
       return 409; // Conflict
+    case ErrorCode.FEATURE_NOT_ENABLED:
+      return 403;
 
     // Infrastructure
     case ErrorCode.CONFIG_ERROR:
@@ -179,6 +182,7 @@ export function getErrorTitle(code: ErrorCode): string {
     [ErrorCode.RESOURCE_NOT_FOUND]: "Resource Not Found",
     [ErrorCode.INVALID_STATE]: "Invalid State",
     [ErrorCode.VALIDATION_ERROR]: "Validation Error",
+    [ErrorCode.FEATURE_NOT_ENABLED]: "Feature Not Enabled",
     [ErrorCode.CONFIG_ERROR]: "Configuration Error",
     [ErrorCode.DATABASE_ERROR]: "Database Error",
     [ErrorCode.REDIS_ERROR]: "Redis Error",

@@ -53,6 +53,8 @@ export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCode.INVALID_STATE]:
     "Operation not allowed in current state. Please try again.",
   [ErrorCode.VALIDATION_ERROR]: "Invalid input. Please check your request.",
+  [ErrorCode.FEATURE_NOT_ENABLED]:
+    "This feature is not enabled for your subscription.",
 
   // Infrastructure (these get masked to generic "unexpected error" for 5xx anyway)
   [ErrorCode.CONFIG_ERROR]: "Service configuration error.",
