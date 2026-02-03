@@ -6,6 +6,7 @@ import {
   Magnifer,
   Play,
 } from "@solar-icons/react";
+import { Parser } from "node-sql-parser";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -15,19 +16,134 @@ import {
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useDataExtensionFields } from "@/features/editor-workspace/hooks/use-metadata";
 import type { DataExtension } from "@/features/editor-workspace/types";
 import { cn } from "@/lib/utils";
 
 interface TargetDataExtensionModalProps {
   isOpen: boolean;
+  tenantId?: string | null;
   dataExtensions: DataExtension[];
   sqlText: string;
   onClose: () => void;
   onSelect: (customerKey: string) => void;
 }
 
+type CompatibilityState =
+  | "idle"
+  | "checking"
+  | "compatible"
+  | "incompatible"
+  | "unknown";
+
+type CompatibilityDetails = {
+  state: CompatibilityState;
+  summary?: string;
+  missingInTarget: string[];
+  requiredMissingFromQuery: string[];
+  duplicateOutputColumns: string[];
+};
+
+const sqlParser = new Parser();
+const DIALECT = "transactsql";
+
+function stripBrackets(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function normalizeFieldName(name: string): string {
+  return stripBrackets(name).trim().toLowerCase();
+}
+
+function extractOutputColumnNames(
+  sqlText: string,
+): { ok: true; names: string[] } | { ok: false; reason: string } {
+  let ast: unknown;
+  try {
+    ast = sqlParser.astify(sqlText, { database: DIALECT });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Failed to parse SQL: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
+
+  const statements = Array.isArray(ast) ? ast : [ast];
+  const selectStmt = statements.find(
+    (stmt): stmt is { type?: unknown; columns?: unknown[] } =>
+      Boolean(
+        stmt &&
+        typeof stmt === "object" &&
+        (stmt as { type?: unknown }).type === "select",
+      ),
+  );
+
+  if (!selectStmt || !Array.isArray(selectStmt.columns)) {
+    return { ok: false, reason: "No SELECT statement found" };
+  }
+
+  const names: string[] = [];
+
+  for (let i = 0; i < selectStmt.columns.length; i++) {
+    const col = selectStmt.columns[i] as unknown;
+
+    if (col === "*") {
+      return {
+        ok: false,
+        reason: "SELECT * cannot be validated for compatibility",
+      };
+    }
+
+    if (!col || typeof col !== "object") {
+      return { ok: false, reason: "Unsupported SELECT column" };
+    }
+
+    const record = col as {
+      as?: unknown;
+      expr?: { type?: unknown; column?: unknown } | undefined;
+      type?: unknown;
+      column?: unknown;
+    };
+
+    if (typeof record.as === "string" && record.as.trim()) {
+      names.push(stripBrackets(record.as));
+      continue;
+    }
+
+    const expr = record.expr;
+    const isColumnRef =
+      expr?.type === "column_ref" || record.type === "column_ref";
+    const columnValue = (expr?.column ?? record.column) as unknown;
+
+    if (isColumnRef) {
+      if (columnValue === "*") {
+        return {
+          ok: false,
+          reason: "SELECT * cannot be validated for compatibility",
+        };
+      }
+      if (typeof columnValue === "string" && columnValue.trim()) {
+        names.push(stripBrackets(columnValue));
+        continue;
+      }
+    }
+
+    return {
+      ok: false,
+      reason: "Cannot validate computed columns without an explicit AS alias",
+    };
+  }
+
+  return { ok: true, names };
+}
+
 export function TargetDataExtensionModal({
   isOpen,
+  tenantId,
   dataExtensions,
   sqlText,
   onClose,
@@ -36,6 +152,7 @@ export function TargetDataExtensionModal({
   const [search, setSearch] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -57,6 +174,7 @@ export function TargetDataExtensionModal({
       setSearch("");
       setSelectedTargetId(null);
       setIsSearchFocused(false);
+      setDetailsOpen(false);
     }
   }, [isOpen]);
 
@@ -79,12 +197,131 @@ export function TargetDataExtensionModal({
     return dataExtensions.find((de) => de.id === selectedTargetId) ?? null;
   }, [dataExtensions, selectedTargetId]);
 
-  const canRun = Boolean(selectedTargetId);
+  const selectedCustomerKey = selectedTarget?.customerKey;
+  const fieldsQuery = useDataExtensionFields({
+    tenantId,
+    customerKey: selectedCustomerKey,
+    enabled: Boolean(isOpen && selectedCustomerKey),
+  });
+
+  const compatibility = useMemo((): CompatibilityDetails => {
+    if (!selectedTarget || !isOpen) {
+      return {
+        state: "idle",
+        missingInTarget: [],
+        requiredMissingFromQuery: [],
+        duplicateOutputColumns: [],
+      };
+    }
+
+    if (!selectedCustomerKey) {
+      return {
+        state: "unknown",
+        summary: "No target Data Extension selected",
+        missingInTarget: [],
+        requiredMissingFromQuery: [],
+        duplicateOutputColumns: [],
+      };
+    }
+
+    if (fieldsQuery.isLoading) {
+      return {
+        state: "checking",
+        summary: "Checking compatibility...",
+        missingInTarget: [],
+        requiredMissingFromQuery: [],
+        duplicateOutputColumns: [],
+      };
+    }
+
+    const targetFields = fieldsQuery.data ?? selectedTarget.fields;
+    if (!targetFields || targetFields.length === 0) {
+      return {
+        state: "unknown",
+        summary:
+          "Unable to validate compatibility (missing target field metadata)",
+        missingInTarget: [],
+        requiredMissingFromQuery: [],
+        duplicateOutputColumns: [],
+      };
+    }
+
+    const extracted = extractOutputColumnNames(sqlText);
+    if (!extracted.ok) {
+      return {
+        state: "unknown",
+        summary: `Unable to validate compatibility (${extracted.reason})`,
+        missingInTarget: [],
+        requiredMissingFromQuery: [],
+        duplicateOutputColumns: [],
+      };
+    }
+
+    const outputNames = extracted.names;
+    const outputSet = new Set(outputNames.map(normalizeFieldName));
+    const targetSet = new Set(
+      targetFields.map((f) => normalizeFieldName(f.name)),
+    );
+
+    const missingInTarget = outputNames.filter(
+      (name) => !targetSet.has(normalizeFieldName(name)),
+    );
+
+    const requiredMissingFromQuery = targetFields
+      .filter((f) => f.isNullable === false)
+      .map((f) => f.name)
+      .filter((name) => !outputSet.has(normalizeFieldName(name)));
+
+    const counts = new Map<string, number>();
+    for (const name of outputNames) {
+      const normalized = normalizeFieldName(name);
+      counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+    }
+
+    const duplicateOutputColumns = outputNames.filter((name) => {
+      const normalized = normalizeFieldName(name);
+      return (counts.get(normalized) ?? 0) > 1;
+    });
+
+    const isIncompatible =
+      missingInTarget.length > 0 ||
+      requiredMissingFromQuery.length > 0 ||
+      duplicateOutputColumns.length > 0;
+
+    if (isIncompatible) {
+      return {
+        state: "incompatible",
+        summary: "Target Data Extension is not compatible with this query.",
+        missingInTarget,
+        requiredMissingFromQuery,
+        duplicateOutputColumns,
+      };
+    }
+
+    return {
+      state: "compatible",
+      summary: "Target Data Extension is compatible.",
+      missingInTarget: [],
+      requiredMissingFromQuery: [],
+      duplicateOutputColumns: [],
+    };
+  }, [
+    fieldsQuery.data,
+    fieldsQuery.isLoading,
+    isOpen,
+    selectedCustomerKey,
+    selectedTarget,
+    sqlText,
+  ]);
+
+  const canRun =
+    Boolean(selectedTargetId) && compatibility.state !== "incompatible";
 
   const handleSelectTarget = (de: DataExtension) => {
     setSelectedTargetId(de.id);
     setSearch("");
     setIsSearchFocused(false);
+    setDetailsOpen(false);
   };
 
   const handleRun = () => {
@@ -245,6 +482,80 @@ export function TargetDataExtensionModal({
                 </p>
               </div>
             </div>
+
+            {selectedTarget ? (
+              <div
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-xs",
+                  compatibility.state === "compatible"
+                    ? "bg-success/10 border-success/25 text-success-foreground"
+                    : compatibility.state === "incompatible"
+                      ? "bg-destructive/10 border-destructive/25 text-destructive"
+                      : "bg-muted/50 border-border text-muted-foreground",
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold">Compatibility</p>
+                    <p className="mt-0.5 text-[11px] leading-snug break-words">
+                      {compatibility.summary ??
+                        (compatibility.state === "checking"
+                          ? "Checking compatibility..."
+                          : compatibility.state === "unknown"
+                            ? "Unable to validate compatibility"
+                            : compatibility.state === "compatible"
+                              ? "Compatible"
+                              : compatibility.state === "incompatible"
+                                ? "Not compatible"
+                                : "")}
+                    </p>
+                  </div>
+
+                  {compatibility.state === "incompatible" ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setDetailsOpen((prev) => !prev)}
+                      className="h-8 px-3 text-[10px] font-bold"
+                    >
+                      {detailsOpen ? "Hide details" : "View details"}
+                    </Button>
+                  ) : null}
+                </div>
+
+                {compatibility.state === "incompatible" && detailsOpen ? (
+                  <div className="mt-2 space-y-2 text-[11px]">
+                    {compatibility.missingInTarget.length > 0 ? (
+                      <div>
+                        <p className="font-semibold">Missing in target</p>
+                        <p className="text-muted-foreground">
+                          {compatibility.missingInTarget.join(", ")}
+                        </p>
+                      </div>
+                    ) : null}
+                    {compatibility.requiredMissingFromQuery.length > 0 ? (
+                      <div>
+                        <p className="font-semibold">
+                          Required fields not selected
+                        </p>
+                        <p className="text-muted-foreground">
+                          {compatibility.requiredMissingFromQuery.join(", ")}
+                        </p>
+                      </div>
+                    ) : null}
+                    {compatibility.duplicateOutputColumns.length > 0 ? (
+                      <div>
+                        <p className="font-semibold">
+                          Duplicate output columns
+                        </p>
+                        <p className="text-muted-foreground">
+                          {compatibility.duplicateOutputColumns.join(", ")}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
 
