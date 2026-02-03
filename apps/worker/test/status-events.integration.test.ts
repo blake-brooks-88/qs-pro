@@ -363,7 +363,7 @@ function createMockPollJob(data: {
   taskId?: string;
   queryDefinitionId?: string;
   queryCustomerKey?: string;
-  targetDeName?: string;
+  targetDeCustomerKey?: string;
   pollCount?: number;
   pollStartedAt?: string;
 }): Partial<Job> {
@@ -378,7 +378,7 @@ function createMockPollJob(data: {
       taskId: data.taskId ?? 'task-123',
       queryDefinitionId: data.queryDefinitionId ?? 'qd-123',
       queryCustomerKey: data.queryCustomerKey ?? `QPP_Query_${data.runId}`,
-      targetDeName: data.targetDeName ?? `QPP_Results_${data.runId.substring(0, 8)}`,
+      targetDeCustomerKey: data.targetDeCustomerKey ?? `QPP_Results_${data.runId.substring(0, 8)}`,
       pollCount: data.pollCount ?? 0,
       pollStartedAt: data.pollStartedAt ?? new Date().toISOString(),
       notRunningConfirmations: 0,

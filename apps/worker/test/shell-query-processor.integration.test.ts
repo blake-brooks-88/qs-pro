@@ -48,6 +48,7 @@ import {
 } from 'vitest';
 
 import { ShellQueryProcessor } from '../src/shell-query/shell-query.processor';
+import { RunToTargetFlow } from '../src/shell-query/strategies/run-to-target.strategy';
 import { RunToTempFlow } from '../src/shell-query/strategies/run-to-temp.strategy';
 import { MceQueryValidator } from '../src/shell-query/mce-query-validator';
 
@@ -406,7 +407,7 @@ function createMockPollJob(data: {
   taskId?: string;
   queryDefinitionId?: string;
   queryCustomerKey?: string;
-  targetDeName?: string;
+  targetDeCustomerKey?: string;
   pollCount?: number;
   pollStartedAt?: string;
   notRunningConfirmations?: number;
@@ -423,7 +424,7 @@ function createMockPollJob(data: {
       taskId: data.taskId ?? 'task-123',
       queryDefinitionId: data.queryDefinitionId ?? 'qd-123',
       queryCustomerKey: data.queryCustomerKey ?? `QPP_Query_${data.runId}`,
-      targetDeName: data.targetDeName ?? `QPP_Results_${data.runId.substring(0, 8)}`,
+      targetDeCustomerKey: data.targetDeCustomerKey ?? `QPP_Results_${data.runId.substring(0, 8)}`,
       pollCount: data.pollCount ?? 0,
       pollStartedAt: data.pollStartedAt ?? new Date().toISOString(),
       notRunningConfirmations: data.notRunningConfirmations ?? 0,
@@ -480,6 +481,7 @@ describe('ShellQueryProcessor (integration)', () => {
       providers: [
         ShellQueryProcessor,
         RunToTempFlow,
+        RunToTargetFlow,
         MceQueryValidator,
         { provide: 'REDIS_CLIENT', useValue: redisStub },
         { provide: 'METRICS_JOBS_TOTAL', useValue: metricsStub },
@@ -1037,7 +1039,7 @@ describe('ShellQueryProcessor (integration)', () => {
         mid: TEST_MID,
         pollStartedAt,
         queryDefinitionId: '',
-        targetDeName: '',
+        targetDeCustomerKey: '',
       });
 
       const result = await processor.process(job as Job);
@@ -1070,7 +1072,7 @@ describe('ShellQueryProcessor (integration)', () => {
         userId: TEST_USER_ID,
         mid: TEST_MID,
         pollStartedAt,
-        targetDeName: '',
+        targetDeCustomerKey: '',
       });
 
       // Make updateData persist state between polls.

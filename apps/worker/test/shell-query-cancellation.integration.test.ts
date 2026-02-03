@@ -247,7 +247,7 @@ describe('Shell Query Cancellation (integration)', () => {
       taskId: data.taskId ?? 'task-123',
       queryDefinitionId: data.queryDefinitionId ?? '',
       queryCustomerKey: data.queryCustomerKey ?? `QPP_Query_${data.runId ?? runId}`,
-      targetDeName: data.targetDeName ?? '',
+      targetDeCustomerKey: data.targetDeCustomerKey ?? '',
       pollCount: data.pollCount ?? 0,
       pollStartedAt: data.pollStartedAt ?? new Date().toISOString(),
       notRunningConfirmations: data.notRunningConfirmations ?? 0,

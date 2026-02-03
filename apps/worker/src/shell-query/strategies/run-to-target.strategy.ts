@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   AppError,
-  buildQppResultsDataExtensionName,
   type DataExtensionField,
   DataExtensionService,
   DataFolderService,
@@ -15,7 +14,6 @@ import {
   type PostgresJsDatabase,
   tenantSettings,
 } from "@qpp/database";
-import type { DataRetentionPolicy } from "@qpp/shared-types";
 
 import { MceQueryValidator } from "../mce-query-validator";
 import {
@@ -25,7 +23,6 @@ import {
   type MetadataFetcher,
 } from "../query-analyzer";
 import { buildQueryCustomerKey } from "../query-definition.utils";
-import { type ColumnDefinition, inferSchema } from "../schema-inferrer";
 import {
   FlowResult,
   IFlowStrategy,
@@ -53,18 +50,9 @@ function safeRecordGet<V>(
   return record && Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
-const TEMP_DE_RETENTION: DataRetentionPolicy = {
-  type: "period",
-  periodLength: 1,
-  periodUnit: "Days",
-  deleteType: "all",
-  resetOnImport: false,
-  deleteAtEnd: true,
-};
-
 @Injectable()
-export class RunToTempFlow implements IFlowStrategy {
-  private readonly logger = new Logger(RunToTempFlow.name);
+export class RunToTargetFlow implements IFlowStrategy {
+  private readonly logger = new Logger(RunToTargetFlow.name);
 
   constructor(
     private readonly queryValidator: MceQueryValidator,
@@ -80,8 +68,13 @@ export class RunToTempFlow implements IFlowStrategy {
     job: ShellQueryJob,
     publishStatus?: StatusPublisher,
   ): Promise<FlowResult> {
-    const { runId, tenantId, userId, mid, sqlText, snippetName } = job;
-    const deName = buildQppResultsDataExtensionName(runId, snippetName);
+    const { tenantId, userId, mid, sqlText, targetDeCustomerKey } = job;
+
+    if (!targetDeCustomerKey) {
+      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+        statusMessage: "targetDeCustomerKey is required for RunToTargetFlow",
+      });
+    }
 
     await publishStatus?.("validating_query");
     const validationResult = await this.queryValidator.validateQuery(sqlText, {
@@ -109,28 +102,34 @@ export class RunToTempFlow implements IFlowStrategy {
       );
     }
 
-    const inferredSchema = await inferSchema(expandedSql, metadataFetcher);
-    this.logger.debug(
-      `Inferred schema for run (fields: ${inferredSchema.length})`,
+    await publishStatus?.("targeting_data_extension");
+    const targetDe = await this.dataExtensionService.retrieveByCustomerKey(
+      tenantId,
+      userId,
+      mid,
+      targetDeCustomerKey,
     );
 
-    await publishStatus?.("creating_data_extension");
+    if (!targetDe) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        statusMessage: `Target Data Extension not found: ${targetDeCustomerKey}`,
+      });
+    }
+
+    this.logger.log(
+      `Found target Data Extension: ${targetDe.name} (CustomerKey: ${targetDe.customerKey}, ObjectID: ${targetDe.objectId})`,
+    );
+
     const folderId = await this.ensureQppFolder(tenantId, userId, mid);
-
-    const deObjectId = await this.createTempDe(
-      job,
-      deName,
-      folderId,
-      inferredSchema,
-    );
 
     const queryCustomerKey = buildQueryCustomerKey(userId);
     const queryIds = await this.createQueryDefinition(
       job,
       queryCustomerKey,
       expandedSql,
-      deObjectId,
-      deName,
+      targetDe.objectId,
+      targetDe.customerKey,
+      targetDe.name,
       folderId,
     );
 
@@ -142,7 +141,7 @@ export class RunToTempFlow implements IFlowStrategy {
       taskId,
       queryDefinitionId: queryIds.definitionId,
       queryCustomerKey,
-      targetDeCustomerKey: deName,
+      targetDeCustomerKey: targetDe.customerKey,
     };
   }
 
@@ -309,87 +308,12 @@ export class RunToTempFlow implements IFlowStrategy {
     });
   }
 
-  private async createTempDe(
-    job: ShellQueryJob,
-    deName: string,
-    folderId: number,
-    schema: ColumnDefinition[],
-  ): Promise<string> {
-    const { tenantId, userId, mid } = job;
-
-    if (schema.length === 0) {
-      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
-        statusMessage: "Empty schema array",
-      });
-    }
-
-    await this.deleteDataExtensionIfExists(job, deName);
-
-    const result = await this.dataExtensionService.create(
-      tenantId,
-      userId,
-      mid,
-      {
-        name: deName,
-        customerKey: deName,
-        categoryId: folderId,
-        retention: TEMP_DE_RETENTION,
-        fields: schema.map((col, index) => ({
-          name: col.Name,
-          fieldType: this.mapFieldType(col.FieldType),
-          maxLength: this.isTextType(col.FieldType) ? col.MaxLength : undefined,
-          scale: col.FieldType === "Decimal" ? col.Scale : undefined,
-          precision: col.FieldType === "Decimal" ? col.Precision : undefined,
-          isPrimaryKey: index === 0 ? false : undefined,
-        })),
-      },
-    );
-
-    this.logger.log(
-      `Data Extension created: ${deName} (ObjectID: ${result.objectId})`,
-    );
-    return result.objectId;
-  }
-
-  private mapFieldType(fieldType: string): string {
-    const mapping = {
-      Text: "Text",
-      Number: "Number",
-      Decimal: "Decimal",
-      Date: "Date",
-      Boolean: "Boolean",
-      EmailAddress: "EmailAddress",
-      Phone: "Phone",
-      Email: "EmailAddress",
-    } as const satisfies Record<string, string>;
-    return mapping[fieldType as keyof typeof mapping] ?? "Text";
-  }
-
-  private isTextType(fieldType: string): boolean {
-    return ["Text", "EmailAddress", "Phone"].includes(fieldType);
-  }
-
-  private async deleteDataExtensionIfExists(
-    job: ShellQueryJob,
-    deName: string,
-  ): Promise<void> {
-    const { tenantId, userId, mid } = job;
-
-    try {
-      await this.dataExtensionService.delete(tenantId, userId, mid, deName);
-      this.logger.debug(`Deleted existing Data Extension: ${deName}`);
-    } catch (error) {
-      this.logger.debug(
-        `Delete DE failed for ${deName} (may not exist): ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
-  }
-
   private async createQueryDefinition(
     job: ShellQueryJob,
     key: string,
     sql: string,
     deObjectId: string,
+    deCustomerKey: string,
     deName: string,
     folderId: number,
   ): Promise<QueryDefinitionIds> {
@@ -406,7 +330,7 @@ export class RunToTempFlow implements IFlowStrategy {
         customerKey: key,
         categoryId: folderId,
         targetId: deObjectId,
-        targetCustomerKey: deName,
+        targetCustomerKey: deCustomerKey,
         targetName: deName,
         queryText: sql,
       },

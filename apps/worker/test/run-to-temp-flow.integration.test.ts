@@ -494,7 +494,7 @@ describe('RunToTempFlow (integration)', () => {
       expect(result.queryDefinitionId).toBe(expectedQdObjectId);
       expect(result.queryCustomerKey).toContain('QPP_Query_');
       expect(result.queryCustomerKey).toContain(TEST_USER_ID.substring(0, 26)); // userId-based key
-      expect(result.targetDeName).toContain('QPP_');
+      expect(result.targetDeCustomerKey).toContain('QPP_');
 
       // Verify MCE calls sequence
       expect(capturedRequests.some((r) => r.type === 'REST' && r.action === 'validate')).toBe(true);
@@ -985,9 +985,9 @@ describe('RunToTempFlow (integration)', () => {
       expect(result1.queryCustomerKey).toBe(result2.queryCustomerKey);
 
       // But temp DE names should be DIFFERENT (runId-based, no collision)
-      expect(result1.targetDeName).not.toBe(result2.targetDeName);
-      expect(result1.targetDeName).toContain(runId1.substring(0, 8));
-      expect(result2.targetDeName).toContain(runId2.substring(0, 8));
+      expect(result1.targetDeCustomerKey).not.toBe(result2.targetDeCustomerKey);
+      expect(result1.targetDeCustomerKey).toContain(runId1.substring(0, 8));
+      expect(result2.targetDeCustomerKey).toContain(runId2.substring(0, 8));
     });
 
     it('should use different Query Activity keys for different users', async () => {

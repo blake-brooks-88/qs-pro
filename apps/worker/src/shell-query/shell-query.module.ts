@@ -8,6 +8,7 @@ import { DatabaseModule, MceModule } from "@qpp/backend-shared";
 import { MceQueryValidator } from "./mce-query-validator";
 import { ShellQueryProcessor } from "./shell-query.processor";
 import { ShellQuerySweeper } from "./shell-query.sweeper";
+import { RunToTargetFlow } from "./strategies/run-to-target.strategy";
 import { RunToTempFlow } from "./strategies/run-to-temp.strategy";
 
 @Module({
@@ -33,6 +34,7 @@ import { RunToTempFlow } from "./strategies/run-to-temp.strategy";
   providers: [
     ShellQueryProcessor,
     RunToTempFlow,
+    RunToTargetFlow,
     MceQueryValidator,
     ShellQuerySweeper,
   ],

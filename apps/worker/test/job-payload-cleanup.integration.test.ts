@@ -574,7 +574,7 @@ describe('Job Payload Cleanup (integration)', () => {
           taskId: 'task-123',
           queryDefinitionId: 'qd-123',
           queryCustomerKey: `QPP_Query_${runId}`,
-          targetDeName: `QPP_Results_${runId.substring(0, 8)}`,
+          targetDeCustomerKey: `QPP_Results_${runId.substring(0, 8)}`,
           pollCount: 5,
           pollStartedAt: new Date().toISOString(),
           notRunningConfirmations: 0,

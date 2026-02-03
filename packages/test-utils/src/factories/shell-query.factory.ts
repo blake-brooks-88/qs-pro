@@ -35,7 +35,7 @@ export interface PollShellQueryJob {
   taskId: string;
   queryDefinitionId: string;
   queryCustomerKey: string;
-  targetDeName: string;
+  targetDeCustomerKey: string;
   pollCount: number;
   pollStartedAt: string;
   notRunningDetectedAt?: string;
@@ -88,7 +88,7 @@ export function createMockPollJobData(
     taskId: `task-${id}`,
     queryDefinitionId: `query-def-${id}`,
     queryCustomerKey: `QPP_Query_run-test-${id}`,
-    targetDeName: "QPP_Results_run-",
+    targetDeCustomerKey: "QPP_Results_run-",
     pollCount: 0,
     pollStartedAt: new Date().toISOString(),
     notRunningConfirmations: 0,

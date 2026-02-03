@@ -42,6 +42,7 @@ import {
   SSEEvent,
   STATUS_MESSAGES,
 } from "./shell-query.types";
+import { RunToTargetFlow } from "./strategies/run-to-target.strategy";
 import { RunToTempFlow } from "./strategies/run-to-temp.strategy";
 
 type AnyShellQueryJob = ShellQueryJob | PollShellQueryJob;
@@ -69,6 +70,7 @@ export class ShellQueryProcessor extends WorkerHost {
 
   constructor(
     private readonly runToTempFlow: RunToTempFlow,
+    private readonly runToTargetFlow: RunToTargetFlow,
     private readonly rlsContext: RlsContextService,
     private readonly mceBridge: MceBridgeService,
     private readonly asyncStatusService: AsyncStatusService,
@@ -324,12 +326,16 @@ export class ShellQueryProcessor extends WorkerHost {
         await this.publishStatusEvent(runId, status);
       };
 
+      const strategy = job.data.targetDeCustomerKey
+        ? this.runToTargetFlow
+        : this.runToTempFlow;
+
       const result = await this.rlsContext.runWithUserContext(
         tenantId,
         mid,
         userId,
         async () => {
-          return await this.runToTempFlow.execute(
+          return await strategy.execute(
             { ...job.data, sqlText },
             publishStatus,
           );
@@ -368,7 +374,7 @@ export class ShellQueryProcessor extends WorkerHost {
         taskId: result.taskId,
         queryDefinitionId: result.queryDefinitionId ?? "",
         queryCustomerKey: result.queryCustomerKey ?? "",
-        targetDeName: result.targetDeName ?? "",
+        targetDeCustomerKey: result.targetDeCustomerKey ?? "",
         pollCount: 0,
         pollStartedAt: pollStartedAt.toISOString(),
         notRunningConfirmations: 0,
@@ -566,10 +572,10 @@ export class ShellQueryProcessor extends WorkerHost {
       }
 
       const updatedData = { ...job.data };
-      const { targetDeName } = job.data;
+      const { targetDeCustomerKey } = job.data;
 
       const shouldRowProbe =
-        Boolean(targetDeName) &&
+        Boolean(targetDeCustomerKey) &&
         elapsed >= POLL_CONFIG.ROW_PROBE_MIN_RUNTIME_MS &&
         (!job.data.rowProbeLastCheckedAt ||
           Date.now() - Date.parse(job.data.rowProbeLastCheckedAt) >=
@@ -585,7 +591,7 @@ export class ShellQueryProcessor extends WorkerHost {
               tenantId,
               userId,
               mid,
-              targetDeName,
+              targetDeCustomerKey,
             );
           },
         );
@@ -822,13 +828,19 @@ export class ShellQueryProcessor extends WorkerHost {
     job: Job<PollShellQueryJob> | { data: PollShellQueryJob },
     token?: string,
   ): Promise<unknown> {
-    const { runId, tenantId, userId, mid, targetDeName, queryDefinitionId } =
-      job.data;
+    const {
+      runId,
+      tenantId,
+      userId,
+      mid,
+      targetDeCustomerKey,
+      queryDefinitionId,
+    } = job.data;
     const currentAttempts = job.data.rowsetReadyAttempts ?? 0;
 
-    if (!targetDeName) {
+    if (!targetDeCustomerKey) {
       this.logger.warn(
-        `Run ${runId}: No targetDeName available, skipping rowset readiness check`,
+        `Run ${runId}: No targetDeCustomerKey available, skipping rowset readiness check`,
       );
       await this.markReady(tenantId, userId, mid, runId);
       await this.rlsContext.runWithUserContext(
@@ -853,7 +865,12 @@ export class ShellQueryProcessor extends WorkerHost {
       mid,
       userId,
       async () => {
-        return this.checkRowsetReady(tenantId, userId, mid, targetDeName);
+        return this.checkRowsetReady(
+          tenantId,
+          userId,
+          mid,
+          targetDeCustomerKey,
+        );
       },
     );
 
@@ -880,7 +897,7 @@ export class ShellQueryProcessor extends WorkerHost {
     const nextAttempt = currentAttempts + 1;
 
     if (nextAttempt >= POLL_CONFIG.ROWSET_READY_MAX_ATTEMPTS) {
-      const errorMessage = `Data Extension "${targetDeName}" not queryable after ${POLL_CONFIG.ROWSET_READY_MAX_ATTEMPTS} attempts`;
+      const errorMessage = `Data Extension "${targetDeCustomerKey}" not queryable after ${POLL_CONFIG.ROWSET_READY_MAX_ATTEMPTS} attempts`;
       this.logger.error(`Run ${runId}: ${errorMessage}`);
       await this.markFailed(tenantId, userId, mid, runId, errorMessage);
       await this.rlsContext.runWithUserContext(

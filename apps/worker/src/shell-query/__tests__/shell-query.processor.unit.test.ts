@@ -42,11 +42,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ShellQueryProcessor } from "../shell-query.processor";
 import { POLL_CONFIG } from "../shell-query.types";
+import { RunToTargetFlow } from "../strategies/run-to-target.strategy";
 import { RunToTempFlow } from "../strategies/run-to-temp.strategy";
 
 describe("ShellQueryProcessor", () => {
   let processor: ShellQueryProcessor;
   let runToTempFlowMock: {
+    execute: ReturnType<typeof vi.fn>;
+    retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn>;
+  };
+  let runToTargetFlowMock: {
     execute: ReturnType<typeof vi.fn>;
     retrieveQueryDefinitionObjectId: ReturnType<typeof vi.fn>;
   };
@@ -70,7 +75,18 @@ describe("ShellQueryProcessor", () => {
         taskId: "task-123",
         queryDefinitionId: "qd-123",
         queryCustomerKey: "QPP_Query_user-1",
-        targetDeName: "QPP_Results_run-1",
+        targetDeCustomerKey: "QPP_Results_run-1",
+      }),
+      retrieveQueryDefinitionObjectId: vi.fn().mockResolvedValue(null),
+    };
+
+    runToTargetFlowMock = {
+      execute: vi.fn().mockResolvedValue({
+        status: "ready",
+        taskId: "task-target-123",
+        queryDefinitionId: "qd-target-123",
+        queryCustomerKey: "QPP_Query_user-1",
+        targetDeCustomerKey: "ExistingDE_CustomerKey",
       }),
       retrieveQueryDefinitionObjectId: vi.fn().mockResolvedValue(null),
     };
@@ -95,6 +111,7 @@ describe("ShellQueryProcessor", () => {
       providers: [
         ShellQueryProcessor,
         { provide: RunToTempFlow, useValue: runToTempFlowMock },
+        { provide: RunToTargetFlow, useValue: runToTargetFlowMock },
         { provide: RlsContextService, useValue: rlsContextStub },
         { provide: MceBridgeService, useValue: mceBridgeStub },
         { provide: AsyncStatusService, useValue: asyncStatusServiceStub },
@@ -199,7 +216,7 @@ describe("ShellQueryProcessor", () => {
           taskId: "task-123",
           queryDefinitionId: "qd-123",
           queryCustomerKey: "QPP_Query_user-1",
-          targetDeName: "QPP_Results_run-1",
+          targetDeCustomerKey: "QPP_Results_run-1",
         };
       });
 
@@ -272,7 +289,7 @@ describe("ShellQueryProcessor", () => {
         taskId: "task-enqueue",
         queryDefinitionId: "qd-enqueue",
         queryCustomerKey: "QPP_Query_enqueue",
-        targetDeName: "QPP_Results_enqueue",
+        targetDeCustomerKey: "QPP_Results_enqueue",
       });
 
       // Act
@@ -406,7 +423,7 @@ describe("ShellQueryProcessor", () => {
       // Arrange
       const job = createMockPollBullJob({
         pollStartedAt: new Date().toISOString(),
-        targetDeName: "QPP_Results_test",
+        targetDeCustomerKey: "QPP_Results_test",
       });
       asyncStatusServiceStub.retrieve.mockResolvedValue({
         status: "Complete",
@@ -453,7 +470,7 @@ describe("ShellQueryProcessor", () => {
       const job = createMockPollBullJob({
         pollCount: 1,
         pollStartedAt: pastStart,
-        targetDeName: "QPP_Results_probe",
+        targetDeCustomerKey: "QPP_Results_probe",
       });
       asyncStatusServiceStub.retrieve.mockResolvedValue({
         status: "Pending",
@@ -510,7 +527,7 @@ describe("ShellQueryProcessor", () => {
         pollStartedAt: pastStart,
         queryCustomerKey: "QPP_Query_confirm",
         queryDefinitionId: "qd-confirm",
-        targetDeName: "QPP_Results_confirm",
+        targetDeCustomerKey: "QPP_Results_confirm",
         notRunningDetectedAt: firstDetection,
         notRunningConfirmations: POLL_CONFIG.NOT_RUNNING_CONFIRMATIONS - 1,
       });
@@ -538,7 +555,7 @@ describe("ShellQueryProcessor", () => {
       // Arrange
       const job = createMockPollBullJob({
         pollStartedAt: new Date().toISOString(),
-        targetDeName: "QPP_Results_readiness",
+        targetDeCustomerKey: "QPP_Results_readiness",
       });
       asyncStatusServiceStub.retrieve.mockResolvedValue({
         status: "Complete",
@@ -923,7 +940,7 @@ describe("ShellQueryProcessor", () => {
       // Arrange
       const job = createMockPollBullJob({
         pollStartedAt: new Date().toISOString(),
-        targetDeName: "QPP_Results_metrics",
+        targetDeCustomerKey: "QPP_Results_metrics",
       });
       asyncStatusServiceStub.retrieve.mockResolvedValue({
         status: "Complete",

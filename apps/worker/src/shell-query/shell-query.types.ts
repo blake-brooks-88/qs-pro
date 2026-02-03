@@ -100,6 +100,7 @@ export interface ShellQueryJob {
   sqlText: string;
   snippetName?: string;
   tableMetadata?: TableMetadata;
+  targetDeCustomerKey?: string;
 }
 
 export interface PollShellQueryJob {
@@ -110,7 +111,7 @@ export interface PollShellQueryJob {
   taskId: string;
   queryDefinitionId: string;
   queryCustomerKey: string;
-  targetDeName: string;
+  targetDeCustomerKey: string;
 
   pollCount: number;
   pollStartedAt: string;
@@ -130,7 +131,7 @@ export interface FlowResult {
   taskId?: string;
   queryDefinitionId?: string;
   queryCustomerKey?: string;
-  targetDeName?: string;
+  targetDeCustomerKey?: string;
   errorMessage?: string;
 }
 
@@ -138,6 +139,7 @@ export type RunStatus =
   | ShellQueryRunStatus
   | "validating_query"
   | "creating_data_extension"
+  | "targeting_data_extension"
   | "executing_query"
   | "fetching_results";
 
@@ -146,6 +148,7 @@ export const STATUS_MESSAGES = {
   running: "Running...",
   validating_query: "Validating query...",
   creating_data_extension: "Creating temp Data Extension...",
+  targeting_data_extension: "Targeting Data Extension...",
   executing_query: "Executing query...",
   fetching_results: "Fetching results...",
   ready: "Query completed",
