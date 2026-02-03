@@ -19,10 +19,12 @@ import { MceQueryValidator } from "../mce-query-validator";
 import {
   containsSelectStar,
   expandSelectStar,
+  extractTableNames,
   type FieldDefinition,
   type MetadataFetcher,
 } from "../query-analyzer";
 import { buildQueryCustomerKey } from "../query-definition.utils";
+import { inferSchema } from "../schema-inferrer";
 import {
   FlowResult,
   IFlowStrategy,
@@ -40,6 +42,15 @@ function normalizeTableName(name: string): string {
     return name.slice(1, -1);
   }
   return name;
+}
+
+function normalizeMceIdentifier(name: string): string {
+  const trimmed = name.trim();
+  const noBrackets = normalizeTableName(trimmed);
+  const noEntPrefix = noBrackets.toLowerCase().startsWith("ent.")
+    ? noBrackets.slice(4)
+    : noBrackets;
+  return noEntPrefix.trim().toLowerCase();
 }
 
 function safeRecordGet<V>(
@@ -100,6 +111,22 @@ export class RunToTargetFlow implements IFlowStrategy {
       this.logger.debug(
         `Expanded SELECT * query (length=${expandedSql.length})`,
       );
+
+      // We validate the original sqlText above, but we actually execute expandedSql.
+      // Re-validate to avoid running an invalid/unsupported expansion in MCE.
+      const expandedValidation = await this.queryValidator.validateQuery(
+        expandedSql,
+        { tenantId, userId, mid },
+      );
+
+      if (!expandedValidation.valid) {
+        throw new AppError(
+          ErrorCode.MCE_VALIDATION_FAILED,
+          undefined,
+          undefined,
+          { violations: expandedValidation.errors },
+        );
+      }
     }
 
     await publishStatus?.("targeting_data_extension");
@@ -118,6 +145,34 @@ export class RunToTargetFlow implements IFlowStrategy {
 
     this.logger.log(
       `Found target Data Extension: ${targetDe.name} (CustomerKey: ${targetDe.customerKey}, ObjectID: ${targetDe.objectId})`,
+    );
+
+    // Safety guard: MCE "Overwrite" clears the target DE before the query runs.
+    // If the query reads from the same DE, it will end up selecting 0 rows and
+    // permanently wipe the DE contents.
+    const referencedTables = extractTableNames(expandedSql);
+    const normalizedTargetNames = new Set([
+      normalizeMceIdentifier(targetDe.customerKey),
+      normalizeMceIdentifier(targetDe.name),
+    ]);
+    const readsFromTarget = referencedTables.some((table) =>
+      normalizedTargetNames.has(normalizeMceIdentifier(table)),
+    );
+
+    if (readsFromTarget) {
+      throw new AppError(ErrorCode.MCE_BAD_REQUEST, undefined, {
+        statusMessage:
+          `Cannot overwrite Data Extension "${targetDe.name}" because it is referenced in the query FROM/JOIN. ` +
+          "Overwrite clears the target before the query runs, resulting in 0 rows. " +
+          "Choose a different target, or write to a temp DE first and then overwrite the target from that temp DE.",
+      });
+    }
+
+    await this.validateTargetSchemaCompatibility(
+      job,
+      expandedSql,
+      metadataFetcher,
+      targetDe.name,
     );
 
     const folderId = await this.ensureQppFolder(tenantId, userId, mid);
@@ -398,5 +453,97 @@ export class RunToTargetFlow implements IFlowStrategy {
 
     this.logger.log(`Query started with TaskID: ${result.taskId}`);
     return result.taskId;
+  }
+
+  private async validateTargetSchemaCompatibility(
+    job: ShellQueryJob,
+    sqlText: string,
+    metadataFetcher: MetadataFetcher,
+    targetDeName: string,
+  ): Promise<void> {
+    const { tenantId, userId, mid } = job;
+
+    let inferredColumns: Array<{
+      name: string;
+      fieldType: string;
+      maxLength?: number;
+    }>;
+
+    try {
+      const schema = await inferSchema(sqlText, metadataFetcher);
+      inferredColumns = schema.map((col) => ({
+        name: col.Name,
+        fieldType: col.FieldType,
+        maxLength: col.MaxLength,
+      }));
+    } catch (error) {
+      this.logger.debug(
+        `Target schema validation skipped (schema inference failed): ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+      return;
+    }
+
+    if (inferredColumns.length === 0) {
+      this.logger.debug("Target schema validation skipped (empty inferred schema)");
+      return;
+    }
+
+    const targetFields = await this.dataExtensionService.retrieveFields(
+      tenantId,
+      userId,
+      mid,
+      targetDeName,
+    );
+
+    if (targetFields.length === 0) {
+      this.logger.debug(
+        `Target schema validation skipped (no target fields returned for "${targetDeName}")`,
+      );
+      return;
+    }
+
+    const targetByName = new Map(
+      targetFields.map((f) => [normalizeMceIdentifier(f.name), f] as const),
+    );
+
+    const violations: string[] = [];
+
+    const seen = new Set<string>();
+    for (const col of inferredColumns) {
+      const normalized = normalizeMceIdentifier(col.name);
+      if (seen.has(normalized)) {
+        violations.push(`Duplicate output column: "${col.name}".`);
+      }
+      seen.add(normalized);
+    }
+
+    for (const col of inferredColumns) {
+      const targetField = targetByName.get(normalizeMceIdentifier(col.name));
+      if (!targetField) {
+        violations.push(`Target DE missing field "${col.name}".`);
+        continue;
+      }
+    }
+
+    const requiredMissing = targetFields
+      .filter((f) => f.isRequired)
+      .filter((f) => !seen.has(normalizeMceIdentifier(f.name)));
+    for (const field of requiredMissing) {
+      violations.push(`Required target field "${field.name}" is not selected.`);
+    }
+
+    if (violations.length > 0) {
+      throw new AppError(
+        ErrorCode.MCE_VALIDATION_FAILED,
+        undefined,
+        undefined,
+        {
+          violations: [
+            `Query output does not match target Data Extension "${targetDeName}".`,
+            ...violations,
+          ],
+        },
+      );
+    }
   }
 }
