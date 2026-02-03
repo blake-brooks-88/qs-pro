@@ -142,6 +142,23 @@ describe('ShellQueryController', () => {
         undefined,
       );
     });
+
+    it('rejects run-to-target when feature is not enabled', async () => {
+      const user = createMockUserSession() as UserSession;
+      const body = {
+        sqlText: 'SELECT 1',
+        targetDeCustomerKey: 'some-de-key',
+      };
+
+      featuresService.getTenantFeatures.mockResolvedValue({
+        ...(await featuresService.getTenantFeatures()),
+        runToTargetDE: false,
+      });
+
+      await expect(controller.createRun(user, body)).rejects.toMatchObject({
+        code: ErrorCode.FEATURE_NOT_ENABLED,
+      });
+    });
   });
 
   describe('GET /:runId (getRunStatus)', () => {
