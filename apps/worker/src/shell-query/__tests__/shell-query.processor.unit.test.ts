@@ -419,6 +419,23 @@ describe("ShellQueryProcessor", () => {
       expect(result).toHaveProperty("error", "Query execution failed");
     });
 
+    it("treats FatalError status as failed even when errorMsg is empty", async () => {
+      const job = createMockPollBullJob({
+        pollStartedAt: new Date().toISOString(),
+      });
+      asyncStatusServiceStub.retrieve.mockResolvedValue({
+        status: "FatalError",
+        errorMsg: "",
+        completedDate: new Date().toISOString(),
+      });
+
+      const result = await processor.process(job as never);
+
+      expect(result).toHaveProperty("status", "failed");
+      expect(result).toHaveProperty("error");
+      expect((result as { error?: string }).error).toContain("FatalError");
+    });
+
     it("returns completed status when async status is Complete", async () => {
       // Arrange
       const job = createMockPollBullJob({
@@ -693,6 +710,41 @@ describe("ShellQueryProcessor", () => {
       });
       expect(dbStub.update).toHaveBeenCalled();
       expect(redisStub.publish).toHaveBeenCalled();
+    });
+
+    it("onFailed persists AppError validation violations when UnrecoverableError has an AppError cause", async () => {
+      const job = createMockBullJob();
+      job.attemptsMade = 3;
+      job.opts.attempts = 3;
+
+      const appError = new AppError(
+        ErrorCode.MCE_VALIDATION_FAILED,
+        undefined,
+        undefined,
+        {
+          violations: [
+            'The multi-part identifier "ms.Email" could not be bound.',
+          ],
+        },
+      );
+
+      const error = new UnrecoverableError("Query validation failed.") as Error &
+        { cause?: unknown };
+      error.cause = appError;
+
+      await processor.onFailed(job as never, error as never);
+
+      expect(dbStub.update).toHaveBeenCalled();
+      const updateResult = dbStub.update.mock.results[0]?.value as
+        | { set?: ReturnType<typeof vi.fn> }
+        | undefined;
+      expect(updateResult?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          errorMessage: expect.stringContaining(
+            'encrypted:The multi-part identifier "ms.Email" could not be bound.',
+          ),
+        }),
+      );
     });
 
     it("onFailed attempts cleanup on failure", async () => {

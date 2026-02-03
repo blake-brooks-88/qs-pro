@@ -60,6 +60,35 @@ interface RowProbeResult {
 
 const LAST_EVENT_TTL_SECONDS = 86400;
 
+function truncateClientSafeMessage(message: string, maxLength = 4000): string {
+  const trimmed = message.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function getClientSafeErrorMessage(error: Error): string {
+  if (error instanceof AppError) {
+    const violations = error.extensions?.violations;
+    if (violations && violations.length > 0) {
+      return truncateClientSafeMessage(violations.join("\n"));
+    }
+    return truncateClientSafeMessage(error.message);
+  }
+
+  const maybeCause = (error as Error & { cause?: unknown }).cause;
+  if (maybeCause instanceof AppError) {
+    const violations = maybeCause.extensions?.violations;
+    if (violations && violations.length > 0) {
+      return truncateClientSafeMessage(violations.join("\n"));
+    }
+    return truncateClientSafeMessage(maybeCause.message);
+  }
+
+  return truncateClientSafeMessage(error.message);
+}
+
 @Processor("shell-query", {
   concurrency: parseInt(process.env.WORKER_CONCURRENCY ?? "50", 10),
   lockDuration: 120000,
@@ -134,7 +163,7 @@ export class ShellQueryProcessor extends WorkerHost {
     error: Error,
   ): Promise<void> {
     const { tenantId, userId, mid, runId } = job.data;
-    const message = error.message;
+    const message = getClientSafeErrorMessage(error);
 
     const maxAttempts = job.opts.attempts ?? 1;
     const isFinalAttempt = job.attemptsMade >= maxAttempts;
@@ -548,11 +577,14 @@ export class ShellQueryProcessor extends WorkerHost {
 
       const normalizedStatus = pollResult.status?.trim().toLowerCase();
       const hasError =
-        normalizedStatus === "error" ||
+        Boolean(normalizedStatus && normalizedStatus.includes("error")) ||
         (pollResult.errorMsg && pollResult.errorMsg.trim() !== "");
 
       if (hasError) {
-        const errorMessage = pollResult.errorMsg || "MCE Query Execution Error";
+        const statusLabel = pollResult.status?.trim();
+        const errorMessage =
+          pollResult.errorMsg?.trim() ||
+          `MCE Query Execution Error${statusLabel ? ` (status=${statusLabel})` : ""}`;
         await this.markFailed(tenantId, userId, mid, runId, errorMessage);
         await this.rlsContext.runWithUserContext(
           tenantId,
