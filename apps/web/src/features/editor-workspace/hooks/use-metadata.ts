@@ -163,6 +163,7 @@ const mapDataExtensions = (raw: DataExtensionResponse[]): DataExtension[] => {
         folderId: folderId ?? "",
         description: "",
         fields,
+        isShared: item.isShared ?? false,
       };
     })
     .filter((de): de is DataExtension => Boolean(de));

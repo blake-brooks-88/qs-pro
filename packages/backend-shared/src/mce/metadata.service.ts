@@ -175,7 +175,17 @@ export class MetadataService {
 
     const [local, shared] = await Promise.all([localPromise, sharedPromise]);
 
-    return [...local, ...shared];
+    // Tag each DE with isShared flag so frontend can distinguish them
+    const taggedLocal = local.map((de) => ({
+      ...(de as object),
+      isShared: false,
+    }));
+    const taggedShared = shared.map((de) => ({
+      ...(de as object),
+      isShared: true,
+    }));
+
+    return [...taggedLocal, ...taggedShared];
   }
 
   private async fetchDataExtensions(

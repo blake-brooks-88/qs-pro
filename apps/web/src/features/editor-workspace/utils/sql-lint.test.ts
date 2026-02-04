@@ -116,6 +116,7 @@ describe("sql lint", () => {
         folderId: "local",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
 
@@ -148,6 +149,7 @@ describe("sql lint", () => {
           },
           { name: "Id", type: "Text", isPrimaryKey: false, isNullable: true },
         ],
+        isShared: false,
       },
       {
         id: "de-2",
@@ -164,6 +166,7 @@ describe("sql lint", () => {
           },
           { name: "Id", type: "Text", isPrimaryKey: false, isNullable: true },
         ],
+        isShared: false,
       },
     ];
 
@@ -198,6 +201,7 @@ describe("sql lint", () => {
           },
           { name: "Id", type: "Text", isPrimaryKey: false, isNullable: true },
         ],
+        isShared: false,
       },
       {
         id: "de-2",
@@ -214,6 +218,7 @@ describe("sql lint", () => {
           },
           { name: "Id", type: "Text", isPrimaryKey: false, isNullable: true },
         ],
+        isShared: false,
       },
     ];
 
@@ -253,6 +258,7 @@ describe("sql lint", () => {
             isNullable: true,
           },
         ],
+        isShared: false,
       },
       {
         id: "de-2",
@@ -274,6 +280,7 @@ describe("sql lint", () => {
             isNullable: true,
           },
         ],
+        isShared: false,
       },
     ];
 
@@ -633,6 +640,7 @@ describe("sql lint", () => {
         folderId: "local",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
 
@@ -734,6 +742,7 @@ describe("sql lint", () => {
             isNullable: true,
           },
         ],
+        isShared: false,
       },
       {
         id: "de-2",
@@ -744,6 +753,7 @@ describe("sql lint", () => {
         fields: [
           { name: "Id", type: "Text", isPrimaryKey: true, isNullable: false },
         ],
+        isShared: false,
       },
     ];
 

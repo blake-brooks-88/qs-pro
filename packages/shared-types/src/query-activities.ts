@@ -5,7 +5,7 @@ import { z } from "zod";
  * - name: 1-200 characters, required
  * - customerKey: max 36 characters, alphanumeric with underscores/hyphens, optional (auto-generated if blank)
  * - description: max 500 characters, optional
- * - categoryId: folder ID, defaults to root (0)
+ * - categoryId: folder ID, undefined means root folder (MCE has no folder ID 0)
  * - targetDataExtensionCustomerKey: required, identifies the target DE
  * - queryText: 1-100,000 characters, the SQL query
  * - targetUpdateType: "Overwrite" (default), "Append", or "Update"
@@ -24,8 +24,8 @@ export const CreateQueryActivitySchema = z.object({
     .optional(),
   /** Optional description of the Query Activity (max 500 characters) */
   description: z.string().max(500).optional(),
-  /** Folder ID where the Query Activity will be created (defaults to root) */
-  categoryId: z.number().int().nonnegative().optional().default(0),
+  /** Folder ID where the Query Activity will be created (undefined = root folder) */
+  categoryId: z.number().int().positive().optional(),
   /** Customer key of the target Data Extension */
   targetDataExtensionCustomerKey: z.string().min(1),
   /** Enterprise ID of the target Data Extension (optional, for shared DEs) */

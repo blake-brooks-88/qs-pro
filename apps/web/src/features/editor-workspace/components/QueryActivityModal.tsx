@@ -93,12 +93,18 @@ export function QueryActivityModal({
     setHighlightedIndex(-1);
   }, [search, isSearchFocused]);
 
+  // Filter to local DEs only - shared DEs cannot be used as query targets from child BUs
+  const localDataExtensions = useMemo(
+    () => dataExtensions.filter((de) => !de.isShared),
+    [dataExtensions],
+  );
+
   const filteredTargets = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term && !isSearchFocused) {
       return [];
     }
-    return dataExtensions
+    return localDataExtensions
       .filter((de) => {
         return (
           de.name.toLowerCase().includes(term) ||
@@ -106,11 +112,11 @@ export function QueryActivityModal({
         );
       })
       .slice(0, 10);
-  }, [dataExtensions, search, isSearchFocused]);
+  }, [localDataExtensions, search, isSearchFocused]);
 
   const selectedTarget = useMemo(() => {
-    return dataExtensions.find((de) => de.id === selectedTargetId) ?? null;
-  }, [dataExtensions, selectedTargetId]);
+    return localDataExtensions.find((de) => de.id === selectedTargetId) ?? null;
+  }, [localDataExtensions, selectedTargetId]);
 
   // Fetch DE details (including PK info) when a target is selected
   const { data: targetDetails, isLoading: isLoadingDetails } =
@@ -281,10 +287,15 @@ export function QueryActivityModal({
             <div className="space-y-1.5 relative" ref={searchRef}>
               <label
                 htmlFor="activity-target-de"
-                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
+                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1 flex justify-between items-center"
               >
-                Target Data Extension{" "}
-                <span className="text-destructive">*</span>
+                <span>
+                  Target Data Extension{" "}
+                  <span className="text-destructive">*</span>
+                </span>
+                <span className="text-[8px] font-normal lowercase opacity-60 italic">
+                  Local DEs only
+                </span>
               </label>
 
               <div className="relative">
@@ -499,7 +510,7 @@ export function QueryActivityModal({
             <Button
               disabled={!canCreate || isPending}
               onClick={() => {
-                const selectedDE = dataExtensions.find(
+                const selectedDE = localDataExtensions.find(
                   (de) => de.id === selectedTargetId,
                 );
                 if (!selectedDE) {

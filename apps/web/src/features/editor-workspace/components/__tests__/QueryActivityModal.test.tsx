@@ -24,6 +24,7 @@ function createMockDataExtensions(): DataExtension[] {
       folderId: "f1",
       description: "Subscriber data",
       fields: [],
+      isShared: false,
     },
     {
       id: "de-2",
@@ -32,6 +33,7 @@ function createMockDataExtensions(): DataExtension[] {
       folderId: "f1",
       description: "Product catalog",
       fields: [],
+      isShared: false,
     },
     {
       id: "de-3",
@@ -40,6 +42,7 @@ function createMockDataExtensions(): DataExtension[] {
       folderId: "f1",
       description: "Order history",
       fields: [],
+      isShared: false,
     },
   ];
 }

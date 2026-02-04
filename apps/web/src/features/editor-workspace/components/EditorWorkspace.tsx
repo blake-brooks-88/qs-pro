@@ -378,7 +378,7 @@ export function EditorWorkspace({
           name: draft.name,
           customerKey: draft.externalKey,
           description: draft.description,
-          categoryId: draft.categoryId ?? 0,
+          categoryId: draft.categoryId,
           targetDataExtensionCustomerKey: draft.targetDataExtensionCustomerKey,
           queryText: draft.queryText,
           targetUpdateType: draft.targetUpdateType,

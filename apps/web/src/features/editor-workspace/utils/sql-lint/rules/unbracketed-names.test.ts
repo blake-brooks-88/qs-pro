@@ -23,6 +23,7 @@ const createDE = (name: string, customerKey?: string): DataExtension => ({
   folderId: "folder-1",
   description: "",
   fields: [],
+  isShared: false,
 });
 
 describe("unbracketedNamesRule", () => {

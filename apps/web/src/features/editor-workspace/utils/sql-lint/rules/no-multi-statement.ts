@@ -27,7 +27,12 @@ function isInsideStringOrComment(sql: string, position: number): boolean {
       continue;
     }
     if (inSingleQuote) {
-      if (char === "'" && sql[i - 1] !== "'") {
+      if (char === "'") {
+        // Forward lookahead: if next char is also a quote, it's an escaped quote
+        if (nextChar === "'") {
+          i++; // Skip both quotes of the escape sequence
+          continue;
+        }
         inSingleQuote = false;
       }
       continue;

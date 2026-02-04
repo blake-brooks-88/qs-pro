@@ -71,6 +71,7 @@ describe("linter infrastructure", () => {
         folderId: "local",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
 

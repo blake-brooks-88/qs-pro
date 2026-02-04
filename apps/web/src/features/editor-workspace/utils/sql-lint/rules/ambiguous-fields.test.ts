@@ -24,6 +24,7 @@ const makeDe = (name: string, fieldNames: string[]): DataExtension => ({
   folderId: "0",
   description: "",
   fields: makeFields(fieldNames),
+  isShared: false,
 });
 
 const createContext = (

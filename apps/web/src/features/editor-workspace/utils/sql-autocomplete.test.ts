@@ -34,6 +34,7 @@ describe("sql autocomplete helpers", () => {
         folderId: "shared-1",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
     const folders: Folder[] = [
@@ -67,6 +68,7 @@ describe("sql autocomplete helpers", () => {
         folderId: "local",
         description: "",
         fields: [],
+        isShared: false,
       },
       {
         id: "de-1",
@@ -75,6 +77,7 @@ describe("sql autocomplete helpers", () => {
         folderId: "local",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
 

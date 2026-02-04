@@ -47,6 +47,7 @@ export interface DataExtension {
   folderId: string;
   description: string;
   fields: DataExtensionField[];
+  isShared: boolean;
 }
 
 export type QueryStatus = "running" | "success" | "error" | "idle";
