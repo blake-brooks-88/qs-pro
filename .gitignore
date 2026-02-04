@@ -30,6 +30,9 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Screenshots (root level only - use .screenshots/ for tracked ones)
+/*.png
+
 # IDEs
 .vscode/
 !.vscode/extensions.json
