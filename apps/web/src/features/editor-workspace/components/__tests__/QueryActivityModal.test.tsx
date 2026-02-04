@@ -2,9 +2,18 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DataExtension } from "@/features/editor-workspace/types";
+import type { DataExtension, Folder } from "@/features/editor-workspace/types";
 
 import { QueryActivityModal } from "../QueryActivityModal";
+
+// Mock the useDataExtensionDetails hook
+vi.mock("@/features/editor-workspace/hooks/use-data-extension-details", () => ({
+  useDataExtensionDetails: () => ({
+    data: { hasPrimaryKey: true, fieldCount: 5, fields: [] },
+    isLoading: false,
+    error: null,
+  }),
+}));
 
 function createMockDataExtensions(): DataExtension[] {
   return [
@@ -35,12 +44,31 @@ function createMockDataExtensions(): DataExtension[] {
   ];
 }
 
+function createMockFolders(): Folder[] {
+  return [
+    {
+      id: "100",
+      name: "Query Activities",
+      parentId: null,
+      type: "library",
+    },
+    {
+      id: "101",
+      name: "Subfolder",
+      parentId: "100",
+      type: "library",
+    },
+  ];
+}
+
 describe("QueryActivityModal", () => {
   const defaultProps = {
     isOpen: true,
     dataExtensions: createMockDataExtensions(),
+    folders: createMockFolders(),
+    queryText: "SELECT * FROM Test",
     onClose: vi.fn(),
-    onCreate: vi.fn(),
+    onSubmit: vi.fn().mockResolvedValue(undefined),
   };
 
   describe("search filtering", () => {
@@ -111,7 +139,7 @@ describe("QueryActivityModal", () => {
 
       // Act - Focus search to show dropdown, then click a target
       await user.click(searchInput);
-      await user.click(screen.getByRole("button", { name: /subscribers/i }));
+      await user.click(screen.getByRole("option", { name: /subscribers/i }));
 
       // Assert - Selected target card should be visible
       // The search input should be replaced with the selected target display
@@ -133,7 +161,7 @@ describe("QueryActivityModal", () => {
 
       // Act - Select a target
       await user.click(searchInput);
-      await user.click(screen.getByRole("button", { name: /products/i }));
+      await user.click(screen.getByRole("option", { name: /products/i }));
 
       // Assert - Verify the selected target card structure
       expect(screen.getByText("Products")).toBeInTheDocument();
@@ -160,22 +188,70 @@ describe("QueryActivityModal", () => {
       expect(deployButton).toBeDisabled();
     });
 
-    it("QueryActivityModal_TargetSelectedAndNameFilled_CallsOnCreateWithCorrectData", async () => {
+    it("QueryActivityModal_TargetSelectedAndNameFilled_WithoutFolder_CallsOnSubmitWithUndefinedCategoryId", async () => {
       // Arrange
       const user = userEvent.setup();
-      const onCreate = vi.fn();
-      render(<QueryActivityModal {...defaultProps} onCreate={onCreate} />);
+      const onSubmit = vi.fn().mockResolvedValue(undefined);
+      render(<QueryActivityModal {...defaultProps} onSubmit={onSubmit} />);
 
       // Act - Fill activity name
       const activityNameInput = screen.getByLabelText(/activity name/i);
       await user.type(activityNameInput, "My Query Activity");
+
+      // Act - Select target (no folder selected - folder is optional)
+      const searchInput = screen.getByPlaceholderText(
+        /search by name or customer key/i,
+      );
+      await user.click(searchInput);
+      await user.click(screen.getByRole("option", { name: /subscribers/i }));
+
+      // Act - Click deploy
+      const deployButton = screen.getByRole("button", {
+        name: /deploy activity/i,
+      });
+      expect(deployButton).not.toBeDisabled();
+      await user.click(deployButton);
+
+      // Assert - categoryId should be undefined when no folder selected
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "My Query Activity",
+          targetDataExtensionCustomerKey: "subscribers_key",
+          categoryId: undefined,
+          queryText: "SELECT * FROM Test",
+          targetUpdateType: "Overwrite",
+        }),
+      );
+    });
+
+    it("QueryActivityModal_TargetSelectedAndNameFilled_WithFolder_CallsOnSubmitWithCategoryId", async () => {
+      // Arrange
+      const user = userEvent.setup();
+      const onSubmit = vi.fn().mockResolvedValue(undefined);
+      render(<QueryActivityModal {...defaultProps} onSubmit={onSubmit} />);
+
+      // Act - Fill activity name
+      const activityNameInput = screen.getByLabelText(/activity name/i);
+      await user.type(activityNameInput, "My Query Activity");
+
+      // Act - Select folder
+      const folderPicker = screen.getByRole("combobox", {
+        name: /query activity folder/i,
+      });
+      await user.click(folderPicker);
+      // Click the folder button inside the tree (the text is in the button, not the option wrapper)
+      const folderButton = screen.getByRole("button", {
+        name: /query activities/i,
+      });
+      await user.click(folderButton);
 
       // Act - Select target
       const searchInput = screen.getByPlaceholderText(
         /search by name or customer key/i,
       );
       await user.click(searchInput);
-      await user.click(screen.getByRole("button", { name: /subscribers/i }));
+      await user.click(screen.getByRole("option", { name: /subscribers/i }));
 
       // Act - Click deploy
       const deployButton = screen.getByRole("button", {
@@ -183,13 +259,15 @@ describe("QueryActivityModal", () => {
       });
       await user.click(deployButton);
 
-      // Assert
-      expect(onCreate).toHaveBeenCalledTimes(1);
-      expect(onCreate).toHaveBeenCalledWith(
+      // Assert - categoryId should be the selected folder ID
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "My Query Activity",
-          targetDataExtensionId: "de-1",
-          dataAction: "Overwrite",
+          targetDataExtensionCustomerKey: "subscribers_key",
+          categoryId: 100,
+          queryText: "SELECT * FROM Test",
+          targetUpdateType: "Overwrite",
         }),
       );
     });

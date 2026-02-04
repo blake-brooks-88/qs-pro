@@ -9,6 +9,7 @@ import {
   Rocket,
 } from "@solar-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -21,7 +22,12 @@ import {
 import { toast } from "sonner";
 
 import { FeatureGate } from "@/components/FeatureGate";
+import { useCreateQueryActivity } from "@/features/editor-workspace/hooks/use-create-query-activity";
 import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
+import {
+  queryActivityFoldersQueryKeys,
+  useQueryActivityFolders,
+} from "@/features/editor-workspace/hooks/use-query-activity-folders";
 import { useQueryExecution } from "@/features/editor-workspace/hooks/use-query-execution";
 import {
   useSavedQuery,
@@ -32,6 +38,7 @@ import type {
   DataExtensionField,
   EditorWorkspaceProps,
   ExecutionResult,
+  QueryActivityDraft,
 } from "@/features/editor-workspace/types";
 import { formatDiagnosticMessage } from "@/features/editor-workspace/utils/sql-diagnostics";
 import {
@@ -69,8 +76,8 @@ export function EditorWorkspace({
   onSave,
   onSaveAs: _onSaveAs,
   onFormat,
-  onDeploy,
-  onCreateQueryActivity,
+  onDeploy: _onDeploy,
+  onCreateQueryActivity: _onCreateQueryActivity,
   onSelectQuery,
   onSelectDE,
   onToggleSidebar,
@@ -123,6 +130,10 @@ export function EditorWorkspace({
 
   // Mutation for auto-saving existing queries
   const updateQuery = useUpdateSavedQuery();
+
+  // Query Activity hooks
+  const { data: qaFolders = [] } = useQueryActivityFolders(eid);
+  const createQueryActivityMutation = useCreateQueryActivity();
 
   // Zustand store - single source of truth for tabs
   const tabs = useTabsStore((state) => state.tabs);
@@ -359,6 +370,44 @@ export function EditorWorkspace({
   const handleOpenQueryActivityModal = () => {
     setIsQueryActivityModalOpen(true);
   };
+
+  const handleCreateQueryActivity = useCallback(
+    async (draft: QueryActivityDraft) => {
+      try {
+        const result = await createQueryActivityMutation.mutateAsync({
+          name: draft.name,
+          customerKey: draft.externalKey,
+          description: draft.description,
+          categoryId: draft.categoryId ?? 0,
+          targetDataExtensionCustomerKey: draft.targetDataExtensionCustomerKey,
+          queryText: draft.queryText,
+          targetUpdateType: draft.targetUpdateType,
+        });
+
+        // Invalidate Query Activity folders cache to refresh the sidebar
+        await queryClient.invalidateQueries({
+          queryKey: queryActivityFoldersQueryKeys.all,
+        });
+
+        toast.success(`Query Activity "${draft.name}" deployed`, {
+          description: `Object ID: ${result.objectId}`,
+        });
+        setIsQueryActivityModalOpen(false);
+      } catch (error) {
+        // Extract detailed error message from API response (RFC 9457 Problem Details format)
+        let description = "An error occurred";
+        if (axios.isAxiosError(error)) {
+          const detail = error.response?.data?.detail;
+          description = typeof detail === "string" ? detail : error.message;
+        } else if (error instanceof Error) {
+          description = error.message;
+        }
+        toast.error("Failed to deploy Query Activity", { description });
+        // Keep modal open on error - do not close or rethrow
+      }
+    },
+    [createQueryActivityMutation, queryClient],
+  );
 
   const handleCloseTab = useCallback(
     (id: string) => {
@@ -721,12 +770,12 @@ export function EditorWorkspace({
         <QueryActivityModal
           isOpen={isQueryActivityModalOpen}
           dataExtensions={dataExtensions}
+          folders={qaFolders}
+          queryText={safeActiveTab.content}
           initialName={safeActiveTab.name}
+          isPending={createQueryActivityMutation.isPending}
           onClose={() => setIsQueryActivityModalOpen(false)}
-          onCreate={(draft) => {
-            onCreateQueryActivity?.(draft);
-            onDeploy?.(safeActiveTab.queryId ?? safeActiveTab.id);
-          }}
+          onSubmit={handleCreateQueryActivity}
         />
 
         <TargetDataExtensionModal

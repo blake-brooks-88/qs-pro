@@ -369,7 +369,7 @@ export function useMetadata({
   tenantId?: string | null;
   eid?: string;
 } = {}): MetadataState {
-  const systemDataViewsEnabled = useFeature("systemDataViews");
+  const { enabled: systemDataViewsEnabled } = useFeature("systemDataViews");
 
   const folderQuery = useMetadataFolders(tenantId, eid);
 
