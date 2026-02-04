@@ -157,15 +157,15 @@ describe('Features Remaining Gaps (integration)', () => {
       });
 
       // Should not throw - invalid key should be ignored
-      const features = await featuresService.getTenantFeatures(tenant.id);
+      const response = await featuresService.getTenantFeatures(tenant.id);
 
       // Verify features are returned (free tier defaults)
-      expect(features).toBeDefined();
-      expect(features.basicLinting).toBe(true);
-      expect(features.syntaxHighlighting).toBe(true);
+      expect(response).toBeDefined();
+      expect(response.features.basicLinting).toBe(true);
+      expect(response.features.syntaxHighlighting).toBe(true);
 
       // Invalid key should NOT appear in the result (it's ignored)
-      expect(features).not.toHaveProperty(
+      expect(response.features).not.toHaveProperty(
         'TOTALLY_INVALID_KEY_THAT_DOES_NOT_EXIST',
       );
     });
@@ -196,18 +196,18 @@ describe('Features Remaining Gaps (integration)', () => {
         `;
       });
 
-      const features = await featuresService.getTenantFeatures(tenant.id);
+      const response = await featuresService.getTenantFeatures(tenant.id);
 
       // Free tier defaults
-      expect(features.basicLinting).toBe(true);
-      expect(features.syntaxHighlighting).toBe(true);
+      expect(response.features.basicLinting).toBe(true);
+      expect(response.features.syntaxHighlighting).toBe(true);
 
       // Override applied - quickFixes enabled despite being free tier
-      expect(features.quickFixes).toBe(true);
+      expect(response.features.quickFixes).toBe(true);
 
       // Other pro features NOT enabled
-      expect(features.minimap).toBe(false);
-      expect(features.advancedAutocomplete).toBe(false);
+      expect(response.features.minimap).toBe(false);
+      expect(response.features.advancedAutocomplete).toBe(false);
     });
   });
 });

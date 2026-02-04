@@ -4,7 +4,7 @@ import type {
   IFeatureOverrideRepository,
   ITenantRepository,
 } from '@qpp/database';
-import type { FeatureKey, TenantFeatures } from '@qpp/shared-types';
+import type { FeatureKey, TenantFeaturesResponse } from '@qpp/shared-types';
 import { ALL_FEATURE_KEYS, getTierFeatures } from '@qpp/shared-types';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class FeaturesService {
   /**
    * Gets the effective features for a tenant, including tier-based features and overrides
    */
-  async getTenantFeatures(tenantId: string): Promise<TenantFeatures> {
+  async getTenantFeatures(tenantId: string): Promise<TenantFeaturesResponse> {
     const tenant = await this.tenantRepo.findById(tenantId);
     if (!tenant) {
       throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
@@ -33,8 +33,10 @@ export class FeaturesService {
       });
     }
 
+    const tier = tenant.subscriptionTier;
+
     // Start with base tier features
-    const features = getTierFeatures(tenant.subscriptionTier);
+    const features = getTierFeatures(tier);
 
     // Apply overrides
     const overrides = await this.featureOverrideRepo.findByTenantId(tenantId);
@@ -47,6 +49,6 @@ export class FeaturesService {
       }
     }
 
-    return features;
+    return { tier, features };
   }
 }

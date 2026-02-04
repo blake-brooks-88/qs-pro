@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { SessionGuard } from '@qpp/backend-shared';
-import type { TenantFeatures } from '@qpp/shared-types';
+import type { TenantFeaturesResponse } from '@qpp/shared-types';
 
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -15,7 +15,9 @@ export class FeaturesController {
    * Returns the effective features for the authenticated tenant
    */
   @Get()
-  async getFeatures(@CurrentUser() user: UserSession): Promise<TenantFeatures> {
+  async getFeatures(
+    @CurrentUser() user: UserSession,
+  ): Promise<TenantFeaturesResponse> {
     return this.featuresService.getTenantFeatures(user.tenantId);
   }
 }
