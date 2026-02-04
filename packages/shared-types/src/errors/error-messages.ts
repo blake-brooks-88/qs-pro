@@ -56,6 +56,14 @@ export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCode.FEATURE_NOT_ENABLED]:
     "This feature is not enabled for your subscription.",
 
+  // Query Activity Errors
+  [ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME]:
+    "A Query Activity with this name already exists in the selected folder. Please choose a different name.",
+  [ErrorCode.DUPLICATE_CUSTOMER_KEY]:
+    "A Query Activity with this external key already exists. Please use a different key or leave blank for auto-generation.",
+  [ErrorCode.SHARED_DE_ACCESS_DENIED]:
+    "Cannot access Shared Data Extension from another enterprise.",
+
   // Infrastructure (these get masked to generic "unexpected error" for 5xx anyway)
   [ErrorCode.CONFIG_ERROR]: "Service configuration error.",
   [ErrorCode.DATABASE_ERROR]: "Database error.",

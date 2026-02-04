@@ -116,3 +116,14 @@ export function getTierFeatures(tier: SubscriptionTier): TenantFeatures {
   }
   return features as TenantFeatures;
 }
+
+/**
+ * Response type for tenant features API including tier
+ */
+export const TenantFeaturesResponseSchema = z.object({
+  tier: SubscriptionTierSchema,
+  features: TenantFeaturesSchema,
+});
+export type TenantFeaturesResponse = z.infer<
+  typeof TenantFeaturesResponseSchema
+>;
