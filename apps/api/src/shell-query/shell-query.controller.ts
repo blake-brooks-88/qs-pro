@@ -75,10 +75,9 @@ export class ShellQueryController {
       result.data;
 
     if (targetDeCustomerKey) {
-      const features = await this.featuresService.getTenantFeatures(
-        user.tenantId,
-      );
-      if (!features.runToTargetDE) {
+      const { features: tenantFeatures } =
+        await this.featuresService.getTenantFeatures(user.tenantId);
+      if (!tenantFeatures.runToTargetDE) {
         throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
           operation: 'runToTargetDE',
           reason: 'Run to Target DE requires Pro subscription',
