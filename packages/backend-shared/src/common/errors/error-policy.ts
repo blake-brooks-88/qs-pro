@@ -34,6 +34,11 @@ const TERMINAL_CODES = new Set<ErrorCode>([
   ErrorCode.VALIDATION_ERROR,
   ErrorCode.FEATURE_NOT_ENABLED,
 
+  // Query Activity errors
+  ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME,
+  ErrorCode.DUPLICATE_CUSTOMER_KEY,
+  ErrorCode.SHARED_DE_ACCESS_DENIED,
+
   // Infrastructure (misconfiguration won't fix itself)
   ErrorCode.CONFIG_ERROR,
   ErrorCode.INTERNAL_ERROR,
@@ -148,6 +153,13 @@ export function getHttpStatus(code: ErrorCode): number {
     case ErrorCode.FEATURE_NOT_ENABLED:
       return 403;
 
+    // Query Activity errors
+    case ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME:
+    case ErrorCode.DUPLICATE_CUSTOMER_KEY:
+      return 409; // Conflict
+    case ErrorCode.SHARED_DE_ACCESS_DENIED:
+      return 403;
+
     // Infrastructure
     case ErrorCode.CONFIG_ERROR:
       return 500;
@@ -183,6 +195,9 @@ export function getErrorTitle(code: ErrorCode): string {
     [ErrorCode.INVALID_STATE]: "Invalid State",
     [ErrorCode.VALIDATION_ERROR]: "Validation Error",
     [ErrorCode.FEATURE_NOT_ENABLED]: "Feature Not Enabled",
+    [ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME]: "Duplicate Query Activity Name",
+    [ErrorCode.DUPLICATE_CUSTOMER_KEY]: "Duplicate Customer Key",
+    [ErrorCode.SHARED_DE_ACCESS_DENIED]: "Shared Data Extension Access Denied",
     [ErrorCode.CONFIG_ERROR]: "Configuration Error",
     [ErrorCode.DATABASE_ERROR]: "Database Error",
     [ErrorCode.REDIS_ERROR]: "Redis Error",

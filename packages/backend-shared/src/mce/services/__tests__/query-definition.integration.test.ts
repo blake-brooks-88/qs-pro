@@ -569,6 +569,57 @@ describe("QueryDefinitionService (integration)", () => {
         }),
       ).rejects.toThrow();
     });
+
+    it("omits CategoryID when categoryId is 0 or undefined", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            capturedBody = await request.text();
+            return HttpResponse.xml(buildCreateResponse("qd-no-folder"));
+          },
+        ),
+      );
+
+      // Test with categoryId = 0 (root folder, invalid for MCE)
+      await service.create(TEST_TENANT_ID, TEST_USER_ID, TEST_MID, {
+        name: "Test",
+        customerKey: "test-key",
+        categoryId: 0,
+        targetId: "de-id",
+        targetCustomerKey: "de-key",
+        targetName: "DE Name",
+        queryText: "SELECT 1",
+      });
+
+      // CategoryID should NOT be included when categoryId is 0
+      expect(capturedBody).not.toContain("<CategoryID>");
+    });
+
+    it("omits CategoryID when categoryId is undefined", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            capturedBody = await request.text();
+            return HttpResponse.xml(buildCreateResponse("qd-no-folder"));
+          },
+        ),
+      );
+
+      // Test with categoryId = undefined
+      await service.create(TEST_TENANT_ID, TEST_USER_ID, TEST_MID, {
+        name: "Test",
+        customerKey: "test-key",
+        targetId: "de-id",
+        targetCustomerKey: "de-key",
+        targetName: "DE Name",
+        queryText: "SELECT 1",
+      });
+
+      // CategoryID should NOT be included when categoryId is undefined
+      expect(capturedBody).not.toContain("<CategoryID>");
+    });
   });
 
   describe("perform", () => {

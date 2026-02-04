@@ -8,9 +8,11 @@ export interface QueryDefinition {
 export interface CreateQueryDefinitionParams {
   name: string;
   customerKey: string;
-  categoryId: number;
+  categoryId?: number;
   targetId: string;
   targetCustomerKey: string;
   targetName: string;
   queryText: string;
+  description?: string;
+  targetUpdateType?: "Overwrite" | "Append" | "Update";
 }

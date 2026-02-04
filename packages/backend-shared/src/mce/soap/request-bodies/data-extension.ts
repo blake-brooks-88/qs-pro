@@ -8,9 +8,15 @@ import { escapeXml } from "../helpers";
 
 export function buildRetrieveDataExtensionFieldsByCustomerKey(
   customerKey: string,
+  clientId?: string,
 ): string {
+  const clientContext = clientId
+    ? `<ClientIDs><ClientID>${escapeXml(clientId)}</ClientID></ClientIDs>`
+    : "";
+
   return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
   <RetrieveRequest>
+    ${clientContext}
     <ObjectType>DataExtensionField</ObjectType>
     <Properties>Name</Properties>
     <Properties>FieldType</Properties>
@@ -26,9 +32,17 @@ export function buildRetrieveDataExtensionFieldsByCustomerKey(
 </RetrieveRequestMsg>`;
 }
 
-export function buildRetrieveDataExtensionFieldsByName(name: string): string {
+export function buildRetrieveDataExtensionFieldsByName(
+  name: string,
+  clientId?: string,
+): string {
+  const clientContext = clientId
+    ? `<ClientIDs><ClientID>${escapeXml(clientId)}</ClientID></ClientIDs>`
+    : "";
+
   return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
   <RetrieveRequest>
+    ${clientContext}
     <ObjectType>DataExtensionField</ObjectType>
     <Properties>Name</Properties>
     <Properties>FieldType</Properties>
@@ -45,12 +59,17 @@ export function buildRetrieveDataExtensionFieldsByName(name: string): string {
 }
 
 export function buildRetrieveDataExtensionFields(
-  params: { customerKey: string } | { name: string },
+  params:
+    | { customerKey: string; clientId?: string }
+    | { name: string; clientId?: string },
 ): string {
   if ("customerKey" in params) {
-    return buildRetrieveDataExtensionFieldsByCustomerKey(params.customerKey);
+    return buildRetrieveDataExtensionFieldsByCustomerKey(
+      params.customerKey,
+      params.clientId,
+    );
   }
-  return buildRetrieveDataExtensionFieldsByName(params.name);
+  return buildRetrieveDataExtensionFieldsByName(params.name, params.clientId);
 }
 
 function buildRetentionXml(retention: DataRetentionPolicy): string {
@@ -205,9 +224,15 @@ export function buildRetrieveDataExtensionByName(name: string): string {
 
 export function buildRetrieveDataExtensionByCustomerKey(
   customerKey: string,
+  clientId?: string,
 ): string {
+  const clientContext = clientId
+    ? `<ClientIDs><ClientID>${escapeXml(clientId)}</ClientID></ClientIDs>`
+    : "";
+
   return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
   <RetrieveRequest>
+    ${clientContext}
     <ObjectType>DataExtension</ObjectType>
     <Properties>ObjectID</Properties>
     <Properties>CustomerKey</Properties>
