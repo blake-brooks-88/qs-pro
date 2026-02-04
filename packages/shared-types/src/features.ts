@@ -42,6 +42,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, readonly FeatureKey[]> = {
     "minimap",
     "advancedAutocomplete",
     "createDataExtension",
+    "deployToAutomation",
     "systemDataViews",
     "runToTargetDE",
   ],
