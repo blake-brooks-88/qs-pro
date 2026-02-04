@@ -63,17 +63,20 @@ describe('FeaturesService', () => {
 
     // Assert - free tier gets basic features + systemDataViews only
     expect(features).toEqual({
-      basicLinting: true,
-      syntaxHighlighting: true,
-      systemDataViews: true,
-      quickFixes: false,
-      minimap: false,
-      advancedAutocomplete: false,
-      createDataExtension: false,
-      teamSnippets: false,
-      auditLogs: false,
-      deployToAutomation: false,
-      runToTargetDE: false,
+      tier: 'free',
+      features: {
+        basicLinting: true,
+        syntaxHighlighting: true,
+        systemDataViews: true,
+        quickFixes: false,
+        minimap: false,
+        advancedAutocomplete: false,
+        createDataExtension: false,
+        teamSnippets: false,
+        auditLogs: false,
+        deployToAutomation: false,
+        runToTargetDE: false,
+      },
     });
   });
 
@@ -93,18 +96,22 @@ describe('FeaturesService', () => {
     const features = await service.getTenantFeatures(tenantId);
 
     // Assert - pro tier gets additional features but not enterprise features
+    // Note: deployToAutomation was moved from enterprise to pro tier
     expect(features).toEqual({
-      basicLinting: true,
-      syntaxHighlighting: true,
-      systemDataViews: true,
-      quickFixes: true,
-      minimap: true,
-      advancedAutocomplete: true,
-      createDataExtension: true,
-      teamSnippets: false,
-      auditLogs: false,
-      deployToAutomation: false,
-      runToTargetDE: true,
+      tier: 'pro',
+      features: {
+        basicLinting: true,
+        syntaxHighlighting: true,
+        systemDataViews: true,
+        quickFixes: true,
+        minimap: true,
+        advancedAutocomplete: true,
+        createDataExtension: true,
+        teamSnippets: false,
+        auditLogs: false,
+        deployToAutomation: true,
+        runToTargetDE: true,
+      },
     });
   });
 
@@ -136,17 +143,20 @@ describe('FeaturesService', () => {
 
     // Assert - free tier with quickFixes enabled via override
     expect(features).toEqual({
-      basicLinting: true,
-      syntaxHighlighting: true,
-      systemDataViews: true,
-      quickFixes: true, // Enabled by override
-      minimap: false,
-      advancedAutocomplete: false,
-      createDataExtension: false,
-      teamSnippets: false,
-      auditLogs: false,
-      deployToAutomation: false,
-      runToTargetDE: false,
+      tier: 'free',
+      features: {
+        basicLinting: true,
+        syntaxHighlighting: true,
+        systemDataViews: true,
+        quickFixes: true, // Enabled by override
+        minimap: false,
+        advancedAutocomplete: false,
+        createDataExtension: false,
+        teamSnippets: false,
+        auditLogs: false,
+        deployToAutomation: false,
+        runToTargetDE: false,
+      },
     });
   });
 
@@ -177,18 +187,22 @@ describe('FeaturesService', () => {
     const features = await service.getTenantFeatures(tenantId);
 
     // Assert - pro tier with minimap disabled via override
+    // Note: deployToAutomation was moved from enterprise to pro tier
     expect(features).toEqual({
-      basicLinting: true,
-      syntaxHighlighting: true,
-      systemDataViews: true,
-      quickFixes: true,
-      minimap: false, // Disabled by override
-      advancedAutocomplete: true,
-      createDataExtension: true,
-      teamSnippets: false,
-      auditLogs: false,
-      deployToAutomation: false,
-      runToTargetDE: true,
+      tier: 'pro',
+      features: {
+        basicLinting: true,
+        syntaxHighlighting: true,
+        systemDataViews: true,
+        quickFixes: true,
+        minimap: false, // Disabled by override
+        advancedAutocomplete: true,
+        createDataExtension: true,
+        teamSnippets: false,
+        auditLogs: false,
+        deployToAutomation: true,
+        runToTargetDE: true,
+      },
     });
   });
 
@@ -209,17 +223,20 @@ describe('FeaturesService', () => {
 
     // Assert - enterprise tier gets all features
     expect(features).toEqual({
-      basicLinting: true,
-      syntaxHighlighting: true,
-      systemDataViews: true,
-      quickFixes: true,
-      minimap: true,
-      advancedAutocomplete: true,
-      createDataExtension: true,
-      teamSnippets: true,
-      auditLogs: true,
-      deployToAutomation: true,
-      runToTargetDE: true,
+      tier: 'enterprise',
+      features: {
+        basicLinting: true,
+        syntaxHighlighting: true,
+        systemDataViews: true,
+        quickFixes: true,
+        minimap: true,
+        advancedAutocomplete: true,
+        createDataExtension: true,
+        teamSnippets: true,
+        auditLogs: true,
+        deployToAutomation: true,
+        runToTargetDE: true,
+      },
     });
   });
 

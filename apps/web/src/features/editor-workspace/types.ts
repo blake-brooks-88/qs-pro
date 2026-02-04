@@ -1,6 +1,6 @@
 import type { DataRetentionPolicy } from "@qpp/shared-types";
 
-export type FolderType = "library" | "data-extension";
+export type FolderType = "library" | "data-extension" | "queryactivity";
 
 export interface Folder {
   id: string;
@@ -47,6 +47,7 @@ export interface DataExtension {
   folderId: string;
   description: string;
   fields: DataExtensionField[];
+  isShared: boolean;
 }
 
 export type QueryStatus = "running" | "success" | "error" | "idle";
@@ -80,14 +81,16 @@ export interface ExecutionResult {
   errorMessage?: string;
 }
 
-export type QueryDataAction = "Overwrite" | "Append" | "Update";
+export type TargetUpdateType = "Overwrite" | "Append" | "Update";
 
 export interface QueryActivityDraft {
   name: string;
   externalKey?: string;
   description?: string;
-  targetDataExtensionId: string;
-  dataAction: QueryDataAction;
+  targetDataExtensionCustomerKey: string;
+  targetUpdateType: TargetUpdateType;
+  categoryId?: number;
+  queryText: string;
 }
 
 export interface QueryTab {

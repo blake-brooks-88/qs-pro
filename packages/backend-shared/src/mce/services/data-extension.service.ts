@@ -136,8 +136,12 @@ export class DataExtensionService {
     userId: string,
     mid: string,
     customerKey: string,
+    clientId?: string,
   ): Promise<DataExtension | null> {
-    const soapBody = buildRetrieveDataExtensionByCustomerKey(customerKey);
+    const soapBody = buildRetrieveDataExtensionByCustomerKey(
+      customerKey,
+      clientId,
+    );
 
     const response = await this.mceBridge.soapRequest<SoapRetrieveResponse>(
       tenantId,

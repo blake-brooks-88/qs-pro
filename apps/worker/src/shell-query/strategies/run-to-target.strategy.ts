@@ -484,7 +484,9 @@ export class RunToTargetFlow implements IFlowStrategy {
     }
 
     if (inferredColumns.length === 0) {
-      this.logger.debug("Target schema validation skipped (empty inferred schema)");
+      this.logger.debug(
+        "Target schema validation skipped (empty inferred schema)",
+      );
       return;
     }
 

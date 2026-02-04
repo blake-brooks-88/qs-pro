@@ -24,17 +24,20 @@ import { ShellQuerySseService } from '../shell-query-sse.service';
 function createFeaturesServiceStub() {
   return {
     getTenantFeatures: vi.fn().mockResolvedValue({
-      runToTargetDE: true,
-      basicLinting: true,
-      syntaxHighlighting: true,
-      quickFixes: true,
-      minimap: true,
-      advancedAutocomplete: true,
-      createDataExtension: true,
-      systemDataViews: true,
-      teamSnippets: false,
-      auditLogs: false,
-      deployToAutomation: false,
+      tier: 'pro',
+      features: {
+        runToTargetDE: true,
+        basicLinting: true,
+        syntaxHighlighting: true,
+        quickFixes: true,
+        minimap: true,
+        advancedAutocomplete: true,
+        createDataExtension: true,
+        systemDataViews: true,
+        teamSnippets: false,
+        auditLogs: false,
+        deployToAutomation: true,
+      },
     }),
   };
 }
@@ -151,8 +154,20 @@ describe('ShellQueryController', () => {
       };
 
       featuresService.getTenantFeatures.mockResolvedValue({
-        ...(await featuresService.getTenantFeatures()),
-        runToTargetDE: false,
+        tier: 'free',
+        features: {
+          runToTargetDE: false,
+          basicLinting: true,
+          syntaxHighlighting: true,
+          quickFixes: false,
+          minimap: false,
+          advancedAutocomplete: false,
+          createDataExtension: false,
+          systemDataViews: true,
+          teamSnippets: false,
+          auditLogs: false,
+          deployToAutomation: false,
+        },
       });
 
       await expect(controller.createRun(user, body)).rejects.toMatchObject({

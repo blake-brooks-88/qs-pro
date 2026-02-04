@@ -23,6 +23,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
         {
           id: "de-2",
@@ -31,6 +32,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
         {
           id: "de-3",
@@ -39,6 +41,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
       ];
 
@@ -68,6 +71,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
         {
           id: "de-2",
@@ -76,6 +80,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
         {
           id: "de-3",
@@ -84,6 +89,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
       ];
 
@@ -111,6 +117,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
         {
           id: "de-2",
@@ -119,6 +126,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         },
       ];
 
@@ -148,6 +156,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         }),
       );
 
@@ -174,6 +183,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local",
           description: "",
           fields: [],
+          isShared: false,
         }),
       );
 
@@ -228,6 +238,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "shared-1",
           description: "",
           fields: [],
+          isShared: false,
         },
         {
           id: "de-2",
@@ -236,6 +247,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "local-1",
           description: "",
           fields: [],
+          isShared: false,
         },
       ];
       const folders: Folder[] = [
@@ -282,6 +294,7 @@ describe("fuzzy matching and ENT. table suggestions", () => {
           folderId: "shared-1",
           description: "",
           fields: [],
+          isShared: false,
         },
       ];
       const folders: Folder[] = [

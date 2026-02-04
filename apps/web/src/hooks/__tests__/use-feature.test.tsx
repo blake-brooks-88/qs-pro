@@ -22,17 +22,21 @@ const createQueryClient = () =>
     },
   });
 
-const mockFeatures = {
-  basicLinting: true,
-  syntaxHighlighting: true,
-  quickFixes: false,
-  minimap: false,
-  advancedAutocomplete: false,
-  teamSnippets: false,
-  auditLogs: false,
-  createDataExtension: false,
-  deployToAutomation: false,
-  systemDataViews: true,
+const mockFeaturesResponse = {
+  tier: "free" as const,
+  features: {
+    basicLinting: true,
+    syntaxHighlighting: true,
+    quickFixes: false,
+    minimap: false,
+    advancedAutocomplete: false,
+    teamSnippets: false,
+    auditLogs: false,
+    createDataExtension: false,
+    deployToAutomation: false,
+    systemDataViews: true,
+    runToTargetDE: false,
+  },
 };
 
 describe("useFeature", () => {
@@ -40,13 +44,13 @@ describe("useFeature", () => {
     server.resetHandlers();
   });
 
-  it("returns true for enabled feature", async () => {
+  it("returns enabled: true for enabled feature", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
     server.use(
       http.get("/api/features", () => {
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
 
@@ -55,17 +59,18 @@ describe("useFeature", () => {
     });
 
     await waitFor(() => {
-      expect(result.current).toBe(true);
+      expect(result.current.enabled).toBe(true);
+      expect(result.current.isLoading).toBe(false);
     });
   });
 
-  it("returns false for disabled feature", async () => {
+  it("returns enabled: false for disabled feature", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
     server.use(
       http.get("/api/features", () => {
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
 
@@ -74,11 +79,12 @@ describe("useFeature", () => {
     });
 
     await waitFor(() => {
-      expect(result.current).toBe(false);
+      expect(result.current.enabled).toBe(false);
+      expect(result.current.isLoading).toBe(false);
     });
   });
 
-  it("returns false while loading (fail-closed)", async () => {
+  it("returns isLoading: true and enabled: false while loading (fail-closed)", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
@@ -92,10 +98,11 @@ describe("useFeature", () => {
       wrapper,
     });
 
-    expect(result.current).toBe(false);
+    expect(result.current.enabled).toBe(false);
+    expect(result.current.isLoading).toBe(true);
   });
 
-  it("returns false when API returns error", async () => {
+  it("returns enabled: false when API returns error", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
@@ -110,19 +117,23 @@ describe("useFeature", () => {
     });
 
     await waitFor(() => {
-      expect(result.current).toBe(false);
+      expect(result.current.enabled).toBe(false);
+      expect(result.current.isLoading).toBe(false);
     });
   });
 
-  it("returns false for feature missing from response (fail-closed)", async () => {
+  it("returns enabled: false for feature missing from response (fail-closed)", async () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
     server.use(
       http.get("/api/features", () => {
         return HttpResponse.json({
-          basicLinting: true,
-          syntaxHighlighting: true,
+          tier: "free",
+          features: {
+            basicLinting: true,
+            syntaxHighlighting: true,
+          },
         });
       }),
     );
@@ -132,7 +143,8 @@ describe("useFeature", () => {
     });
 
     await waitFor(() => {
-      expect(result.current).toBe(false);
+      expect(result.current.enabled).toBe(false);
+      expect(result.current.isLoading).toBe(false);
     });
   });
 
@@ -144,7 +156,7 @@ describe("useFeature", () => {
     server.use(
       http.get("/api/features", () => {
         fetchCount++;
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
 
@@ -153,7 +165,7 @@ describe("useFeature", () => {
     });
 
     await waitFor(() => {
-      expect(result1.current).toBe(true);
+      expect(result1.current.enabled).toBe(true);
     });
 
     const { result: result2 } = renderHook(() => useFeature("quickFixes"), {
@@ -161,7 +173,7 @@ describe("useFeature", () => {
     });
 
     await waitFor(() => {
-      expect(result2.current).toBe(false);
+      expect(result2.current.enabled).toBe(false);
     });
 
     expect(fetchCount).toBe(1);
@@ -171,22 +183,26 @@ describe("useFeature", () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
-    const allEnabledFeatures = {
-      basicLinting: true,
-      syntaxHighlighting: true,
-      quickFixes: true,
-      minimap: true,
-      advancedAutocomplete: true,
-      teamSnippets: true,
-      auditLogs: true,
-      createDataExtension: true,
-      deployToAutomation: true,
-      systemDataViews: true,
+    const allEnabledFeaturesResponse = {
+      tier: "enterprise" as const,
+      features: {
+        basicLinting: true,
+        syntaxHighlighting: true,
+        quickFixes: true,
+        minimap: true,
+        advancedAutocomplete: true,
+        teamSnippets: true,
+        auditLogs: true,
+        createDataExtension: true,
+        deployToAutomation: true,
+        systemDataViews: true,
+        runToTargetDE: true,
+      },
     };
 
     server.use(
       http.get("/api/features", () => {
-        return HttpResponse.json(allEnabledFeatures);
+        return HttpResponse.json(allEnabledFeaturesResponse);
       }),
     );
 
@@ -195,7 +211,8 @@ describe("useFeature", () => {
     });
 
     await waitFor(() => {
-      expect(result.current).toBe(true);
+      expect(result.current.enabled).toBe(true);
+      expect(result.current.isLoading).toBe(false);
     });
   });
 });

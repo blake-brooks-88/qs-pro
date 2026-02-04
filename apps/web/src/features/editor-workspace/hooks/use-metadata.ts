@@ -163,6 +163,7 @@ const mapDataExtensions = (raw: DataExtensionResponse[]): DataExtension[] => {
         folderId: folderId ?? "",
         description: "",
         fields,
+        isShared: item.isShared ?? false,
       };
     })
     .filter((de): de is DataExtension => Boolean(de));
@@ -369,7 +370,7 @@ export function useMetadata({
   tenantId?: string | null;
   eid?: string;
 } = {}): MetadataState {
-  const systemDataViewsEnabled = useFeature("systemDataViews");
+  const { enabled: systemDataViewsEnabled } = useFeature("systemDataViews");
 
   const folderQuery = useMetadataFolders(tenantId, eid);
 

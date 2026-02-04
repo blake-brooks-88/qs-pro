@@ -46,18 +46,24 @@ export class MetadataService {
     userId: string,
     mid: string,
     eid?: string,
+    contentType?: string,
   ): Promise<unknown> {
-    const cacheKey = eid
-      ? `folders:${tenantId}:${mid}:${eid}`
-      : `folders:${tenantId}:${mid}`;
+    const effectiveContentType = contentType ?? "dataextension";
+    const cacheKey = `folders:${tenantId}:${mid}:${effectiveContentType}:${eid ?? "local"}`;
     const cached = await this.cacheManager.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const localPromise = this.fetchFolders(tenantId, userId, mid);
+    const localPromise = this.fetchFolders(
+      tenantId,
+      userId,
+      mid,
+      undefined,
+      effectiveContentType,
+    );
     const sharedPromise = eid
-      ? this.fetchFolders(tenantId, userId, mid, eid)
+      ? this.fetchFolders(tenantId, userId, mid, eid, effectiveContentType)
       : Promise.resolve([]);
 
     const [local, shared] = await Promise.all([localPromise, sharedPromise]);
@@ -74,6 +80,7 @@ export class MetadataService {
     userId: string,
     mid: string,
     clientId?: string,
+    contentType?: string,
   ): Promise<MceSoapFolder[]> {
     let allFolders: MceSoapFolder[] = [];
     let continueRequestId: string | null = null;
@@ -84,7 +91,7 @@ export class MetadataService {
       const soapBody = continueRequestId
         ? buildContinueRequest(continueRequestId)
         : buildRetrieveDataFolder({
-            contentType: "dataextension",
+            contentType: contentType ?? "dataextension",
             clientId,
           });
 
@@ -168,7 +175,17 @@ export class MetadataService {
 
     const [local, shared] = await Promise.all([localPromise, sharedPromise]);
 
-    return [...local, ...shared];
+    // Tag each DE with isShared flag so frontend can distinguish them
+    const taggedLocal = local.map((de) => ({
+      ...(de as object),
+      isShared: false,
+    }));
+    const taggedShared = shared.map((de) => ({
+      ...(de as object),
+      isShared: true,
+    }));
+
+    return [...taggedLocal, ...taggedShared];
   }
 
   private async fetchDataExtensions(
@@ -218,14 +235,18 @@ export class MetadataService {
     userId: string,
     mid: string,
     deKey: string,
+    eid?: string,
   ): Promise<unknown[]> {
-    const cacheKey = `fields:${tenantId}:${mid}:${deKey}`;
+    const cacheKey = `fields:${tenantId}:${mid}:${deKey}:${eid ?? "local"}`;
     const cached = await this.cacheManager.get(cacheKey);
     if (cached) {
       return cached as unknown[];
     }
 
-    const soapBody = buildRetrieveDataExtensionFields({ customerKey: deKey });
+    const soapBody = buildRetrieveDataExtensionFields({
+      customerKey: deKey,
+      clientId: eid,
+    });
 
     const response = (await this.bridge.soapRequest(
       tenantId,

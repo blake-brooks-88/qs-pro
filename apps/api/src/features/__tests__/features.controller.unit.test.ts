@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionGuard } from '@qpp/backend-shared';
-import type { TenantFeatures } from '@qpp/shared-types';
+import type { TenantFeaturesResponse } from '@qpp/shared-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserSession } from '../../common/decorators/current-user.decorator';
@@ -77,24 +77,27 @@ describe('FeaturesController', () => {
       mid: 'mid-1',
     };
 
-    const mockFeatures: TenantFeatures = {
-      basicLinting: true,
-      syntaxHighlighting: true,
-      quickFixes: true,
-      minimap: true,
-      advancedAutocomplete: true,
-      teamSnippets: false,
-      auditLogs: false,
+    const mockResponse: TenantFeaturesResponse = {
+      tier: 'pro',
+      features: {
+        basicLinting: true,
+        syntaxHighlighting: true,
+        quickFixes: true,
+        minimap: true,
+        advancedAutocomplete: true,
+        teamSnippets: false,
+        auditLogs: false,
+      },
     };
 
     vi.mocked(featuresService.getTenantFeatures).mockResolvedValue(
-      mockFeatures,
+      mockResponse,
     );
 
     // Act
     const result = await controller.getFeatures(userSession);
 
     // Assert - focus on observable behavior: returned features match expected shape and values
-    expect(result).toEqual(mockFeatures);
+    expect(result).toEqual(mockResponse);
   });
 });

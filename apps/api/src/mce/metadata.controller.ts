@@ -28,12 +28,21 @@ export class MetadataController {
   async getFolders(
     @CurrentUser() user: UserSession,
     @Query('eid') eid?: string,
+    @Query('contentType') contentType?: string,
   ) {
+    const allowedContentTypes = ['dataextension', 'queryactivity'];
+    if (contentType && !allowedContentTypes.includes(contentType)) {
+      throw new BadRequestException(
+        `Invalid contentType. Allowed values: ${allowedContentTypes.join(', ')}`,
+      );
+    }
+
     return this.metadataService.getFolders(
       user.tenantId,
       user.userId,
       user.mid,
       eid,
+      contentType,
     );
   }
 
@@ -51,7 +60,11 @@ export class MetadataController {
   }
 
   @Get('fields')
-  async getFields(@CurrentUser() user: UserSession, @Query('key') key: string) {
+  async getFields(
+    @CurrentUser() user: UserSession,
+    @Query('key') key: string,
+    @Query('eid') eid?: string,
+  ) {
     if (typeof key !== 'string' || !key.trim()) {
       throw new BadRequestException('key is required');
     }
@@ -60,6 +73,7 @@ export class MetadataController {
       user.userId,
       user.mid,
       key,
+      eid,
     );
   }
 

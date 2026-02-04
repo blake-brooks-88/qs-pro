@@ -175,6 +175,7 @@ const createMockDataExtensions = (): DataExtension[] => [
         length: 50,
       },
     ],
+    isShared: false,
   },
   {
     id: "de-2",
@@ -202,6 +203,7 @@ const createMockDataExtensions = (): DataExtension[] => [
         isNullable: false,
       },
     ],
+    isShared: false,
   },
   {
     id: "de-3",
@@ -223,6 +225,7 @@ const createMockDataExtensions = (): DataExtension[] => [
         isNullable: false,
       },
     ],
+    isShared: false,
   },
 ];
 

@@ -121,7 +121,9 @@ describe("RunToTargetFlow", () => {
     });
 
     it("throws RESOURCE_NOT_FOUND when target DE does not exist", async () => {
-      dataExtensionServiceStub.retrieveByCustomerKey.mockResolvedValueOnce(null);
+      dataExtensionServiceStub.retrieveByCustomerKey.mockResolvedValueOnce(
+        null,
+      );
 
       const job = createTestJob({
         targetDeCustomerKey: "MissingDEKey",

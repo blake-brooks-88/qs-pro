@@ -13,10 +13,16 @@ export function getFolderAncestors(
   }
 
   const ancestors: Folder[] = [];
+  const visited = new Set<string>();
   let currentId: string | null = folderId;
   const folderMap = new Map(folders.map((f) => [f.id, f]));
 
   while (currentId) {
+    if (visited.has(currentId)) {
+      break; // Cycle detected
+    }
+    visited.add(currentId);
+
     const folder = folderMap.get(currentId);
     if (!folder) {
       break;
@@ -24,11 +30,6 @@ export function getFolderAncestors(
 
     ancestors.unshift(folder);
     currentId = folder.parentId;
-
-    // Prevent infinite loops if there's a circular reference in the data
-    if (ancestors.length > folders.length) {
-      break;
-    }
   }
 
   return ancestors;

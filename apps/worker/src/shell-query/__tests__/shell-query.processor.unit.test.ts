@@ -728,8 +728,9 @@ describe("ShellQueryProcessor", () => {
         },
       );
 
-      const error = new UnrecoverableError("Query validation failed.") as Error &
-        { cause?: unknown };
+      const error = new UnrecoverableError(
+        "Query validation failed.",
+      ) as Error & { cause?: unknown };
       error.cause = appError;
 
       await processor.onFailed(job as never, error as never);

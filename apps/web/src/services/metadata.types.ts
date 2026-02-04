@@ -8,6 +8,7 @@ export interface DataExtensionResponseDto {
   CustomerKey?: string;
   Name?: string;
   CategoryID?: string | number;
+  isShared?: boolean;
 }
 
 export interface DataExtensionFieldResponseDto {

@@ -74,7 +74,7 @@ export function FeatureGate({
   children,
   onUpgradeClick,
 }: FeatureGateProps) {
-  const isEnabled = useFeature(feature);
+  const { enabled: isEnabled } = useFeature(feature);
   /**
    * ESLINT-DISABLE JUSTIFICATION:
    * This eslint-disable is an exception to project standards, not a pattern to follow.

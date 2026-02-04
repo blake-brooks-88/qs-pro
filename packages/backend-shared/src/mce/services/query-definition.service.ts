@@ -10,6 +10,7 @@ import {
   buildDeleteQueryDefinition,
   buildPerformQueryDefinition,
   buildRetrieveQueryDefinition,
+  buildRetrieveQueryDefinitionByNameAndFolder,
 } from "../soap/request-bodies";
 import {
   SoapCreateResponse,
@@ -55,6 +56,57 @@ export class QueryDefinitionService {
         return null;
       }
       throw mceSoapFailure("RetrieveQueryDefinition", status);
+    }
+
+    const rawResults = msg?.Results;
+    if (!rawResults) {
+      return null;
+    }
+
+    const item = Array.isArray(rawResults) ? rawResults[0] : rawResults;
+    if (!item) {
+      return null;
+    }
+
+    return {
+      objectId: String(item.ObjectID ?? ""),
+      customerKey: String(item.CustomerKey ?? ""),
+      name: String(item.Name ?? ""),
+      categoryId: item.CategoryID
+        ? parseInt(String(item.CategoryID), 10)
+        : undefined,
+    };
+  }
+
+  async retrieveByNameAndFolder(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    name: string,
+    categoryId?: number,
+  ): Promise<QueryDefinition | null> {
+    const soapBody = buildRetrieveQueryDefinitionByNameAndFolder({
+      name,
+      categoryId,
+    });
+
+    const response = await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+      tenantId,
+      userId,
+      mid,
+      soapBody,
+      "Retrieve",
+      MCE_TIMEOUTS.METADATA,
+    );
+
+    const msg = response.Body?.RetrieveResponseMsg;
+    const status = msg?.OverallStatus;
+
+    if (status && status !== "OK" && status !== "MoreDataAvailable") {
+      if (status === "Error" && !msg?.Results) {
+        return null;
+      }
+      throw mceSoapFailure("RetrieveQueryDefinitionByNameAndFolder", status);
     }
 
     const rawResults = msg?.Results;

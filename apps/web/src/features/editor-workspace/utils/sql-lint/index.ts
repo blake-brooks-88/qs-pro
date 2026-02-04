@@ -12,6 +12,7 @@ import { duplicateTableAliasRule } from "./rules/duplicate-table-alias";
 import { emptyInClauseRule } from "./rules/empty-in-clause";
 import { limitProhibitionRule } from "./rules/limit-prohibition";
 import { missingJoinOnRule } from "./rules/missing-join-on";
+import { noMultiStatementRule } from "./rules/no-multi-statement";
 import { notEqualStyleRule } from "./rules/not-equal-style";
 import { notInSubqueryRule } from "./rules/not-in-subquery";
 import { offsetWithoutOrderByRule } from "./rules/offset-without-order-by";
@@ -70,6 +71,7 @@ const rules = [
   aliasInClauseRule,
   // New syntax error rules
   trailingSemicolonRule,
+  noMultiStatementRule,
   unmatchedDelimitersRule,
   emptyInClauseRule,
   variableUsageRule,

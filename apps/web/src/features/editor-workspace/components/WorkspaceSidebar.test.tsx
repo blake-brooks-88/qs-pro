@@ -117,6 +117,7 @@ describe("WorkspaceSidebar", () => {
         folderId: "root",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
 
@@ -144,6 +145,7 @@ describe("WorkspaceSidebar", () => {
         folderId: "1",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
 
@@ -173,6 +175,7 @@ describe("WorkspaceSidebar", () => {
         folderId: "2",
         description: "",
         fields: [],
+        isShared: false,
       },
     ];
 
@@ -284,6 +287,7 @@ describe("WorkspaceSidebar", () => {
           folderId: "root",
           description: "",
           fields: [],
+          isShared: false,
         },
       ];
 
@@ -435,6 +439,7 @@ describe("WorkspaceSidebar", () => {
           folderId: "1",
           description: "",
           fields: [],
+          isShared: false,
         },
         {
           id: "de2",
@@ -443,6 +448,7 @@ describe("WorkspaceSidebar", () => {
           folderId: "1",
           description: "",
           fields: [],
+          isShared: false,
         },
       ];
 

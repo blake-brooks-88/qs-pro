@@ -16,6 +16,7 @@ export type {
   FeatureKey,
   SubscriptionTier,
   TenantFeatures,
+  TenantFeaturesResponse,
 } from "./features.js";
 export {
   ALL_FEATURE_KEYS,
@@ -23,6 +24,7 @@ export {
   getTierFeatures,
   isTierFeature,
   SubscriptionTierSchema,
+  TenantFeaturesResponseSchema,
   TenantFeaturesSchema,
   TIER_FEATURES,
 } from "./features.js";
@@ -80,3 +82,7 @@ export {
   DE_NAME_VALIDATION,
   FIELD_NAME_VALIDATION,
 } from "./data-extensions.js";
+
+// Query Activities
+export type { CreateQueryActivityDto } from "./query-activities.js";
+export { CreateQueryActivitySchema } from "./query-activities.js";

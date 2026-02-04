@@ -157,15 +157,18 @@ describe('FeaturesController (integration)', () => {
 
     const res = await testAgent.get('/features').expect(200);
 
+    // Check tier
+    expect(res.body.tier).toBe('free');
+
     // Free tier defaults
-    expect(res.body.basicLinting).toBe(true);
-    expect(res.body.syntaxHighlighting).toBe(true);
+    expect(res.body.features.basicLinting).toBe(true);
+    expect(res.body.features.syntaxHighlighting).toBe(true);
 
     // Overrides applied
-    expect(res.body.quickFixes).toBe(true);
-    expect(res.body.minimap).toBe(true);
+    expect(res.body.features.quickFixes).toBe(true);
+    expect(res.body.features.minimap).toBe(true);
 
     // Other pro features remain disabled unless overridden
-    expect(res.body.advancedAutocomplete).toBe(false);
+    expect(res.body.features.advancedAutocomplete).toBe(false);
   });
 });
