@@ -22,15 +22,21 @@ const createQueryClient = () =>
     },
   });
 
-const mockFeatures = {
-  basicLinting: true,
-  syntaxHighlighting: true,
-  quickFixes: false,
-  minimap: false,
-  advancedAutocomplete: false,
-  teamSnippets: false,
-  auditLogs: false,
-  deployToAutomation: false,
+const mockFeaturesResponse = {
+  tier: "free" as const,
+  features: {
+    basicLinting: true,
+    syntaxHighlighting: true,
+    quickFixes: false,
+    minimap: false,
+    advancedAutocomplete: false,
+    teamSnippets: false,
+    auditLogs: false,
+    deployToAutomation: false,
+    createDataExtension: false,
+    systemDataViews: true,
+    runToTargetDE: false,
+  },
 };
 
 describe("FeatureGate", () => {
@@ -38,7 +44,7 @@ describe("FeatureGate", () => {
     server.resetHandlers();
     server.use(
       http.get("/api/features", () => {
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
   });

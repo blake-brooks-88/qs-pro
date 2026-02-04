@@ -4,40 +4,19 @@ import { useTenantFeatures } from "@/hooks/use-tenant-features";
 
 /**
  * Hook to determine the current tenant's subscription tier.
- *
- * Derives tier from feature flags since the /features API currently only
- * returns feature flags, not the tier directly. This approach infers tier
- * based on which features are enabled:
- *
- * - Enterprise: deployToAutomation enabled
- * - Pro: advancedAutocomplete enabled (but not deployToAutomation)
- * - Free: neither pro nor enterprise features enabled
- *
+ * Reads tier directly from the /features API response.
  * Returns "free" while loading (fail-closed approach).
  */
 export function useTier(): {
   tier: SubscriptionTier;
   isLoading: boolean;
 } {
-  const { data: features, isLoading } = useTenantFeatures();
+  const { data, isLoading } = useTenantFeatures();
 
-  // Fail-closed: default to free while loading
-  if (isLoading || !features) {
-    return { tier: "free", isLoading };
-  }
-
-  // Enterprise has deployToAutomation
-  if (features.deployToAutomation) {
-    return { tier: "enterprise", isLoading: false };
-  }
-
-  // Pro has advancedAutocomplete (but not deployToAutomation)
-  if (features.advancedAutocomplete) {
-    return { tier: "pro", isLoading: false };
-  }
-
-  // Default to free
-  return { tier: "free", isLoading: false };
+  return {
+    tier: data?.tier ?? "free",
+    isLoading,
+  };
 }
 
 /**

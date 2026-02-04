@@ -1,4 +1,4 @@
-import type { TenantFeatures } from "@qpp/shared-types";
+import type { TenantFeatures, TenantFeaturesResponse } from "@qpp/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
@@ -37,6 +37,12 @@ const mockFeatures: TenantFeatures = {
   createDataExtension: false,
   deployToAutomation: false,
   systemDataViews: true,
+  runToTargetDE: false,
+};
+
+const mockFeaturesResponse: TenantFeaturesResponse = {
+  tier: "free",
+  features: mockFeatures,
 };
 
 describe("useTenantFeatures", () => {
@@ -50,7 +56,7 @@ describe("useTenantFeatures", () => {
 
     server.use(
       http.get("/api/features", () => {
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
 
@@ -63,7 +69,7 @@ describe("useTenantFeatures", () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(result.current.data).toEqual(mockFeatures);
+    expect(result.current.data).toEqual(mockFeaturesResponse);
   });
 
   it("returns loading state initially", async () => {
@@ -129,7 +135,7 @@ describe("useTenantFeatures", () => {
     server.use(
       http.get("/api/features", () => {
         fetchCount++;
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
 
@@ -179,7 +185,7 @@ describe("useTenantFeatures", () => {
     server.use(
       http.get("/api/features", () => {
         fetchCount++;
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
 
@@ -210,7 +216,7 @@ describe("useTenantFeatures", () => {
 
     server.use(
       http.get("/api/features", () => {
-        return HttpResponse.json(mockFeatures);
+        return HttpResponse.json(mockFeaturesResponse);
       }),
     );
 
@@ -221,15 +227,18 @@ describe("useTenantFeatures", () => {
     });
 
     const data = result.current.data;
-    expect(data).toHaveProperty("basicLinting");
-    expect(data).toHaveProperty("syntaxHighlighting");
-    expect(data).toHaveProperty("quickFixes");
-    expect(data).toHaveProperty("minimap");
-    expect(data).toHaveProperty("advancedAutocomplete");
-    expect(data).toHaveProperty("teamSnippets");
-    expect(data).toHaveProperty("auditLogs");
-    expect(data).toHaveProperty("createDataExtension");
-    expect(data).toHaveProperty("deployToAutomation");
-    expect(data).toHaveProperty("systemDataViews");
+    expect(data).toHaveProperty("tier");
+    expect(data).toHaveProperty("features");
+    expect(data?.features).toHaveProperty("basicLinting");
+    expect(data?.features).toHaveProperty("syntaxHighlighting");
+    expect(data?.features).toHaveProperty("quickFixes");
+    expect(data?.features).toHaveProperty("minimap");
+    expect(data?.features).toHaveProperty("advancedAutocomplete");
+    expect(data?.features).toHaveProperty("teamSnippets");
+    expect(data?.features).toHaveProperty("auditLogs");
+    expect(data?.features).toHaveProperty("createDataExtension");
+    expect(data?.features).toHaveProperty("deployToAutomation");
+    expect(data?.features).toHaveProperty("systemDataViews");
+    expect(data?.features).toHaveProperty("runToTargetDE");
   });
 });

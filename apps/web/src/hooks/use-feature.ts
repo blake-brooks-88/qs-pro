@@ -2,12 +2,21 @@ import type { FeatureKey } from "@qpp/shared-types";
 
 import { useTenantFeatures } from "@/hooks/use-tenant-features";
 
-export function useFeature(featureKey: FeatureKey): boolean {
+export interface UseFeatureResult {
+  enabled: boolean;
+  isLoading: boolean;
+}
+
+export function useFeature(featureKey: FeatureKey): UseFeatureResult {
   const { data, isLoading } = useTenantFeatures();
 
   // Fail-closed: return false while loading or if data is unavailable
-  if (isLoading || !data) {
-    return false;
+  if (isLoading) {
+    return { enabled: false, isLoading: true };
+  }
+
+  if (!data?.features) {
+    return { enabled: false, isLoading: false };
   }
 
   /**
@@ -16,7 +25,7 @@ export function useFeature(featureKey: FeatureKey): boolean {
    *
    * Why this is safe: `featureKey` is typed as `FeatureKey`, which is a Zod enum
    * defined in packages/shared-types/src/features.ts with compile-time constant values
-   * ("basicLinting", "syntaxHighlighting", etc.). The `data` object is typed as
+   * ("basicLinting", "syntaxHighlighting", etc.). The `data.features` object is typed as
    * `TenantFeatures` (Record<FeatureKey, boolean>). TypeScript enforces that only
    * valid FeatureKey values can be passed to this hook. User input cannot reach this
    * code path because the hook parameter must satisfy the FeatureKey type at compile time.
@@ -27,5 +36,5 @@ export function useFeature(featureKey: FeatureKey): boolean {
    * is idiomatic and cannot be exploited.
    */
   // eslint-disable-next-line security/detect-object-injection
-  return data[featureKey] ?? false;
+  return { enabled: data.features[featureKey] ?? false, isLoading: false };
 }

@@ -1,4 +1,4 @@
-import type { TenantFeatures } from "@qpp/shared-types";
+import type { TenantFeaturesResponse } from "@qpp/shared-types";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { getTenantFeatures } from "@/services/features";
@@ -11,7 +11,7 @@ export const featuresQueryKeys = {
 
 export function useTenantFeatures(
   tenantId?: string | null,
-): UseQueryResult<TenantFeatures, Error> {
+): UseQueryResult<TenantFeaturesResponse, Error> {
   return useQuery({
     queryKey: featuresQueryKeys.tenant(tenantId),
     queryFn: getTenantFeatures,

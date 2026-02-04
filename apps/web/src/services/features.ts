@@ -1,8 +1,8 @@
-import type { TenantFeatures } from "@qpp/shared-types";
+import type { TenantFeaturesResponse } from "@qpp/shared-types";
 
 import api from "@/services/api";
 
-export async function getTenantFeatures(): Promise<TenantFeatures> {
-  const { data } = await api.get<TenantFeatures>("/features");
+export async function getTenantFeatures(): Promise<TenantFeaturesResponse> {
+  const { data } = await api.get<TenantFeaturesResponse>("/features");
   return data;
 }
