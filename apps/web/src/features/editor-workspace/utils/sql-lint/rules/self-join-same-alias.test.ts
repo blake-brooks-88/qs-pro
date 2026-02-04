@@ -79,4 +79,55 @@ describe("selfJoinSameAliasRule", () => {
       expect(diagnostics).toHaveLength(0);
     });
   });
+
+  describe("UNION/set operations (should NOT flag as self-join)", () => {
+    it("should allow same table in UNION without aliases", () => {
+      const sql =
+        "SELECT email FROM [Master_Subscriber] UNION SELECT email FROM [Master_Subscriber]";
+      const diagnostics = selfJoinSameAliasRule.check(createContext(sql));
+
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it("should allow same table in UNION ALL without aliases", () => {
+      const sql =
+        "SELECT email FROM [Master_Subscriber] UNION ALL SELECT email FROM [Master_Subscriber]";
+      const diagnostics = selfJoinSameAliasRule.check(createContext(sql));
+
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it("should allow same table in INTERSECT without aliases", () => {
+      const sql =
+        "SELECT email FROM [Master_Subscriber] INTERSECT SELECT email FROM [Master_Subscriber]";
+      const diagnostics = selfJoinSameAliasRule.check(createContext(sql));
+
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it("should allow same table in EXCEPT without aliases", () => {
+      const sql =
+        "SELECT email FROM [Master_Subscriber] EXCEPT SELECT email FROM [Master_Subscriber]";
+      const diagnostics = selfJoinSameAliasRule.check(createContext(sql));
+
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it("should allow multiple UNIONs with same table", () => {
+      const sql =
+        "SELECT email FROM [A] UNION SELECT email FROM [A] UNION SELECT email FROM [A]";
+      const diagnostics = selfJoinSameAliasRule.check(createContext(sql));
+
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it("should still detect self-join within single SELECT of UNION", () => {
+      const sql = "SELECT * FROM [A] JOIN [A] ON 1=1 UNION SELECT * FROM [B]";
+      const diagnostics = selfJoinSameAliasRule.check(createContext(sql));
+
+      // Self-join in first SELECT should still be flagged
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]?.message).toContain("Self-join");
+    });
+  });
 });
