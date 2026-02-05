@@ -77,7 +77,7 @@ const SYSTEM_DATA_VIEW_FOLDERS: DataFolderResponseDto[] = [
 ];
 
 // =============================================================================
-// DATA VIEWS (29 visible in folder tree)
+// DATA VIEWS (30 visible in folder tree)
 // =============================================================================
 
 const SYSTEM_DATA_VIEWS: DataExtensionResponseDto[] = [
