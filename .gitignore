@@ -45,6 +45,7 @@ Thumbs.db
 coverage/
 coverage-*/
 .nyc_output
+.nyc_output_merged/
 
 # Docker
 .docker/
@@ -71,4 +72,3 @@ agent-os/
 
 # Git worktrees
 .worktrees/
-
