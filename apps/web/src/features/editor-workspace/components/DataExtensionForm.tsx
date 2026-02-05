@@ -74,6 +74,8 @@ export interface DataExtensionFormProps {
   isSubmitting?: boolean;
   /** Pre-populated DE name (for auto-generated names) */
   initialName?: string;
+  /** Whether to show the cancel button (default: true) */
+  showCancel?: boolean;
 }
 
 export function DataExtensionForm({
@@ -85,6 +87,7 @@ export function DataExtensionForm({
   submitLabel = "Create Data Extension",
   isSubmitting = false,
   initialName = "",
+  showCancel = true,
 }: DataExtensionFormProps) {
   const [name, setName] = useState(initialName);
   const [customerKey, setCustomerKey] = useState("");
@@ -867,13 +870,15 @@ export function DataExtensionForm({
 
       {/* Footer */}
       <div className="flex justify-end gap-2 border-t border-border pt-4">
-        <Button
-          variant="ghost"
-          onClick={onCancel}
-          className="text-xs font-bold"
-        >
-          Cancel
-        </Button>
+        {showCancel ? (
+          <Button
+            variant="ghost"
+            onClick={onCancel}
+            className="text-xs font-bold"
+          >
+            Cancel
+          </Button>
+        ) : null}
         <Button
           onClick={handleSubmit}
           disabled={!validation.isSubmittable || isSubmitting}

@@ -219,6 +219,7 @@ export function TargetDECreationView({
           onCancel={onBack}
           submitLabel="Create Data Extension"
           isSubmitting={isSubmitting}
+          showCancel={false}
         />
       </div>
     </div>
