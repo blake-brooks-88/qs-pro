@@ -7,6 +7,7 @@ import {
   Magnifer,
   Rocket,
 } from "@solar-icons/react";
+import type { QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -25,11 +26,15 @@ import type {
 import { cn } from "@/lib/utils";
 
 import { FolderTreePicker } from "./FolderTreePicker";
+import { TargetDECreationView } from "./TargetDECreationView";
 
 interface QueryActivityModalProps {
   isOpen: boolean;
+  tenantId?: string | null;
+  eid?: string;
   dataExtensions: DataExtension[];
   folders: Folder[];
+  queryClient?: QueryClient;
   queryText: string;
   initialName?: string;
   isPending?: boolean;
@@ -39,14 +44,18 @@ interface QueryActivityModalProps {
 
 export function QueryActivityModal({
   isOpen,
+  tenantId,
+  eid,
   dataExtensions,
   folders,
+  queryClient,
   queryText,
   initialName,
   isPending = false,
   onClose,
   onSubmit,
 }: QueryActivityModalProps) {
+  const [view, setView] = useState<"selection" | "creation">("selection");
   const [search, setSearch] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -76,6 +85,7 @@ export function QueryActivityModal({
   // Reset form state when modal closes
   useEffect(() => {
     if (!isOpen) {
+      setView("selection");
       setSearch("");
       setIsSearchFocused(false);
       setHighlightedIndex(-1);
@@ -176,6 +186,30 @@ export function QueryActivityModal({
         break;
     }
   };
+
+  const handleCreationComplete = (newDE: DataExtension) => {
+    setSelectedTargetId(newDE.id);
+    setView("selection");
+  };
+
+  if (view === "creation" && queryClient) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-2xl bg-card border-border p-0 overflow-hidden">
+          <TargetDECreationView
+            tenantId={tenantId}
+            eid={eid}
+            sqlText={queryText}
+            folders={folders}
+            dataExtensions={dataExtensions}
+            queryClient={queryClient}
+            onBack={() => setView("selection")}
+            onCreated={handleCreationComplete}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog
@@ -293,9 +327,14 @@ export function QueryActivityModal({
                   Target Data Extension{" "}
                   <span className="text-destructive">*</span>
                 </span>
-                <span className="text-[8px] font-normal lowercase opacity-60 italic">
-                  Local DEs only
-                </span>
+                {queryClient && folders.length > 0 ? (
+                  <button
+                    onClick={() => setView("creation")}
+                    className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                  >
+                    Create New
+                  </button>
+                ) : null}
               </label>
 
               <div className="relative">

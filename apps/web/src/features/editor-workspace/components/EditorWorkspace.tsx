@@ -769,8 +769,11 @@ export function EditorWorkspace({
 
         <QueryActivityModal
           isOpen={isQueryActivityModalOpen}
+          tenantId={tenantId}
+          eid={eid}
           dataExtensions={dataExtensions}
           folders={qaFolders}
+          queryClient={queryClient}
           queryText={safeActiveTab.content}
           initialName={safeActiveTab.name}
           isPending={createQueryActivityMutation.isPending}
