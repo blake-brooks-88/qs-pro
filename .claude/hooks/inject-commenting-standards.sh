@@ -18,10 +18,13 @@ else
 - JSDoc only for public APIs consumed externally"
 fi
 
+# JSON-escape the content to handle quotes, newlines, and special characters
+ESCAPED_CONTENT=$(printf '%s' "$CONTENT" | jq -Rs . | sed 's/^"//;s/"$//')
+
 # Output as systemMessage for Claude's context
 cat << EOF
 {
   "continue": true,
-  "systemMessage": "MANDATORY COMMENTING STANDARD (applies to ALL code you write):\n\n$CONTENT\n\nViolations will be blocked. Write self-documenting code."
+  "systemMessage": "MANDATORY COMMENTING STANDARD (applies to ALL code you write):\n\n$ESCAPED_CONTENT\n\nViolations will be blocked. Write self-documenting code."
 }
 EOF

@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 export * from "./ConfirmationDialog";
 export * from "./DataExtensionForm";
 export * from "./DataExtensionModal";

@@ -115,10 +115,11 @@ export function TargetDECreationView({
 
       const result = await createDataExtension(dto);
 
+      const resolvedKey = draft.customerKey || result.objectId;
       const newDE: DataExtension = {
-        id: result.objectId,
+        id: resolvedKey,
         name: draft.name,
-        customerKey: draft.customerKey || result.objectId,
+        customerKey: resolvedKey,
         folderId: draft.folderId,
         description: "",
         fields: draft.fields,
@@ -152,7 +153,6 @@ export function TargetDECreationView({
           error instanceof Error ? error.message : "An error occurred",
       });
       setIsSubmitting(false);
-      throw error;
     }
   };
 

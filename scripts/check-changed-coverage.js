@@ -112,6 +112,74 @@ function isCoveredSourceFile(file) {
   return !excluded;
 }
 
+function isBarrelIndexFile(file, repoRoot) {
+  const normalized = file.replaceAll("\\", "/");
+  const basename = path.posix.basename(normalized);
+  if (!/^index\.(ts|tsx|js|jsx)$/.test(basename)) {
+    return false;
+  }
+
+  const abs = path.resolve(repoRoot, file);
+  let content = "";
+  try {
+    content = fs.readFileSync(abs, "utf8");
+  } catch {
+    return false;
+  }
+
+  const lines = content.split(/\r?\n/);
+  let inBlockComment = false;
+
+  for (const rawLine of lines) {
+    let line = rawLine;
+
+    if (inBlockComment) {
+      const end = line.indexOf("*/");
+      if (end === -1) {
+        continue;
+      }
+      line = line.slice(end + 2);
+      inBlockComment = false;
+    }
+
+    while (true) {
+      const blockStart = line.indexOf("/*");
+      if (blockStart === -1) {
+        break;
+      }
+      const blockEnd = line.indexOf("*/", blockStart + 2);
+      if (blockEnd === -1) {
+        line = line.slice(0, blockStart);
+        inBlockComment = true;
+        break;
+      }
+      line = `${line.slice(0, blockStart)}${line.slice(blockEnd + 2)}`;
+    }
+
+    const lineComment = line.indexOf("//");
+    if (lineComment !== -1) {
+      line = line.slice(0, lineComment);
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const isReExportLine =
+      /^export\s+(type\s+)?\*\s+from\s+["'][^"']+["']\s*;?$/.test(trimmed) ||
+      /^export\s+(type\s+)?\*\s+as\s+\w+\s+from\s+["'][^"']+["']\s*;?$/.test(trimmed) ||
+      /^export\s+(type\s+)?\{[^}]*\}\s+from\s+["'][^"']+["']\s*;?$/.test(trimmed) ||
+      /^export\s+\{\}\s*;?$/.test(trimmed);
+
+    if (!isReExportLine) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -153,7 +221,9 @@ function main() {
     .filter(Boolean)
     .filter(isCoveredSourceFile);
 
-  if (changed.length === 0) {
+  const coveredChanged = changed.filter((file) => !isBarrelIndexFile(file, repoRoot));
+
+  if (coveredChanged.length === 0) {
     console.log("No changed covered source files.");
     return;
   }
@@ -171,7 +241,7 @@ function main() {
   let overallTotal = 0;
   let overallCovered = 0;
 
-  for (const rel of changed) {
+  for (const rel of coveredChanged) {
     const abs = path.resolve(repoRoot, rel);
     const entry = summary[abs];
     if (!entry || !entry.lines) {

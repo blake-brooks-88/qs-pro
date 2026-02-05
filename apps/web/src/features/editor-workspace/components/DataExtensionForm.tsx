@@ -150,7 +150,9 @@ export function DataExtensionForm({
   useEffect(() => {
     if (
       subscriberKeyField &&
-      !subscriberKeyEligibleFields.some((f) => f.name === subscriberKeyField)
+      !subscriberKeyEligibleFields.some(
+        (f) => f.name.trim() === subscriberKeyField,
+      )
     ) {
       setSubscriberKeyField("");
     }
@@ -397,7 +399,7 @@ export function DataExtensionForm({
     setFields((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setDidAttemptSubmit(true);
     if (!validation.isSubmittable) {
       return;
@@ -420,7 +422,7 @@ export function DataExtensionForm({
       })),
     };
 
-    void onSubmit(draft);
+    await onSubmit(draft);
   };
 
   return (
@@ -580,7 +582,7 @@ export function DataExtensionForm({
                 >
                   <option value="">Select a field...</option>
                   {subscriberKeyEligibleFields.map((f) => (
-                    <option key={f.id ?? f.name} value={f.name}>
+                    <option key={f.id ?? f.name} value={f.name.trim()}>
                       {f.name} ({f.type})
                     </option>
                   ))}
