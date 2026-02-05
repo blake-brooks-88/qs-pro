@@ -130,6 +130,15 @@ export function TargetDECreationView({
         (old) => (old ? [newDE, ...old] : [newDE]),
       );
 
+      // Seed the fields cache so compatibility check works immediately
+      const fieldsForCache: DataExtensionField[] = draft.fields.map(
+        ({ id: _id, ...field }) => field,
+      );
+      queryClient.setQueryData(
+        metadataQueryKeys.fields(tenantId, newDE.customerKey),
+        fieldsForCache,
+      );
+
       setCreatedDEName(draft.name);
       setShowSuccess(true);
       toast.success(`Created: ${draft.name}`);
@@ -142,9 +151,8 @@ export function TargetDECreationView({
         description:
           error instanceof Error ? error.message : "An error occurred",
       });
-      throw error;
-    } finally {
       setIsSubmitting(false);
+      throw error;
     }
   };
 
