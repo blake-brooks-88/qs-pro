@@ -115,8 +115,8 @@ jobs:
       - name: Run migrations
         run: pnpm db:migrate
 
-      - name: Unit & integration tests with coverage
-        run: pnpm test:coverage
+      - name: Unit, integration & e2e tests with coverage
+        run: pnpm test:coverage:all
 
       - name: Upload coverage artifacts
         if: always()
@@ -127,9 +127,6 @@ jobs:
             coverage/coverage-summary.json
             coverage/coverage-final.json
           retention-days: 7
-
-      - name: E2E tests
-        run: pnpm test:e2e
 
   coverage-report:
     needs: check
