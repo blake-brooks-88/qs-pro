@@ -1,5 +1,29 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/inject-commenting-standards.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Before approving subagent completion, verify ALL code written follows commenting standards: (1) Code must be self-documenting through clear naming - no comments needed to explain WHAT code does, (2) Comments ONLY explain WHY something exists or non-obvious decisions, (3) NO changelog-style comments like 'Fix for X', 'Added because...', 'Removed old...', (4) NO commented-out code - delete it, git has history. Review the subagent's work. If ANY violation exists, return 'block' with specific file:line violations requiring fixes. Only return 'approve' if all code meets these standards.",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "*",
