@@ -550,6 +550,35 @@ describe("AuthService Integration", () => {
         code: ErrorCode.AUTH_IDENTITY_MISMATCH,
       });
     });
+
+    it("should throw AUTH_IDENTITY_MISMATCH when MID does not match userinfo", async () => {
+      server.use(
+        http.get(
+          `https://${AUTH_TEST_TSSD}.auth.marketingcloudapis.com/v2/userinfo`,
+          async () => {
+            return HttpResponse.json({
+              sub: AUTH_TEST_SF_USER_ID,
+              enterprise_id: AUTH_TEST_EID,
+              member_id: "userinfo-returned-mid",
+            });
+          },
+        ),
+      );
+
+      await expect(
+        authService.handleCallback(
+          AUTH_TEST_TSSD,
+          "test-auth-code",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "different-provided-mid",
+        ),
+      ).rejects.toMatchObject({
+        code: ErrorCode.AUTH_IDENTITY_MISMATCH,
+      });
+    });
   });
 
   describe("refreshToken", () => {
@@ -816,6 +845,103 @@ describe("AuthService Integration", () => {
         code: ErrorCode.MCE_CREDENTIALS_MISSING,
       });
     });
+
+    it("should coalesce concurrent refresh requests into single MCE call", async () => {
+      // Setup: user with expired credentials
+      const uniqueEid = "auth-integ-eid-concurrency";
+      const uniqueSfUserId = "auth-integ-sf-concurrency";
+      const uniqueMid = "auth-integ-mid-concurrency";
+
+      const [tenant] = await db
+        .insert(tenants)
+        .values({ eid: uniqueEid, tssd: AUTH_TEST_TSSD })
+        .returning();
+      assertDefined(tenant, "Tenant insert failed");
+      createdTenantIds.push(tenant.id);
+
+      const [user] = await db
+        .insert(users)
+        .values({ sfUserId: uniqueSfUserId, tenantId: tenant.id })
+        .returning();
+      assertDefined(user, "User insert failed");
+      createdUserIds.push(user.id);
+
+      const encryptedAccessToken = encryptionService.encrypt(
+        "expired-access-token",
+      ) as string;
+      const encryptedRefreshToken = encryptionService.encrypt(
+        "expired-refresh-token",
+      ) as string;
+
+      // Create credentials with past expiry
+      const pastExpiry = new Date(Date.now() - 3600 * 1000);
+
+      await rlsContextService.runWithTenantContext(
+        tenant.id,
+        uniqueMid,
+        async () => {
+          const contextDb = getContextDb();
+          await contextDb.insert(credentials).values({
+            tenantId: tenant.id,
+            userId: user.id,
+            mid: uniqueMid,
+            accessToken: encryptedAccessToken,
+            refreshToken: encryptedRefreshToken,
+            expiresAt: pastExpiry,
+          });
+        },
+      );
+
+      // Set up MSW handler that tracks call count
+      server.use(
+        http.post(
+          `https://${AUTH_TEST_TSSD}.auth.marketingcloudapis.com/v2/token`,
+          async () => {
+            mswTracker.tokenCalls++;
+            return HttpResponse.json({
+              access_token: "coalesced-access-token",
+              refresh_token: "coalesced-refresh-token",
+              expires_in: 3600,
+              rest_instance_url: `https://${AUTH_TEST_TSSD}.rest.marketingcloudapis.com`,
+              soap_instance_url: `https://${AUTH_TEST_TSSD}.soap.marketingcloudapis.com`,
+              scope: "email openid",
+              token_type: "Bearer",
+            });
+          },
+        ),
+      );
+
+      mswTracker.tokenCalls = 0;
+
+      // Make 3 concurrent refresh calls within a single RLS context
+      // This tests the coalescing behavior without the timing variability
+      // of separate context setup sequences
+      const results = await rlsContextService.runWithTenantContext(
+        tenant.id,
+        uniqueMid,
+        async () => {
+          const refreshPromises = [
+            authService.refreshToken(tenant.id, user.id, uniqueMid, false),
+            authService.refreshToken(tenant.id, user.id, uniqueMid, false),
+            authService.refreshToken(tenant.id, user.id, uniqueMid, false),
+          ];
+          return Promise.all(refreshPromises);
+        },
+      );
+
+      const [result1, result2, result3] = results;
+      assertDefined(result1, "First refresh result");
+      assertDefined(result2, "Second refresh result");
+      assertDefined(result3, "Third refresh result");
+
+      // Only 1 MCE API call despite 3 concurrent requests
+      expect(mswTracker.tokenCalls).toBe(1);
+
+      // All calls get same token
+      expect(result1.accessToken).toBe("coalesced-access-token");
+      expect(result2.accessToken).toBe("coalesced-access-token");
+      expect(result3.accessToken).toBe("coalesced-access-token");
+    });
   });
 
   describe("invalidateToken", () => {
@@ -995,6 +1121,31 @@ describe("AuthService Integration", () => {
         context: { reason: "JWT missing required identity claims" },
       });
     });
+
+    it("should extract TSSD from application_context.base_url when stack is missing", async () => {
+      const jwtSecret = process.env.MCE_JWT_SIGNING_SECRET;
+      if (!jwtSecret) {
+        throw new Error("MCE_JWT_SIGNING_SECRET not set");
+      }
+
+      const secret = new TextEncoder().encode(jwtSecret);
+
+      const jwt = await new jose.SignJWT({
+        user_id: "user-123",
+        enterprise_id: "eid-456",
+        member_id: "mid-789",
+        application_context: {
+          base_url: "https://mc-abc123.rest.marketingcloudapis.com/some/path",
+        },
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .sign(secret);
+
+      const result = await authService.verifyMceJwt(jwt);
+      expect(result.tssd).toBe("mc-abc123");
+    });
   });
 
   describe("getTokensViaClientCredentials", () => {
@@ -1104,6 +1255,48 @@ describe("AuthService Integration", () => {
       ).rejects.toMatchObject({
         code: ErrorCode.AUTH_UNAUTHORIZED,
       });
+    });
+
+    it("should retry with fallback code when primary fails with invalid_token", async () => {
+      let callCount = 0;
+      server.use(
+        http.post(
+          `https://${AUTH_TEST_TSSD}.auth.marketingcloudapis.com/v2/token`,
+          async ({ request }) => {
+            callCount++;
+            const body = await request.text();
+
+            if (body.includes("code=primary-code")) {
+              return HttpResponse.json(
+                { error: "invalid_token" },
+                { status: 400 },
+              );
+            }
+            if (body.includes("code=fallback-code")) {
+              return HttpResponse.json({
+                access_token: "success-token",
+                refresh_token: "success-refresh",
+                expires_in: 3600,
+                rest_instance_url: `https://${AUTH_TEST_TSSD}.rest.marketingcloudapis.com`,
+                soap_instance_url: `https://${AUTH_TEST_TSSD}.soap.marketingcloudapis.com`,
+              });
+            }
+            return HttpResponse.json(
+              { error: "unknown_code" },
+              { status: 400 },
+            );
+          },
+        ),
+      );
+
+      const result = await authService.exchangeCodeForToken(
+        AUTH_TEST_TSSD,
+        "primary-code",
+        "fallback-code",
+      );
+
+      expect(result.access_token).toBe("success-token");
+      expect(callCount).toBe(2);
     });
   });
 
