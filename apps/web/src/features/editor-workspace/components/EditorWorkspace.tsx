@@ -773,6 +773,7 @@ export function EditorWorkspace({
           eid={eid}
           dataExtensions={dataExtensions}
           folders={qaFolders}
+          deFolders={folders}
           queryClient={queryClient}
           queryText={safeActiveTab.content}
           initialName={safeActiveTab.name}

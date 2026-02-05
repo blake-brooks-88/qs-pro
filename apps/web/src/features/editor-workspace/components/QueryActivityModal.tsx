@@ -34,6 +34,7 @@ interface QueryActivityModalProps {
   eid?: string;
   dataExtensions: DataExtension[];
   folders: Folder[];
+  deFolders?: Folder[];
   queryClient?: QueryClient;
   queryText: string;
   initialName?: string;
@@ -48,6 +49,7 @@ export function QueryActivityModal({
   eid,
   dataExtensions,
   folders,
+  deFolders,
   queryClient,
   queryText,
   initialName,
@@ -200,7 +202,7 @@ export function QueryActivityModal({
             tenantId={tenantId}
             eid={eid}
             sqlText={queryText}
-            folders={folders}
+            folders={deFolders ?? []}
             dataExtensions={dataExtensions}
             queryClient={queryClient}
             onBack={() => setView("selection")}
@@ -327,7 +329,7 @@ export function QueryActivityModal({
                   Target Data Extension{" "}
                   <span className="text-destructive">*</span>
                 </span>
-                {queryClient && folders.length > 0 ? (
+                {queryClient && deFolders && deFolders.length > 0 ? (
                   <button
                     onClick={() => setView("creation")}
                     className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
