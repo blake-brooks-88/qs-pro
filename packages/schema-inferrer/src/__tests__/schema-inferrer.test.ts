@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { MetadataFetcher, InferredField } from "../types";
-import { inferSchema, inferFieldTypeFromMetadata } from "../schema-inferrer";
+
+import { inferFieldTypeFromMetadata, inferSchema } from "../schema-inferrer";
+import type { InferredField, MetadataFetcher } from "../types";
 
 /**
  * Creates a stub MetadataFetcher with the provided table metadata.
@@ -10,7 +11,7 @@ function createMetadataStub(
   tables: Record<
     string,
     Array<{ Name: string; FieldType: string; MaxLength?: number }>
-  >
+  >,
 ): MetadataFetcher {
   const tableMap = new Map(Object.entries(tables));
   return {
@@ -25,13 +26,28 @@ function createMetadataStub(
  * Helper to assert success and extract fields.
  */
 function expectSuccess(
-  result: Awaited<ReturnType<typeof inferSchema>>
+  result: Awaited<ReturnType<typeof inferSchema>>,
 ): InferredField[] {
   expect(result.success).toBe(true);
   if (!result.success) {
     throw new Error(`Expected success but got error: ${result.error.message}`);
   }
   return result.fields;
+}
+
+/**
+ * Helper to assert failure and extract the error.
+ */
+function expectFailure(
+  result: Awaited<ReturnType<typeof inferSchema>>,
+): NonNullable<
+  Extract<Awaited<ReturnType<typeof inferSchema>>, { success: false }>["error"]
+> {
+  expect(result.success).toBe(false);
+  if (result.success) {
+    throw new Error("Expected failure but got success");
+  }
+  return result.error;
 }
 
 describe("SchemaInferrer", () => {
@@ -159,7 +175,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "Full Name",
             FieldType: "Text",
-          })
+          }),
         );
       });
 
@@ -176,7 +192,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "FullName",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -244,7 +260,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "Amount",
             FieldType: "Decimal",
-          })
+          }),
         );
       });
     });
@@ -267,7 +283,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "IsActive",
             FieldType: "Text",
-          })
+          }),
         );
       });
 
@@ -290,7 +306,7 @@ describe("SchemaInferrer", () => {
             Name: "Points",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -314,7 +330,7 @@ describe("SchemaInferrer", () => {
             Name: "ActiveDate",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -335,7 +351,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "Grade",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -352,7 +368,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "AgeStr",
             FieldType: "Text",
-          })
+          }),
         );
       });
 
@@ -369,7 +385,7 @@ describe("SchemaInferrer", () => {
             Name: "ShortDesc",
             FieldType: "Text",
             MaxLength: expect.any(Number),
-          })
+          }),
         );
       });
 
@@ -385,7 +401,7 @@ describe("SchemaInferrer", () => {
             Name: "IntValue",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -401,7 +417,7 @@ describe("SchemaInferrer", () => {
             Name: "BigValue",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -417,7 +433,7 @@ describe("SchemaInferrer", () => {
             Name: "Created",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -434,7 +450,7 @@ describe("SchemaInferrer", () => {
             Name: "Timestamp",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -451,7 +467,7 @@ describe("SchemaInferrer", () => {
             Name: "DecAmount",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -467,7 +483,7 @@ describe("SchemaInferrer", () => {
             Name: "Flag",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -483,7 +499,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "UnicodeName",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -577,7 +593,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "LineTotal",
             FieldType: "Decimal",
-          })
+          }),
         );
       });
 
@@ -598,7 +614,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "FullName",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -670,7 +686,7 @@ describe("SchemaInferrer", () => {
             FieldType: "Decimal",
             Scale: 2,
             Precision: 18,
-          })
+          }),
         );
       });
 
@@ -688,7 +704,7 @@ describe("SchemaInferrer", () => {
             Name: "FirstCreated",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -706,7 +722,7 @@ describe("SchemaInferrer", () => {
             Name: "HighScore",
             FieldType: "Text",
             MaxLength: 254,
-          })
+          }),
         );
       });
 
@@ -723,7 +739,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "FirstName",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -906,7 +922,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "MiddleName",
             FieldType: "Text",
-          })
+          }),
         );
       });
 
@@ -922,7 +938,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "ContactNumber",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -1022,7 +1038,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "Greeting",
             FieldType: "Text",
-          })
+          }),
         );
       });
 
@@ -1152,7 +1168,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "MaybeActive",
             FieldType: "Text",
-          })
+          }),
         );
       });
 
@@ -1167,7 +1183,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "ConcatWithNull",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -1263,7 +1279,7 @@ describe("SchemaInferrer", () => {
           expect.objectContaining({
             Name: "FullName",
             FieldType: "Text",
-          })
+          }),
         );
       });
     });
@@ -1294,10 +1310,10 @@ describe("SchemaInferrer", () => {
 
         expect(schema).toHaveLength(6);
         expect(schema.find((c) => c.Name === "Total")?.FieldType).toBe(
-          "Number"
+          "Number",
         );
         expect(schema.find((c) => c.Name === "UpperFirst")?.FieldType).toBe(
-          "Text"
+          "Text",
         );
         expect(schema.find((c) => c.Name === "Now")?.FieldType).toBe("Date");
       });
@@ -1340,12 +1356,10 @@ describe("SchemaInferrer", () => {
 
         const result = await inferSchema(sql, metadataFn);
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.code).toBe("PARSE_ERROR");
-          expect(result.error.message).toBeDefined();
-          expect(result.error.sql).toBe(sql);
-        }
+        const error = expectFailure(result);
+        expect(error.code).toBe("PARSE_ERROR");
+        expect(error.message).toBeDefined();
+        expect(error.sql).toBe(sql);
       });
 
       it("should return PARSE_ERROR for invalid function syntax", async () => {
@@ -1354,10 +1368,8 @@ describe("SchemaInferrer", () => {
 
         const result = await inferSchema(sql, metadataFn);
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.code).toBe("PARSE_ERROR");
-        }
+        const error = expectFailure(result);
+        expect(error.code).toBe("PARSE_ERROR");
       });
 
       it("should return PARSE_ERROR for unclosed string literal", async () => {
@@ -1366,10 +1378,8 @@ describe("SchemaInferrer", () => {
 
         const result = await inferSchema(sql, metadataFn);
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.code).toBe("PARSE_ERROR");
-        }
+        const error = expectFailure(result);
+        expect(error.code).toBe("PARSE_ERROR");
       });
     });
 
@@ -1380,11 +1390,9 @@ describe("SchemaInferrer", () => {
 
         const result = await inferSchema(sql, metadataFn);
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.code).toBe("NO_COLUMNS");
-          expect(result.error.message).toContain("SELECT *");
-        }
+        const error = expectFailure(result);
+        expect(error.code).toBe("NO_COLUMNS");
+        expect(error.message).toContain("SELECT *");
       });
 
       it("should return NO_COLUMNS for table.* syntax", async () => {
@@ -1393,10 +1401,8 @@ describe("SchemaInferrer", () => {
 
         const result = await inferSchema(sql, metadataFn);
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.code).toBe("NO_COLUMNS");
-        }
+        const error = expectFailure(result);
+        expect(error.code).toBe("NO_COLUMNS");
       });
     });
   });
@@ -1493,7 +1499,7 @@ describe("SchemaInferrer", () => {
       expect(inferFieldTypeFromMetadata("DateTime").FieldType).toBe("Date");
       expect(inferFieldTypeFromMetadata("Boolean").FieldType).toBe("Boolean");
       expect(inferFieldTypeFromMetadata("emailAddress").FieldType).toBe(
-        "EmailAddress"
+        "EmailAddress",
       );
       expect(inferFieldTypeFromMetadata("Phone").FieldType).toBe("Phone");
     });
