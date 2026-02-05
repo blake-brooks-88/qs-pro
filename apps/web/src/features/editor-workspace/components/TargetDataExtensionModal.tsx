@@ -6,6 +6,7 @@ import {
   Magnifer,
   Play,
 } from "@solar-icons/react";
+import type { QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -16,18 +17,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDataExtensionFields } from "@/features/editor-workspace/hooks/use-metadata";
-import type { DataExtension } from "@/features/editor-workspace/types";
+import type { DataExtension, Folder } from "@/features/editor-workspace/types";
 import { extractOutputColumnNames } from "@/features/editor-workspace/utils/extract-output-columns";
 import { cn } from "@/lib/utils";
+
+import { TargetDECreationView } from "./TargetDECreationView";
 
 interface TargetDataExtensionModalProps {
   isOpen: boolean;
   tenantId?: string | null;
+  eid?: string;
   dataExtensions: DataExtension[];
+  folders?: Folder[];
+  queryClient?: QueryClient;
   sqlText: string;
   onClose: () => void;
   onSelect: (customerKey: string) => void;
 }
+
+type ModalView = "selection" | "creation";
 
 type CompatibilityState =
   | "idle"
@@ -59,7 +67,10 @@ function normalizeFieldName(name: string): string {
 export function TargetDataExtensionModal({
   isOpen,
   tenantId,
+  eid,
   dataExtensions,
+  folders,
+  queryClient,
   sqlText,
   onClose,
   onSelect,
@@ -68,6 +79,8 @@ export function TargetDataExtensionModal({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [view, setView] = useState<ModalView>("selection");
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +103,8 @@ export function TargetDataExtensionModal({
       setSelectedTargetId(null);
       setIsSearchFocused(false);
       setDetailsOpen(false);
+      setView("selection");
+      setIsTransitioning(false);
     }
   }, [isOpen]);
 
@@ -246,6 +261,27 @@ export function TargetDataExtensionModal({
     onSelect(selectedTarget.customerKey);
   };
 
+  const handleSwitchToCreation = () => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setView("creation");
+      setIsTransitioning(false);
+    }, 150);
+  };
+
+  const handleBackToSelection = () => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setView("selection");
+      setIsTransitioning(false);
+    }, 150);
+  };
+
+  const handleCreationComplete = (newDE: DataExtension) => {
+    setSelectedTargetId(newDE.id);
+    handleBackToSelection();
+  };
+
   const sqlPreview = useMemo(() => {
     const trimmed = sqlText.trim();
     if (trimmed.length <= 100) {
@@ -257,240 +293,281 @@ export function TargetDataExtensionModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-xl bg-card border-border p-0 overflow-hidden">
-        <div className="bg-primary/5 px-6 py-8 border-b border-primary/10">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shadow-inner">
-              <Database size={28} weight="Bold" className="text-primary" />
-            </div>
-            <div className="min-w-0">
-              <DialogTitle className="font-display text-2xl font-bold tracking-tight">
-                Run to Target DE
-              </DialogTitle>
-              <p className="text-sm text-muted-foreground">
-                Write query results directly to an existing Data Extension
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {sqlPreview ? (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
-                Query Preview
-              </span>
-              <div className="bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-xs font-mono text-muted-foreground overflow-hidden">
-                {sqlPreview}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="space-y-5 bg-muted/30 p-5 rounded-xl border border-border/50">
-            <div className="space-y-1.5 relative" ref={searchRef}>
-              <label
-                htmlFor="target-de-search"
-                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
-              >
-                Target Data Extension
-              </label>
-
-              <div className="relative">
-                {selectedTarget ? (
-                  <div className="flex items-center gap-3 w-full bg-background border border-primary/50 rounded-lg pl-3 pr-2 py-2 group shadow-sm">
-                    <Database
-                      size={20}
-                      weight="Bold"
-                      className="text-primary"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-foreground truncate">
-                        {selectedTarget.name}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {selectedTarget.customerKey}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedTargetId(null)}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all"
-                    >
-                      <CloseCircle size={18} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative group">
-                    <Magnifer
-                      size={18}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors"
-                    />
-                    <input
-                      id="target-de-search"
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value);
-                        setIsSearchFocused(true);
-                      }}
-                      onFocus={() => setIsSearchFocused(true)}
-                      placeholder="Search by name or customer key..."
-                      className="w-full bg-background border border-border rounded-lg pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <AltArrowDown
-                        size={18}
-                        className="text-muted-foreground"
+        <div
+          className={cn(
+            "transition-opacity duration-150",
+            isTransitioning && "opacity-0",
+          )}
+        >
+          {view === "selection" ? (
+            <>
+              <div className="bg-primary/5 px-6 py-8 border-b border-primary/10">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shadow-inner">
+                      <Database
+                        size={28}
+                        weight="Bold"
+                        className="text-primary"
                       />
                     </div>
+                    <div className="min-w-0">
+                      <DialogTitle className="font-display text-2xl font-bold tracking-tight">
+                        Run to Target DE
+                      </DialogTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Write query results directly to an existing Data
+                        Extension
+                      </p>
+                    </div>
                   </div>
-                )}
-
-                {isSearchFocused ? (
-                  <div className="absolute z-10 top-full mt-1 w-full bg-background border border-border rounded-lg shadow-xl max-h-[200px] overflow-y-auto overflow-x-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                    {filteredTargets.length > 0 ? (
-                      filteredTargets.map((de) => (
-                        <button
-                          key={de.id}
-                          onClick={() => handleSelectTarget(de)}
-                          className="w-full text-left px-4 py-2.5 hover:bg-primary/5 flex items-center gap-3 transition-colors border-l-2 border-transparent hover:border-primary"
-                        >
-                          <Database
-                            size={16}
-                            className="text-muted-foreground shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold truncate">
-                              {de.name}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {de.customerKey}
-                            </p>
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-8 text-center">
-                        <InfoCircle
-                          size={24}
-                          className="mx-auto text-muted-foreground/30 mb-2"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          No matching Data Extensions found
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div
-              className={cn(
-                "flex items-start gap-3 p-3 rounded-lg border text-xs",
-                "bg-amber-500/5 border-amber-500/20 text-amber-700 dark:text-amber-400",
-              )}
-            >
-              <InfoCircle size={16} className="mt-0.5 shrink-0" />
-              <div>
-                <p className="font-semibold">Overwrite Warning</p>
-                <p className="text-muted-foreground mt-0.5">
-                  Results will completely replace existing data in the target
-                  DE.
-                </p>
-              </div>
-            </div>
-
-            {selectedTarget ? (
-              <div
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-xs",
-                  compatibility.state === "compatible"
-                    ? "bg-success/10 border-success/25 text-success-foreground"
-                    : compatibility.state === "incompatible"
-                      ? "bg-destructive/10 border-destructive/25 text-destructive"
-                      : "bg-muted/50 border-border text-muted-foreground",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold">Compatibility</p>
-                    <p className="mt-0.5 text-[11px] leading-snug break-words">
-                      {compatibility.summary ??
-                        (compatibility.state === "checking"
-                          ? "Checking compatibility..."
-                          : compatibility.state === "unknown"
-                            ? "Unable to validate compatibility"
-                            : compatibility.state === "compatible"
-                              ? "Compatible"
-                              : compatibility.state === "incompatible"
-                                ? "Not compatible"
-                                : "")}
-                    </p>
-                  </div>
-
-                  {compatibility.state === "incompatible" ? (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setDetailsOpen((prev) => !prev)}
-                      className="h-8 px-3 text-[10px] font-bold"
+                  {queryClient && folders ? (
+                    <button
+                      onClick={handleSwitchToCreation}
+                      className="text-xs text-primary hover:text-primary/80 font-medium transition-colors shrink-0"
                     >
-                      {detailsOpen ? "Hide details" : "View details"}
-                    </Button>
+                      Create New
+                    </button>
                   ) : null}
                 </div>
+              </div>
 
-                {compatibility.state === "incompatible" && detailsOpen ? (
-                  <div className="mt-2 space-y-2 text-[11px]">
-                    {compatibility.missingInTarget.length > 0 ? (
-                      <div>
-                        <p className="font-semibold">Missing in target</p>
-                        <p className="text-muted-foreground">
-                          {compatibility.missingInTarget.join(", ")}
-                        </p>
-                      </div>
-                    ) : null}
-                    {compatibility.requiredMissingFromQuery.length > 0 ? (
-                      <div>
-                        <p className="font-semibold">
-                          Required fields not selected
-                        </p>
-                        <p className="text-muted-foreground">
-                          {compatibility.requiredMissingFromQuery.join(", ")}
-                        </p>
-                      </div>
-                    ) : null}
-                    {compatibility.duplicateOutputColumns.length > 0 ? (
-                      <div>
-                        <p className="font-semibold">
-                          Duplicate output columns
-                        </p>
-                        <p className="text-muted-foreground">
-                          {compatibility.duplicateOutputColumns.join(", ")}
-                        </p>
-                      </div>
-                    ) : null}
+              <div className="p-6 space-y-6">
+                {sqlPreview ? (
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                      Query Preview
+                    </span>
+                    <div className="bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-xs font-mono text-muted-foreground overflow-hidden">
+                      {sqlPreview}
+                    </div>
                   </div>
                 ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
 
-        <DialogFooter className="bg-muted/30 px-6 py-4 border-t border-border flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={onClose}
-            className="text-xs font-bold text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </Button>
-          <Button
-            disabled={!canRun}
-            onClick={handleRun}
-            className="bg-success hover:bg-success/90 text-success-foreground text-xs font-bold px-6 h-10 shadow-lg shadow-success/20 disabled:opacity-50 transition-all active:scale-95"
-          >
-            <Play size={16} weight="Bold" className="mr-2" />
-            Run Query
-          </Button>
-        </DialogFooter>
+                <div className="space-y-5 bg-muted/30 p-5 rounded-xl border border-border/50">
+                  <div className="space-y-1.5 relative" ref={searchRef}>
+                    <label
+                      htmlFor="target-de-search"
+                      className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
+                    >
+                      Target Data Extension
+                    </label>
+
+                    <div className="relative">
+                      {selectedTarget ? (
+                        <div className="flex items-center gap-3 w-full bg-background border border-primary/50 rounded-lg pl-3 pr-2 py-2 group shadow-sm">
+                          <Database
+                            size={20}
+                            weight="Bold"
+                            className="text-primary"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-foreground truncate">
+                              {selectedTarget.name}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {selectedTarget.customerKey}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setSelectedTargetId(null)}
+                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all"
+                          >
+                            <CloseCircle size={18} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative group">
+                          <Magnifer
+                            size={18}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors"
+                          />
+                          <input
+                            id="target-de-search"
+                            value={search}
+                            onChange={(e) => {
+                              setSearch(e.target.value);
+                              setIsSearchFocused(true);
+                            }}
+                            onFocus={() => setIsSearchFocused(true)}
+                            placeholder="Search by name or customer key..."
+                            className="w-full bg-background border border-border rounded-lg pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                          />
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <AltArrowDown
+                              size={18}
+                              className="text-muted-foreground"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {isSearchFocused ? (
+                        <div className="absolute z-10 top-full mt-1 w-full bg-background border border-border rounded-lg shadow-xl max-h-[200px] overflow-y-auto overflow-x-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                          {filteredTargets.length > 0 ? (
+                            filteredTargets.map((de) => (
+                              <button
+                                key={de.id}
+                                onClick={() => handleSelectTarget(de)}
+                                className="w-full text-left px-4 py-2.5 hover:bg-primary/5 flex items-center gap-3 transition-colors border-l-2 border-transparent hover:border-primary"
+                              >
+                                <Database
+                                  size={16}
+                                  className="text-muted-foreground shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold truncate">
+                                    {de.name}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    {de.customerKey}
+                                  </p>
+                                </div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-8 text-center">
+                              <InfoCircle
+                                size={24}
+                                className="mx-auto text-muted-foreground/30 mb-2"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                No matching Data Extensions found
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "flex items-start gap-3 p-3 rounded-lg border text-xs",
+                      "bg-amber-500/5 border-amber-500/20 text-amber-700 dark:text-amber-400",
+                    )}
+                  >
+                    <InfoCircle size={16} className="mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Overwrite Warning</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        Results will completely replace existing data in the
+                        target DE.
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedTarget ? (
+                    <div
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-xs",
+                        compatibility.state === "compatible"
+                          ? "bg-success/10 border-success/25 text-success-foreground"
+                          : compatibility.state === "incompatible"
+                            ? "bg-destructive/10 border-destructive/25 text-destructive"
+                            : "bg-muted/50 border-border text-muted-foreground",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold">Compatibility</p>
+                          <p className="mt-0.5 text-[11px] leading-snug break-words">
+                            {compatibility.summary ??
+                              (compatibility.state === "checking"
+                                ? "Checking compatibility..."
+                                : compatibility.state === "unknown"
+                                  ? "Unable to validate compatibility"
+                                  : compatibility.state === "compatible"
+                                    ? "Compatible"
+                                    : compatibility.state === "incompatible"
+                                      ? "Not compatible"
+                                      : "")}
+                          </p>
+                        </div>
+
+                        {compatibility.state === "incompatible" ? (
+                          <Button
+                            variant="ghost"
+                            onClick={() => setDetailsOpen((prev) => !prev)}
+                            className="h-8 px-3 text-[10px] font-bold"
+                          >
+                            {detailsOpen ? "Hide details" : "View details"}
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      {compatibility.state === "incompatible" && detailsOpen ? (
+                        <div className="mt-2 space-y-2 text-[11px]">
+                          {compatibility.missingInTarget.length > 0 ? (
+                            <div>
+                              <p className="font-semibold">Missing in target</p>
+                              <p className="text-muted-foreground">
+                                {compatibility.missingInTarget.join(", ")}
+                              </p>
+                            </div>
+                          ) : null}
+                          {compatibility.requiredMissingFromQuery.length > 0 ? (
+                            <div>
+                              <p className="font-semibold">
+                                Required fields not selected
+                              </p>
+                              <p className="text-muted-foreground">
+                                {compatibility.requiredMissingFromQuery.join(
+                                  ", ",
+                                )}
+                              </p>
+                            </div>
+                          ) : null}
+                          {compatibility.duplicateOutputColumns.length > 0 ? (
+                            <div>
+                              <p className="font-semibold">
+                                Duplicate output columns
+                              </p>
+                              <p className="text-muted-foreground">
+                                {compatibility.duplicateOutputColumns.join(
+                                  ", ",
+                                )}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <DialogFooter className="bg-muted/30 px-6 py-4 border-t border-border flex items-center justify-between">
+                <Button
+                  variant="ghost"
+                  onClick={onClose}
+                  className="text-xs font-bold text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!canRun}
+                  onClick={handleRun}
+                  className="bg-success hover:bg-success/90 text-success-foreground text-xs font-bold px-6 h-10 shadow-lg shadow-success/20 disabled:opacity-50 transition-all active:scale-95"
+                >
+                  <Play size={16} weight="Bold" className="mr-2" />
+                  Run Query
+                </Button>
+              </DialogFooter>
+            </>
+          ) : queryClient ? (
+            <TargetDECreationView
+              tenantId={tenantId}
+              eid={eid}
+              sqlText={sqlText}
+              folders={folders ?? []}
+              dataExtensions={dataExtensions}
+              queryClient={queryClient}
+              onBack={handleBackToSelection}
+              onCreated={handleCreationComplete}
+            />
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   );
