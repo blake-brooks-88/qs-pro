@@ -27,6 +27,7 @@
     "@nestjs/schedule": "^6.1.0",
     "@qpp/backend-shared": "workspace:^",
     "@qpp/database": "workspace:^",
+    "@qpp/schema-inferrer": "workspace:^",
     "@qpp/shared-types": "workspace:^",
     "bullmq": "^5.66.4",
     "dotenv": "^16.4.5",
