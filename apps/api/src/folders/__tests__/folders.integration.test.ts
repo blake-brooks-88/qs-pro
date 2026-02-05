@@ -29,6 +29,7 @@ import {
 
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
+import { SavedQueriesService } from '../../saved-queries/saved-queries.service';
 import { FoldersService } from '../folders.service';
 
 function getRequiredEnv(key: string): string {
@@ -82,8 +83,9 @@ describe('FoldersService (integration)', () => {
   const testMid = 'mid-folders-int';
   const testEid = 'eid-folders-int';
 
-  // Track created folders for cleanup
+  // Track created entities for cleanup
   const createdFolderIds: string[] = [];
+  const createdSavedQueryIds: string[] = [];
 
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
@@ -174,6 +176,24 @@ describe('FoldersService (integration)', () => {
   });
 
   afterEach(async () => {
+    // Clean up saved queries first (before folders due to FK constraint)
+    for (const savedQueryId of createdSavedQueryIds) {
+      try {
+        const reserved = await sqlClient.reserve();
+        await reserved`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
+        await reserved`SELECT set_config('app.mid', ${testMid}, false)`;
+        await reserved`SELECT set_config('app.user_id', ${testUserId}, false)`;
+        await reserved`DELETE FROM saved_queries WHERE id = ${savedQueryId}::uuid`;
+        await reserved`RESET app.tenant_id`;
+        await reserved`RESET app.mid`;
+        await reserved`RESET app.user_id`;
+        reserved.release();
+      } catch {
+        // Best effort cleanup
+      }
+    }
+    createdSavedQueryIds.length = 0;
+
     // Clean up folders created during test (reverse order for parent-child relationships)
     for (const folderId of [...createdFolderIds].reverse()) {
       try {
@@ -385,6 +405,36 @@ describe('FoldersService (integration)', () => {
       });
     });
 
+    it('prevents circular reference through ancestry', async () => {
+      const grandparent = await service.create(
+        testTenantId,
+        testMid,
+        testUserId,
+        { name: 'Grandparent' },
+      );
+      createdFolderIds.push(grandparent.id);
+
+      const parent = await service.create(testTenantId, testMid, testUserId, {
+        name: 'Parent',
+        parentId: grandparent.id,
+      });
+      createdFolderIds.push(parent.id);
+
+      const child = await service.create(testTenantId, testMid, testUserId, {
+        name: 'Child',
+        parentId: parent.id,
+      });
+      createdFolderIds.push(child.id);
+
+      await expect(
+        service.update(testTenantId, testMid, testUserId, grandparent.id, {
+          parentId: child.id,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.VALIDATION_ERROR,
+      });
+    });
+
     it('throws RESOURCE_NOT_FOUND for non-existent folder', async () => {
       const fakeId = crypto.randomUUID();
 
@@ -435,6 +485,33 @@ describe('FoldersService (integration)', () => {
 
       await expect(
         service.delete(testTenantId, testMid, testUserId, parent.id),
+      ).rejects.toMatchObject({
+        code: ErrorCode.VALIDATION_ERROR,
+      });
+    });
+
+    it('rejects deletion of folder with saved queries', async () => {
+      const savedQueriesService = app.get(SavedQueriesService);
+
+      const folder = await service.create(testTenantId, testMid, testUserId, {
+        name: 'Folder with Query',
+      });
+      createdFolderIds.push(folder.id);
+
+      const savedQuery = await savedQueriesService.create(
+        testTenantId,
+        testMid,
+        testUserId,
+        {
+          name: 'Test Query',
+          sqlText: 'SELECT 1',
+          folderId: folder.id,
+        },
+      );
+      createdSavedQueryIds.push(savedQuery.id);
+
+      await expect(
+        service.delete(testTenantId, testMid, testUserId, folder.id),
       ).rejects.toMatchObject({
         code: ErrorCode.VALIDATION_ERROR,
       });
