@@ -18,9 +18,9 @@ import {
   getSystemDataViewFields,
   type SystemDataViewField,
 } from "./system-data-views";
-import { Parser } from "node-sql-parser";
+import nodeSqlParser from "node-sql-parser";
 
-const parser = new Parser();
+const parser = new nodeSqlParser.Parser();
 const DIALECT = "transactsql";
 
 interface FunctionNamePart {
