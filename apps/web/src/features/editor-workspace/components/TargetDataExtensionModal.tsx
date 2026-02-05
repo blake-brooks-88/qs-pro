@@ -302,33 +302,22 @@ export function TargetDataExtensionModal({
           {view === "selection" ? (
             <>
               <div className="bg-primary/5 px-6 py-8 border-b border-primary/10">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shadow-inner">
-                      <Database
-                        size={28}
-                        weight="Bold"
-                        className="text-primary"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <DialogTitle className="font-display text-2xl font-bold tracking-tight">
-                        Run to Target DE
-                      </DialogTitle>
-                      <p className="text-sm text-muted-foreground">
-                        Write query results directly to an existing Data
-                        Extension
-                      </p>
-                    </div>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shadow-inner">
+                    <Database
+                      size={28}
+                      weight="Bold"
+                      className="text-primary"
+                    />
                   </div>
-                  {queryClient && folders ? (
-                    <button
-                      onClick={handleSwitchToCreation}
-                      className="text-xs text-primary hover:text-primary/80 font-medium transition-colors shrink-0"
-                    >
-                      Create New
-                    </button>
-                  ) : null}
+                  <div className="min-w-0">
+                    <DialogTitle className="font-display text-2xl font-bold tracking-tight">
+                      Run to Target DE
+                    </DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Write query results directly to an existing Data Extension
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -346,12 +335,22 @@ export function TargetDataExtensionModal({
 
                 <div className="space-y-5 bg-muted/30 p-5 rounded-xl border border-border/50">
                   <div className="space-y-1.5 relative" ref={searchRef}>
-                    <label
-                      htmlFor="target-de-search"
-                      className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
-                    >
-                      Target Data Extension
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor="target-de-search"
+                        className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
+                      >
+                        Target Data Extension
+                      </label>
+                      {queryClient && folders ? (
+                        <button
+                          onClick={handleSwitchToCreation}
+                          className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                        >
+                          Create New
+                        </button>
+                      ) : null}
+                    </div>
 
                     <div className="relative">
                       {selectedTarget ? (
