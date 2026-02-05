@@ -1,4 +1,5 @@
 export * from "./ConfirmationDialog";
+export * from "./DataExtensionForm";
 export * from "./DataExtensionModal";
 export * from "./MonacoQueryEditor";
 export * from "./QueryActivityModal";
