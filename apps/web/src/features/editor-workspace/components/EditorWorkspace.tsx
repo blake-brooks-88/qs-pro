@@ -781,7 +781,10 @@ export function EditorWorkspace({
         <TargetDataExtensionModal
           isOpen={isTargetDEModalOpen}
           tenantId={tenantId}
+          eid={eid}
           dataExtensions={dataExtensions}
+          folders={folders}
+          queryClient={queryClient}
           sqlText={safeActiveTab.content}
           onClose={() => setIsTargetDEModalOpen(false)}
           onSelect={handleSelectTargetDE}
