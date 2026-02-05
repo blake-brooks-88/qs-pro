@@ -26,8 +26,9 @@ IFS=',' read -r -a VARIANTS <<<"$COVERAGE_VARIANTS"
 pnpm -r --filter "./packages/**" build
 
 # Clean and create directories for coverage collection
-rm -rf .nyc_output coverage
-mkdir -p .nyc_output coverage
+MERGED_NYC_DIR=".nyc_output_merged"
+rm -rf .nyc_output "$MERGED_NYC_DIR" coverage
+mkdir -p .nyc_output "$MERGED_NYC_DIR" coverage
 
 # Packages to test
 if [ "${1-}" != "" ]; then
@@ -106,11 +107,12 @@ done
 echo ""
 echo "Merging coverage reports..."
 
-# Use nyc to merge all coverage files
-npx nyc merge .nyc_output coverage/coverage-final.json
+# Use nyc to merge all coverage files into a dedicated temp dir (avoid report dir collisions)
+npx nyc merge .nyc_output "$MERGED_NYC_DIR/coverage-final.json"
+cp "$MERGED_NYC_DIR/coverage-final.json" coverage/coverage-final.json
 
 # Generate summary using nyc report
-npx nyc report --reporter=json-summary --temp-dir=coverage --report-dir=coverage 2>/dev/null || {
+npx nyc report --reporter=json-summary --temp-dir="$MERGED_NYC_DIR" --report-dir=coverage 2>/dev/null || {
   # Fallback: create minimal summary if nyc report fails
   echo '{"total":{"lines":{"total":0,"covered":0,"pct":0},"statements":{"total":0,"covered":0,"pct":0},"functions":{"total":0,"covered":0,"pct":0},"branches":{"total":0,"covered":0,"pct":0}}}' > coverage/coverage-summary.json
 }

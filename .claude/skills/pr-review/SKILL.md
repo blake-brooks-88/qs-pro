@@ -97,11 +97,17 @@ You are performing a code review for this pull request: `{PR_URL}`
    - Look for `src/path/file.spec.ts`, `src/path/file.test.ts`
    - Grep test files for imports/references to the modified functions
    - Check if existing tests exercise the changed code paths
-3. **Evaluate coverage**:
+3. **Run coverage and enforce a hard threshold for changed code**:
+   - Run full coverage (unit + integration + e2e): `pnpm test:coverage:all`
+   - Enforce **>= 90% line coverage** on the *changed source files*, even if tests already exist and no new tests were added in the PR:
+     - `node scripts/check-changed-coverage.js --threshold 90 --mode per-file`
+   - If this fails: **Request Changes** and call out the specific files below threshold.
+4. **Evaluate coverage qualitatively (behavioral)**:
    - ✅ **OK:** Tests exist (in PR or codebase) that cover the changed behavior
    - ✅ **OK:** Refactoring with no behavior change, existing tests still pass
    - ⚠️ **Flag:** New functionality with no tests anywhere
    - ⚠️ **Flag:** Behavior change with no tests covering the new behavior
+   - ⚠️ **Flag:** Coverage for changed files is < 90% (even if “tests exist” elsewhere)
 
 ### Step 3: Provide Feedback
 
