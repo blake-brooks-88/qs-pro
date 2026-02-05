@@ -303,14 +303,10 @@ export function DataExtensionForm({
         errs.name ??= "Field name must be unique.";
       }
 
-      if (
-        (f.type === "Text" ||
-          f.type === "EmailAddress" ||
-          f.type === "Phone") &&
-        (typeof f.length !== "number" || f.length <= 0)
-      ) {
+      // If length is provided, it must be positive
+      if (f.length !== undefined && f.length !== null && f.length <= 0) {
         const errs = (fieldErrorsById[f.id] ??= {});
-        errs.length ??= "Length is required for this field type.";
+        errs.length ??= "Length must be greater than 0.";
       }
 
       if (f.type === "Decimal") {
