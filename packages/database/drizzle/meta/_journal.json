@@ -92,6 +92,13 @@
       "when": 1770087782439,
       "tag": "0012_known_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1770330502748,
+      "tag": "0013_free_magneto",
+      "breakpoints": true
     }
   ]
 }

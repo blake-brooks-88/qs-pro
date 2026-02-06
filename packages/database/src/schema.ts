@@ -124,6 +124,7 @@ export const shellQueryRuns = pgTable(
     taskId: varchar("task_id"),
     queryDefinitionId: varchar("query_definition_id"),
     targetDeCustomerKey: varchar("target_de_customer_key"),
+    targetUpdateType: varchar("target_update_type"),
     pollStartedAt: timestamp("poll_started_at"),
     errorMessage: text("error_message"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

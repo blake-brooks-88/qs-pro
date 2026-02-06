@@ -1,0 +1,1 @@
+ALTER TABLE "shell_query_runs" ADD COLUMN "target_update_type" varchar;
