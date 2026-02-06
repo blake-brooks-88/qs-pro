@@ -5,8 +5,8 @@
  */
 
 export {
-  isSystemDataView,
+  type SystemDataViewField as DataViewField,
   getSystemDataViewFields,
   getSystemDataViewNames,
-  type SystemDataViewField as DataViewField,
+  isSystemDataView,
 } from "@qpp/schema-inferrer";

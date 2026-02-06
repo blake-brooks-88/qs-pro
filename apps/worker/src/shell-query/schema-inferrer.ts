@@ -7,11 +7,11 @@
 
 import { AppError, ErrorCode } from "@qpp/backend-shared";
 import {
-  inferSchema as coreInferSchema,
+  type FieldTypeConstraints,
   inferFieldTypeFromMetadata as coreInferFieldTypeFromMetadata,
   type InferredField,
+  inferSchema as coreInferSchema,
   type MetadataFetcher,
-  type FieldTypeConstraints,
 } from "@qpp/schema-inferrer";
 
 /**
