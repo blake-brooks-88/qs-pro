@@ -39,6 +39,7 @@ import type {
   EditorWorkspaceProps,
   ExecutionResult,
   QueryActivityDraft,
+  TargetUpdateType,
 } from "@/features/editor-workspace/types";
 import { formatDiagnosticMessage } from "@/features/editor-workspace/utils/sql-diagnostics";
 import {
@@ -506,8 +507,13 @@ export function EditorWorkspace({
   }, []);
 
   const handleSelectTargetDE = useCallback(
-    (customerKey: string) => {
-      void execute(safeActiveTab.content, safeActiveTab.name, customerKey);
+    (customerKey: string, targetUpdateType: TargetUpdateType) => {
+      void execute(
+        safeActiveTab.content,
+        safeActiveTab.name,
+        customerKey,
+        targetUpdateType,
+      );
       setIsTargetDEModalOpen(false);
     },
     [execute, safeActiveTab.content, safeActiveTab.name],

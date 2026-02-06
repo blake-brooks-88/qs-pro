@@ -530,7 +530,7 @@ describe("TargetDataExtensionModal", () => {
 
       // Assert
       expect(onSelect).toHaveBeenCalledTimes(1);
-      expect(onSelect).toHaveBeenCalledWith("subscribers_key");
+      expect(onSelect).toHaveBeenCalledWith("subscribers_key", "Overwrite");
     });
   });
 

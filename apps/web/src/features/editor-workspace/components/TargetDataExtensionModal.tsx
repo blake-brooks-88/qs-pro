@@ -1,6 +1,7 @@
 import {
   AltArrowDown,
   CloseCircle,
+  DangerTriangle,
   Database,
   InfoCircle,
   Magnifer,
@@ -17,7 +18,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDataExtensionFields } from "@/features/editor-workspace/hooks/use-metadata";
-import type { DataExtension, Folder } from "@/features/editor-workspace/types";
+import type {
+  DataExtension,
+  Folder,
+  TargetUpdateType,
+} from "@/features/editor-workspace/types";
 import { extractOutputColumnNames } from "@/features/editor-workspace/utils/extract-output-columns";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +37,7 @@ interface TargetDataExtensionModalProps {
   queryClient?: QueryClient;
   sqlText: string;
   onClose: () => void;
-  onSelect: (customerKey: string) => void;
+  onSelect: (customerKey: string, targetUpdateType: TargetUpdateType) => void;
 }
 
 type ModalView = "selection" | "creation";
@@ -81,6 +86,8 @@ export function TargetDataExtensionModal({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [view, setView] = useState<ModalView>("selection");
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [targetUpdateType, setTargetUpdateType] =
+    useState<TargetUpdateType>("Overwrite");
 
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -105,6 +112,7 @@ export function TargetDataExtensionModal({
       setDetailsOpen(false);
       setView("selection");
       setIsTransitioning(false);
+      setTargetUpdateType("Overwrite");
     }
   }, [isOpen]);
 
@@ -133,6 +141,14 @@ export function TargetDataExtensionModal({
     customerKey: selectedCustomerKey,
     enabled: Boolean(isOpen && selectedCustomerKey),
   });
+
+  const hasPrimaryKey = fieldsQuery.data?.some((f) => f.isPrimaryKey) ?? false;
+  const needsPrimaryKey = targetUpdateType === "Update";
+  const isPrimaryKeyMissing =
+    needsPrimaryKey &&
+    selectedTarget &&
+    !fieldsQuery.isLoading &&
+    !hasPrimaryKey;
 
   const compatibility = useMemo((): CompatibilityDetails => {
     if (!selectedTarget || !isOpen) {
@@ -245,7 +261,9 @@ export function TargetDataExtensionModal({
   ]);
 
   const canRun =
-    Boolean(selectedTargetId) && compatibility.state !== "incompatible";
+    Boolean(selectedTargetId) &&
+    compatibility.state !== "incompatible" &&
+    !isPrimaryKeyMissing;
 
   const handleSelectTarget = (de: DataExtension) => {
     setSelectedTargetId(de.id);
@@ -258,7 +276,7 @@ export function TargetDataExtensionModal({
     if (!selectedTarget) {
       return;
     }
-    onSelect(selectedTarget.customerKey);
+    onSelect(selectedTarget.customerKey, targetUpdateType);
   };
 
   const handleSwitchToCreation = () => {
@@ -440,20 +458,75 @@ export function TargetDataExtensionModal({
                     </div>
                   </div>
 
-                  <div
-                    className={cn(
-                      "flex items-start gap-3 p-3 rounded-lg border text-xs",
-                      "bg-amber-500/5 border-amber-500/20 text-amber-700 dark:text-amber-400",
-                    )}
-                  >
-                    <InfoCircle size={16} className="mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-semibold">Overwrite Warning</p>
-                      <p className="text-muted-foreground mt-0.5">
-                        Results will completely replace existing data in the
-                        target DE.
-                      </p>
+                  <div className="space-y-2.5">
+                    <span
+                      id="target-data-action-label"
+                      className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
+                    >
+                      Data Action
+                    </span>
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="target-data-action-label"
+                      aria-describedby="target-data-action-description"
+                      className="grid grid-cols-3 gap-2 p-1 bg-background/50 rounded-lg border border-border"
+                    >
+                      {(["Overwrite", "Append", "Update"] as const).map(
+                        (action) => (
+                          <button
+                            key={action}
+                            type="button"
+                            role="radio"
+                            aria-checked={targetUpdateType === action}
+                            onClick={() => setTargetUpdateType(action)}
+                            className={cn(
+                              "flex flex-col items-center gap-1 py-2 px-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all",
+                              targetUpdateType === action
+                                ? "bg-primary text-primary-foreground shadow-md"
+                                : "text-muted-foreground hover:bg-muted",
+                            )}
+                          >
+                            {action}
+                            {action === "Overwrite" && (
+                              <span className="text-[8px] font-normal normal-case opacity-60">
+                                (Default)
+                              </span>
+                            )}
+                          </button>
+                        ),
+                      )}
                     </div>
+                    <p
+                      id="target-data-action-description"
+                      className="text-[10px] text-muted-foreground px-1 italic"
+                    >
+                      {targetUpdateType === "Overwrite" &&
+                        "Destroys all existing records and replaces them with new results."}
+                      {targetUpdateType === "Append" &&
+                        "Adds new records to the existing data. Duplicate primary key values may cause errors if the DE has constraints."}
+                      {targetUpdateType === "Update" &&
+                        "Updates existing records based on Primary Key or inserts if missing."}
+                    </p>
+                    {targetUpdateType === "Overwrite" && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs mt-2">
+                        <DangerTriangle size={16} className="shrink-0" />
+                        <span>
+                          <strong>Warning:</strong> Overwrite will permanently
+                          delete all existing records in the target Data
+                          Extension before inserting new data.
+                        </span>
+                      </div>
+                    )}
+                    {isPrimaryKeyMissing ? (
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs mt-2">
+                        <DangerTriangle size={16} className="shrink-0" />
+                        <span>
+                          <strong>Update mode requires a Primary Key.</strong>{" "}
+                          The selected Data Extension does not have a Primary
+                          Key field.
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
 
                   {selectedTarget ? (
