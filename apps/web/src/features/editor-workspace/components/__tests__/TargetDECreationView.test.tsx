@@ -203,6 +203,7 @@ describe("TargetDECreationView", () => {
       const { createDataExtension } = await import("@/services/metadata");
       vi.mocked(createDataExtension).mockResolvedValue({
         objectId: "new-de-id-123",
+        customerKey: "my_new_de_key",
       });
 
       renderComponent();
@@ -241,6 +242,7 @@ describe("TargetDECreationView", () => {
       const { createDataExtension } = await import("@/services/metadata");
       vi.mocked(createDataExtension).mockResolvedValue({
         objectId: "new-de-id-123",
+        customerKey: "my_new_de_key",
       });
 
       renderComponent();
@@ -296,6 +298,7 @@ describe("TargetDECreationView", () => {
       const { createDataExtension } = await import("@/services/metadata");
       vi.mocked(createDataExtension).mockResolvedValue({
         objectId: "new-de-id-123",
+        customerKey: "my_new_de_key",
       });
 
       renderComponent({ tenantId: "tenant-123", eid: "eid-456" });
@@ -355,6 +358,7 @@ describe("TargetDECreationView", () => {
       const { createDataExtension } = await import("@/services/metadata");
       vi.mocked(createDataExtension).mockResolvedValue({
         objectId: "new-de-id-123",
+        customerKey: "my_new_de_key",
       });
 
       renderComponent();
