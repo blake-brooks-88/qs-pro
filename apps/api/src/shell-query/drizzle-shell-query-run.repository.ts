@@ -38,6 +38,7 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
           mid: params.mid,
           snippetName: params.snippetName,
           targetDeCustomerKey: params.targetDeCustomerKey,
+          targetUpdateType: params.targetUpdateType,
           sqlTextHash: params.sqlTextHash,
           status: params.status,
         });
