@@ -1,19 +1,7 @@
+import type { UsageResponse } from "@qpp/shared-types";
 import { useQuery } from "@tanstack/react-query";
 
 import api from "@/services/api";
-
-// TODO: Import from @qpp/shared-types once Plan 01 merges the backend usage endpoint
-interface UsageResponse {
-  queryRuns: {
-    current: number;
-    limit: number | null;
-    resetDate: string;
-  };
-  savedQueries: {
-    current: number;
-    limit: number | null;
-  };
-}
 
 export const usageQueryKeys = {
   all: ["usage"] as const,

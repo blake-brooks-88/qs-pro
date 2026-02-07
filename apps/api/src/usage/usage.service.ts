@@ -6,8 +6,8 @@ import { FeaturesService } from '../features/features.service';
 import type { SavedQueriesRepository } from '../saved-queries/saved-queries.repository';
 import type { ShellQueryRunRepository } from '../shell-query/shell-query-run.repository';
 
-const FREE_TIER_RUN_LIMIT = 50;
-const FREE_TIER_SAVED_QUERY_LIMIT = 5;
+export const FREE_TIER_RUN_LIMIT = 50;
+export const FREE_TIER_SAVED_QUERY_LIMIT = 5;
 
 @Injectable()
 export class UsageService {

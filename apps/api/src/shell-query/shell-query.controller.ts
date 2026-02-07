@@ -21,7 +21,7 @@ import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FeaturesService } from '../features/features.service';
-import { UsageService } from '../usage/usage.service';
+import { FREE_TIER_RUN_LIMIT, UsageService } from '../usage/usage.service';
 import { ShellQueryService } from './shell-query.service';
 import { ShellQuerySseService } from './shell-query-sse.service';
 
@@ -91,10 +91,10 @@ export class ShellQueryController {
         user.mid,
         user.userId,
       );
-      if (monthlyCount >= 50) {
+      if (monthlyCount >= FREE_TIER_RUN_LIMIT) {
         throw new AppError(ErrorCode.QUOTA_EXCEEDED, undefined, {
           operation: 'createRun',
-          reason: `Monthly run limit reached: ${monthlyCount}/50`,
+          reason: `Monthly run limit reached: ${monthlyCount}/${FREE_TIER_RUN_LIMIT}`,
         });
       }
     }
