@@ -1,0 +1,523 @@
+import type { ExecutionHistoryItem } from "@qpp/shared-types";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { Copy, DocumentAdd, MenuDots } from "@solar-icons/react";
+import type {
+  ColumnDef,
+  PaginationState,
+  SortingState,
+} from "@tanstack/react-table";
+import { useCallback, useMemo, useState } from "react";
+
+import {
+  DataTable,
+  DataTableColumnHeader,
+  DataTableToolbar,
+} from "@/components/ui/data-table";
+import { LockedOverlay } from "@/components/ui/locked-overlay";
+import { runStatusToVariant, StatusBadge } from "@/components/ui/status-badge";
+import { useFeature } from "@/hooks/use-feature";
+import { cn } from "@/lib/utils";
+
+import {
+  type HistoryFilters,
+  useExecutionHistory,
+} from "../hooks/use-execution-history";
+
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+function formatDuration(ms: number | null): string {
+  if (ms === null) {
+    return "--";
+  }
+  if (ms < 1000) {
+    return "< 1s";
+  }
+  if (ms < 60_000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+  const minutes = Math.floor(ms / 60_000);
+  const seconds = Math.round((ms % 60_000) / 1000);
+  return `${String(minutes)}m ${String(seconds)}s`;
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+
+  if (diffMs < 60_000) {
+    return "just now";
+  }
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) {
+    return `${String(minutes)}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${String(hours)}h ago`;
+  }
+  const days = Math.floor(hours / 24);
+  if (days < 30) {
+    return `${String(days)}d ago`;
+  }
+  const months = Math.floor(days / 30);
+  return `${String(months)}mo ago`;
+}
+
+function formatRowCount(n: number | null): string {
+  if (n === null) {
+    return "--";
+  }
+  return new Intl.NumberFormat("en-US").format(n);
+}
+
+const STATUS_LABEL = new Map<string, string>([
+  ["ready", "Success"],
+  ["failed", "Failed"],
+  ["canceled", "Canceled"],
+  ["running", "Running"],
+  ["queued", "Queued"],
+]);
+
+// ---------------------------------------------------------------------------
+// Date preset helpers
+// ---------------------------------------------------------------------------
+
+type DatePreset = "today" | "7d" | "30d" | "month";
+
+function getDatePresetRange(preset: DatePreset): {
+  dateFrom: string;
+  dateTo: string;
+} {
+  const now = new Date();
+  const dateTo = now.toISOString();
+
+  switch (preset) {
+    case "today": {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      return { dateFrom: start.toISOString(), dateTo };
+    }
+    case "7d": {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 7);
+      return { dateFrom: start.toISOString(), dateTo };
+    }
+    case "30d": {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 30);
+      return { dateFrom: start.toISOString(), dateTo };
+    }
+    case "month": {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { dateFrom: start.toISOString(), dateTo };
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryPanel
+// ---------------------------------------------------------------------------
+
+interface HistoryPanelProps {
+  queryIdFilter?: string;
+  onRerun?: (sql: string, queryName: string, createdAt: string) => void;
+  onCopySql?: (sql: string) => void;
+  onUpgradeClick?: () => void;
+}
+
+const STATUSES = ["ready", "failed", "canceled", "running", "queued"] as const;
+const DATE_PRESETS: { key: DatePreset; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "7d", label: "7 days" },
+  { key: "30d", label: "30 days" },
+  { key: "month", label: "This month" },
+];
+
+export function HistoryPanel({
+  queryIdFilter,
+  onRerun,
+  onCopySql,
+  onUpgradeClick,
+}: HistoryPanelProps) {
+  const { enabled: hasAccess } = useFeature("executionHistory");
+
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [datePreset, setDatePreset] = useState<DatePreset | null>(null);
+  const [searchValue, setSearchValue] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "createdAt", desc: true },
+  ]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 25,
+  });
+
+  // Build filter object for the API
+  const filters = useMemo((): HistoryFilters => {
+    const sortCol = sorting[0];
+    const dateRange = datePreset ? getDatePresetRange(datePreset) : undefined;
+
+    return {
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      status: statusFilter.length > 0 ? statusFilter.join(",") : undefined,
+      dateFrom: dateRange?.dateFrom,
+      dateTo: dateRange?.dateTo,
+      queryId: queryIdFilter,
+      search: searchValue || undefined,
+      sortBy: (sortCol?.id as HistoryFilters["sortBy"]) ?? "createdAt",
+      sortDir: sortCol?.desc ? "desc" : "asc",
+    };
+  }, [
+    pagination,
+    statusFilter,
+    datePreset,
+    searchValue,
+    sorting,
+    queryIdFilter,
+  ]);
+
+  const { data, isLoading } = useExecutionHistory(filters);
+
+  const items = data?.items ?? [];
+  const totalItems = data?.total ?? 0;
+  const pageCount = Math.ceil(totalItems / pagination.pageSize);
+
+  // Reset to first page when filters change
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchValue(value);
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, []);
+
+  const toggleStatus = useCallback((status: string) => {
+    setStatusFilter((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status],
+    );
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, []);
+
+  const handleDatePreset = useCallback((preset: DatePreset) => {
+    setDatePreset((prev) => (prev === preset ? null : preset));
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, []);
+
+  // Column definitions
+  const columns = useMemo(
+    (): ColumnDef<ExecutionHistoryItem, unknown>[] => [
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Status" />
+        ),
+        cell: ({ row }) => {
+          const status = row.original.status;
+          return (
+            <StatusBadge variant={runStatusToVariant(status)}>
+              {STATUS_LABEL.get(status) ?? status}
+            </StatusBadge>
+          );
+        },
+        size: 110,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "queryName",
+        header: "Name",
+        cell: ({ row }) => (
+          <span
+            className="truncate block max-w-[120px]"
+            title={row.original.queryName ?? undefined}
+          >
+            {row.original.queryName ?? "Untitled"}
+          </span>
+        ),
+        size: 120,
+        enableSorting: false,
+      },
+      {
+        accessorKey: "createdAt",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Time" />
+        ),
+        cell: ({ row }) => {
+          const date = row.original.createdAt;
+          return (
+            <Tooltip.Root>
+              <Tooltip.Trigger asChild>
+                <span className="whitespace-nowrap text-muted-foreground cursor-default">
+                  {formatRelativeTime(date)}
+                </span>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
+                  sideOffset={5}
+                >
+                  {new Date(date).toLocaleString()}
+                  <Tooltip.Arrow className="fill-foreground" />
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          );
+        },
+        size: 80,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "durationMs",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Duration" />
+        ),
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-muted-foreground">
+            {formatDuration(row.original.durationMs)}
+          </span>
+        ),
+        size: 70,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "rowCount",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Rows" />
+        ),
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+            {formatRowCount(row.original.rowCount)}
+          </span>
+        ),
+        size: 70,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "sqlPreview",
+        header: "SQL",
+        cell: ({ row }) => (
+          <span
+            className="truncate block max-w-[140px] font-mono text-[10px] text-muted-foreground"
+            title={row.original.sqlPreview ?? undefined}
+          >
+            {row.original.sqlPreview ?? "SQL unavailable"}
+          </span>
+        ),
+        size: 140,
+        enableSorting: false,
+      },
+      {
+        accessorKey: "targetDeCustomerKey",
+        header: "Target DE",
+        cell: ({ row }) => {
+          const key = row.original.targetDeCustomerKey;
+          return key ? (
+            <span
+              className="truncate block max-w-[100px] text-muted-foreground"
+              title={key}
+            >
+              {key}
+            </span>
+          ) : null;
+        },
+        size: 100,
+        enableSorting: false,
+      },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => {
+          const item = row.original;
+          const hasSql = item.sqlPreview !== null;
+
+          return (
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button
+                  type="button"
+                  className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Row actions"
+                >
+                  <MenuDots size={14} />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  className="min-w-[160px] bg-card border border-border rounded-lg shadow-xl p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                  sideOffset={5}
+                  align="end"
+                >
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 px-3 py-2 text-xs rounded-md cursor-pointer outline-none transition-colors hover:bg-muted/50 focus:bg-muted/50 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed"
+                    disabled={!hasSql}
+                    onSelect={() => {
+                      if (hasSql && item.sqlPreview) {
+                        onRerun?.(
+                          item.sqlPreview,
+                          item.queryName ?? "Untitled",
+                          item.createdAt,
+                        );
+                      }
+                    }}
+                  >
+                    <DocumentAdd size={14} />
+                    Open in new tab
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 px-3 py-2 text-xs rounded-md cursor-pointer outline-none transition-colors hover:bg-muted/50 focus:bg-muted/50 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed"
+                    disabled={!hasSql}
+                    onSelect={() => {
+                      if (hasSql && item.sqlPreview) {
+                        onCopySql?.(item.sqlPreview);
+                      }
+                    }}
+                  >
+                    <Copy size={14} />
+                    Copy SQL
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          );
+        },
+        size: 40,
+        enableSorting: false,
+      },
+    ],
+    [onRerun, onCopySql],
+  );
+
+  // Determine empty state message
+  const emptyMessage =
+    statusFilter.length > 0 ||
+    datePreset !== null ||
+    searchValue ||
+    queryIdFilter
+      ? "No runs match your filters."
+      : "No query runs yet. Run a query to see it here.";
+
+  const hasActiveFilters =
+    statusFilter.length > 0 || datePreset !== null || searchValue.length > 0;
+
+  const panelContent = (
+    <div className="flex flex-col h-full">
+      {/* Per-query breadcrumb */}
+      {queryIdFilter && items.length > 0 ? (
+        <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/30 border-b border-border/50 text-xs">
+          <span className="text-muted-foreground">Showing:</span>
+          <span className="font-medium truncate">
+            {items[0]?.queryName ?? "Query"}
+          </span>
+        </div>
+      ) : null}
+
+      {/* Toolbar: search */}
+      <div className="px-2">
+        <DataTableToolbar
+          searchValue={searchValue}
+          onSearchChange={handleSearchChange}
+          searchPlaceholder="Search name or target DE..."
+          className="py-1.5"
+        />
+      </div>
+
+      {/* Status filter pills */}
+      <div className="flex flex-wrap items-center gap-1.5 px-2 pb-1.5">
+        {STATUSES.map((status) => {
+          const isActive = statusFilter.includes(status);
+          return (
+            <button
+              key={status}
+              type="button"
+              onClick={() => toggleStatus(status)}
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border transition-colors",
+                isActive
+                  ? "bg-primary/10 text-primary border-primary/30"
+                  : "bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/50",
+              )}
+            >
+              <StatusBadge
+                variant={runStatusToVariant(status)}
+                className="!px-0 !py-0 !border-0 !bg-transparent !text-inherit"
+              />
+              {STATUS_LABEL.get(status)}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Date preset buttons */}
+      <div className="flex items-center gap-1.5 px-2 pb-2">
+        {DATE_PRESETS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => handleDatePreset(key)}
+            className={cn(
+              "px-2 py-0.5 text-[10px] font-medium rounded border transition-colors",
+              datePreset === key
+                ? "bg-primary/10 text-primary border-primary/30"
+                : "bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/50",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter([]);
+              setDatePreset(null);
+              setSearchValue("");
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+            }}
+            className="px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear all
+          </button>
+        ) : null}
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0 px-2 pb-2">
+        <DataTable
+          columns={columns}
+          data={items}
+          pageCount={pageCount}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          isLoading={isLoading}
+          emptyMessage={emptyMessage}
+          totalItems={totalItems}
+        />
+      </div>
+    </div>
+  );
+
+  if (!hasAccess) {
+    return (
+      <LockedOverlay
+        locked
+        variant="panel"
+        tier="pro"
+        title="Unlock Execution History"
+        description="Search past runs, filter by status, and re-run queries with one click."
+        ctaLabel="Upgrade to Pro"
+        onCtaClick={onUpgradeClick}
+      >
+        {panelContent}
+      </LockedOverlay>
+    );
+  }
+
+  return panelContent;
+}
