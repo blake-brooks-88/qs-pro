@@ -532,6 +532,120 @@ describe("TargetDataExtensionModal", () => {
       expect(onSelect).toHaveBeenCalledTimes(1);
       expect(onSelect).toHaveBeenCalledWith("subscribers_key", "Overwrite");
     });
+
+    it("run button calls onSelect with Append when Append data action is selected", async () => {
+      // Arrange
+      const onSelect = vi.fn();
+      mockUseDataExtensionFields.mockReturnValue({
+        data: createMockTargetFields(),
+        isLoading: false,
+        error: null,
+      });
+
+      const user = userEvent.setup();
+      render(
+        <TargetDataExtensionModal {...defaultProps} onSelect={onSelect} />,
+      );
+
+      // Select a target
+      const searchInput = screen.getByPlaceholderText(
+        /search by name or customer key/i,
+      );
+      await user.click(searchInput);
+      const subscribersButtons = screen.getAllByText("Subscribers");
+      await user.click(selectDropdownTarget(subscribersButtons));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/target data extension is compatible/i),
+        ).toBeInTheDocument();
+      });
+
+      // Act - Select Append data action, then click Run
+      await user.click(screen.getByRole("radio", { name: /append/i }));
+      await user.click(screen.getByRole("button", { name: /run query/i }));
+
+      // Assert
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledWith("subscribers_key", "Append");
+    });
+
+    it("run button calls onSelect with Update when Update data action is selected", async () => {
+      // Arrange
+      const onSelect = vi.fn();
+      mockUseDataExtensionFields.mockReturnValue({
+        data: createMockTargetFields(),
+        isLoading: false,
+        error: null,
+      });
+
+      const user = userEvent.setup();
+      render(
+        <TargetDataExtensionModal {...defaultProps} onSelect={onSelect} />,
+      );
+
+      // Select a target
+      const searchInput = screen.getByPlaceholderText(
+        /search by name or customer key/i,
+      );
+      await user.click(searchInput);
+      const subscribersButtons = screen.getAllByText("Subscribers");
+      await user.click(selectDropdownTarget(subscribersButtons));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/target data extension is compatible/i),
+        ).toBeInTheDocument();
+      });
+
+      // Act - Select Update data action, then click Run
+      await user.click(screen.getByRole("radio", { name: /update/i }));
+      await user.click(screen.getByRole("button", { name: /run query/i }));
+
+      // Assert
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledWith("subscribers_key", "Update");
+    });
+
+    it("run button is disabled when Update is selected and target has no primary key", async () => {
+      // Arrange - Fields with no primary key
+      mockUseDataExtensionFields.mockReturnValue({
+        data: [
+          {
+            id: "f2",
+            name: "EmailAddress",
+            type: "EmailAddress",
+            isPrimaryKey: false,
+            isNullable: false,
+          },
+        ],
+        isLoading: false,
+        error: null,
+      });
+
+      const user = userEvent.setup();
+      render(<TargetDataExtensionModal {...defaultProps} />);
+
+      // Select a target
+      const searchInput = screen.getByPlaceholderText(
+        /search by name or customer key/i,
+      );
+      await user.click(searchInput);
+      const subscribersButtons = screen.getAllByText("Subscribers");
+      await user.click(selectDropdownTarget(subscribersButtons));
+
+      // Act - Select Update data action
+      await user.click(screen.getByRole("radio", { name: /update/i }));
+
+      // Assert - Run button disabled and PK warning shown
+      await waitFor(() => {
+        expect(
+          screen.getByText(/update mode requires a primary key/i),
+        ).toBeInTheDocument();
+      });
+      const runButton = screen.getByRole("button", { name: /run query/i });
+      expect(runButton).toBeDisabled();
+    });
   });
 
   describe("search filtering", () => {

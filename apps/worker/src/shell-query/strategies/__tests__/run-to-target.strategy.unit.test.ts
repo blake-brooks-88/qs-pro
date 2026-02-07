@@ -182,6 +182,129 @@ describe("RunToTargetFlow", () => {
       expect(queryDefinitionServiceStub.perform).toHaveBeenCalledTimes(1);
     });
 
+    it("allows Append mode when query reads from target DE (no self-overwrite guard)", async () => {
+      const job = createTestJob({
+        sqlText: "SELECT SubscriberKey FROM [Target DE]",
+        targetUpdateType: "Append",
+        tableMetadata: {
+          "Target DE": [
+            {
+              Name: "SubscriberKey",
+              FieldType: "Text",
+              MaxLength: 254,
+            },
+          ],
+        },
+      });
+
+      dataExtensionServiceStub.retrieveFields.mockResolvedValue([
+        {
+          name: "SubscriberKey",
+          fieldType: "Text",
+          maxLength: 254,
+          isPrimaryKey: false,
+          isRequired: false,
+        },
+      ]);
+
+      const result = await flow.execute(job);
+
+      expect(result).toEqual({
+        status: "ready",
+        taskId: "task-created-123",
+        queryDefinitionId: "qd-created-123",
+        queryCustomerKey: expect.stringContaining("QPP_Query_"),
+        targetDeCustomerKey: "TargetDEKey",
+      });
+    });
+
+    it("allows Update mode when query reads from target DE (no self-overwrite guard)", async () => {
+      const job = createTestJob({
+        sqlText: "SELECT SubscriberKey FROM [Target DE]",
+        targetUpdateType: "Update",
+        tableMetadata: {
+          "Target DE": [
+            {
+              Name: "SubscriberKey",
+              FieldType: "Text",
+              MaxLength: 254,
+            },
+          ],
+        },
+      });
+
+      dataExtensionServiceStub.retrieveFields.mockResolvedValue([
+        {
+          name: "SubscriberKey",
+          fieldType: "Text",
+          maxLength: 254,
+          isPrimaryKey: true,
+          isRequired: false,
+        },
+      ]);
+
+      const result = await flow.execute(job);
+
+      expect(result).toEqual({
+        status: "ready",
+        taskId: "task-created-123",
+        queryDefinitionId: "qd-created-123",
+        queryCustomerKey: expect.stringContaining("QPP_Query_"),
+        targetDeCustomerKey: "TargetDEKey",
+      });
+    });
+
+    it("rejects Update mode when target DE has no primary key", async () => {
+      const job = createTestJob({
+        sqlText: "SELECT EmailAddress FROM [Source DE]",
+        targetUpdateType: "Update",
+        tableMetadata: {
+          "Source DE": [
+            { Name: "EmailAddress", FieldType: "EmailAddress", MaxLength: 254 },
+          ],
+        },
+      });
+
+      dataExtensionServiceStub.retrieveFields.mockResolvedValue([
+        {
+          name: "EmailAddress",
+          fieldType: "EmailAddress",
+          maxLength: 254,
+          isPrimaryKey: false,
+          isRequired: false,
+        },
+      ]);
+
+      await expect(flow.execute(job)).rejects.toMatchObject({
+        code: ErrorCode.MCE_VALIDATION_FAILED,
+      });
+      expect(queryDefinitionServiceStub.create).not.toHaveBeenCalled();
+    });
+
+    it("passes targetUpdateType through to QueryDefinitionService.create", async () => {
+      const job = createTestJob({
+        sqlText: "SELECT EmailAddress FROM [Source DE]",
+        targetUpdateType: "Append",
+        tableMetadata: {
+          "Source DE": [
+            { Name: "EmailAddress", FieldType: "EmailAddress", MaxLength: 254 },
+          ],
+        },
+      });
+
+      const result = await flow.execute(job);
+
+      expect(result.status).toBe("ready");
+      expect(queryDefinitionServiceStub.create).toHaveBeenCalledWith(
+        "tenant-1",
+        "user-1",
+        "mid-1",
+        expect.objectContaining({
+          targetUpdateType: "Append",
+        }),
+      );
+    });
+
     it("fails fast when query output columns do not match target DE fields", async () => {
       const job = createTestJob({
         sqlText: "SELECT ms.Email FROM [Master_Subscriber] AS ms",
