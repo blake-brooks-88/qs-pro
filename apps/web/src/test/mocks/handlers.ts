@@ -43,6 +43,17 @@ export const handlers = [
     return HttpResponse.json({ count: 0 });
   }),
 
+  http.get("/api/usage", () => {
+    return HttpResponse.json({
+      queryRuns: {
+        current: 0,
+        limit: null,
+        resetDate: new Date().toISOString(),
+      },
+      savedQueries: { current: 0, limit: null },
+    });
+  }),
+
   http.get("/api/auth/refresh", () => {
     return HttpResponse.json({ success: true });
   }),

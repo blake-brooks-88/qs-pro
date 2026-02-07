@@ -18,6 +18,7 @@ export interface ITenantRepository {
   findByEid(eid: string): Promise<Tenant | undefined>;
   upsert(tenant: NewTenant): Promise<Tenant>;
   countUsersByTenantId(tenantId: string): Promise<number>;
+  updateTier(id: string, tier: "free" | "pro" | "enterprise"): Promise<void>;
 }
 
 export interface IUserRepository {

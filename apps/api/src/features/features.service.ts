@@ -4,7 +4,11 @@ import type {
   IFeatureOverrideRepository,
   ITenantRepository,
 } from '@qpp/database';
-import type { FeatureKey, TenantFeaturesResponse } from '@qpp/shared-types';
+import type {
+  FeatureKey,
+  SubscriptionTier,
+  TenantFeaturesResponse,
+} from '@qpp/shared-types';
 import { ALL_FEATURE_KEYS, getTierFeatures } from '@qpp/shared-types';
 
 @Injectable()
@@ -50,5 +54,13 @@ export class FeaturesService {
     }
 
     return { tier, features };
+  }
+
+  async updateTier(
+    tenantId: string,
+    tier: SubscriptionTier,
+  ): Promise<TenantFeaturesResponse> {
+    await this.tenantRepo.updateTier(tenantId, tier);
+    return this.getTenantFeatures(tenantId);
   }
 }
