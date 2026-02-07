@@ -29,6 +29,7 @@ const TERMINAL_CODES = new Set<ErrorCode>([
   // Business logic
   ErrorCode.SEAT_LIMIT_EXCEEDED,
   ErrorCode.RATE_LIMIT_EXCEEDED,
+  ErrorCode.QUOTA_EXCEEDED,
   ErrorCode.RESOURCE_NOT_FOUND,
   ErrorCode.INVALID_STATE,
   ErrorCode.VALIDATION_ERROR,
@@ -145,6 +146,7 @@ export function getHttpStatus(code: ErrorCode): number {
     case ErrorCode.SEAT_LIMIT_EXCEEDED:
       return 403;
     case ErrorCode.RATE_LIMIT_EXCEEDED:
+    case ErrorCode.QUOTA_EXCEEDED:
       return 429;
     case ErrorCode.RESOURCE_NOT_FOUND:
       return 404;
@@ -191,6 +193,7 @@ export function getErrorTitle(code: ErrorCode): string {
     [ErrorCode.SCHEMA_INFERENCE_FAILED]: "Schema Inference Failed",
     [ErrorCode.SEAT_LIMIT_EXCEEDED]: "Seat Limit Exceeded",
     [ErrorCode.RATE_LIMIT_EXCEEDED]: "Rate Limit Exceeded",
+    [ErrorCode.QUOTA_EXCEEDED]: "Usage Quota Exceeded",
     [ErrorCode.RESOURCE_NOT_FOUND]: "Resource Not Found",
     [ErrorCode.INVALID_STATE]: "Invalid State",
     [ErrorCode.VALIDATION_ERROR]: "Validation Error",

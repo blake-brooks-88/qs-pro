@@ -1,6 +1,6 @@
 import { getDbFromContext, type RlsContextService } from '@qpp/backend-shared';
 import type { createDatabaseFromClient } from '@qpp/database';
-import { and, count, eq, notInArray, shellQueryRuns } from '@qpp/database';
+import { and, count, eq, gte, notInArray, shellQueryRuns } from '@qpp/database';
 
 import type {
   CreateShellQueryRunParams,
@@ -123,6 +123,39 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
                 'failed',
                 'canceled',
               ]),
+            ),
+          );
+
+        return result[0]?.count ?? 0;
+      },
+    );
+  }
+
+  async countMonthlyRuns(
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<number> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const now = new Date();
+        const startOfMonth = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+        );
+
+        const result = await this.getDb()
+          .select({ count: count() })
+          .from(shellQueryRuns)
+          .where(
+            and(
+              eq(shellQueryRuns.tenantId, tenantId),
+              eq(shellQueryRuns.mid, mid),
+              eq(shellQueryRuns.userId, userId),
+              gte(shellQueryRuns.createdAt, startOfMonth),
+              notInArray(shellQueryRuns.status, ['canceled']),
             ),
           );
 
