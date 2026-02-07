@@ -1,12 +1,11 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { ClockCircle, Database, Folder2 } from "@solar-icons/react";
 
-import { cn } from "@/lib/utils";
-
 import {
   type ActivityView,
   useActivityBarStore,
 } from "@/features/editor-workspace/store/activity-bar-store";
+import { cn } from "@/lib/utils";
 
 const items: {
   view: ActivityView;
@@ -38,13 +37,10 @@ export function ActivityBar() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {isActive && (
+                {isActive ? (
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-primary rounded-r" />
-                )}
-                <Icon
-                  size={22}
-                  weight={isActive ? "Bold" : "Linear"}
-                />
+                ) : null}
+                <Icon size={22} weight={isActive ? "Bold" : "Linear"} />
               </button>
             </Tooltip.Trigger>
             <Tooltip.Portal>
