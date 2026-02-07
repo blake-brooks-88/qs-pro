@@ -523,7 +523,13 @@ export function EditorWorkspace({
       setIsUpgradeModalOpen(true);
       return;
     }
-    void execute(safeActiveTab.content, safeActiveTab.name);
+    void execute(
+      safeActiveTab.content,
+      safeActiveTab.name,
+      undefined,
+      undefined,
+      safeActiveTab.queryId ?? undefined,
+    );
   }, [
     isRunning,
     hasBlockingDiagnostics,
@@ -531,6 +537,7 @@ export function EditorWorkspace({
     execute,
     safeActiveTab.content,
     safeActiveTab.name,
+    safeActiveTab.queryId,
   ]);
 
   const handleCancel = useCallback(() => {
@@ -578,10 +585,11 @@ export function EditorWorkspace({
         safeActiveTab.name,
         customerKey,
         targetUpdateType,
+        safeActiveTab.queryId ?? undefined,
       );
       setIsTargetDEModalOpen(false);
     },
-    [execute, safeActiveTab.content, safeActiveTab.name],
+    [execute, safeActiveTab.content, safeActiveTab.name, safeActiveTab.queryId],
   );
 
   const handleResultsResizeStart = (

@@ -33,6 +33,7 @@ const createRunSchema = z.object({
   snippetName: z.string().max(1000).optional(),
   targetDeCustomerKey: z.string().trim().min(1).max(200).optional(),
   targetUpdateType: z.enum(['Overwrite', 'Append', 'Update']).optional(),
+  savedQueryId: z.string().uuid().optional(),
   tableMetadata: z
     .record(
       z.string().max(128),
@@ -80,6 +81,7 @@ export class ShellQueryController {
       snippetName,
       targetDeCustomerKey,
       targetUpdateType,
+      savedQueryId,
       tableMetadata,
     } = result.data;
 
@@ -129,6 +131,7 @@ export class ShellQueryController {
         tableMetadata,
         targetDeCustomerKey,
         targetUpdateType,
+        savedQueryId,
       );
 
       return { runId, status: 'queued' };

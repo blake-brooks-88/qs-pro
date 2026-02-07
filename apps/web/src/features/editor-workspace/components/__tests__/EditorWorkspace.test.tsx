@@ -581,11 +581,14 @@ describe("EditorWorkspace", () => {
       const runButton = screen.getByTestId("run-button");
       await user.click(runButton);
 
-      // execute should be called with content
+      // execute should be called with content and savedQueryId
       await waitFor(() => {
         expect(mockExecute).toHaveBeenCalledWith(
           "SELECT * FROM Contacts",
           "Test Query",
+          undefined,
+          undefined,
+          "test-query-1",
         );
       });
     });

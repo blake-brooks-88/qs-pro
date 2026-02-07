@@ -159,6 +159,7 @@ describe('ShellQueryController', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 

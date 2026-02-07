@@ -23,6 +23,7 @@ import {
   type HistoryFilters,
   useExecutionHistory,
 } from "../hooks/use-execution-history";
+import { useActivityBarStore } from "../store/activity-bar-store";
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -144,6 +145,7 @@ export function HistoryPanel({
   onUpgradeClick,
 }: HistoryPanelProps) {
   const { enabled: hasAccess } = useFeature("executionHistory");
+  const clearHistoryFilter = useActivityBarStore((s) => s.clearHistoryFilter);
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -406,12 +408,21 @@ export function HistoryPanel({
   const panelContent = (
     <div className="flex flex-col h-full">
       {/* Per-query breadcrumb */}
-      {queryIdFilter && items.length > 0 ? (
-        <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/30 border-b border-border/50 text-xs">
-          <span className="text-muted-foreground">Showing:</span>
-          <span className="font-medium truncate">
-            {items[0]?.queryName ?? "Query"}
+      {queryIdFilter ? (
+        <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/30 text-xs">
+          <span className="text-muted-foreground">
+            Showing:{" "}
+            <span className="text-foreground font-medium">
+              {items[0]?.queryName ?? "Query"}
+            </span>
           </span>
+          <button
+            type="button"
+            onClick={clearHistoryFilter}
+            className="text-primary hover:underline text-xs"
+          >
+            View All History
+          </button>
         </div>
       ) : null}
 
