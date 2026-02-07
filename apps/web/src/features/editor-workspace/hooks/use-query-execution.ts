@@ -9,6 +9,7 @@ import type {
   TargetUpdateType,
 } from "@/features/editor-workspace/types";
 import { extractTableReferences } from "@/features/editor-workspace/utils/sql-context";
+import { usageQueryKeys } from "@/hooks/use-run-usage";
 import api from "@/services/api";
 
 import { metadataQueryKeys } from "./use-metadata";
@@ -290,6 +291,8 @@ export function useQueryExecution(
         sessionStorage.setItem(SESSION_STORAGE_KEY, newRunId);
 
         subscribeToSSE(newRunId);
+
+        void queryClient.invalidateQueries({ queryKey: usageQueryKeys.all });
       } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 429) {
           toast.error(

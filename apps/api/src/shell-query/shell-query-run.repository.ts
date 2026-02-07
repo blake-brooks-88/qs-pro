@@ -35,4 +35,9 @@ export interface ShellQueryRunRepository {
     mid: string,
     userId: string,
   ): Promise<number>;
+  countMonthlyRuns(
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<number>;
 }

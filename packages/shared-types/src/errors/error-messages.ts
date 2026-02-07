@@ -49,6 +49,8 @@ export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCode.SEAT_LIMIT_EXCEEDED]: "User limit reached for your organization.",
   [ErrorCode.RATE_LIMIT_EXCEEDED]:
     "Too many requests. Please wait before trying again.",
+  [ErrorCode.QUOTA_EXCEEDED]:
+    "Monthly usage limit reached. Please upgrade your plan or wait for the next billing cycle.",
   [ErrorCode.RESOURCE_NOT_FOUND]: "The requested resource was not found.",
   [ErrorCode.INVALID_STATE]:
     "Operation not allowed in current state. Please try again.",

@@ -22,6 +22,8 @@ import {
 import { toast } from "sonner";
 
 import { FeatureGate } from "@/components/FeatureGate";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { UsageWarningBanner } from "@/components/UsageWarningBanner";
 import { useCreateQueryActivity } from "@/features/editor-workspace/hooks/use-create-query-activity";
 import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
 import {
@@ -47,6 +49,8 @@ import {
   hasBlockingDiagnostics as checkHasBlockingDiagnostics,
 } from "@/features/editor-workspace/utils/sql-lint";
 import { useSqlDiagnostics } from "@/features/editor-workspace/utils/sql-lint/use-sql-diagnostics";
+import { useRunUsage } from "@/hooks/use-run-usage";
+import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { cn } from "@/lib/utils";
 import { createDataExtension } from "@/services/metadata";
 import { useTabsStore } from "@/store/tabs-store";
@@ -103,9 +107,14 @@ export function EditorWorkspace({
   const [inferredFields, setInferredFields] = useState<DataExtensionField[]>(
     [],
   );
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   // TanStack Query client for metadata fetching
   const queryClient = useQueryClient();
+
+  // Quota hooks
+  const { tier } = useTier();
+  const { data: usageData } = useRunUsage();
 
   // State for lazy-loading query content when opening from sidebar
   const [pendingQueryId, setPendingQueryId] = useState<string | null>(null);
@@ -228,6 +237,23 @@ export function EditorWorkspace({
     [sqlDiagnostics],
   );
 
+  const isAtRunLimit = useMemo(() => {
+    if (!usageData?.queryRuns.limit) {
+      return false;
+    }
+    return usageData.queryRuns.current >= usageData.queryRuns.limit;
+  }, [usageData]);
+
+  const isNearRunLimit = useMemo(() => {
+    if (!usageData?.queryRuns.limit) {
+      return false;
+    }
+    return (
+      usageData.queryRuns.current >=
+      usageData.queryRuns.limit * WARNING_THRESHOLD
+    );
+  }, [usageData]);
+
   const runBlockMessage = useMemo(() => {
     if (!blockingDiagnostic) {
       return null;
@@ -239,11 +265,14 @@ export function EditorWorkspace({
     if (isRunning) {
       return "Query is currently running...";
     }
+    if (isAtRunLimit) {
+      return "Monthly run limit reached. Click to upgrade.";
+    }
     if (hasBlockingDiagnostics) {
       return runBlockMessage ?? "Query is missing required SQL.";
     }
     return "Execute SQL (Ctrl+Enter)";
-  }, [isRunning, hasBlockingDiagnostics, runBlockMessage]);
+  }, [isRunning, isAtRunLimit, hasBlockingDiagnostics, runBlockMessage]);
 
   const executionResult: ExecutionResult = useMemo(() => {
     const legacyStatus =
@@ -489,10 +518,15 @@ export function EditorWorkspace({
       setIsRunBlockedOpen(true);
       return;
     }
+    if (isAtRunLimit) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
     void execute(safeActiveTab.content, safeActiveTab.name);
   }, [
     isRunning,
     hasBlockingDiagnostics,
+    isAtRunLimit,
     execute,
     safeActiveTab.content,
     safeActiveTab.name,
@@ -667,6 +701,16 @@ export function EditorWorkspace({
               </FeatureGate>
             </div>
           </div>
+
+          {/* Usage Warning Banner */}
+          {tier === "free" && isNearRunLimit && usageData?.queryRuns.limit ? (
+            <UsageWarningBanner
+              resourceName="query runs"
+              current={usageData.queryRuns.current}
+              limit={usageData.queryRuns.limit}
+              resetDate={usageData.queryRuns.resetDate}
+            />
+          ) : null}
 
           {/* Editor & Results Pane Split */}
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -847,6 +891,11 @@ export function EditorWorkspace({
               handleCloseTab(tabToClose);
             }
           }}
+        />
+
+        <UpgradeModal
+          isOpen={isUpgradeModalOpen}
+          onClose={() => setIsUpgradeModalOpen(false)}
         />
       </div>
     </Tooltip.Provider>
