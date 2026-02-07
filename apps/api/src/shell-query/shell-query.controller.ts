@@ -21,6 +21,7 @@ import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FeaturesService } from '../features/features.service';
+import { UsageService } from '../usage/usage.service';
 import { ShellQueryService } from './shell-query.service';
 import { ShellQuerySseService } from './shell-query-sse.service';
 
@@ -61,6 +62,7 @@ export class ShellQueryController {
     private readonly shellQueryService: ShellQueryService,
     private readonly shellQuerySse: ShellQuerySseService,
     private readonly featuresService: FeaturesService,
+    private readonly usageService: UsageService,
     @Inject('TENANT_REPOSITORY') private tenantRepo: TenantRepository,
   ) {}
 
@@ -80,9 +82,24 @@ export class ShellQueryController {
       tableMetadata,
     } = result.data;
 
+    const { tier, features: tenantFeatures } =
+      await this.featuresService.getTenantFeatures(user.tenantId);
+
+    if (tier === 'free') {
+      const monthlyCount = await this.usageService.getMonthlyRunCount(
+        user.tenantId,
+        user.mid,
+        user.userId,
+      );
+      if (monthlyCount >= 50) {
+        throw new AppError(ErrorCode.QUOTA_EXCEEDED, undefined, {
+          operation: 'createRun',
+          reason: `Monthly run limit reached: ${monthlyCount}/50`,
+        });
+      }
+    }
+
     if (targetDeCustomerKey) {
-      const { features: tenantFeatures } =
-        await this.featuresService.getTenantFeatures(user.tenantId);
       if (!tenantFeatures.runToTargetDE) {
         throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
           operation: 'runToTargetDE',

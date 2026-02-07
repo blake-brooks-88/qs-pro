@@ -19,6 +19,7 @@ import { QueryActivitiesModule } from './query-activities/query-activities.modul
 import { RedisModule } from './redis/redis.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { ShellQueryModule } from './shell-query/shell-query.module';
+import { UsageModule } from './usage/usage.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -51,6 +52,7 @@ import { UsersModule } from './users/users.module';
     FoldersModule,
     SavedQueriesModule,
     QueryActivitiesModule,
+    UsageModule,
   ],
   controllers: [AppController],
   providers: [AppService],

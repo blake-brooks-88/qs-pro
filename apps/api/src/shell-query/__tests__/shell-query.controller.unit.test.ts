@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CsrfGuard } from '../../auth/csrf.guard';
 import type { UserSession } from '../../common/decorators/current-user.decorator';
 import { FeaturesService } from '../../features/features.service';
+import { UsageService } from '../../usage/usage.service';
 import { ShellQueryController } from '../shell-query.controller';
 import { ShellQueryService } from '../shell-query.service';
 import { ShellQuerySseService } from '../shell-query-sse.service';
@@ -42,11 +43,19 @@ function createFeaturesServiceStub() {
   };
 }
 
+function createUsageServiceStub() {
+  return {
+    getUsage: vi.fn(),
+    getMonthlyRunCount: vi.fn().mockResolvedValue(0),
+  };
+}
+
 describe('ShellQueryController', () => {
   let controller: ShellQueryController;
   let shellQueryService: ReturnType<typeof createShellQueryServiceStub>;
   let shellQuerySseService: ReturnType<typeof createShellQuerySseServiceStub>;
   let featuresService: ReturnType<typeof createFeaturesServiceStub>;
+  let usageService: ReturnType<typeof createUsageServiceStub>;
   let tenantRepo: ReturnType<typeof createTenantRepoStub>;
 
   beforeEach(async () => {
@@ -55,6 +64,7 @@ describe('ShellQueryController', () => {
     shellQueryService = createShellQueryServiceStub();
     shellQuerySseService = createShellQuerySseServiceStub();
     featuresService = createFeaturesServiceStub();
+    usageService = createUsageServiceStub();
     tenantRepo = createTenantRepoStub();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -71,6 +81,10 @@ describe('ShellQueryController', () => {
         {
           provide: FeaturesService,
           useValue: featuresService,
+        },
+        {
+          provide: UsageService,
+          useValue: usageService,
         },
         {
           provide: 'TENANT_REPOSITORY',
