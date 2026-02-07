@@ -2,6 +2,7 @@ import type { CreateDataExtensionDto } from "@qpp/shared-types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   AltArrowUp,
+  ClockCircle,
   Code,
   Database,
   Diskette,
@@ -96,6 +97,10 @@ export function EditorWorkspace({
   onNewTab: _onNewTab,
 }: EditorWorkspaceProps) {
   const activeView = useActivityBarStore((s) => s.activeView);
+  const historyQueryIdFilter = useActivityBarStore(
+    (s) => s.historyQueryIdFilter,
+  );
+  const showHistoryForQuery = useActivityBarStore((s) => s.showHistoryForQuery);
 
   const [isDEModalOpen, setIsDEModalOpen] = useState(false);
   const [isQueryActivityModalOpen, setIsQueryActivityModalOpen] =
@@ -109,9 +114,6 @@ export function EditorWorkspace({
     [],
   );
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [historyQueryIdFilter, _setHistoryQueryIdFilter] = useState<
-    string | undefined
-  >(undefined);
 
   // TanStack Query client for metadata fetching
   const queryClient = useQueryClient();
@@ -558,6 +560,13 @@ export function EditorWorkspace({
     toast.success("SQL copied to clipboard");
   }, []);
 
+  const handleViewQueryHistory = useCallback(
+    (queryId: string) => {
+      showHistoryForQuery(queryId);
+    },
+    [showHistoryForQuery],
+  );
+
   const handleRunToTarget = useCallback(() => {
     setIsTargetDEModalOpen(true);
   }, []);
@@ -645,6 +654,7 @@ export function EditorWorkspace({
             onRerun={handleHistoryRerun}
             onCopySql={handleHistoryCopySql}
             onUpgradeClick={() => setIsUpgradeModalOpen(true)}
+            onViewQueryHistory={handleViewQueryHistory}
           />
         )}
 
@@ -688,6 +698,21 @@ export function EditorWorkspace({
                     className="text-primary hover:text-primary-foreground hover:bg-primary"
                   />
                 </FeatureGate>
+                {safeActiveTab.queryId ? (
+                  <>
+                    <div className="h-4 w-px bg-border mx-1" />
+                    <ToolbarButton
+                      icon={<ClockCircle size={18} />}
+                      label="View Run History"
+                      onClick={() => {
+                        const qId = safeActiveTab.queryId;
+                        if (qId) {
+                          showHistoryForQuery(qId);
+                        }
+                      }}
+                    />
+                  </>
+                ) : null}
               </div>
             </div>
 

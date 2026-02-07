@@ -45,6 +45,7 @@ interface WorkspaceSidebarProps {
   onRerun?: (sql: string, queryName: string, createdAt: string) => void;
   onCopySql?: (sql: string) => void;
   onUpgradeClick?: () => void;
+  onViewQueryHistory?: (queryId: string) => void;
 }
 
 interface DataExtensionNodeProps {
@@ -60,11 +61,11 @@ interface DataExtensionNodeProps {
 const sortByName = (a: { name: string }, b: { name: string }) =>
   a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 
-const VIEW_TITLES: Record<WorkspaceSidebarProps["activeView"], string> = {
-  dataExtensions: "Data Extensions",
-  queries: "Queries",
-  history: "Execution History",
-};
+const VIEW_TITLES = new Map<WorkspaceSidebarProps["activeView"], string>([
+  ["dataExtensions", "Data Extensions"],
+  ["queries", "Queries"],
+  ["history", "Execution History"],
+]);
 
 function DataExtensionNode({
   dataExtension,
@@ -194,6 +195,7 @@ export function WorkspaceSidebar({
   onRerun,
   onCopySql,
   onUpgradeClick,
+  onViewQueryHistory,
 }: WorkspaceSidebarProps) {
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { tier } = useTier();
@@ -557,7 +559,7 @@ export function WorkspaceSidebar({
       {/* Panel Header */}
       <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2.5">
         <span className="text-xs font-bold uppercase tracking-widest text-foreground">
-          {VIEW_TITLES[activeView]}
+          {VIEW_TITLES.get(activeView)}
         </span>
         <button
           onClick={() => setActiveView(null)}
@@ -673,6 +675,7 @@ export function WorkspaceSidebar({
                 searchQuery={searchQuery}
                 onSelectQuery={(queryId) => onSelectQuery?.(queryId)}
                 onCreateFolder={() => onCreateFolder?.(null)}
+                onViewQueryHistory={onViewQueryHistory}
               />
             )}
           </div>
