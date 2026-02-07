@@ -412,9 +412,13 @@ describe("WorkspaceSidebar", () => {
       expect(screen.getByText("Execution History")).toBeInTheDocument();
     });
 
-    it("renders history placeholder for history view", () => {
+    it("renders HistoryPanel for history view", async () => {
       renderSidebar([], [], [], "history");
-      expect(screen.getByText("History panel coming soon")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText("Search name or target DE..."),
+        ).toBeInTheDocument();
+      });
     });
   });
 

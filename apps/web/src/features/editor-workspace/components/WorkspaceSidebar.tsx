@@ -21,6 +21,7 @@ import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { cn } from "@/lib/utils";
 
 import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
+import { HistoryPanel } from "./HistoryPanel";
 import { QueryTreeView } from "./QueryTreeView";
 import {
   SidebarSearch,
@@ -40,6 +41,10 @@ interface WorkspaceSidebarProps {
   onSelectDE?: (id: string) => void;
   onCreateDE?: () => void;
   onCreateFolder?: (parentId: string | null) => void;
+  queryIdFilter?: string;
+  onRerun?: (sql: string, queryName: string, createdAt: string) => void;
+  onCopySql?: (sql: string) => void;
+  onUpgradeClick?: () => void;
 }
 
 interface DataExtensionNodeProps {
@@ -185,6 +190,10 @@ export function WorkspaceSidebar({
   onSelectQuery,
   onSelectDE,
   onCreateFolder,
+  queryIdFilter,
+  onRerun,
+  onCopySql,
+  onUpgradeClick,
 }: WorkspaceSidebarProps) {
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { tier } = useTier();
@@ -628,54 +637,65 @@ export function WorkspaceSidebar({
         </div>
       ) : null}
 
-      {/* Tree Content */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="space-y-1">
-          {activeView === "dataExtensions" && (
-            <>
-              <div className="flex items-center justify-between px-2 py-1 mb-2">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Data Extensions
-                </span>
-              </div>
-              {rootFolders.map((folder) => renderFolderNode(folder, 0))}
-              {rootDataExtensions
-                .filter((de) => isVisible(de.id, "de"))
-                .map((dataExtension) => (
-                  <DataExtensionNode
-                    key={dataExtension.id}
-                    dataExtension={dataExtension}
-                    depth={0}
-                    isExpanded={Boolean(expandedDeIds[dataExtension.id])}
-                    isSelected={focusedItemId === dataExtension.id}
-                    onToggle={(id) =>
-                      setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
-                    }
-                    onSelectDE={onSelectDE}
-                    tenantId={tenantId}
-                  />
-                ))}
-            </>
-          )}
+      {/* Tree Content (DE and Queries views) */}
+      {activeView !== "history" && (
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            {activeView === "dataExtensions" && (
+              <>
+                <div className="flex items-center justify-between px-2 py-1 mb-2">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Data Extensions
+                  </span>
+                </div>
+                {rootFolders.map((folder) => renderFolderNode(folder, 0))}
+                {rootDataExtensions
+                  .filter((de) => isVisible(de.id, "de"))
+                  .map((dataExtension) => (
+                    <DataExtensionNode
+                      key={dataExtension.id}
+                      dataExtension={dataExtension}
+                      depth={0}
+                      isExpanded={Boolean(expandedDeIds[dataExtension.id])}
+                      isSelected={focusedItemId === dataExtension.id}
+                      onToggle={(id) =>
+                        setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
+                      }
+                      onSelectDE={onSelectDE}
+                      tenantId={tenantId}
+                    />
+                  ))}
+              </>
+            )}
 
-          {activeView === "queries" && (
-            <QueryTreeView
-              searchQuery={searchQuery}
-              onSelectQuery={(queryId) => onSelectQuery?.(queryId)}
-              onCreateFolder={() => onCreateFolder?.(null)}
-            />
-          )}
-
-          {activeView === "history" && (
-            <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
-              History panel coming soon
-            </div>
-          )}
+            {activeView === "queries" && (
+              <QueryTreeView
+                searchQuery={searchQuery}
+                onSelectQuery={(queryId) => onSelectQuery?.(queryId)}
+                onCreateFolder={() => onCreateFolder?.(null)}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Sidebar Footer - Usage Badge */}
-      {tier === "free" && usageData && usageData.queryRuns.limit !== null ? (
+      {/* History Panel (fills full sidebar) */}
+      {activeView === "history" && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <HistoryPanel
+            queryIdFilter={queryIdFilter}
+            onRerun={onRerun}
+            onCopySql={onCopySql}
+            onUpgradeClick={onUpgradeClick}
+          />
+        </div>
+      )}
+
+      {/* Sidebar Footer - Usage Badge (hidden in history view) */}
+      {activeView !== "history" &&
+      tier === "free" &&
+      usageData &&
+      usageData.queryRuns.limit !== null ? (
         <div className="border-t border-border p-3 shrink-0">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Runs</span>

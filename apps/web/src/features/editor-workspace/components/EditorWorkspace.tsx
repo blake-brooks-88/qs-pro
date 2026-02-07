@@ -109,6 +109,9 @@ export function EditorWorkspace({
     [],
   );
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [historyQueryIdFilter, _setHistoryQueryIdFilter] = useState<
+    string | undefined
+  >(undefined);
 
   // TanStack Query client for metadata fetching
   const queryClient = useQueryClient();
@@ -532,6 +535,29 @@ export function EditorWorkspace({
     void cancel();
   }, [cancel]);
 
+  const handleHistoryRerun = useCallback(
+    (sql: string, queryName: string, createdAt: string) => {
+      const dateStr = new Date(createdAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const tabName = `Copy of ${queryName} (${dateStr} run)`;
+
+      const newTabId = storeCreateNewTab();
+      storeUpdateTabContent(newTabId, sql);
+
+      toast.success(`Opened "${tabName}" in a new tab`, {
+        description: "Review and edit before running.",
+      });
+    },
+    [storeCreateNewTab, storeUpdateTabContent],
+  );
+
+  const handleHistoryCopySql = useCallback((sql: string) => {
+    void navigator.clipboard.writeText(sql);
+    toast.success("SQL copied to clipboard");
+  }, []);
+
   const handleRunToTarget = useCallback(() => {
     setIsTargetDEModalOpen(true);
   }, []);
@@ -615,6 +641,10 @@ export function EditorWorkspace({
             }}
             onSelectDE={onSelectDE}
             onCreateDE={handleCreateDE}
+            queryIdFilter={historyQueryIdFilter}
+            onRerun={handleHistoryRerun}
+            onCopySql={handleHistoryCopySql}
+            onUpgradeClick={() => setIsUpgradeModalOpen(true)}
           />
         )}
 

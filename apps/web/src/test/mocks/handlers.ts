@@ -12,6 +12,8 @@ export const defaultFeatures: TenantFeatures = {
   createDataExtension: false,
   deployToAutomation: false,
   systemDataViews: true,
+  runToTargetDE: false,
+  executionHistory: false,
 };
 
 export const handlers = [
@@ -72,5 +74,14 @@ export const handlers = [
 
   http.delete("/api/saved-queries/:id", () => {
     return HttpResponse.json({ success: true });
+  }),
+
+  http.get("/api/runs/history", () => {
+    return HttpResponse.json({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 25,
+    });
   }),
 ];
