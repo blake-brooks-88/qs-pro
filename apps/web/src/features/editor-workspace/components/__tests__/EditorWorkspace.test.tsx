@@ -103,6 +103,17 @@ vi.mock("../WorkspaceSidebar", () => ({
   ),
 }));
 
+vi.mock("../HistoryPanel", () => ({
+  HistoryPanel: ({ queryIdFilter }: { queryIdFilter?: string }) => (
+    <div
+      data-testid="mock-history-panel"
+      data-query-id-filter={queryIdFilter ?? ""}
+    >
+      HistoryPanel
+    </div>
+  ),
+}));
+
 vi.mock("../DataExtensionModal", () => ({
   DataExtensionModal: ({
     isOpen,
@@ -681,6 +692,61 @@ describe("EditorWorkspace", () => {
 
       const sidebar = screen.getByTestId("mock-sidebar");
       expect(sidebar).toHaveAttribute("data-active-view", "dataExtensions");
+    });
+
+    it("renders history panel in main area when history view is active", () => {
+      useActivityBarStore.setState({
+        activeView: "history",
+        historyQueryIdFilter: "query-123",
+      });
+
+      renderEditorWorkspace();
+
+      expect(screen.getByTestId("mock-history-panel")).toHaveAttribute(
+        "data-query-id-filter",
+        "query-123",
+      );
+      expect(screen.queryByTestId("mock-sidebar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("mock-editor")).not.toBeInTheDocument();
+    });
+
+    it("shows history panel after clicking View Run History toolbar button", async () => {
+      const user = userEvent.setup();
+
+      const initialTabs: QueryTab[] = [
+        {
+          id: "tab-1",
+          queryId: "q1",
+          name: "Saved Query",
+          content: "SELECT 1",
+          isDirty: false,
+          isNew: false,
+        },
+      ];
+
+      renderEditorWorkspace({ initialTabs });
+
+      const toolbarSection = document.querySelector(
+        ".flex.items-center.gap-1.overflow-visible",
+      );
+      expect(toolbarSection).toBeTruthy();
+      const toolbarButtons = Array.from(
+        toolbarSection?.querySelectorAll("button") ?? [],
+      );
+      expect(toolbarButtons.length).toBeGreaterThan(4);
+
+      const viewHistoryButton = toolbarButtons.at(4);
+      expect(viewHistoryButton).toBeDefined();
+      await user.click(viewHistoryButton as HTMLElement);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("mock-history-panel")).toHaveAttribute(
+          "data-query-id-filter",
+          "q1",
+        );
+      });
+      expect(useActivityBarStore.getState().activeView).toBe("history");
+      expect(screen.queryByTestId("mock-sidebar")).not.toBeInTheDocument();
     });
   });
 

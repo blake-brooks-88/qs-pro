@@ -32,7 +32,7 @@ const renderSidebar = (
   folders: Folder[],
   dataExtensions: DataExtension[],
   savedQueries: SavedQuery[] = [],
-  activeView: "dataExtensions" | "queries" | "history" = "dataExtensions",
+  activeView: "dataExtensions" | "queries" = "dataExtensions",
 ) => {
   const queryClient = createQueryClient();
   return render(
@@ -396,29 +396,6 @@ describe("WorkspaceSidebar", () => {
       );
 
       expect(screen.getByText("Queries")).toBeInTheDocument();
-
-      rerender(
-        <QueryClientProvider client={queryClient}>
-          <WorkspaceSidebar
-            activeView="history"
-            tenantId="tenant-1"
-            folders={[]}
-            savedQueries={[]}
-            dataExtensions={[]}
-          />
-        </QueryClientProvider>,
-      );
-
-      expect(screen.getByText("Execution History")).toBeInTheDocument();
-    });
-
-    it("renders HistoryPanel for history view", async () => {
-      renderSidebar([], [], [], "history");
-      await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Search name or target DE..."),
-        ).toBeInTheDocument();
-      });
     });
   });
 
