@@ -10,7 +10,6 @@ import {
 } from "../repositories/drizzle-repositories";
 import {
   credentials,
-  queryHistory,
   shellQueryRuns,
   snippets,
   tenantFeatureOverrides,
@@ -68,9 +67,6 @@ describe("Drizzle Repositories", () => {
 
     if (tenantIds.length > 0) {
       await cleanupDb
-        .delete(queryHistory)
-        .where(inArray(queryHistory.tenantId, tenantIds));
-      await cleanupDb
         .delete(snippets)
         .where(inArray(snippets.tenantId, tenantIds));
       await cleanupDb
@@ -87,9 +83,6 @@ describe("Drizzle Repositories", () => {
     }
 
     if (userIds.length > 0) {
-      await cleanupDb
-        .delete(queryHistory)
-        .where(inArray(queryHistory.userId, userIds));
       await cleanupDb.delete(snippets).where(inArray(snippets.userId, userIds));
       await cleanupDb
         .delete(shellQueryRuns)
@@ -260,9 +253,6 @@ describe("RLS Tenant Isolation", () => {
 
     if (tenantIds.length > 0) {
       await cleanupDb
-        .delete(queryHistory)
-        .where(inArray(queryHistory.tenantId, tenantIds));
-      await cleanupDb
         .delete(snippets)
         .where(inArray(snippets.tenantId, tenantIds));
       await cleanupDb
@@ -271,9 +261,6 @@ describe("RLS Tenant Isolation", () => {
     }
 
     if (userIds.length > 0) {
-      await cleanupDb
-        .delete(queryHistory)
-        .where(inArray(queryHistory.userId, userIds));
       await cleanupDb.delete(snippets).where(inArray(snippets.userId, userIds));
       await cleanupDb
         .delete(shellQueryRuns)

@@ -65,7 +65,6 @@ describe('RLS Tenant Isolation (e2e)', () => {
     tenantId: string;
     mid: string;
   }> = [];
-  const createdHistory: Array<{ historyId: string; tenantId: string }> = [];
 
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
@@ -137,20 +136,7 @@ describe('RLS Tenant Isolation (e2e)', () => {
       }
     }
 
-    // 3. Delete query_history with exact context (tenant required)
-    for (const hist of createdHistory) {
-      try {
-        const reserved = await sqlClient.reserve();
-        await reserved`SELECT set_config('app.tenant_id', ${hist.tenantId}, false)`;
-        await reserved`DELETE FROM query_history WHERE id = ${hist.historyId}::uuid`;
-        await reserved`RESET app.tenant_id`;
-        reserved.release();
-      } catch {
-        // Best effort
-      }
-    }
-
-    // 4. Delete any remaining credentials created during auth flow (try all mid combinations)
+    // 3. Delete any remaining credentials created during auth flow (try all mid combinations)
     // Credentials table has RLS on tenant + mid
     if (createdUserIds.length > 0 && createdTenantIds.length > 0) {
       const midsToTry = [
@@ -183,7 +169,7 @@ describe('RLS Tenant Isolation (e2e)', () => {
       }
     }
 
-    // 5. Delete any remaining shell_query_runs (try all context combinations)
+    // 4. Delete any remaining shell_query_runs (try all context combinations)
     // shell_query_runs has RLS on tenant + mid + user
     if (createdUserIds.length > 0 && createdTenantIds.length > 0) {
       const midsToTry = [
@@ -218,7 +204,7 @@ describe('RLS Tenant Isolation (e2e)', () => {
       }
     }
 
-    // 6. Users and tenants are NOT RLS-protected, delete directly
+    // 5. Users and tenants are NOT RLS-protected, delete directly
     if (createdUserIds.length > 0) {
       await sqlClient`DELETE FROM users WHERE id = ANY(${createdUserIds}::uuid[])`;
     }
@@ -340,37 +326,6 @@ describe('RLS Tenant Isolation (e2e)', () => {
     }
 
     return credentialId;
-  }
-
-  async function createQueryHistoryWithContext(
-    tenantId: string,
-    userId: string,
-    mid: string,
-  ): Promise<string> {
-    const historyId = crypto.randomUUID();
-    createdHistory.push({ historyId, tenantId });
-
-    const reserved = await sqlClient.reserve();
-    try {
-      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
-
-      await reserved`
-        INSERT INTO query_history (id, tenant_id, user_id, mid, sql_text, status)
-        VALUES (
-          ${historyId}::uuid,
-          ${tenantId}::uuid,
-          ${userId}::uuid,
-          ${mid},
-          'SELECT * FROM test',
-          'SUCCESS'
-        )
-      `;
-    } finally {
-      await reserved`RESET app.tenant_id`;
-      reserved.release();
-    }
-
-    return historyId;
   }
 
   it('should block cross-tenant access to shell_query_runs via GET endpoint', async () => {
@@ -510,36 +465,6 @@ describe('RLS Tenant Isolation (e2e)', () => {
       await reserved`RESET app.tenant_id`;
       await reserved`RESET app.mid`;
       await reserved`RESET app.user_id`;
-      reserved.release();
-    }
-  });
-
-  it('should block cross-tenant SELECT queries on query_history at database level', async () => {
-    // Create Tenant H with query history
-    const tenantHId = await createTestTenant('eid-tenant-h', 'tssd-h');
-    const userHId = await createTestUser('sf-user-tenant-h', tenantHId);
-    const midH = 'mid-h';
-
-    // Insert query history for Tenant H
-    await createQueryHistoryWithContext(tenantHId, userHId, midH);
-
-    // Create Tenant I
-    const tenantIId = await createTestTenant('eid-tenant-i', 'tssd-i');
-    const midI = 'mid-i';
-
-    // Query query_history with Tenant I's context
-    const reserved = await sqlClient.reserve();
-    try {
-      await reserved`SELECT set_config('app.tenant_id', ${tenantIId}, false)`;
-      await reserved`SELECT set_config('app.mid', ${midI}, false)`;
-
-      // Query all history - should be empty (Tenant I can't see Tenant H's history)
-      const result = await reserved`SELECT * FROM query_history`;
-
-      expect(result.length).toBe(0);
-    } finally {
-      await reserved`RESET app.tenant_id`;
-      await reserved`RESET app.mid`;
       reserved.release();
     }
   });
