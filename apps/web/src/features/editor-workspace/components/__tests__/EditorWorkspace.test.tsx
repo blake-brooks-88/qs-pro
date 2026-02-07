@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { QueryExecutionStatus } from "@/features/editor-workspace/hooks/use-query-execution";
 import type { RunResultsResponse } from "@/features/editor-workspace/hooks/use-run-results";
+import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import type {
   DataExtension,
   ExecutionResult,
@@ -79,20 +80,19 @@ vi.mock("../ResultsPane", () => ({
   ),
 }));
 
+vi.mock("@/components/ActivityBar", () => ({
+  ActivityBar: () => <div data-testid="mock-activity-bar">ActivityBar</div>,
+}));
+
 vi.mock("../WorkspaceSidebar", () => ({
   WorkspaceSidebar: ({
-    isCollapsed,
-    onToggle,
+    activeView,
     onSelectQuery,
   }: {
-    isCollapsed: boolean;
-    onToggle?: () => void;
+    activeView: string;
     onSelectQuery?: (id: string) => void;
   }) => (
-    <div data-testid="mock-sidebar" data-collapsed={isCollapsed}>
-      <button onClick={onToggle} data-testid="sidebar-toggle">
-        {isCollapsed ? "Expand" : "Collapse"} Sidebar
-      </button>
+    <div data-testid="mock-sidebar" data-active-view={activeView}>
       <button
         onClick={() => onSelectQuery?.("test-query-id")}
         data-testid="sidebar-select-query"
@@ -380,8 +380,9 @@ describe("EditorWorkspace", () => {
     vi.clearAllMocks();
     mockQueryExecutionReturn = { ...defaultMockQueryExecution };
     mockSavedQueryData = null;
-    // Reset Zustand store before each test
+    // Reset Zustand stores before each test
     useTabsStore.getState().reset();
+    useActivityBarStore.setState({ activeView: "dataExtensions" });
   });
 
   // Tab lifecycle tests removed - these were mock-heavy and implementation-coupled.
@@ -665,38 +666,18 @@ describe("EditorWorkspace", () => {
   });
 
   describe("sidebar behavior", () => {
-    it("collapses sidebar when toggle button clicked", async () => {
-      const user = userEvent.setup();
-      const onToggleSidebar = vi.fn();
+    it("renders ActivityBar and sidebar panel", () => {
+      renderEditorWorkspace();
 
-      renderEditorWorkspace({ isSidebarCollapsed: false, onToggleSidebar });
-
-      // Sidebar should show expanded state
-      const sidebar = screen.getByTestId("mock-sidebar");
-      expect(sidebar).toHaveAttribute("data-collapsed", "false");
-
-      // Click toggle
-      await user.click(screen.getByTestId("sidebar-toggle"));
-
-      // onToggleSidebar callback should be called
-      expect(onToggleSidebar).toHaveBeenCalled();
+      expect(screen.getByTestId("mock-activity-bar")).toBeInTheDocument();
+      expect(screen.getByTestId("mock-sidebar")).toBeInTheDocument();
     });
 
-    it("expands sidebar when toggle button clicked", async () => {
-      const user = userEvent.setup();
-      const onToggleSidebar = vi.fn();
+    it("passes activeView from store to sidebar", () => {
+      renderEditorWorkspace();
 
-      renderEditorWorkspace({ isSidebarCollapsed: true, onToggleSidebar });
-
-      // Sidebar should show collapsed state
       const sidebar = screen.getByTestId("mock-sidebar");
-      expect(sidebar).toHaveAttribute("data-collapsed", "true");
-
-      // Click toggle
-      await user.click(screen.getByTestId("sidebar-toggle"));
-
-      // onToggleSidebar callback should be called
-      expect(onToggleSidebar).toHaveBeenCalled();
+      expect(sidebar).toHaveAttribute("data-active-view", "dataExtensions");
     });
   });
 

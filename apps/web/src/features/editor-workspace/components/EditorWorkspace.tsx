@@ -21,6 +21,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { ActivityBar } from "@/components/ActivityBar";
 import { FeatureGate } from "@/components/FeatureGate";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
@@ -35,6 +36,7 @@ import {
   useSavedQuery,
   useUpdateSavedQuery,
 } from "@/features/editor-workspace/hooks/use-saved-queries";
+import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import type {
   DataExtensionDraft,
   DataExtensionField,
@@ -74,7 +76,7 @@ export function EditorWorkspace({
   dataExtensions,
   executionResult: externalExecutionResult,
   initialTabs,
-  isSidebarCollapsed: initialSidebarCollapsed,
+  isSidebarCollapsed: _initialSidebarCollapsed,
   isDataExtensionsFetching = false,
   guardrailMessage: _guardrailMessageProp,
   guardrailTitle: _guardrailTitleProp = "Guardrail Violation",
@@ -85,7 +87,7 @@ export function EditorWorkspace({
   onCreateQueryActivity: _onCreateQueryActivity,
   onSelectQuery,
   onSelectDE,
-  onToggleSidebar,
+  onToggleSidebar: _onToggleSidebar,
   onPageChange,
   onViewInContactBuilder,
   onCreateDE,
@@ -93,9 +95,8 @@ export function EditorWorkspace({
   onTabChange,
   onNewTab: _onNewTab,
 }: EditorWorkspaceProps) {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
-    initialSidebarCollapsed,
-  );
+  const activeView = useActivityBarStore((s) => s.activeView);
+
   const [isDEModalOpen, setIsDEModalOpen] = useState(false);
   const [isQueryActivityModalOpen, setIsQueryActivityModalOpen] =
     useState(false);
@@ -340,11 +341,6 @@ export function EditorWorkspace({
       setIsResultsOpen(true);
     }
   }, [executionResult.status]);
-
-  const handleToggleSidebar = () => {
-    setIsSidebarCollapsed(!isSidebarCollapsed);
-    onToggleSidebar?.();
-  };
 
   const handleCreateDE = async () => {
     // Lazy load both inferrer and fetcher to avoid bundle impact
@@ -593,30 +589,34 @@ export function EditorWorkspace({
   return (
     <Tooltip.Provider delayDuration={400}>
       <div className="flex flex-1 bg-background text-foreground font-sans h-full">
-        {/* Sidebar Explorer */}
-        <WorkspaceSidebar
-          tenantId={tenantId}
-          folders={folders}
-          savedQueries={savedQueries}
-          dataExtensions={dataExtensions}
-          isCollapsed={isSidebarCollapsed}
-          isDataExtensionsFetching={isDataExtensionsFetching}
-          onToggle={handleToggleSidebar}
-          onSelectQuery={(id) => {
-            // Check if already open in Zustand store
-            const existingTab = tabs.find((t) => t.queryId === id);
-            if (existingTab) {
-              storeSetActiveTab(existingTab.id);
-              onTabChange?.(existingTab.id);
-              return;
-            }
-            // Trigger lazy fetch
-            setPendingQueryId(id);
-            onSelectQuery?.(id);
-          }}
-          onSelectDE={onSelectDE}
-          onCreateDE={handleCreateDE}
-        />
+        {/* Activity Bar */}
+        <ActivityBar />
+
+        {/* Sidebar Panel */}
+        {activeView !== null && (
+          <WorkspaceSidebar
+            activeView={activeView}
+            tenantId={tenantId}
+            folders={folders}
+            savedQueries={savedQueries}
+            dataExtensions={dataExtensions}
+            isDataExtensionsFetching={isDataExtensionsFetching}
+            onSelectQuery={(id) => {
+              // Check if already open in Zustand store
+              const existingTab = tabs.find((t) => t.queryId === id);
+              if (existingTab) {
+                storeSetActiveTab(existingTab.id);
+                onTabChange?.(existingTab.id);
+                return;
+              }
+              // Trigger lazy fetch
+              setPendingQueryId(id);
+              onSelectQuery?.(id);
+            }}
+            onSelectDE={onSelectDE}
+            onCreateDE={handleCreateDE}
+          />
+        )}
 
         {/* Main IDE Workspace */}
         <div ref={workspaceRef} className="flex-1 flex flex-col min-w-0">
