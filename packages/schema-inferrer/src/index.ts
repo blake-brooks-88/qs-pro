@@ -1,22 +1,22 @@
 // Types
 export type {
-  MCEFieldType,
-  InferredField,
   FieldTypeConstraints,
-  MetadataField,
-  MetadataFetcher,
-  InferErrorCode,
   InferError,
+  InferErrorCode,
+  InferredField,
   InferResult,
+  MCEFieldType,
+  MetadataFetcher,
+  MetadataField,
 } from "./types";
 
 // Core inference
-export { inferSchema, inferFieldTypeFromMetadata } from "./schema-inferrer";
+export { inferFieldTypeFromMetadata, inferSchema } from "./schema-inferrer";
 
 // System data views
 export type { SystemDataViewField } from "./system-data-views";
 export {
-  isSystemDataView,
   getSystemDataViewFields,
   getSystemDataViewNames,
+  isSystemDataView,
 } from "./system-data-views";

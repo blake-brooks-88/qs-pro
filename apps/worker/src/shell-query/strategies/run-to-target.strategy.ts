@@ -79,7 +79,14 @@ export class RunToTargetFlow implements IFlowStrategy {
     job: ShellQueryJob,
     publishStatus?: StatusPublisher,
   ): Promise<FlowResult> {
-    const { tenantId, userId, mid, sqlText, targetDeCustomerKey } = job;
+    const {
+      tenantId,
+      userId,
+      mid,
+      sqlText,
+      targetDeCustomerKey,
+      targetUpdateType,
+    } = job;
 
     if (!targetDeCustomerKey) {
       throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
@@ -147,25 +154,43 @@ export class RunToTargetFlow implements IFlowStrategy {
       `Found target Data Extension: ${targetDe.name} (CustomerKey: ${targetDe.customerKey}, ObjectID: ${targetDe.objectId})`,
     );
 
-    // Safety guard: MCE "Overwrite" clears the target DE before the query runs.
-    // If the query reads from the same DE, it will end up selecting 0 rows and
-    // permanently wipe the DE contents.
-    const referencedTables = extractTableNames(expandedSql);
-    const normalizedTargetNames = new Set([
-      normalizeMceIdentifier(targetDe.customerKey),
-      normalizeMceIdentifier(targetDe.name),
-    ]);
-    const readsFromTarget = referencedTables.some((table) =>
-      normalizedTargetNames.has(normalizeMceIdentifier(table)),
-    );
+    const isOverwriteMode =
+      !targetUpdateType || targetUpdateType === "Overwrite";
 
-    if (readsFromTarget) {
-      throw new AppError(ErrorCode.MCE_BAD_REQUEST, undefined, {
-        statusMessage:
-          `Cannot overwrite Data Extension "${targetDe.name}" because it is referenced in the query FROM/JOIN. ` +
-          "Overwrite clears the target before the query runs, resulting in 0 rows. " +
-          "Choose a different target, or write to a temp DE first and then overwrite the target from that temp DE.",
-      });
+    if (isOverwriteMode) {
+      const referencedTables = extractTableNames(expandedSql);
+      const normalizedTargetNames = new Set([
+        normalizeMceIdentifier(targetDe.customerKey),
+        normalizeMceIdentifier(targetDe.name),
+      ]);
+      const readsFromTarget = referencedTables.some((table) =>
+        normalizedTargetNames.has(normalizeMceIdentifier(table)),
+      );
+
+      if (readsFromTarget) {
+        throw new AppError(ErrorCode.MCE_BAD_REQUEST, undefined, {
+          statusMessage:
+            `Cannot overwrite Data Extension "${targetDe.name}" because it is referenced in the query FROM/JOIN. ` +
+            "Overwrite clears the target before the query runs, resulting in 0 rows. " +
+            'Use "Append" or "Update" data action instead, or choose a different target.',
+        });
+      }
+    }
+
+    if (targetUpdateType === "Update") {
+      const targetFields = await this.dataExtensionService.retrieveFields(
+        tenantId,
+        userId,
+        mid,
+        targetDe.name,
+      );
+      const hasPk = targetFields.some((f) => f.isPrimaryKey);
+      if (!hasPk) {
+        throw new AppError(ErrorCode.MCE_VALIDATION_FAILED, undefined, {
+          statusMessage:
+            "Update mode requires the target Data Extension to have a Primary Key field.",
+        });
+      }
     }
 
     await this.validateTargetSchemaCompatibility(
@@ -186,6 +211,7 @@ export class RunToTargetFlow implements IFlowStrategy {
       targetDe.customerKey,
       targetDe.name,
       folderId,
+      targetUpdateType,
     );
 
     await publishStatus?.("executing_query");
@@ -371,6 +397,7 @@ export class RunToTargetFlow implements IFlowStrategy {
     deCustomerKey: string,
     deName: string,
     folderId: number,
+    targetUpdateType?: "Overwrite" | "Append" | "Update",
   ): Promise<QueryDefinitionIds> {
     const { tenantId, userId, mid } = job;
 
@@ -388,6 +415,7 @@ export class RunToTargetFlow implements IFlowStrategy {
         targetCustomerKey: deCustomerKey,
         targetName: deName,
         queryText: sql,
+        targetUpdateType,
       },
     );
 

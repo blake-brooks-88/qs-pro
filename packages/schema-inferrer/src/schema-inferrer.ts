@@ -1,24 +1,25 @@
-import type {
-  MCEFieldType,
-  InferredField,
-  FieldTypeConstraints,
-  MetadataFetcher,
-  InferResult,
-} from "./types";
-import { normalizeFieldType } from "./type-normalizer";
+import nodeSqlParser from "node-sql-parser";
+
 import {
   AGGREGATE_TYPE_MAP,
-  STRING_FUNCTIONS,
   DATE_FUNCTIONS,
   NUMERIC_FUNCTIONS,
+  STRING_FUNCTIONS,
 } from "./function-maps";
-import { stripBrackets, buildTableAliasMap } from "./sql-utils";
+import { buildTableAliasMap, stripBrackets } from "./sql-utils";
 import {
-  isSystemDataView,
   getSystemDataViewFields,
+  isSystemDataView,
   type SystemDataViewField,
 } from "./system-data-views";
-import nodeSqlParser from "node-sql-parser";
+import { normalizeFieldType } from "./type-normalizer";
+import type {
+  FieldTypeConstraints,
+  InferredField,
+  InferResult,
+  MCEFieldType,
+  MetadataFetcher,
+} from "./types";
 
 const parser = new nodeSqlParser.Parser();
 const DIALECT = "transactsql";
@@ -124,7 +125,7 @@ function getColumnName(col: SelectColumn | string, index: number): string {
 async function inferColumnType(
   expr: AstExpression | undefined,
   aliasMap: Map<string, string>,
-  metadataFetcher: MetadataFetcher
+  metadataFetcher: MetadataFetcher,
 ): Promise<InternalField> {
   if (!expr) {
     return { Name: "Unknown", FieldType: "Text", MaxLength: 254 };
@@ -148,7 +149,7 @@ async function inferColumnType(
       const fieldType = await lookupFieldType(
         tableName,
         columnName,
-        metadataFetcher
+        metadataFetcher,
       );
       if (fieldType) {
         return { Name: columnName, ...fieldType };
@@ -156,7 +157,11 @@ async function inferColumnType(
     }
 
     for (const table of aliasMap.values()) {
-      const fieldType = await lookupFieldType(table, columnName, metadataFetcher);
+      const fieldType = await lookupFieldType(
+        table,
+        columnName,
+        metadataFetcher,
+      );
       if (fieldType) {
         return { Name: columnName, ...fieldType };
       }
@@ -193,7 +198,7 @@ async function inferColumnType(
           const argType = await inferColumnType(
             argList[0] as AstExpression,
             aliasMap,
-            metadataFetcher
+            metadataFetcher,
           );
           return { ...argType, Name: funcName };
         }
@@ -312,7 +317,7 @@ async function inferColumnType(
       const firstResult = await inferColumnType(
         results[0] as AstExpression,
         aliasMap,
-        metadataFetcher
+        metadataFetcher,
       );
       return { ...firstResult, Name: "Case" };
     }
@@ -340,8 +345,16 @@ async function inferColumnType(
   }
 
   if (expr.type === "binary_expr") {
-    const leftType = await inferColumnType(expr.left, aliasMap, metadataFetcher);
-    const rightType = await inferColumnType(expr.right, aliasMap, metadataFetcher);
+    const leftType = await inferColumnType(
+      expr.left,
+      aliasMap,
+      metadataFetcher,
+    );
+    const rightType = await inferColumnType(
+      expr.right,
+      aliasMap,
+      metadataFetcher,
+    );
 
     if (
       leftType.FieldType === "Number" ||
@@ -372,7 +385,7 @@ async function inferColumnType(
 async function lookupFieldType(
   tableName: string,
   columnName: string,
-  metadataFetcher: MetadataFetcher
+  metadataFetcher: MetadataFetcher,
 ): Promise<{ FieldType: MCEFieldType; MaxLength?: number } | null> {
   const normalizedTable = stripBrackets(tableName);
 
@@ -384,7 +397,8 @@ async function lookupFieldType(
   if (isSystemDataView(effectiveTableName)) {
     const fields = getSystemDataViewFields(effectiveTableName);
     const field = fields.find(
-      (f: SystemDataViewField) => f.Name.toLowerCase() === columnName.toLowerCase()
+      (f: SystemDataViewField) =>
+        f.Name.toLowerCase() === columnName.toLowerCase(),
     );
     if (field) {
       return { FieldType: field.FieldType, MaxLength: field.MaxLength };
@@ -395,7 +409,7 @@ async function lookupFieldType(
   const fields = await metadataFetcher.getFieldsForTable(effectiveTableName);
   if (fields) {
     const field = fields.find(
-      (f) => f.Name.toLowerCase() === columnName.toLowerCase()
+      (f) => f.Name.toLowerCase() === columnName.toLowerCase(),
     );
     if (field) {
       const normalizedType = normalizeFieldType(field.FieldType);
@@ -488,7 +502,7 @@ function isStarColumn(col: SelectColumn | string): boolean {
 
 export async function inferSchema(
   sql: string,
-  metadataFetcher: MetadataFetcher
+  metadataFetcher: MetadataFetcher,
 ): Promise<InferResult> {
   let ast: AstStatement | AstStatement[];
 
@@ -545,7 +559,7 @@ export async function inferSchema(
         internalField = await inferColumnType(
           col.expr as AstExpression,
           aliasMap,
-          metadataFetcher
+          metadataFetcher,
         );
         internalField.Name = sanitizedName;
       } else if (
@@ -557,7 +571,7 @@ export async function inferSchema(
         internalField = await inferColumnType(
           col as unknown as AstExpression,
           aliasMap,
-          metadataFetcher
+          metadataFetcher,
         );
         internalField.Name = sanitizedName;
       } else {
@@ -587,7 +601,7 @@ export async function inferSchema(
 }
 
 export function inferFieldTypeFromMetadata(
-  metadataType: string
+  metadataType: string,
 ): FieldTypeConstraints {
   const typeStr = (metadataType || "").trim();
 

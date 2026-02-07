@@ -115,7 +115,7 @@ export function TargetDECreationView({
 
       const result = await createDataExtension(dto);
 
-      const resolvedKey = draft.customerKey || result.objectId;
+      const resolvedKey = result.customerKey;
       const newDE: DataExtension = {
         id: resolvedKey,
         name: draft.name,

@@ -56,6 +56,7 @@ export class ShellQueryService {
     snippetName?: string,
     tableMetadata?: TableMetadata,
     targetDeCustomerKey?: string,
+    targetUpdateType?: 'Overwrite' | 'Append' | 'Update',
   ): Promise<string> {
     const normalizedSnippetName = snippetName?.trim();
     const truncatedSnippetName = normalizedSnippetName
@@ -90,6 +91,7 @@ export class ShellQueryService {
       mid: context.mid,
       snippetName: truncatedSnippetName,
       targetDeCustomerKey,
+      targetUpdateType,
       sqlTextHash,
       status: 'queued',
     });
@@ -111,6 +113,7 @@ export class ShellQueryService {
         snippetName: truncatedSnippetName,
         tableMetadata,
         targetDeCustomerKey,
+        targetUpdateType,
       },
       {
         attempts: 2,

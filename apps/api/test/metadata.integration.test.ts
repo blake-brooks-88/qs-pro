@@ -817,7 +817,10 @@ describe('Metadata Endpoints (integration)', () => {
         })
         .expect(201);
 
-      expect(response.body).toEqual({ objectId: 'new-de-object-id' });
+      expect(response.body).toEqual({
+        objectId: 'new-de-object-id',
+        customerKey: expect.any(String),
+      });
       expect(lastSoapBody).toContain('<Objects xsi:type="DataExtension">');
       expect(lastSoapBody).toContain('<CategoryID>123</CategoryID>');
       expect(lastSoapBody).toContain('<Field xsi:type="DataExtensionField">');

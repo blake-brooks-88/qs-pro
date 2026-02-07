@@ -85,8 +85,8 @@ export async function fetchDataExtensionDetails(params: {
 
 export async function createDataExtension(
   data: CreateDataExtensionDto,
-): Promise<{ objectId: string }> {
-  const response = await api.post<{ objectId: string }>(
+): Promise<{ objectId: string; customerKey: string }> {
+  const response = await api.post<{ objectId: string; customerKey: string }>(
     "/metadata/data-extensions",
     data,
   );

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type {
   DataExtension,
   DataExtensionField,
+  TargetUpdateType,
 } from "@/features/editor-workspace/types";
 import { extractTableReferences } from "@/features/editor-workspace/utils/sql-context";
 import api from "@/services/api";
@@ -77,6 +78,7 @@ interface UseQueryExecutionResult {
     sqlText: string,
     snippetName?: string,
     targetDeCustomerKey?: string,
+    targetUpdateType?: TargetUpdateType,
   ) => Promise<void>;
   cancel: () => Promise<void>;
   status: QueryExecutionStatus;
@@ -256,6 +258,7 @@ export function useQueryExecution(
       sqlText: string,
       snippetName?: string,
       targetDeCustomerKey?: string,
+      targetUpdateType?: TargetUpdateType,
     ): Promise<void> => {
       setCurrentPage(1);
       if (runId) {
@@ -276,6 +279,7 @@ export function useQueryExecution(
           snippetName,
           tableMetadata,
           targetDeCustomerKey,
+          targetUpdateType,
         });
 
         const { runId: newRunId, status: newStatus } = response.data;

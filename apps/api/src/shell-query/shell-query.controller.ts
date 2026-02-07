@@ -30,6 +30,7 @@ const createRunSchema = z.object({
   // preserve backward compatibility with callers that don't pre-trim.
   snippetName: z.string().max(1000).optional(),
   targetDeCustomerKey: z.string().trim().min(1).max(200).optional(),
+  targetUpdateType: z.enum(['Overwrite', 'Append', 'Update']).optional(),
   tableMetadata: z
     .record(
       z.string().max(128),
@@ -71,8 +72,13 @@ export class ShellQueryController {
       throw new BadRequestException(result.error.errors);
     }
 
-    const { sqlText, snippetName, targetDeCustomerKey, tableMetadata } =
-      result.data;
+    const {
+      sqlText,
+      snippetName,
+      targetDeCustomerKey,
+      targetUpdateType,
+      tableMetadata,
+    } = result.data;
 
     if (targetDeCustomerKey) {
       const { features: tenantFeatures } =
@@ -104,6 +110,7 @@ export class ShellQueryController {
         snippetName,
         tableMetadata,
         targetDeCustomerKey,
+        targetUpdateType,
       );
 
       return { runId, status: 'queued' };

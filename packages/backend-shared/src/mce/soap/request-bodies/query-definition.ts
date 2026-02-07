@@ -89,7 +89,7 @@ export function buildCreateQueryDefinition(
       <CustomerKey>${escapeXml(targetCustomerKey)}</CustomerKey>
       <Name>${escapeXml(targetName)}</Name>
     </DataExtensionTarget>
-    <TargetUpdateType>${targetUpdateType ?? "Overwrite"}</TargetUpdateType>
+    <TargetUpdateType>${escapeXml(targetUpdateType ?? "Overwrite")}</TargetUpdateType>
     ${categoryIdXml}
   </Objects>
 </CreateRequest>`;

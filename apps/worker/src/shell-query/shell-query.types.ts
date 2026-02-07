@@ -101,6 +101,7 @@ export interface ShellQueryJob {
   snippetName?: string;
   tableMetadata?: TableMetadata;
   targetDeCustomerKey?: string;
+  targetUpdateType?: "Overwrite" | "Append" | "Update";
 }
 
 export interface PollShellQueryJob {

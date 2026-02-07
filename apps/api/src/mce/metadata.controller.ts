@@ -108,7 +108,7 @@ export class MetadataController {
       sendableFieldType = field?.type;
     }
 
-    return this.metadataService.createDataExtension(
+    const response = await this.metadataService.createDataExtension(
       user.tenantId,
       user.userId,
       user.mid,
@@ -131,5 +131,7 @@ export class MetadataController {
         })),
       },
     );
+
+    return { ...response, customerKey: finalCustomerKey };
   }
 }

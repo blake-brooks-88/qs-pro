@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+
 import {
-  isSystemDataView,
   getSystemDataViewFields,
   getSystemDataViewNames,
+  isSystemDataView,
 } from "../system-data-views";
 
 describe("System Data Views", () => {
@@ -206,7 +207,7 @@ describe("System Data Views", () => {
         expect(jobIdField?.FieldType).toBe("Number");
 
         const subscriberKeyField = fields.find(
-          (f) => f.Name === "SubscriberKey"
+          (f) => f.Name === "SubscriberKey",
         );
         expect(subscriberKeyField?.FieldType).toBe("Text");
         expect(subscriberKeyField?.MaxLength).toBe(254);
