@@ -1,6 +1,7 @@
 import { LockKeyhole, Rocket } from "@solar-icons/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { cn } from "@/lib/utils";
 
 interface QuotaGateProps {
@@ -74,6 +75,8 @@ function QuotaBlockedDefault({
   resourceName,
   limit,
 }: QuotaBlockedDefaultProps) {
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
+
   return (
     <div className="p-4 border border-border rounded-lg bg-card text-center">
       <LockKeyhole size={32} className="mx-auto mb-2 text-muted-foreground" />
@@ -87,14 +90,15 @@ function QuotaBlockedDefault({
       <button
         type="button"
         className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        onClick={() => {
-          // TODO: Open upgrade modal or redirect to upgrade page
-          console.warn("Upgrade clicked - implement upgrade flow");
-        }}
+        onClick={() => setIsUpgradeOpen(true)}
       >
         <Rocket size={16} />
         Upgrade to Pro
       </button>
+      <UpgradeModal
+        isOpen={isUpgradeOpen}
+        onClose={() => setIsUpgradeOpen(false)}
+      />
     </div>
   );
 }
