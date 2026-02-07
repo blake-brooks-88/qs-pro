@@ -196,12 +196,22 @@ export function HistoryPanel({
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   }, []);
 
-  const toggleStatus = useCallback((status: string) => {
-    setStatusFilter((prev) =>
-      prev.includes(status)
-        ? prev.filter((s) => s !== status)
-        : [...prev, status],
-    );
+  const handleStatusFilterChange = useCallback(
+    (status: string, checked: boolean | "indeterminate") => {
+      setStatusFilter((prev) =>
+        checked === true
+          ? prev.includes(status)
+            ? prev
+            : [...prev, status]
+          : prev.filter((value) => value !== status),
+      );
+      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    },
+    [],
+  );
+
+  const clearStatusFilters = useCallback(() => {
+    setStatusFilter([]);
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   }, []);
 
@@ -210,14 +220,79 @@ export function HistoryPanel({
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   }, []);
 
+  const clearAllFilters = useCallback(() => {
+    setStatusFilter([]);
+    setDatePreset(null);
+    setSearchValue("");
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, []);
+
   // Column definitions
   const columns = useMemo(
     (): ColumnDef<ExecutionHistoryItem, unknown>[] => [
       {
         accessorKey: "status",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Status" />
-        ),
+        header: ({ column }) => {
+          const hasStatusFilter = statusFilter.length > 0;
+
+          return (
+            <div className="flex items-center gap-1">
+              <DataTableColumnHeader column={column} title="Status" />
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Filter status"
+                    className={cn(
+                      "inline-flex h-5 w-5 items-center justify-center rounded transition-colors hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+                      hasStatusFilter && "bg-muted/50 text-foreground",
+                    )}
+                  >
+                    <MenuDots size={12} />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    className="min-w-[180px] bg-card border border-border rounded-lg shadow-xl p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                    sideOffset={5}
+                    align="start"
+                  >
+                    <DropdownMenu.Label className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Filter Status
+                    </DropdownMenu.Label>
+                    <DropdownMenu.Separator className="h-px bg-border my-1" />
+                    {STATUSES.map((status) => (
+                      <DropdownMenu.CheckboxItem
+                        key={status}
+                        checked={statusFilter.includes(status)}
+                        onCheckedChange={(checked) => {
+                          handleStatusFilterChange(status, checked);
+                        }}
+                        className="relative pl-7 pr-3 py-2 text-xs rounded-md cursor-pointer outline-none transition-colors hover:bg-muted/50 focus:bg-muted/50"
+                      >
+                        <DropdownMenu.ItemIndicator className="absolute left-2 inline-flex items-center justify-center text-primary">
+                          ✓
+                        </DropdownMenu.ItemIndicator>
+                        {STATUS_LABEL.get(status) ?? status}
+                      </DropdownMenu.CheckboxItem>
+                    ))}
+                    {hasStatusFilter ? (
+                      <>
+                        <DropdownMenu.Separator className="h-px bg-border my-1" />
+                        <DropdownMenu.Item
+                          className="px-2 py-1.5 text-xs rounded-md cursor-pointer outline-none transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50 focus:bg-muted/50"
+                          onSelect={clearStatusFilters}
+                        >
+                          Clear status filter
+                        </DropdownMenu.Item>
+                      </>
+                    ) : null}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            </div>
+          );
+        },
         cell: ({ row }) => {
           const status = row.original.status;
           return (
@@ -390,7 +465,13 @@ export function HistoryPanel({
         enableSorting: false,
       },
     ],
-    [onRerun, onCopySql],
+    [
+      onRerun,
+      onCopySql,
+      statusFilter,
+      handleStatusFilterChange,
+      clearStatusFilters,
+    ],
   );
 
   // Determine empty state message
@@ -433,67 +514,35 @@ export function HistoryPanel({
           onSearchChange={handleSearchChange}
           searchPlaceholder="Search name or target DE..."
           className="py-1.5"
-        />
-      </div>
+        >
+          <div className="flex items-center gap-1.5">
+            {DATE_PRESETS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => handleDatePreset(key)}
+                className={cn(
+                  "px-2 py-0.5 text-[10px] font-medium rounded border transition-colors",
+                  datePreset === key
+                    ? "bg-primary/10 text-primary border-primary/30"
+                    : "bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/50",
+                )}
+              >
+                {label}
+              </button>
+            ))}
 
-      {/* Status filter pills */}
-      <div className="flex flex-wrap items-center gap-1.5 px-2 pb-1.5">
-        {STATUSES.map((status) => {
-          const isActive = statusFilter.includes(status);
-          return (
-            <button
-              key={status}
-              type="button"
-              onClick={() => toggleStatus(status)}
-              className={cn(
-                "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary border-primary/30"
-                  : "bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/50",
-              )}
-            >
-              <StatusBadge
-                variant={runStatusToVariant(status)}
-                className="!px-0 !py-0 !border-0 !bg-transparent !text-inherit"
-              />
-              {STATUS_LABEL.get(status)}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Date preset buttons */}
-      <div className="flex items-center gap-1.5 px-2 pb-2">
-        {DATE_PRESETS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => handleDatePreset(key)}
-            className={cn(
-              "px-2 py-0.5 text-[10px] font-medium rounded border transition-colors",
-              datePreset === key
-                ? "bg-primary/10 text-primary border-primary/30"
-                : "bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/50",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-
-        {hasActiveFilters ? (
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter([]);
-              setDatePreset(null);
-              setSearchValue("");
-              setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-            }}
-            className="px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Clear all
-          </button>
-        ) : null}
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+        </DataTableToolbar>
       </div>
 
       {/* Table */}
