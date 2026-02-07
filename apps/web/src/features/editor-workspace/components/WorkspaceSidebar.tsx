@@ -9,12 +9,15 @@ import {
 import Fuse from "fuse.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { QuotaCountBadge } from "@/components/QuotaGate";
 import { useDataExtensionFields } from "@/features/editor-workspace/hooks/use-metadata";
 import type {
   DataExtension,
   Folder,
   SavedQuery,
 } from "@/features/editor-workspace/types";
+import { useRunUsage } from "@/hooks/use-run-usage";
+import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { cn } from "@/lib/utils";
 
 import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
@@ -179,6 +182,9 @@ export function WorkspaceSidebar({
   onSelectDE,
   onCreateFolder,
 }: WorkspaceSidebarProps) {
+  const { tier } = useTier();
+  const { data: usageData } = useRunUsage();
+
   const [activeTab, setActiveTab] = useState<"de" | "queries">("de");
   const [expandedFolderIds, setExpandedFolderIds] = useState<
     Record<string, boolean>
@@ -721,6 +727,30 @@ export function WorkspaceSidebar({
           )}
         </div>
       </div>
+
+      {/* Sidebar Footer - Usage Badge */}
+      {tier === "free" && usageData && usageData.queryRuns.limit !== null ? (
+        <div className="border-t border-border p-3 shrink-0">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Runs</span>
+            <QuotaCountBadge
+              current={usageData.queryRuns.current}
+              limit={usageData.queryRuns.limit}
+              resourceName="Query Runs"
+            />
+          </div>
+          {usageData.queryRuns.current >=
+            usageData.queryRuns.limit * WARNING_THRESHOLD && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Resets{" "}
+              {new Date(usageData.queryRuns.resetDate).toLocaleDateString(
+                "en-US",
+                { month: "long", day: "numeric" },
+              )}
+            </p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
