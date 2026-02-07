@@ -13,6 +13,8 @@ export interface CreateShellQueryRunParams {
   targetDeCustomerKey?: string;
   targetUpdateType?: string;
   sqlTextHash: string;
+  sqlTextEncrypted?: string;
+  savedQueryId?: string;
   status: ShellQueryRunStatus;
 }
 

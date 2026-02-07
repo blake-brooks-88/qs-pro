@@ -83,7 +83,16 @@ export class ShellQueryService {
       });
     }
 
-    // 2. Persist initial state to DB
+    // 2. Encrypt SQL text (reused for both DB persistence and BullMQ queue)
+    const encryptedSqlText = this.encryptionService.encrypt(sqlText);
+    if (!encryptedSqlText) {
+      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+        operation: 'createRun',
+        reason: 'Failed to encrypt sqlText',
+      });
+    }
+
+    // 3. Persist initial state to DB
     await this.runRepo.createRun({
       id: runId,
       tenantId: context.tenantId,
@@ -93,17 +102,11 @@ export class ShellQueryService {
       targetDeCustomerKey,
       targetUpdateType,
       sqlTextHash,
+      sqlTextEncrypted: encryptedSqlText,
       status: 'queued',
     });
 
-    // 3. Add to Queue (encrypt sqlText for at-rest security in Redis)
-    const encryptedSqlText = this.encryptionService.encrypt(sqlText);
-    if (!encryptedSqlText) {
-      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
-        operation: 'createRun',
-        reason: 'Failed to encrypt sqlText',
-      });
-    }
+    // 4. Add to Queue (reuse same encrypted value -- zero extra overhead)
     await this.shellQueryQueue.add(
       'execute-shell-query',
       {
