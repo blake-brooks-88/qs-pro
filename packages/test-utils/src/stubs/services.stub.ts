@@ -27,6 +27,7 @@ export interface ShellQueryServiceStub {
   getRunStatus: ReturnType<typeof vi.fn>;
   getResults: ReturnType<typeof vi.fn>;
   cancelRun: ReturnType<typeof vi.fn>;
+  listHistory: ReturnType<typeof vi.fn>;
 }
 
 /** Shell Query Run Repository stub interface */
@@ -35,6 +36,7 @@ export interface ShellQueryRunRepoStub {
   findRun: ReturnType<typeof vi.fn>;
   markCanceled: ReturnType<typeof vi.fn>;
   countActiveRuns: ReturnType<typeof vi.fn>;
+  listRuns: ReturnType<typeof vi.fn>;
 }
 
 /** Shell Query SSE Service stub interface */
@@ -123,6 +125,9 @@ export function createShellQueryServiceStub(
       getRunStatus: vi.fn(),
       getResults: vi.fn().mockResolvedValue({ items: [] }),
       cancelRun: vi.fn().mockResolvedValue({ status: "canceled" }),
+      listHistory: vi
+        .fn()
+        .mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 }),
     },
     overrides,
   );
@@ -141,6 +146,7 @@ export function createShellQueryRunRepoStub(
       findRun: vi.fn().mockResolvedValue(null),
       markCanceled: vi.fn().mockResolvedValue(undefined),
       countActiveRuns: vi.fn().mockResolvedValue(0),
+      listRuns: vi.fn().mockResolvedValue({ runs: [], total: 0 }),
     },
     overrides,
   );

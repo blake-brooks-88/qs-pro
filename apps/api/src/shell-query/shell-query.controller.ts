@@ -14,6 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import { HistoryQueryParamsSchema } from '@qpp/shared-types';
 import type { Observable } from 'rxjs';
 import { z } from 'zod';
 
@@ -140,6 +141,31 @@ export class ShellQueryController {
         error instanceof Error ? error.message : 'Unknown error',
       );
     }
+  }
+
+  @Get('history')
+  async getHistory(@CurrentUser() user: UserSession, @Query() query: unknown) {
+    const { features: tenantFeatures } =
+      await this.featuresService.getTenantFeatures(user.tenantId);
+
+    if (!tenantFeatures.executionHistory) {
+      throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+        operation: 'getHistory',
+        reason: 'Execution History requires Pro subscription',
+      });
+    }
+
+    const result = HistoryQueryParamsSchema.safeParse(query);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+
+    return this.shellQueryService.listHistory(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      result.data,
+    );
   }
 
   @Get(':runId')

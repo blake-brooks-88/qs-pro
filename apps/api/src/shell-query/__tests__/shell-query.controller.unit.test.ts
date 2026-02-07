@@ -38,6 +38,7 @@ function createFeaturesServiceStub() {
         teamSnippets: false,
         auditLogs: false,
         deployToAutomation: true,
+        executionHistory: true,
       },
     }),
   };
@@ -182,6 +183,7 @@ describe('ShellQueryController', () => {
           teamSnippets: false,
           auditLogs: false,
           deployToAutomation: false,
+          executionHistory: false,
         },
       });
 

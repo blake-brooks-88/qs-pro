@@ -8,11 +8,19 @@ import {
   RestDataService,
   type RowsetResponse,
 } from '@qpp/backend-shared';
-import type { TableMetadata } from '@qpp/shared-types';
+import type {
+  ExecutionHistoryItem,
+  HistoryListResponse,
+  HistoryQueryParams,
+  TableMetadata,
+} from '@qpp/shared-types';
 import { Queue } from 'bullmq';
 import * as crypto from 'crypto';
 
-import type { ShellQueryRunRepository } from './shell-query-run.repository';
+import type {
+  ShellQueryRun,
+  ShellQueryRunRepository,
+} from './shell-query-run.repository';
 
 export interface ShellQueryContext {
   tenantId: string;
@@ -305,6 +313,79 @@ export class ShellQueryService {
     await this.runRepo.markCanceled(runId, tenantId, mid, userId);
 
     return { status: 'canceled', runId };
+  }
+
+  async listHistory(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    params: HistoryQueryParams,
+  ): Promise<HistoryListResponse> {
+    const { runs, total } = await this.runRepo.listRuns({
+      tenantId,
+      mid,
+      userId,
+      page: params.page,
+      pageSize: params.pageSize,
+      sortBy: params.sortBy,
+      sortDir: params.sortDir,
+      status: params.status ? params.status.split(',') : undefined,
+      dateFrom: params.dateFrom ? new Date(params.dateFrom) : undefined,
+      dateTo: params.dateTo ? new Date(params.dateTo) : undefined,
+      queryId: params.queryId,
+      search: params.search,
+    });
+
+    const items = runs.map((run) => this.toHistoryItem(run));
+
+    return { items, total, page: params.page, pageSize: params.pageSize };
+  }
+
+  private toHistoryItem(run: ShellQueryRun): ExecutionHistoryItem {
+    const SQL_PREVIEW_MAX_LENGTH = 200;
+
+    let sqlPreview: string | null = null;
+    if (run.sqlTextEncrypted) {
+      const decrypted = this.tryDecrypt(run.sqlTextEncrypted, {
+        operation: 'listHistory',
+        runId: run.id,
+      });
+      if (decrypted) {
+        sqlPreview =
+          decrypted.length > SQL_PREVIEW_MAX_LENGTH
+            ? `${decrypted.slice(0, SQL_PREVIEW_MAX_LENGTH)}...`
+            : decrypted;
+      }
+    }
+
+    let errorMessage: string | null = null;
+    if (run.status === 'failed' && run.errorMessage) {
+      errorMessage =
+        this.tryDecrypt(run.errorMessage, {
+          operation: 'listHistory',
+          runId: run.id,
+        }) ?? null;
+    }
+
+    let durationMs: number | null = null;
+    if (run.startedAt && run.completedAt) {
+      durationMs = run.completedAt.getTime() - run.startedAt.getTime();
+    }
+
+    return {
+      id: run.id,
+      queryName: run.snippetName ?? null,
+      sqlPreview,
+      status: run.status as ExecutionHistoryItem['status'],
+      createdAt: run.createdAt.toISOString(),
+      startedAt: run.startedAt?.toISOString() ?? null,
+      completedAt: run.completedAt?.toISOString() ?? null,
+      durationMs,
+      rowCount: run.rowCount ?? null,
+      targetDeCustomerKey: run.targetDeCustomerKey ?? null,
+      savedQueryId: run.savedQueryId ?? null,
+      errorMessage,
+    };
   }
 
   private tryDecrypt(
