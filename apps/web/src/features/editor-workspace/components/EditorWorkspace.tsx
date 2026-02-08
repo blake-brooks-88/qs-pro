@@ -54,6 +54,7 @@ import {
 import { useSqlDiagnostics } from "@/features/editor-workspace/utils/sql-lint/use-sql-diagnostics";
 import { useRunUsage } from "@/hooks/use-run-usage";
 import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
+import { copyToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import { createDataExtension } from "@/services/metadata";
 import { useTabsStore } from "@/store/tabs-store";
@@ -101,6 +102,7 @@ export function EditorWorkspace({
   const historyQueryIdFilter = useActivityBarStore(
     (s) => s.historyQueryIdFilter,
   );
+  const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const showHistoryForQuery = useActivityBarStore((s) => s.showHistoryForQuery);
 
   const [isDEModalOpen, setIsDEModalOpen] = useState(false);
@@ -555,17 +557,31 @@ export function EditorWorkspace({
 
       const newTabId = storeCreateNewTab();
       storeUpdateTabContent(newTabId, sql);
+      storeSetActiveTab(newTabId);
+      setActiveView(null);
+      onTabChange?.(newTabId);
 
       toast.success(`Opened "${tabName}" in a new tab`, {
         description: "Review and edit before running.",
       });
     },
-    [storeCreateNewTab, storeUpdateTabContent],
+    [
+      onTabChange,
+      setActiveView,
+      storeCreateNewTab,
+      storeSetActiveTab,
+      storeUpdateTabContent,
+    ],
   );
 
   const handleHistoryCopySql = useCallback((sql: string) => {
-    void navigator.clipboard.writeText(sql);
-    toast.success("SQL copied to clipboard");
+    void copyToClipboard(sql).then((didCopy) => {
+      if (didCopy) {
+        toast.success("SQL copied to clipboard");
+      } else {
+        toast.error("Unable to copy SQL");
+      }
+    });
   }, []);
 
   const handleViewQueryHistory = useCallback(

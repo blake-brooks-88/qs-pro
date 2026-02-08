@@ -1,4 +1,7 @@
-import type { ExecutionHistoryItem } from "@qpp/shared-types";
+import type {
+  ExecutionHistoryItem,
+  RunSqlTextResponse,
+} from "@qpp/shared-types";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { Copy, DocumentAdd, MenuDots } from "@solar-icons/react";
@@ -7,7 +10,9 @@ import type {
   PaginationState,
   SortingState,
 } from "@tanstack/react-table";
+import axios from "axios";
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import {
   DataTable,
@@ -24,6 +29,7 @@ import {
   useExecutionHistory,
 } from "../hooks/use-execution-history";
 import { useActivityBarStore } from "../store/activity-bar-store";
+import { SqlPreviewHoverCard } from "./SqlPreviewHoverCard";
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -309,7 +315,7 @@ export function HistoryPanel({
         header: "Name",
         cell: ({ row }) => (
           <span
-            className="truncate block max-w-[120px]"
+            className="truncate block max-w-full"
             title={row.original.queryName ?? undefined}
           >
             {row.original.queryName ?? "Untitled"}
@@ -376,14 +382,22 @@ export function HistoryPanel({
       {
         accessorKey: "sqlPreview",
         header: "SQL",
-        cell: ({ row }) => (
-          <span
-            className="truncate block max-w-[140px] font-mono text-[10px] text-muted-foreground"
-            title={row.original.sqlPreview ?? undefined}
-          >
-            {row.original.sqlPreview ?? "SQL unavailable"}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const item = row.original;
+          return (
+            <SqlPreviewHoverCard
+              runId={item.id}
+              hasSql={item.hasSql}
+              onOpenInNewTab={(sql) =>
+                onRerun?.(sql, item.queryName ?? "Untitled", item.createdAt)
+              }
+            >
+              <span className="truncate block max-w-[140px] font-mono text-xs text-muted-foreground">
+                {item.hasSql ? (item.sqlPreview ?? "SQL available") : "\u2014"}
+              </span>
+            </SqlPreviewHoverCard>
+          );
+        },
         size: 140,
         enableSorting: false,
       },
@@ -392,14 +406,18 @@ export function HistoryPanel({
         header: "Target DE",
         cell: ({ row }) => {
           const key = row.original.targetDeCustomerKey;
-          return key ? (
+          if (!key) {
+            return null;
+          }
+
+          return (
             <span
-              className="truncate block max-w-[100px] text-muted-foreground"
+              className="truncate block max-w-full text-muted-foreground"
               title={key}
             >
               {key}
             </span>
-          ) : null;
+          );
         },
         size: 100,
         enableSorting: false,
@@ -409,7 +427,6 @@ export function HistoryPanel({
         header: "",
         cell: ({ row }) => {
           const item = row.original;
-          const hasSql = item.sqlPreview !== null;
 
           return (
             <DropdownMenu.Root>
@@ -430,15 +447,23 @@ export function HistoryPanel({
                 >
                   <DropdownMenu.Item
                     className="flex items-center gap-2 px-3 py-2 text-xs rounded-md cursor-pointer outline-none transition-colors hover:bg-muted/50 focus:bg-muted/50 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed"
-                    disabled={!hasSql}
+                    disabled={!item.hasSql}
                     onSelect={() => {
-                      if (hasSql && item.sqlPreview) {
-                        onRerun?.(
-                          item.sqlPreview,
-                          item.queryName ?? "Untitled",
-                          item.createdAt,
-                        );
+                      if (!item.hasSql) {
+                        return;
                       }
+                      void axios
+                        .get<RunSqlTextResponse>(`/api/runs/${item.id}/sql`)
+                        .then(({ data }) => {
+                          onRerun?.(
+                            data.sql,
+                            item.queryName ?? "Untitled",
+                            item.createdAt,
+                          );
+                        })
+                        .catch(() => {
+                          toast.error("Unable to retrieve SQL");
+                        });
                     }}
                   >
                     <DocumentAdd size={14} />
@@ -446,11 +471,19 @@ export function HistoryPanel({
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center gap-2 px-3 py-2 text-xs rounded-md cursor-pointer outline-none transition-colors hover:bg-muted/50 focus:bg-muted/50 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed"
-                    disabled={!hasSql}
+                    disabled={!item.hasSql}
                     onSelect={() => {
-                      if (hasSql && item.sqlPreview) {
-                        onCopySql?.(item.sqlPreview);
+                      if (!item.hasSql) {
+                        return;
                       }
+                      void axios
+                        .get<RunSqlTextResponse>(`/api/runs/${item.id}/sql`)
+                        .then(({ data }) => {
+                          onCopySql?.(data.sql);
+                        })
+                        .catch(() => {
+                          toast.error("Unable to retrieve SQL");
+                        });
                     }}
                   >
                     <Copy size={14} />

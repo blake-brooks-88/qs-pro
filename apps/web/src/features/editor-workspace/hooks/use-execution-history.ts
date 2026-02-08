@@ -1,4 +1,7 @@
-import type { HistoryListResponse } from "@qpp/shared-types";
+import type {
+  HistoryListResponse,
+  RunSqlTextResponse,
+} from "@qpp/shared-types";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
@@ -18,6 +21,7 @@ export const executionHistoryKeys = {
   all: ["executionHistory"] as const,
   list: (filters: HistoryFilters) =>
     ["executionHistory", "list", filters] as const,
+  sqlText: (runId: string) => ["executionHistory", "sqlText", runId] as const,
 };
 
 async function fetchHistory(
@@ -57,5 +61,21 @@ export function useExecutionHistory(filters: HistoryFilters, enabled = true) {
     enabled,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  });
+}
+
+async function fetchRunSqlText(runId: string): Promise<string> {
+  const { data } = await axios.get<RunSqlTextResponse>(
+    `/api/runs/${runId}/sql`,
+  );
+  return data.sql;
+}
+
+export function useRunSqlText(runId: string) {
+  return useQuery({
+    queryKey: executionHistoryKeys.sqlText(runId),
+    queryFn: () => fetchRunSqlText(runId),
+    enabled: false,
+    staleTime: 5 * 60_000,
   });
 }

@@ -104,12 +104,31 @@ vi.mock("../WorkspaceSidebar", () => ({
 }));
 
 vi.mock("../HistoryPanel", () => ({
-  HistoryPanel: ({ queryIdFilter }: { queryIdFilter?: string }) => (
+  HistoryPanel: ({
+    queryIdFilter,
+    onRerun,
+  }: {
+    queryIdFilter?: string;
+    onRerun?: (sql: string, queryName: string, createdAt: string) => void;
+  }) => (
     <div
       data-testid="mock-history-panel"
       data-query-id-filter={queryIdFilter ?? ""}
     >
       HistoryPanel
+      <button
+        type="button"
+        data-testid="mock-history-rerun"
+        onClick={() =>
+          onRerun?.(
+            "SELECT SubscriberKey FROM _Subscribers",
+            "History Query",
+            "2026-02-01T12:00:00.000Z",
+          )
+        }
+      >
+        Rerun
+      </button>
     </div>
   ),
 }));
@@ -747,6 +766,36 @@ describe("EditorWorkspace", () => {
       });
       expect(useActivityBarStore.getState().activeView).toBe("history");
       expect(screen.queryByTestId("mock-sidebar")).not.toBeInTheDocument();
+    });
+
+    it("returns to editor with the rerun tab active when opening from history", async () => {
+      const user = userEvent.setup();
+
+      useActivityBarStore.setState({
+        activeView: "history",
+        historyQueryIdFilter: "query-123",
+      });
+
+      renderEditorWorkspace();
+
+      expect(screen.getByTestId("mock-history-panel")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("mock-history-rerun"));
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("mock-history-panel"),
+        ).not.toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("editor-textarea")).toHaveValue(
+          "SELECT SubscriberKey FROM _Subscribers",
+        );
+      });
+      expect(useActivityBarStore.getState().activeView).toBeNull();
     });
   });
 
