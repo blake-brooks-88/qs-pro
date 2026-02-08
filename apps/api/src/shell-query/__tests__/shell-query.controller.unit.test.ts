@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ErrorCode, SessionGuard } from '@qpp/backend-shared';
@@ -356,6 +357,127 @@ describe('ShellQueryController', () => {
         5,
       );
       expect(result).toEqual(mockResults);
+    });
+  });
+
+  describe('GET /runs/history (getHistory)', () => {
+    it('throws FEATURE_NOT_ENABLED when executionHistory is disabled', async () => {
+      // Arrange
+      const user = createMockUserSession() as UserSession;
+      featuresService.getTenantFeatures.mockResolvedValue({
+        tier: 'free',
+        features: {
+          runToTargetDE: false,
+          basicLinting: true,
+          syntaxHighlighting: true,
+          quickFixes: false,
+          minimap: false,
+          advancedAutocomplete: false,
+          createDataExtension: false,
+          systemDataViews: true,
+          teamSnippets: false,
+          auditLogs: false,
+          deployToAutomation: false,
+          executionHistory: false,
+        },
+      });
+
+      // Act & Assert
+      await expect(controller.getHistory(user, {})).rejects.toMatchObject({
+        code: ErrorCode.FEATURE_NOT_ENABLED,
+      });
+    });
+
+    it('throws BadRequestException on invalid query params', async () => {
+      // Arrange
+      const user = createMockUserSession() as UserSession;
+
+      // Act & Assert
+      await expect(
+        controller.getHistory(user, { page: 'not-a-number' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('delegates to service listHistory with parsed params', async () => {
+      // Arrange
+      const user = createMockUserSession() as UserSession;
+      const mockResult = { items: [], total: 0, page: 1, pageSize: 25 };
+      shellQueryService.listHistory.mockResolvedValue(mockResult);
+
+      // Act
+      const result = await controller.getHistory(user, {
+        page: '2',
+        pageSize: '10',
+      });
+
+      // Assert
+      expect(shellQueryService.listHistory).toHaveBeenCalledWith(
+        user.tenantId,
+        user.mid,
+        user.userId,
+        expect.objectContaining({ page: 2, pageSize: 10 }),
+      );
+      expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('GET /runs/:runId/sql (getRunSqlText)', () => {
+    it('throws FEATURE_NOT_ENABLED when executionHistory is disabled', async () => {
+      // Arrange
+      const user = createMockUserSession() as UserSession;
+      featuresService.getTenantFeatures.mockResolvedValue({
+        tier: 'free',
+        features: {
+          runToTargetDE: false,
+          basicLinting: true,
+          syntaxHighlighting: true,
+          quickFixes: false,
+          minimap: false,
+          advancedAutocomplete: false,
+          createDataExtension: false,
+          systemDataViews: true,
+          teamSnippets: false,
+          auditLogs: false,
+          deployToAutomation: false,
+          executionHistory: false,
+        },
+      });
+
+      // Act & Assert
+      await expect(
+        controller.getRunSqlText('run-123', user),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FEATURE_NOT_ENABLED,
+      });
+    });
+
+    it('throws NotFoundException when service returns null', async () => {
+      // Arrange
+      const user = createMockUserSession() as UserSession;
+      shellQueryService.getRunSqlText.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(controller.getRunSqlText('run-123', user)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('returns sql wrapper on success', async () => {
+      // Arrange
+      const user = createMockUserSession() as UserSession;
+      shellQueryService.getRunSqlText.mockResolvedValue('SELECT 1');
+
+      // Act
+      const result = await controller.getRunSqlText('run-123', user);
+
+      // Assert
+      expect(result).toEqual({ sql: 'SELECT 1' });
+      expect(shellQueryService.getRunSqlText).toHaveBeenCalledWith(
+        'run-123',
+        user.tenantId,
+        user.mid,
+        user.userId,
+      );
     });
   });
 

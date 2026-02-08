@@ -263,7 +263,7 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
       case 'rowCount':
         return sql`COALESCE(${shellQueryRuns.rowCount}, 0)`;
       case 'durationMs':
-        return shellQueryRuns.completedAt;
+        return sql`COALESCE(EXTRACT(EPOCH FROM (${shellQueryRuns.completedAt} - ${shellQueryRuns.startedAt})) * 1000, 0)`;
       default:
         return shellQueryRuns.createdAt;
     }

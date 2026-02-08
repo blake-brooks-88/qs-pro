@@ -1257,7 +1257,7 @@ describe("AuthService Integration", () => {
       });
     });
 
-    it("should retry with fallback code when primary fails with invalid_token", async () => {
+    it("should try embedded code first and fall back to original on invalid_token", async () => {
       let callCount = 0;
       server.use(
         http.post(
@@ -1266,13 +1266,13 @@ describe("AuthService Integration", () => {
             callCount++;
             const body = await request.text();
 
-            if (body.includes("code=primary-code")) {
+            if (body.includes("code=fallback-code")) {
               return HttpResponse.json(
                 { error: "invalid_token" },
                 { status: 400 },
               );
             }
-            if (body.includes("code=fallback-code")) {
+            if (body.includes("code=primary-code")) {
               return HttpResponse.json({
                 access_token: "success-token",
                 refresh_token: "success-refresh",

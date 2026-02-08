@@ -28,6 +28,7 @@ export interface ShellQueryServiceStub {
   getResults: ReturnType<typeof vi.fn>;
   cancelRun: ReturnType<typeof vi.fn>;
   listHistory: ReturnType<typeof vi.fn>;
+  getRunSqlText: ReturnType<typeof vi.fn>;
 }
 
 /** Shell Query Run Repository stub interface */
@@ -128,6 +129,7 @@ export function createShellQueryServiceStub(
       listHistory: vi
         .fn()
         .mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 }),
+      getRunSqlText: vi.fn().mockResolvedValue(null),
     },
     overrides,
   );
