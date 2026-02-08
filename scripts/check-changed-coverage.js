@@ -99,8 +99,13 @@ function isCoveredSourceFile(file) {
   const excluded =
     normalized.includes("/__tests__/") ||
     normalized.includes("/test/") ||
+    normalized.includes("/stubs/") ||
     normalized.endsWith(".test.ts") ||
     normalized.endsWith(".test.tsx") ||
+    normalized.endsWith(".stub.ts") ||
+    normalized.endsWith(".stub.tsx") ||
+    normalized.endsWith(".stub.js") ||
+    normalized.endsWith(".stub.jsx") ||
     normalized.endsWith(".spec.ts") ||
     normalized.endsWith(".spec.tsx") ||
     normalized.endsWith(".integration.test.ts") ||
