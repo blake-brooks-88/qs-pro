@@ -40,6 +40,7 @@ function createFeaturesServiceStub() {
         auditLogs: false,
         deployToAutomation: true,
         executionHistory: true,
+        versionHistory: true,
       },
     }),
   };
@@ -186,6 +187,7 @@ describe('ShellQueryController', () => {
           auditLogs: false,
           deployToAutomation: false,
           executionHistory: false,
+          versionHistory: false,
         },
       });
 
@@ -379,6 +381,7 @@ describe('ShellQueryController', () => {
           auditLogs: false,
           deployToAutomation: false,
           executionHistory: false,
+          versionHistory: false,
         },
       });
 
@@ -440,6 +443,7 @@ describe('ShellQueryController', () => {
           auditLogs: false,
           deployToAutomation: false,
           executionHistory: false,
+          versionHistory: false,
         },
       });
 

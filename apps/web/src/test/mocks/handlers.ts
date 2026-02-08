@@ -14,6 +14,7 @@ export const defaultFeatures: TenantFeatures = {
   systemDataViews: true,
   runToTargetDE: false,
   executionHistory: false,
+  versionHistory: false,
 };
 
 export const handlers = [
@@ -82,6 +83,23 @@ export const handlers = [
       total: 0,
       page: 1,
       pageSize: 25,
+    });
+  }),
+
+  http.get("/api/saved-queries/:id/versions", () => {
+    return HttpResponse.json({ versions: [], total: 0 });
+  }),
+
+  http.get("/api/saved-queries/:id/versions/:versionId", ({ params }) => {
+    return HttpResponse.json({
+      id: params.versionId,
+      savedQueryId: params.id,
+      sqlText: "SELECT 1",
+      lineCount: 1,
+      source: "save",
+      restoredFromId: null,
+      versionName: null,
+      createdAt: new Date().toISOString(),
     });
   }),
 ];

@@ -190,6 +190,41 @@ export const savedQueries = pgTable(
   }),
 );
 
+// 10. Query Versions (Append-only version history for saved queries)
+export const queryVersions = pgTable(
+  "query_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    savedQueryId: uuid("saved_query_id")
+      .references(() => savedQueries.id, { onDelete: "cascade" })
+      .notNull(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    mid: varchar("mid").notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    sqlTextEncrypted: text("sql_text_encrypted").notNull(),
+    sqlTextHash: varchar("sql_text_hash").notNull(),
+    versionName: varchar("version_name", { length: 255 }),
+    lineCount: integer("line_count").notNull(),
+    source: varchar("source")
+      .$type<"save" | "restore">()
+      .default("save")
+      .notNull(),
+    restoredFromId: uuid("restored_from_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    savedQueryIdIdx: index("query_versions_saved_query_id_idx").on(
+      t.savedQueryId,
+    ),
+    tenantIdIdx: index("query_versions_tenant_id_idx").on(t.tenantId),
+    createdAtIdx: index("query_versions_created_at_idx").on(t.createdAt),
+  }),
+);
+
 // --- Zod Validation Schemas ---
 export const selectTenantSchema = createSelectSchema(tenants);
 export const insertTenantSchema = createInsertSchema(tenants);
@@ -221,3 +256,6 @@ export const insertFolderSchema = createInsertSchema(folders);
 
 export const selectSavedQuerySchema = createSelectSchema(savedQueries);
 export const insertSavedQuerySchema = createInsertSchema(savedQueries);
+
+export const selectQueryVersionSchema = createSelectSchema(queryVersions);
+export const insertQueryVersionSchema = createInsertSchema(queryVersions);

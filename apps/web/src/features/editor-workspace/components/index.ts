@@ -6,4 +6,5 @@ export * from "./MonacoQueryEditor";
 export * from "./QueryActivityModal";
 export * from "./ResultsPane";
 export * from "./SaveQueryModal";
+export * from "./VersionHistoryPanel";
 export * from "./WorkspaceSidebar";

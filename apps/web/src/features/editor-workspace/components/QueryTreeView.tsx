@@ -6,6 +6,7 @@ import {
   ClockCircle,
   CodeFile,
   Folder as FolderIcon,
+  History,
   Pen,
   TrashBinMinimalistic,
 } from "@solar-icons/react";
@@ -30,6 +31,7 @@ interface QueryTreeViewProps {
   onSelectQuery: (queryId: string) => void;
   onCreateFolder?: () => void;
   onViewQueryHistory?: (queryId: string) => void;
+  onViewVersionHistory?: (queryId: string) => void;
 }
 
 interface FolderNodeProps {
@@ -53,6 +55,7 @@ interface FolderNodeProps {
   onRenameQuery: (id: string, name: string) => void;
   onDeleteQuery: (id: string) => void;
   onViewQueryHistory?: (queryId: string) => void;
+  onViewVersionHistory?: (queryId: string) => void;
 }
 
 interface QueryNodeProps {
@@ -65,6 +68,7 @@ interface QueryNodeProps {
   onRename: (name: string) => void;
   onDelete: () => void;
   onViewHistory?: () => void;
+  onViewVersionHistory?: () => void;
 }
 
 function QueryNode({
@@ -77,6 +81,7 @@ function QueryNode({
   onRename,
   onDelete,
   onViewHistory,
+  onViewVersionHistory,
 }: QueryNodeProps) {
   if (isRenaming) {
     return (
@@ -126,6 +131,15 @@ function QueryNode({
               View Run History
             </ContextMenu.Item>
           ) : null}
+          {onViewVersionHistory ? (
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              onSelect={onViewVersionHistory}
+            >
+              <History size={14} />
+              Version History
+            </ContextMenu.Item>
+          ) : null}
           <ContextMenu.Item
             className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
             onSelect={onStartRename}
@@ -168,6 +182,7 @@ function FolderNode({
   onRenameQuery,
   onDeleteQuery,
   onViewQueryHistory,
+  onViewVersionHistory,
 }: FolderNodeProps) {
   const isRenaming = renamingId === `folder-${folder.id}`;
 
@@ -272,6 +287,7 @@ function FolderNode({
                 onRenameQuery={onRenameQuery}
                 onDeleteQuery={onDeleteQuery}
                 onViewQueryHistory={onViewQueryHistory}
+                onViewVersionHistory={onViewVersionHistory}
               />
             );
           })}
@@ -291,6 +307,11 @@ function FolderNode({
                   ? () => onViewQueryHistory(query.id)
                   : undefined
               }
+              onViewVersionHistory={
+                onViewVersionHistory
+                  ? () => onViewVersionHistory(query.id)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -304,6 +325,7 @@ export function QueryTreeView({
   onSelectQuery,
   onCreateFolder,
   onViewQueryHistory,
+  onViewVersionHistory,
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
@@ -464,6 +486,7 @@ export function QueryTreeView({
                 onRenameQuery={handleRenameQuery}
                 onDeleteQuery={handleDeleteQuery}
                 onViewQueryHistory={onViewQueryHistory}
+                onViewVersionHistory={onViewVersionHistory}
               />
             );
           })}
@@ -481,6 +504,11 @@ export function QueryTreeView({
               onViewHistory={
                 onViewQueryHistory
                   ? () => onViewQueryHistory(query.id)
+                  : undefined
+              }
+              onViewVersionHistory={
+                onViewVersionHistory
+                  ? () => onViewVersionHistory(query.id)
                   : undefined
               }
             />
