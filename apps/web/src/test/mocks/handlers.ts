@@ -95,7 +95,10 @@ export const handlers = [
       id: params.versionId,
       savedQueryId: params.id,
       sqlText: "SELECT 1",
-      versionNumber: 1,
+      lineCount: 1,
+      source: "save",
+      restoredFromId: null,
+      versionName: null,
       createdAt: new Date().toISOString(),
     });
   }),

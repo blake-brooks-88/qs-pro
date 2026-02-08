@@ -64,8 +64,9 @@ export function VersionHistoryPanel({
   const [showChanges, setShowChanges] = useState(true);
   const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
 
-  const { data: versionData, isLoading: isLoadingVersions } =
-    useQueryVersions(savedQueryId);
+  const { data: versionData, isLoading: isLoadingVersions } = useQueryVersions(
+    hasAccess ? savedQueryId : undefined,
+  );
   const versions = useMemo(
     () => versionData?.versions ?? [],
     [versionData?.versions],
@@ -93,11 +94,11 @@ export function VersionHistoryPanel({
   }, [versions, effectiveSelectedId]);
 
   const { data: selectedDetail } = useVersionDetail(
-    savedQueryId,
+    hasAccess ? savedQueryId : undefined,
     effectiveSelectedId ?? undefined,
   );
   const { data: previousDetail } = useVersionDetail(
-    savedQueryId,
+    hasAccess ? savedQueryId : undefined,
     previousVersionId,
   );
 

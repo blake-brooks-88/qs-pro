@@ -193,6 +193,7 @@ export function EditorWorkspace({
   const storeOpenQuery = useTabsStore((state) => state.openQuery);
   const storeCreateNewTab = useTabsStore((state) => state.createNewTab);
   const storeReset = useTabsStore((state) => state.reset);
+  const storeFindTabByQueryId = useTabsStore((state) => state.findTabByQueryId);
 
   const [isResultsOpen, setIsResultsOpen] = useState(false);
   const [resultsHeight, setResultsHeight] = useState(280);
@@ -650,12 +651,23 @@ export function EditorWorkspace({
 
   const handleVersionRestore = useCallback(
     (sqlText: string) => {
-      if (activeTabId) {
-        storeUpdateTabContent(activeTabId, sqlText);
+      if (!versionHistorySavedQueryId) {
+        return;
+      }
+      const targetTab = storeFindTabByQueryId(versionHistorySavedQueryId);
+      if (targetTab) {
+        storeUpdateTabContent(targetTab.id, sqlText);
+        storeSetActiveTab(targetTab.id);
       }
       closeVersionHistory();
     },
-    [activeTabId, storeUpdateTabContent, closeVersionHistory],
+    [
+      versionHistorySavedQueryId,
+      storeFindTabByQueryId,
+      storeUpdateTabContent,
+      storeSetActiveTab,
+      closeVersionHistory,
+    ],
   );
 
   const handleVersionHistoryWarningCancel = useCallback(() => {
@@ -824,7 +836,10 @@ export function EditorWorkspace({
               {versionHistoryIsOpen && versionHistorySavedQueryId ? (
                 <VersionHistoryPanel
                   savedQueryId={versionHistorySavedQueryId}
-                  queryName={safeActiveTab.name}
+                  queryName={
+                    storeFindTabByQueryId(versionHistorySavedQueryId)?.name ??
+                    safeActiveTab.name
+                  }
                   onClose={closeVersionHistory}
                   onRestore={handleVersionRestore}
                   onUpgradeClick={() => setIsUpgradeModalOpen(true)}

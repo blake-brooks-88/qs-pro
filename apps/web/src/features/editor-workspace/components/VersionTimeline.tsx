@@ -121,25 +121,39 @@ function InlineEditableName({
 
   if (currentName) {
     return (
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         onClick={handleStartEdit}
-        className="w-full text-xs font-medium text-foreground truncate text-left hover:underline cursor-text"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleStartEdit();
+          }
+        }}
+        className="w-full text-xs font-medium text-foreground truncate text-left hover:underline cursor-text block"
         title={currentName}
       >
         {currentName}
-      </button>
+      </span>
     );
   }
 
   return (
-    <button
-      type="button"
+    <span
+      role="button"
+      tabIndex={0}
       onClick={handleStartEdit}
-      className="w-full text-xs text-muted-foreground truncate text-left hover:underline cursor-text"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleStartEdit();
+        }
+      }}
+      className="w-full text-xs text-muted-foreground truncate text-left hover:underline cursor-text block"
     >
       {defaultDisplay}
-    </button>
+    </span>
   );
 }
 
