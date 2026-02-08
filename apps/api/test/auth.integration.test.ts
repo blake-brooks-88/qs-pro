@@ -407,7 +407,7 @@ describe('AuthService (integration)', () => {
       expect(dbCreds?.refreshToken).toBeDefined();
     });
 
-    it('should fall back to embedded auth_code when token exchange fails with invalid_token', async () => {
+    it('should try extracted auth_code first and fall back to full code on invalid_token', async () => {
       const uniqueEid = `embedded-code-eid-${Date.now()}`;
       const uniqueSfUserId = `embedded-code-user-${Date.now()}`;
       const uniqueMid = `embedded-code-mid-${Date.now()}`;
@@ -450,14 +450,14 @@ describe('AuthService (integration)', () => {
               seenCodes.push(code);
             }
 
-            if (code === embeddedCode) {
+            if (code === fallbackAuthCode) {
               return HttpResponse.json(
                 { error: 'invalid_token' },
                 { status: 401 },
               );
             }
 
-            if (code === fallbackAuthCode) {
+            if (code === embeddedCode) {
               return HttpResponse.json({
                 access_token: 'embedded-test-access-token',
                 refresh_token: 'embedded-test-refresh-token',
@@ -482,7 +482,7 @@ describe('AuthService (integration)', () => {
       expect(result.user.sfUserId).toBe(uniqueSfUserId);
       expect(result.tenant.eid).toBe(uniqueEid);
       expect(result.mid).toBe(uniqueMid);
-      expect(seenCodes).toEqual([embeddedCode, fallbackAuthCode]);
+      expect(seenCodes).toEqual([fallbackAuthCode, embeddedCode]);
     });
 
     it('should derive identity from alternate userinfo response shapes', async () => {
