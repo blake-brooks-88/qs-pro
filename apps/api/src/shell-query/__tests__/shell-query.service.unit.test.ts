@@ -562,4 +562,160 @@ describe('ShellQueryService', () => {
       );
     });
   });
+
+  describe('getRunSqlText()', () => {
+    it('returns decrypted SQL for a valid run with encrypted SQL', async () => {
+      // Arrange
+      const run = {
+        ...createMockShellQueryRun({ status: 'ready' }),
+        sqlTextEncrypted: 'encrypted:SELECT SubscriberKey FROM _Subscribers',
+        startedAt: new Date(),
+        completedAt: new Date(),
+        errorMessage: null,
+      };
+      repoStub.findRun.mockResolvedValue(run);
+
+      // Act
+      const result = await service.getRunSqlText(
+        run.id,
+        'tenant-1',
+        'mid-1',
+        'user-1',
+      );
+
+      // Assert
+      expect(result).toBe('SELECT SubscriberKey FROM _Subscribers');
+    });
+
+    it('returns null when run is not found', async () => {
+      // Arrange
+      repoStub.findRun.mockResolvedValue(null);
+
+      // Act
+      const result = await service.getRunSqlText(
+        'non-existent',
+        'tenant-1',
+        'mid-1',
+        'user-1',
+      );
+
+      // Assert
+      expect(result).toBeNull();
+    });
+
+    it('returns null when sqlTextEncrypted is null', async () => {
+      // Arrange
+      const run = {
+        ...createMockShellQueryRun({ status: 'ready' }),
+        sqlTextEncrypted: null,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        errorMessage: null,
+      };
+      repoStub.findRun.mockResolvedValue(run);
+
+      // Act
+      const result = await service.getRunSqlText(
+        run.id,
+        'tenant-1',
+        'mid-1',
+        'user-1',
+      );
+
+      // Assert
+      expect(result).toBeNull();
+    });
+
+    it('returns null when decryption fails', async () => {
+      // Arrange
+      const run = {
+        ...createMockShellQueryRun({ status: 'ready' }),
+        sqlTextEncrypted: 'corrupted-cipher-text',
+        startedAt: new Date(),
+        completedAt: new Date(),
+        errorMessage: null,
+      };
+      repoStub.findRun.mockResolvedValue(run);
+      encryptionStub.decrypt.mockImplementation(() => {
+        throw new Error('Decryption failed');
+      });
+
+      // Act
+      const result = await service.getRunSqlText(
+        run.id,
+        'tenant-1',
+        'mid-1',
+        'user-1',
+      );
+
+      // Assert
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('listHistory() hasSql derivation', () => {
+    it('includes hasSql: true when run has sqlTextEncrypted', async () => {
+      // Arrange
+      const now = new Date();
+      const run = {
+        ...createMockShellQueryRun({ status: 'ready' }),
+        sqlTextEncrypted: 'encrypted:SELECT 1',
+        startedAt: now,
+        completedAt: now,
+        errorMessage: null,
+        rowCount: 10,
+        targetDeCustomerKey: null,
+        targetUpdateType: null,
+        taskId: null,
+        queryDefinitionId: null,
+        pollStartedAt: null,
+        savedQueryId: null,
+      };
+      repoStub.listRuns.mockResolvedValue({ runs: [run], total: 1 });
+
+      // Act
+      const result = await service.listHistory('tenant-1', 'mid-1', 'user-1', {
+        page: 1,
+        pageSize: 25,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+      });
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toHaveProperty('hasSql', true);
+    });
+
+    it('includes hasSql: false when run has no sqlTextEncrypted', async () => {
+      // Arrange
+      const now = new Date();
+      const run = {
+        ...createMockShellQueryRun({ status: 'ready' }),
+        sqlTextEncrypted: null,
+        startedAt: now,
+        completedAt: now,
+        errorMessage: null,
+        rowCount: 5,
+        targetDeCustomerKey: null,
+        targetUpdateType: null,
+        taskId: null,
+        queryDefinitionId: null,
+        pollStartedAt: null,
+        savedQueryId: null,
+      };
+      repoStub.listRuns.mockResolvedValue({ runs: [run], total: 1 });
+
+      // Act
+      const result = await service.listHistory('tenant-1', 'mid-1', 'user-1', {
+        page: 1,
+        pageSize: 25,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+      });
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toHaveProperty('hasSql', false);
+    });
+  });
 });

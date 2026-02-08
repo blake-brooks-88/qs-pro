@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Inject,
   InternalServerErrorException,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -169,6 +170,35 @@ export class ShellQueryController {
       user.userId,
       result.data,
     );
+  }
+
+  @Get(':runId/sql')
+  async getRunSqlText(
+    @Param('runId') runId: string,
+    @CurrentUser() user: UserSession,
+  ) {
+    const { features: tenantFeatures } =
+      await this.featuresService.getTenantFeatures(user.tenantId);
+
+    if (!tenantFeatures.executionHistory) {
+      throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+        operation: 'getRunSqlText',
+        reason: 'Execution History requires Pro subscription',
+      });
+    }
+
+    const sql = await this.shellQueryService.getRunSqlText(
+      runId,
+      user.tenantId,
+      user.mid,
+      user.userId,
+    );
+
+    if (sql === null) {
+      throw new NotFoundException('SQL text not found for this run');
+    }
+
+    return { sql };
   }
 
   @Get(':runId')

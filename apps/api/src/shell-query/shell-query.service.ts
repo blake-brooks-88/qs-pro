@@ -343,6 +343,25 @@ export class ShellQueryService {
     return { items, total, page: params.page, pageSize: params.pageSize };
   }
 
+  async getRunSqlText(
+    runId: string,
+    tenantId: string,
+    mid: string,
+    userId: string,
+  ): Promise<string | null> {
+    const run = await this.runRepo.findRun(runId, tenantId, mid, userId);
+    if (!run?.sqlTextEncrypted) {
+      return null;
+    }
+
+    return (
+      this.tryDecrypt(run.sqlTextEncrypted, {
+        operation: 'getRunSqlText',
+        runId,
+      }) ?? null
+    );
+  }
+
   private toHistoryItem(run: ShellQueryRun): ExecutionHistoryItem {
     const SQL_PREVIEW_MAX_LENGTH = 200;
 
@@ -387,6 +406,7 @@ export class ShellQueryService {
       targetDeCustomerKey: run.targetDeCustomerKey ?? null,
       savedQueryId: run.savedQueryId ?? null,
       errorMessage,
+      hasSql: !!run.sqlTextEncrypted,
     };
   }
 
