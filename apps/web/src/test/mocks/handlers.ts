@@ -85,4 +85,18 @@ export const handlers = [
       pageSize: 25,
     });
   }),
+
+  http.get("/api/saved-queries/:id/versions", () => {
+    return HttpResponse.json({ versions: [], total: 0 });
+  }),
+
+  http.get("/api/saved-queries/:id/versions/:versionId", ({ params }) => {
+    return HttpResponse.json({
+      id: params.versionId,
+      savedQueryId: params.id,
+      sqlText: "SELECT 1",
+      versionNumber: 1,
+      createdAt: new Date().toISOString(),
+    });
+  }),
 ];
