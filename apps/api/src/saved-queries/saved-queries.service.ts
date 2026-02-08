@@ -180,22 +180,6 @@ export class SavedQueriesService {
             });
           }
           updateParams.sqlTextEncrypted = sqlTextEncrypted;
-
-          const sqlTextHash = this.hashSqlText(dto.sqlText);
-          const latestVersion =
-            await this.queryVersionsRepository.findLatestBySavedQueryId(id);
-          if (!latestVersion || latestVersion.sqlTextHash !== sqlTextHash) {
-            await this.queryVersionsRepository.create({
-              savedQueryId: id,
-              tenantId,
-              mid,
-              userId,
-              sqlTextEncrypted,
-              sqlTextHash,
-              lineCount: dto.sqlText.split('\n').length,
-              source: 'save',
-            });
-          }
         }
         if (dto.folderId !== undefined) {
           updateParams.folderId = dto.folderId;
@@ -211,6 +195,25 @@ export class SavedQueriesService {
             reason: `Saved query not found: ${id}`,
           });
         }
+
+        if (dto.sqlText !== undefined && updateParams.sqlTextEncrypted) {
+          const sqlTextHash = this.hashSqlText(dto.sqlText);
+          const latestVersion =
+            await this.queryVersionsRepository.findLatestBySavedQueryId(id);
+          if (latestVersion?.sqlTextHash !== sqlTextHash) {
+            await this.queryVersionsRepository.create({
+              savedQueryId: id,
+              tenantId,
+              mid,
+              userId,
+              sqlTextEncrypted: updateParams.sqlTextEncrypted,
+              sqlTextHash,
+              lineCount: dto.sqlText.split('\n').length,
+              source: 'save',
+            });
+          }
+        }
+
         return this.decryptQuery(query);
       },
     );

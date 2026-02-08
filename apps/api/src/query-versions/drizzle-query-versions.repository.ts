@@ -10,8 +10,8 @@ import {
 import type {
   CreateQueryVersionParams,
   QueryVersion,
+  QueryVersionListItem,
   QueryVersionsRepository,
-  QueryVersionWithAuthor,
 } from './query-versions.repository';
 
 type Database = ReturnType<typeof createDatabaseFromClient>;
@@ -57,7 +57,7 @@ export class DrizzleQueryVersionsRepository implements QueryVersionsRepository {
 
   async findBySavedQueryId(
     savedQueryId: string,
-  ): Promise<QueryVersionWithAuthor[]> {
+  ): Promise<QueryVersionListItem[]> {
     const rows = await this.getDb()
       .select({
         id: queryVersions.id,
@@ -65,7 +65,6 @@ export class DrizzleQueryVersionsRepository implements QueryVersionsRepository {
         tenantId: queryVersions.tenantId,
         mid: queryVersions.mid,
         userId: queryVersions.userId,
-        sqlTextEncrypted: queryVersions.sqlTextEncrypted,
         sqlTextHash: queryVersions.sqlTextHash,
         versionName: queryVersions.versionName,
         lineCount: queryVersions.lineCount,
@@ -78,7 +77,7 @@ export class DrizzleQueryVersionsRepository implements QueryVersionsRepository {
       .leftJoin(users, eq(queryVersions.userId, users.id))
       .where(eq(queryVersions.savedQueryId, savedQueryId))
       .orderBy(desc(queryVersions.createdAt));
-    return rows as QueryVersionWithAuthor[];
+    return rows as QueryVersionListItem[];
   }
 
   async findLatestBySavedQueryId(

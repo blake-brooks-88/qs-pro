@@ -2,7 +2,7 @@ import type { queryVersions } from '@qpp/database';
 
 export type QueryVersion = typeof queryVersions.$inferSelect;
 
-export type QueryVersionWithAuthor = QueryVersion & {
+export type QueryVersionListItem = Omit<QueryVersion, 'sqlTextEncrypted'> & {
   authorName: string | null;
 };
 
@@ -22,7 +22,7 @@ export interface CreateQueryVersionParams {
 export interface QueryVersionsRepository {
   create(params: CreateQueryVersionParams): Promise<QueryVersion>;
   findById(id: string): Promise<QueryVersion | null>;
-  findBySavedQueryId(savedQueryId: string): Promise<QueryVersionWithAuthor[]>;
+  findBySavedQueryId(savedQueryId: string): Promise<QueryVersionListItem[]>;
   findLatestBySavedQueryId(savedQueryId: string): Promise<QueryVersion | null>;
   updateName(
     id: string,
