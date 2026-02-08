@@ -171,6 +171,14 @@ export class RlsContextService {
       );
       throw error;
     } finally {
+      try {
+        await reserved`RESET app.user_id`;
+      } catch (resetError) {
+        this.logger.warn(
+          "Failed to reset app.user_id before releasing connection",
+          resetError instanceof Error ? resetError.message : String(resetError),
+        );
+      }
       reserved.release();
     }
   }

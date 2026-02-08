@@ -684,8 +684,8 @@ export class AuthService {
       return [code];
     }
 
-    // Prefer embedded auth_code from wrapped code payloads used by MCE iframe flow.
-    return [fallbackCode, code];
+    // Try the original code first; fall back to the extracted embedded auth_code.
+    return [code, fallbackCode];
   }
 
   private shouldTryAlternateCodeAttempt(

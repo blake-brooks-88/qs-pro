@@ -22,6 +22,7 @@ describe("RlsContextService", () => {
     const configCalls: Array<{ key: string; value: string; local: boolean }> =
       [];
     const transactionCalls: string[] = [];
+    const resetCalls: string[] = [];
 
     // Template string SQL call: sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`
     // strings = ["SELECT set_config('app.tenant_id', ", ", true)"]
@@ -53,6 +54,8 @@ describe("RlsContextService", () => {
             transactionCalls.push("COMMIT");
           } else if (fullQuery === "ROLLBACK") {
             transactionCalls.push("ROLLBACK");
+          } else if (fullQuery.startsWith("RESET ")) {
+            resetCalls.push(fullQuery);
           }
           return Promise.resolve([]);
         },
@@ -64,6 +67,7 @@ describe("RlsContextService", () => {
       parameters: {},
       configCalls,
       transactionCalls,
+      resetCalls,
     });
   }
 
@@ -187,6 +191,24 @@ describe("RlsContextService", () => {
       await service.runWithUserContext("t1", "m1", "u1", async () => "done");
 
       expect(mockReservedSql.transactionCalls).toEqual(["BEGIN", "COMMIT"]);
+    });
+
+    it("should reset app.user_id before releasing connection", async () => {
+      await service.runWithUserContext("t1", "m1", "u1", async () => "done");
+
+      expect(mockReservedSql.resetCalls).toContain("RESET app.user_id");
+      expect(mockReservedSql.release).toHaveBeenCalled();
+    });
+
+    it("should reset app.user_id even when callback throws", async () => {
+      await expect(
+        service.runWithUserContext("t1", "m1", "u1", async () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+
+      expect(mockReservedSql.resetCalls).toContain("RESET app.user_id");
+      expect(mockReservedSql.release).toHaveBeenCalled();
     });
 
     it("should pass reservedSql to context", async () => {
