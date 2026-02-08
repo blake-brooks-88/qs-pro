@@ -7,6 +7,7 @@ import {
   Database,
   Diskette,
   Download,
+  History,
   Rocket,
 } from "@solar-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,6 +25,14 @@ import { toast } from "sonner";
 
 import { ActivityBar } from "@/components/ActivityBar";
 import { FeatureGate } from "@/components/FeatureGate";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
 import { useCreateQueryActivity } from "@/features/editor-workspace/hooks/use-create-query-activity";
@@ -33,11 +42,13 @@ import {
   useQueryActivityFolders,
 } from "@/features/editor-workspace/hooks/use-query-activity-folders";
 import { useQueryExecution } from "@/features/editor-workspace/hooks/use-query-execution";
+import { versionHistoryKeys } from "@/features/editor-workspace/hooks/use-query-versions";
 import {
   useSavedQuery,
   useUpdateSavedQuery,
 } from "@/features/editor-workspace/hooks/use-saved-queries";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
+import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
   DataExtensionDraft,
   DataExtensionField,
@@ -69,6 +80,7 @@ import { ResultsPane } from "./ResultsPane";
 import { RunButtonDropdown } from "./RunButtonDropdown";
 import { SaveQueryModal } from "./SaveQueryModal";
 import { TargetDataExtensionModal } from "./TargetDataExtensionModal";
+import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 
 export function EditorWorkspace({
@@ -117,6 +129,22 @@ export function EditorWorkspace({
     [],
   );
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+  // Version History state
+  const versionHistoryIsOpen = useVersionHistoryStore((s) => s.isOpen);
+  const versionHistorySavedQueryId = useVersionHistoryStore(
+    (s) => s.savedQueryId,
+  );
+  const openVersionHistory = useVersionHistoryStore(
+    (s) => s.openVersionHistory,
+  );
+  const closeVersionHistory = useVersionHistoryStore(
+    (s) => s.closeVersionHistory,
+  );
+  const [isVersionHistoryWarningOpen, setIsVersionHistoryWarningOpen] =
+    useState(false);
+  const [pendingVersionHistoryQueryId, setPendingVersionHistoryQueryId] =
+    useState<string | null>(null);
 
   // TanStack Query client for metadata fetching
   const queryClient = useQueryClient();
@@ -483,6 +511,12 @@ export function EditorWorkspace({
 
         toast.success("Query saved");
         onSave?.(safeActiveTab.id, safeActiveTab.content);
+
+        if (safeActiveTab.queryId) {
+          void queryClient.invalidateQueries({
+            queryKey: versionHistoryKeys.list(safeActiveTab.queryId),
+          });
+        }
       } catch (error) {
         toast.error("Failed to save query", {
           description:
@@ -490,7 +524,14 @@ export function EditorWorkspace({
         });
       }
     }
-  }, [safeActiveTab, activeTabId, storeMarkTabSaved, updateQuery, onSave]);
+  }, [
+    safeActiveTab,
+    activeTabId,
+    storeMarkTabSaved,
+    updateQuery,
+    onSave,
+    queryClient,
+  ]);
 
   const handleSaveAs = useCallback(() => {
     const name = safeActiveTab?.name || "Untitled";
@@ -591,6 +632,91 @@ export function EditorWorkspace({
     [showHistoryForQuery],
   );
 
+  const handleOpenVersionHistory = useCallback(
+    (queryId?: string) => {
+      const targetQueryId = queryId ?? safeActiveTab.queryId;
+      if (!targetQueryId) {
+        return;
+      }
+      if (safeActiveTab.isDirty && safeActiveTab.queryId === targetQueryId) {
+        setPendingVersionHistoryQueryId(targetQueryId);
+        setIsVersionHistoryWarningOpen(true);
+      } else {
+        openVersionHistory(targetQueryId);
+      }
+    },
+    [safeActiveTab.queryId, safeActiveTab.isDirty, openVersionHistory],
+  );
+
+  const handleVersionRestore = useCallback(
+    (sqlText: string) => {
+      if (activeTabId) {
+        storeUpdateTabContent(activeTabId, sqlText);
+      }
+      closeVersionHistory();
+    },
+    [activeTabId, storeUpdateTabContent, closeVersionHistory],
+  );
+
+  const handleVersionHistoryWarningCancel = useCallback(() => {
+    setIsVersionHistoryWarningOpen(false);
+    setPendingVersionHistoryQueryId(null);
+  }, []);
+
+  const handleVersionHistoryContinueWithoutSaving = useCallback(() => {
+    const queryId = pendingVersionHistoryQueryId;
+    setIsVersionHistoryWarningOpen(false);
+    setPendingVersionHistoryQueryId(null);
+    if (queryId) {
+      openVersionHistory(queryId);
+    }
+  }, [pendingVersionHistoryQueryId, openVersionHistory]);
+
+  const handleVersionHistorySaveAndContinue = useCallback(async () => {
+    const queryId = pendingVersionHistoryQueryId;
+    setIsVersionHistoryWarningOpen(false);
+    setPendingVersionHistoryQueryId(null);
+
+    if (safeActiveTab.queryId && safeActiveTab.isDirty) {
+      try {
+        await updateQuery.mutateAsync({
+          id: safeActiveTab.queryId,
+          data: { sqlText: safeActiveTab.content },
+        });
+        if (activeTabId) {
+          storeMarkTabSaved(
+            activeTabId,
+            safeActiveTab.queryId,
+            safeActiveTab.name,
+          );
+        }
+        toast.success("Query saved");
+
+        void queryClient.invalidateQueries({
+          queryKey: versionHistoryKeys.list(safeActiveTab.queryId),
+        });
+      } catch (error) {
+        toast.error("Failed to save query", {
+          description:
+            error instanceof Error ? error.message : "An error occurred",
+        });
+        return;
+      }
+    }
+
+    if (queryId) {
+      openVersionHistory(queryId);
+    }
+  }, [
+    pendingVersionHistoryQueryId,
+    safeActiveTab,
+    activeTabId,
+    updateQuery,
+    storeMarkTabSaved,
+    queryClient,
+    openVersionHistory,
+  ]);
+
   const handleRunToTarget = useCallback(() => {
     setIsTargetDEModalOpen(true);
   }, []);
@@ -687,212 +813,244 @@ export function EditorWorkspace({
                 onSelectDE={onSelectDE}
                 onCreateDE={handleCreateDE}
                 onViewQueryHistory={handleViewQueryHistory}
+                onViewVersionHistory={(queryId) =>
+                  handleOpenVersionHistory(queryId)
+                }
               />
             ) : null}
 
             {/* Main IDE Workspace */}
             <div ref={workspaceRef} className="flex-1 flex flex-col min-w-0">
-              {/* Workspace Header / Toolbar */}
-              <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 overflow-visible">
-                <div className="flex items-center gap-4">
-                  <RunButtonDropdown
-                    onRun={handleRunRequest}
-                    onRunToTarget={handleRunToTarget}
-                    isRunning={isRunning}
-                    disabled={hasBlockingDiagnostics}
-                    tooltipMessage={runTooltipMessage}
-                  />
-
-                  <div className="h-4 w-px bg-border mx-1" />
-
-                  <div className="flex items-center gap-1 overflow-visible">
-                    <ToolbarButton
-                      icon={<Diskette size={18} />}
-                      label={
-                        safeActiveTab.isDirty ? "Save Changes*" : "Save Query"
-                      }
-                      onClick={handleSave}
-                      className={safeActiveTab.isDirty ? "text-primary" : ""}
-                    />
-                    <ToolbarButton
-                      icon={<Code size={18} />}
-                      label="Format SQL"
-                      onClick={onFormat}
-                    />
-                    <ToolbarButton
-                      icon={<Download size={18} />}
-                      label="Export Results"
-                    />
-                    <div className="h-4 w-px bg-border mx-1" />
-                    <FeatureGate feature="createDataExtension" variant="button">
-                      <ToolbarButton
-                        icon={<Database size={18} />}
-                        label="Create Data Extension"
-                        onClick={handleCreateDE}
-                        className="text-primary hover:text-primary-foreground hover:bg-primary"
-                      />
-                    </FeatureGate>
-                    {safeActiveTab.queryId ? (
-                      <>
-                        <div className="h-4 w-px bg-border mx-1" />
-                        <ToolbarButton
-                          icon={<ClockCircle size={18} />}
-                          label="View Run History"
-                          onClick={() => {
-                            const qId = safeActiveTab.queryId;
-                            if (qId) {
-                              showHistoryForQuery(qId);
-                            }
-                          }}
-                        />
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 overflow-visible">
-                  <div className="hidden sm:flex flex-col items-end mr-2">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Active Tab
-                    </span>
-                    <span className="text-[10px] font-bold text-primary flex items-center gap-1">
-                      {safeActiveTab.name}
-                      {safeActiveTab.isDirty ? (
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                      ) : null}
-                    </span>
-                  </div>
-                  <FeatureGate feature="deployToAutomation" variant="button">
-                    <Tooltip.Root>
-                      <Tooltip.Trigger asChild>
-                        <button
-                          onClick={handleOpenQueryActivityModal}
-                          className="flex items-center gap-2 border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground h-8 px-4 rounded-md text-xs font-bold transition-all group active:scale-95"
-                        >
-                          <Rocket
-                            size={16}
-                            weight="Bold"
-                            className="group-hover:animate-bounce"
-                          />
-                          Deploy to Automation
-                        </button>
-                      </Tooltip.Trigger>
-                      <Tooltip.Portal>
-                        <Tooltip.Content
-                          className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
-                          sideOffset={5}
-                        >
-                          Create permanent MCE Activity
-                          <Tooltip.Arrow className="fill-foreground" />
-                        </Tooltip.Content>
-                      </Tooltip.Portal>
-                    </Tooltip.Root>
-                  </FeatureGate>
-                </div>
-              </div>
-
-              {/* Usage Warning Banner */}
-              {tier === "free" &&
-              isNearRunLimit &&
-              usageData?.queryRuns.limit ? (
-                <UsageWarningBanner
-                  resourceName="query runs"
-                  current={usageData.queryRuns.current}
-                  limit={usageData.queryRuns.limit}
-                  resetDate={usageData.queryRuns.resetDate}
+              {versionHistoryIsOpen && versionHistorySavedQueryId ? (
+                <VersionHistoryPanel
+                  savedQueryId={versionHistorySavedQueryId}
+                  queryName={safeActiveTab.name}
+                  onClose={closeVersionHistory}
+                  onRestore={handleVersionRestore}
+                  onUpgradeClick={() => setIsUpgradeModalOpen(true)}
                 />
-              ) : null}
+              ) : (
+                <>
+                  {/* Workspace Header / Toolbar */}
+                  <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 overflow-visible">
+                    <div className="flex items-center gap-4">
+                      <RunButtonDropdown
+                        onRun={handleRunRequest}
+                        onRunToTarget={handleRunToTarget}
+                        isRunning={isRunning}
+                        disabled={hasBlockingDiagnostics}
+                        tooltipMessage={runTooltipMessage}
+                      />
 
-              {/* Editor & Results Pane Split */}
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                {/* Editor Area with Vertical Tabs */}
-                <div className="flex-1 flex min-h-0">
-                  {/* Monaco Editor Pane */}
-                  <div className="flex-1 relative bg-background/50 font-mono">
-                    <MonacoQueryEditor
-                      value={safeActiveTab.content}
-                      onChange={handleEditorChange}
-                      onSave={handleSave}
-                      onSaveAs={handleSaveAs}
-                      onRunRequest={handleRunRequest}
-                      onCursorPositionChange={setCursorPosition}
-                      diagnostics={sqlDiagnostics}
-                      dataExtensions={dataExtensions}
-                      folders={folders}
-                      tenantId={tenantId}
-                      className="h-full"
-                    />
+                      <div className="h-4 w-px bg-border mx-1" />
+
+                      <div className="flex items-center gap-1 overflow-visible">
+                        <ToolbarButton
+                          icon={<Diskette size={18} />}
+                          label={
+                            safeActiveTab.isDirty
+                              ? "Save Changes*"
+                              : "Save Query"
+                          }
+                          onClick={handleSave}
+                          className={
+                            safeActiveTab.isDirty ? "text-primary" : ""
+                          }
+                        />
+                        <ToolbarButton
+                          icon={<Code size={18} />}
+                          label="Format SQL"
+                          onClick={onFormat}
+                        />
+                        <ToolbarButton
+                          icon={<Download size={18} />}
+                          label="Export Results"
+                        />
+                        <div className="h-4 w-px bg-border mx-1" />
+                        <FeatureGate
+                          feature="createDataExtension"
+                          variant="button"
+                        >
+                          <ToolbarButton
+                            icon={<Database size={18} />}
+                            label="Create Data Extension"
+                            onClick={handleCreateDE}
+                            className="text-primary hover:text-primary-foreground hover:bg-primary"
+                          />
+                        </FeatureGate>
+                        {safeActiveTab.queryId ? (
+                          <>
+                            <div className="h-4 w-px bg-border mx-1" />
+                            <ToolbarButton
+                              icon={<ClockCircle size={18} />}
+                              label="View Run History"
+                              onClick={() => {
+                                const qId = safeActiveTab.queryId;
+                                if (qId) {
+                                  showHistoryForQuery(qId);
+                                }
+                              }}
+                            />
+                            <ToolbarButton
+                              icon={<History size={18} />}
+                              label="Version History"
+                              onClick={() => handleOpenVersionHistory()}
+                            />
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 overflow-visible">
+                      <div className="hidden sm:flex flex-col items-end mr-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          Active Tab
+                        </span>
+                        <span className="text-[10px] font-bold text-primary flex items-center gap-1">
+                          {safeActiveTab.name}
+                          {safeActiveTab.isDirty ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                          ) : null}
+                        </span>
+                      </div>
+                      <FeatureGate
+                        feature="deployToAutomation"
+                        variant="button"
+                      >
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <button
+                              onClick={handleOpenQueryActivityModal}
+                              className="flex items-center gap-2 border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground h-8 px-4 rounded-md text-xs font-bold transition-all group active:scale-95"
+                            >
+                              <Rocket
+                                size={16}
+                                weight="Bold"
+                                className="group-hover:animate-bounce"
+                              />
+                              Deploy to Automation
+                            </button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
+                              sideOffset={5}
+                            >
+                              Create permanent MCE Activity
+                              <Tooltip.Arrow className="fill-foreground" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </FeatureGate>
+                    </div>
                   </div>
 
-                  {/* Vertical Tabs Sidebar (Right Side) */}
-                  <QueryTabBar
-                    onSaveTab={(tabId) => {
-                      const tab = tabs.find((t) => t.id === tabId);
-                      if (tab?.isNew) {
-                        setIsSaveModalOpen(true);
-                      } else if (tab) {
-                        // Mark as saved in store
-                        if (tab.queryId) {
-                          storeMarkTabSaved(tabId, tab.queryId, tab.name);
-                        }
-                        onSave?.(tab.id, tab.content);
-                      }
-                    }}
-                    onCloseWithConfirm={(tabId) => {
-                      setTabToClose(tabId);
-                      setIsConfirmCloseOpen(true);
-                    }}
-                  />
-                </div>
+                  {/* Usage Warning Banner */}
+                  {tier === "free" &&
+                  isNearRunLimit &&
+                  usageData?.queryRuns.limit ? (
+                    <UsageWarningBanner
+                      resourceName="query runs"
+                      current={usageData.queryRuns.current}
+                      limit={usageData.queryRuns.limit}
+                      resetDate={usageData.queryRuns.resetDate}
+                    />
+                  ) : null}
 
-                {/* Results Resizable Pane */}
-                <div
-                  className={cn(
-                    "border-t border-border bg-background flex flex-col min-h-[32px]",
-                    isResizingResults
-                      ? "transition-none"
-                      : "transition-[height] duration-300 ease-out",
-                  )}
-                  style={{ height: shouldShowResultsPane ? resultsHeight : 32 }}
-                >
-                  {shouldShowResultsPane ? (
-                    <>
-                      <div
-                        onPointerDown={handleResultsResizeStart}
-                        className="h-2 cursor-row-resize bg-border/40 hover:bg-border transition-colors"
-                      >
-                        <div className="mx-auto mt-0.5 h-1 w-10 rounded-full bg-muted-foreground/30" />
-                      </div>
-                      <div className="flex-1 min-h-0">
-                        <ResultsPane
-                          result={executionResult}
-                          onPageChange={(page) => {
-                            setPage(page);
-                            onPageChange?.(page);
-                          }}
-                          onCancel={handleCancel}
-                          onViewInContactBuilder={() => {
-                            const subscriberKey =
-                              executionResult.rows[0]?.SubscriberKey;
-                            if (typeof subscriberKey === "string") {
-                              onViewInContactBuilder?.(subscriberKey);
-                            }
-                          }}
+                  {/* Editor & Results Pane Split */}
+                  <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    {/* Editor Area with Vertical Tabs */}
+                    <div className="flex-1 flex min-h-0">
+                      {/* Monaco Editor Pane */}
+                      <div className="flex-1 relative bg-background/50 font-mono">
+                        <MonacoQueryEditor
+                          value={safeActiveTab.content}
+                          onChange={handleEditorChange}
+                          onSave={handleSave}
+                          onSaveAs={handleSaveAs}
+                          onRunRequest={handleRunRequest}
+                          onCursorPositionChange={setCursorPosition}
+                          diagnostics={sqlDiagnostics}
+                          dataExtensions={dataExtensions}
+                          folders={folders}
+                          tenantId={tenantId}
+                          className="h-full"
                         />
                       </div>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleResultsToggle}
-                      className="h-full w-full flex items-center justify-between px-4 bg-card/60 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+
+                      {/* Vertical Tabs Sidebar (Right Side) */}
+                      <QueryTabBar
+                        onSaveTab={(tabId) => {
+                          const tab = tabs.find((t) => t.id === tabId);
+                          if (tab?.isNew) {
+                            setIsSaveModalOpen(true);
+                          } else if (tab) {
+                            // Mark as saved in store
+                            if (tab.queryId) {
+                              storeMarkTabSaved(tabId, tab.queryId, tab.name);
+                            }
+                            onSave?.(tab.id, tab.content);
+                          }
+                        }}
+                        onCloseWithConfirm={(tabId) => {
+                          setTabToClose(tabId);
+                          setIsConfirmCloseOpen(true);
+                        }}
+                      />
+                    </div>
+
+                    {/* Results Resizable Pane */}
+                    <div
+                      className={cn(
+                        "border-t border-border bg-background flex flex-col min-h-[32px]",
+                        isResizingResults
+                          ? "transition-none"
+                          : "transition-[height] duration-300 ease-out",
+                      )}
+                      style={{
+                        height: shouldShowResultsPane ? resultsHeight : 32,
+                      }}
                     >
-                      <span>Run a query to see results</span>
-                      <AltArrowUp size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
+                      {shouldShowResultsPane ? (
+                        <>
+                          <div
+                            onPointerDown={handleResultsResizeStart}
+                            className="h-2 cursor-row-resize bg-border/40 hover:bg-border transition-colors"
+                          >
+                            <div className="mx-auto mt-0.5 h-1 w-10 rounded-full bg-muted-foreground/30" />
+                          </div>
+                          <div className="flex-1 min-h-0">
+                            <ResultsPane
+                              result={executionResult}
+                              onPageChange={(page) => {
+                                setPage(page);
+                                onPageChange?.(page);
+                              }}
+                              onCancel={handleCancel}
+                              onViewInContactBuilder={() => {
+                                const subscriberKey =
+                                  executionResult.rows[0]?.SubscriberKey;
+                                if (typeof subscriberKey === "string") {
+                                  onViewInContactBuilder?.(subscriberKey);
+                                }
+                              }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleResultsToggle}
+                          className="h-full w-full flex items-center justify-between px-4 bg-card/60 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <span>Run a query to see results</span>
+                          <AltArrowUp size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}
@@ -990,6 +1148,50 @@ export function EditorWorkspace({
           isOpen={isUpgradeModalOpen}
           onClose={() => setIsUpgradeModalOpen(false)}
         />
+
+        {/* Unsaved changes warning before opening version history */}
+        <Dialog
+          open={isVersionHistoryWarningOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleVersionHistoryWarningCancel();
+            }
+          }}
+        >
+          <DialogContent className="max-w-md bg-card border-border p-6">
+            <div className="space-y-1">
+              <DialogTitle className="text-lg font-bold">
+                Unsaved Changes
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
+                You have unsaved changes. Would you like to save before viewing
+                version history?
+              </DialogDescription>
+            </div>
+            <DialogFooter className="mt-6 gap-2">
+              <Button
+                variant="ghost"
+                onClick={handleVersionHistoryWarningCancel}
+                className="text-xs font-bold"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleVersionHistoryContinueWithoutSaving}
+                className="text-xs font-bold"
+              >
+                Continue Without Saving
+              </Button>
+              <Button
+                onClick={handleVersionHistorySaveAndContinue}
+                className="text-xs font-bold"
+              >
+                Save & Continue
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Tooltip.Provider>
   );

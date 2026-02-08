@@ -30,6 +30,7 @@ interface QueryTreeViewProps {
   onSelectQuery: (queryId: string) => void;
   onCreateFolder?: () => void;
   onViewQueryHistory?: (queryId: string) => void;
+  onViewVersionHistory?: (queryId: string) => void;
 }
 
 interface FolderNodeProps {
@@ -304,6 +305,7 @@ export function QueryTreeView({
   onSelectQuery,
   onCreateFolder,
   onViewQueryHistory,
+  onViewVersionHistory: _onViewVersionHistory,
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
