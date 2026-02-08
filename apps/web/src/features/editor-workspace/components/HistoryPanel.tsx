@@ -190,7 +190,7 @@ export function HistoryPanel({
     queryIdFilter,
   ]);
 
-  const { data, isLoading } = useExecutionHistory(filters);
+  const { data, isLoading } = useExecutionHistory(filters, hasAccess);
 
   const items = data?.items ?? [];
   const totalItems = data?.total ?? 0;

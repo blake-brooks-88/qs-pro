@@ -331,7 +331,9 @@ export class ShellQueryService {
       pageSize: params.pageSize,
       sortBy: params.sortBy,
       sortDir: params.sortDir,
-      status: params.status ? params.status.split(',') : undefined,
+      status: params.status
+        ? params.status.split(',').map((s) => s.trim())
+        : undefined,
       dateFrom: params.dateFrom ? new Date(params.dateFrom) : undefined,
       dateTo: params.dateTo ? new Date(params.dateTo) : undefined,
       queryId: params.queryId,

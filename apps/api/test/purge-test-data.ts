@@ -81,6 +81,12 @@ function getPrivilegedUrl(): string {
     // .env doesn't exist (CI) — fall through
   }
 
+  // Try DATABASE_URL_MIGRATIONS (CI sets this to the qs_migrate role)
+  const migrationsUrl = process.env.DATABASE_URL_MIGRATIONS;
+  if (migrationsUrl?.trim()) {
+    return migrationsUrl;
+  }
+
   // Last resort: swap DATABASE_URL user to qs_migrate
   const runtimeUrl = process.env.DATABASE_URL;
   if (runtimeUrl?.trim()) {
