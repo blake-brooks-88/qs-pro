@@ -2,6 +2,10 @@ import type { queryVersions } from '@qpp/database';
 
 export type QueryVersion = typeof queryVersions.$inferSelect;
 
+export type QueryVersionWithAuthor = QueryVersion & {
+  authorName: string | null;
+};
+
 export interface CreateQueryVersionParams {
   savedQueryId: string;
   tenantId: string;
@@ -18,7 +22,7 @@ export interface CreateQueryVersionParams {
 export interface QueryVersionsRepository {
   create(params: CreateQueryVersionParams): Promise<QueryVersion>;
   findById(id: string): Promise<QueryVersion | null>;
-  findBySavedQueryId(savedQueryId: string): Promise<QueryVersion[]>;
+  findBySavedQueryId(savedQueryId: string): Promise<QueryVersionWithAuthor[]>;
   findLatestBySavedQueryId(savedQueryId: string): Promise<QueryVersion | null>;
   updateName(
     id: string,

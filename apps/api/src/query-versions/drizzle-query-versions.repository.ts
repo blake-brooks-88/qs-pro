@@ -4,12 +4,14 @@ import {
   desc,
   eq,
   queryVersions,
+  users,
 } from '@qpp/database';
 
 import type {
   CreateQueryVersionParams,
   QueryVersion,
   QueryVersionsRepository,
+  QueryVersionWithAuthor,
 } from './query-versions.repository';
 
 type Database = ReturnType<typeof createDatabaseFromClient>;
@@ -53,12 +55,30 @@ export class DrizzleQueryVersionsRepository implements QueryVersionsRepository {
     return results[0] ?? null;
   }
 
-  async findBySavedQueryId(savedQueryId: string): Promise<QueryVersion[]> {
-    return this.getDb()
-      .select()
+  async findBySavedQueryId(
+    savedQueryId: string,
+  ): Promise<QueryVersionWithAuthor[]> {
+    const rows = await this.getDb()
+      .select({
+        id: queryVersions.id,
+        savedQueryId: queryVersions.savedQueryId,
+        tenantId: queryVersions.tenantId,
+        mid: queryVersions.mid,
+        userId: queryVersions.userId,
+        sqlTextEncrypted: queryVersions.sqlTextEncrypted,
+        sqlTextHash: queryVersions.sqlTextHash,
+        versionName: queryVersions.versionName,
+        lineCount: queryVersions.lineCount,
+        source: queryVersions.source,
+        restoredFromId: queryVersions.restoredFromId,
+        createdAt: queryVersions.createdAt,
+        authorName: users.name,
+      })
       .from(queryVersions)
+      .leftJoin(users, eq(queryVersions.userId, users.id))
       .where(eq(queryVersions.savedQueryId, savedQueryId))
       .orderBy(desc(queryVersions.createdAt));
+    return rows as QueryVersionWithAuthor[];
   }
 
   async findLatestBySavedQueryId(

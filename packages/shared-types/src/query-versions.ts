@@ -8,6 +8,7 @@ export const VersionListItemSchema = z.object({
   restoredFromId: z.string().uuid().nullable(),
   versionName: z.string().max(255).nullable(),
   createdAt: z.string().datetime(),
+  authorName: z.string().nullable(),
 });
 export type VersionListItem = z.infer<typeof VersionListItemSchema>;
 

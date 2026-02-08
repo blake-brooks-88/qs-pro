@@ -130,6 +130,19 @@ export function VersionHistoryPanel({
     setShowChanges((prev) => !prev);
   }, []);
 
+  const latestVersionId = useMemo(() => {
+    if (versions.length === 0) {
+      return null;
+    }
+    const sorted = [...versions].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    return sorted.at(0)?.id ?? null;
+  }, [versions]);
+
+  const isViewingLatest = effectiveSelectedId === latestVersionId;
+
   const selectedVersion = useMemo(
     () => versions.find((v) => v.id === effectiveSelectedId),
     [versions, effectiveSelectedId],
@@ -176,15 +189,39 @@ export function VersionHistoryPanel({
           <button
             type="button"
             onClick={handleToggleShowChanges}
-            className={cn(
-              "px-2.5 py-1 text-[11px] font-medium rounded border transition-colors",
-              showChanges
-                ? "bg-primary/10 text-primary border-primary/30"
-                : "bg-muted/30 text-muted-foreground border-border/50 hover:bg-muted/50",
-            )}
+            className="flex items-center gap-2 group"
           >
-            Show Changes
+            <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+              Show Changes
+            </span>
+            <div
+              className={cn(
+                "relative w-7 h-4 rounded-full transition-colors",
+                showChanges ? "bg-muted-foreground" : "bg-muted-foreground/30",
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform",
+                  showChanges ? "translate-x-3.5" : "translate-x-0.5",
+                )}
+              />
+            </div>
           </button>
+          {effectiveSelectedId && versions.length > 0 ? (
+            <Button
+              onClick={() => setIsRestoreDialogOpen(true)}
+              disabled={isViewingLatest || restoreMutation.isPending}
+              size="sm"
+              variant="default"
+              className="text-[11px] h-7 gap-1.5 px-2.5"
+            >
+              <RestartCircle size={14} />
+              {restoreMutation.isPending
+                ? "Restoring..."
+                : "Restore this version"}
+            </Button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -222,7 +259,7 @@ export function VersionHistoryPanel({
         </div>
 
         {/* Timeline sidebar */}
-        <div className="w-64 min-w-[220px] border-l border-border flex flex-col bg-card">
+        <div className="w-80 min-w-64 border-l border-border flex flex-col bg-card">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <VersionTimeline
               versions={versions}
@@ -231,23 +268,6 @@ export function VersionHistoryPanel({
               onUpdateName={handleUpdateName}
             />
           </div>
-
-          {/* Restore button */}
-          {effectiveSelectedId && versions.length > 0 ? (
-            <div className="p-3 border-t border-border">
-              <Button
-                onClick={() => setIsRestoreDialogOpen(true)}
-                disabled={restoreMutation.isPending}
-                className="w-full text-xs font-medium gap-1.5"
-                variant="outline"
-              >
-                <RestartCircle size={14} />
-                {restoreMutation.isPending
-                  ? "Restoring..."
-                  : "Restore this version"}
-              </Button>
-            </div>
-          ) : null}
         </div>
       </div>
 

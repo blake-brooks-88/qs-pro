@@ -64,6 +64,7 @@ export class QueryVersionsService {
           restoredFromId: v.restoredFromId,
           versionName: v.versionName,
           createdAt: v.createdAt.toISOString(),
+          authorName: v.authorName ?? null,
         }));
 
         return { versions: items, total: items.length };
@@ -148,7 +149,7 @@ export class QueryVersionsService {
           lineCount: version.lineCount,
           source: 'restore',
           restoredFromId: versionId,
-          versionName: `Restored from ${version.createdAt.toISOString()}`,
+          versionName: `Restored from ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(version.createdAt)}`,
         });
 
         const updateParams: UpdateSavedQueryParams = {
@@ -221,6 +222,7 @@ export class QueryVersionsService {
           restoredFromId: updated.restoredFromId,
           versionName: updated.versionName,
           createdAt: updated.createdAt.toISOString(),
+          authorName: null,
         };
       },
     );

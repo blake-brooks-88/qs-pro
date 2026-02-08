@@ -1,5 +1,4 @@
 import type { VersionListItem } from "@qpp/shared-types";
-import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   type KeyboardEvent,
   useCallback,
@@ -27,10 +26,6 @@ function formatTimestamp(dateStr: string): string {
   });
 }
 
-function formatFullTimestamp(dateStr: string): string {
-  return new Date(dateStr).toLocaleString();
-}
-
 function computeLineCountDelta(
   versions: VersionListItem[],
   index: number,
@@ -53,14 +48,14 @@ function computeLineCountDelta(
 interface InlineEditableNameProps {
   versionId: string;
   currentName: string | null;
-  isSelected: boolean;
+  defaultDisplay: string;
   onSave: (versionId: string, name: string | null) => void;
 }
 
 function InlineEditableName({
   versionId,
   currentName,
-  isSelected,
+  defaultDisplay,
   onSave,
 }: InlineEditableNameProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -117,7 +112,8 @@ function InlineEditableName({
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
         maxLength={255}
-        className="w-full px-1.5 py-0.5 text-xs bg-background border border-border rounded outline-none focus:ring-1 focus:ring-primary/40"
+        placeholder={defaultDisplay}
+        className="w-full px-1.5 py-0.5 text-xs bg-background rounded outline-none ring-1 ring-border focus:ring-primary/40"
         aria-label="Version name"
       />
     );
@@ -128,7 +124,7 @@ function InlineEditableName({
       <button
         type="button"
         onClick={handleStartEdit}
-        className="text-xs font-medium text-foreground truncate text-left hover:underline cursor-text max-w-full"
+        className="w-full text-xs font-medium text-foreground truncate text-left hover:underline cursor-text"
         title={currentName}
       >
         {currentName}
@@ -136,19 +132,15 @@ function InlineEditableName({
     );
   }
 
-  if (isSelected) {
-    return (
-      <button
-        type="button"
-        onClick={handleStartEdit}
-        className="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors italic"
-      >
-        Name this version
-      </button>
-    );
-  }
-
-  return null;
+  return (
+    <button
+      type="button"
+      onClick={handleStartEdit}
+      className="w-full text-xs text-muted-foreground truncate text-left hover:underline cursor-text"
+    >
+      {defaultDisplay}
+    </button>
+  );
 }
 
 export function VersionTimeline({
@@ -170,70 +162,111 @@ export function VersionTimeline({
   );
 
   return (
-    <div className="flex flex-col gap-0.5 overflow-y-auto py-1">
+    <div className="flex flex-col overflow-y-auto py-3 px-3">
       {sorted.map((version, index) => {
         const isSelected = version.id === selectedVersionId;
         const delta = computeLineCountDelta(sorted, index);
         const isRestore = version.source === "restore";
 
         return (
-          <button
-            key={version.id}
-            type="button"
-            onClick={() => onSelectVersion(version.id)}
-            className={cn(
-              "flex flex-col gap-0.5 px-3 py-2 text-left rounded-md transition-colors cursor-pointer",
-              "hover:bg-muted/50",
-              isSelected && "bg-primary/10 border-l-2 border-primary",
+          <div key={version.id} className="relative pl-8 pb-4 last:pb-0 group">
+            {index < sorted.length - 1 && (
+              <div className="absolute left-3 top-3 bottom-0 w-px bg-border" />
             )}
-          >
-            <div className="flex items-center gap-2">
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap cursor-default">
-                    {formatTimestamp(version.createdAt)}
-                  </span>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
-                    sideOffset={5}
-                  >
-                    {formatFullTimestamp(version.createdAt)}
-                    <Tooltip.Arrow className="fill-foreground" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
 
-              {delta ? (
-                <span
-                  className={cn(
-                    "text-[10px] font-mono",
-                    delta.startsWith("+") ? "text-green-500" : "text-red-500",
-                  )}
-                >
-                  {delta} lines
-                </span>
-              ) : null}
-
-              {isRestore ? (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  restored
-                </span>
-              ) : null}
-            </div>
-
-            {/* Prevent click from bubbling to parent button when editing name */}
-            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- wrapper prevents parent button click during inline name editing; keyboard is handled by the input inside */}
-            <div className="min-h-[16px]" onClick={(e) => e.stopPropagation()}>
-              <InlineEditableName
-                versionId={version.id}
-                currentName={version.versionName}
-                isSelected={isSelected}
-                onSave={onUpdateName}
+            <div
+              className={cn(
+                "absolute left-0 top-1 w-6 h-6 rounded-full border-2 bg-card flex items-center justify-center transition-all",
+                isSelected
+                  ? "border-primary shadow-[0_0_10px_hsl(var(--primary)/0.3)]"
+                  : "border-muted-foreground/30 group-hover:border-muted-foreground/60",
+              )}
+            >
+              <div
+                className={cn(
+                  "w-2.5 h-2.5 rounded-full bg-primary transition-all",
+                  isSelected ? "opacity-100 scale-100" : "opacity-0 scale-0",
+                )}
               />
             </div>
-          </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectVersion(version.id)}
+              className={cn(
+                "w-full text-left rounded-lg border p-3 transition-all cursor-pointer",
+                isSelected
+                  ? "bg-muted border-primary/30"
+                  : "border-border/50 hover:bg-muted/30 hover:border-border",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="min-w-0 flex-1 min-h-5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectVersion(version.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                      onSelectVersion(version.id);
+                    }
+                  }}
+                >
+                  <InlineEditableName
+                    versionId={version.id}
+                    currentName={version.versionName}
+                    defaultDisplay={formatTimestamp(version.createdAt)}
+                    onSave={onUpdateName}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {isRestore ? (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      restored
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-1.5">
+                {version.authorName ? (
+                  <>
+                    <svg
+                      className="w-3 h-3 text-muted-foreground/60 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M20 21a8 8 0 0 0-16 0" />
+                    </svg>
+                    <span className="text-[10px] text-muted-foreground/60 truncate">
+                      {version.authorName}
+                    </span>
+                  </>
+                ) : null}
+                {delta ? (
+                  <span
+                    className={cn(
+                      "text-[10px] font-mono px-1.5 py-0.5 rounded",
+                      delta.startsWith("+")
+                        ? "text-green-500 bg-green-500/10"
+                        : "text-red-500 bg-red-500/10",
+                    )}
+                  >
+                    {delta} lines
+                  </span>
+                ) : null}
+              </div>
+            </button>
+          </div>
         );
       })}
     </div>
