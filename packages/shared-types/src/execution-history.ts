@@ -13,8 +13,14 @@ export const ExecutionHistoryItemSchema = z.object({
   targetDeCustomerKey: z.string().nullable(),
   savedQueryId: z.string().uuid().nullable(),
   errorMessage: z.string().nullable(),
+  hasSql: z.boolean(),
 });
 export type ExecutionHistoryItem = z.infer<typeof ExecutionHistoryItemSchema>;
+
+export const RunSqlTextResponseSchema = z.object({
+  sql: z.string(),
+});
+export type RunSqlTextResponse = z.infer<typeof RunSqlTextResponseSchema>;
 
 export const HistoryListResponseSchema = z.object({
   items: z.array(ExecutionHistoryItemSchema),

@@ -96,9 +96,11 @@ export type {
   ExecutionHistoryItem,
   HistoryListResponse,
   HistoryQueryParams,
+  RunSqlTextResponse,
 } from "./execution-history.js";
 export {
   ExecutionHistoryItemSchema,
   HistoryListResponseSchema,
   HistoryQueryParamsSchema,
+  RunSqlTextResponseSchema,
 } from "./execution-history.js";
