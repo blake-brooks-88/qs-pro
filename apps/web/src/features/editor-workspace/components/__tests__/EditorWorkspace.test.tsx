@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { QueryExecutionStatus } from "@/features/editor-workspace/hooks/use-query-execution";
 import type { RunResultsResponse } from "@/features/editor-workspace/hooks/use-run-results";
+import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import type {
   DataExtension,
   ExecutionResult,
@@ -79,25 +80,54 @@ vi.mock("../ResultsPane", () => ({
   ),
 }));
 
+vi.mock("@/components/ActivityBar", () => ({
+  ActivityBar: () => <div data-testid="mock-activity-bar">ActivityBar</div>,
+}));
+
 vi.mock("../WorkspaceSidebar", () => ({
   WorkspaceSidebar: ({
-    isCollapsed,
-    onToggle,
+    activeView,
     onSelectQuery,
   }: {
-    isCollapsed: boolean;
-    onToggle?: () => void;
+    activeView: string;
     onSelectQuery?: (id: string) => void;
   }) => (
-    <div data-testid="mock-sidebar" data-collapsed={isCollapsed}>
-      <button onClick={onToggle} data-testid="sidebar-toggle">
-        {isCollapsed ? "Expand" : "Collapse"} Sidebar
-      </button>
+    <div data-testid="mock-sidebar" data-active-view={activeView}>
       <button
         onClick={() => onSelectQuery?.("test-query-id")}
         data-testid="sidebar-select-query"
       >
         Select Query
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock("../HistoryPanel", () => ({
+  HistoryPanel: ({
+    queryIdFilter,
+    onRerun,
+  }: {
+    queryIdFilter?: string;
+    onRerun?: (sql: string, queryName: string, createdAt: string) => void;
+  }) => (
+    <div
+      data-testid="mock-history-panel"
+      data-query-id-filter={queryIdFilter ?? ""}
+    >
+      HistoryPanel
+      <button
+        type="button"
+        data-testid="mock-history-rerun"
+        onClick={() =>
+          onRerun?.(
+            "SELECT SubscriberKey FROM _Subscribers",
+            "History Query",
+            "2026-02-01T12:00:00.000Z",
+          )
+        }
+      >
+        Rerun
       </button>
     </div>
   ),
@@ -380,8 +410,9 @@ describe("EditorWorkspace", () => {
     vi.clearAllMocks();
     mockQueryExecutionReturn = { ...defaultMockQueryExecution };
     mockSavedQueryData = null;
-    // Reset Zustand store before each test
+    // Reset Zustand stores before each test
     useTabsStore.getState().reset();
+    useActivityBarStore.setState({ activeView: "dataExtensions" });
   });
 
   // Tab lifecycle tests removed - these were mock-heavy and implementation-coupled.
@@ -580,11 +611,14 @@ describe("EditorWorkspace", () => {
       const runButton = screen.getByTestId("run-button");
       await user.click(runButton);
 
-      // execute should be called with content
+      // execute should be called with content and savedQueryId
       await waitFor(() => {
         expect(mockExecute).toHaveBeenCalledWith(
           "SELECT * FROM Contacts",
           "Test Query",
+          undefined,
+          undefined,
+          "test-query-1",
         );
       });
     });
@@ -665,38 +699,103 @@ describe("EditorWorkspace", () => {
   });
 
   describe("sidebar behavior", () => {
-    it("collapses sidebar when toggle button clicked", async () => {
-      const user = userEvent.setup();
-      const onToggleSidebar = vi.fn();
+    it("renders ActivityBar and sidebar panel", () => {
+      renderEditorWorkspace();
 
-      renderEditorWorkspace({ isSidebarCollapsed: false, onToggleSidebar });
-
-      // Sidebar should show expanded state
-      const sidebar = screen.getByTestId("mock-sidebar");
-      expect(sidebar).toHaveAttribute("data-collapsed", "false");
-
-      // Click toggle
-      await user.click(screen.getByTestId("sidebar-toggle"));
-
-      // onToggleSidebar callback should be called
-      expect(onToggleSidebar).toHaveBeenCalled();
+      expect(screen.getByTestId("mock-activity-bar")).toBeInTheDocument();
+      expect(screen.getByTestId("mock-sidebar")).toBeInTheDocument();
     });
 
-    it("expands sidebar when toggle button clicked", async () => {
-      const user = userEvent.setup();
-      const onToggleSidebar = vi.fn();
+    it("passes activeView from store to sidebar", () => {
+      renderEditorWorkspace();
 
-      renderEditorWorkspace({ isSidebarCollapsed: true, onToggleSidebar });
-
-      // Sidebar should show collapsed state
       const sidebar = screen.getByTestId("mock-sidebar");
-      expect(sidebar).toHaveAttribute("data-collapsed", "true");
+      expect(sidebar).toHaveAttribute("data-active-view", "dataExtensions");
+    });
 
-      // Click toggle
-      await user.click(screen.getByTestId("sidebar-toggle"));
+    it("renders history panel in main area when history view is active", () => {
+      useActivityBarStore.setState({
+        activeView: "history",
+        historyQueryIdFilter: "query-123",
+      });
 
-      // onToggleSidebar callback should be called
-      expect(onToggleSidebar).toHaveBeenCalled();
+      renderEditorWorkspace();
+
+      expect(screen.getByTestId("mock-history-panel")).toHaveAttribute(
+        "data-query-id-filter",
+        "query-123",
+      );
+      expect(screen.queryByTestId("mock-sidebar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("mock-editor")).not.toBeInTheDocument();
+    });
+
+    it("shows history panel after clicking View Run History toolbar button", async () => {
+      const user = userEvent.setup();
+
+      const initialTabs: QueryTab[] = [
+        {
+          id: "tab-1",
+          queryId: "q1",
+          name: "Saved Query",
+          content: "SELECT 1",
+          isDirty: false,
+          isNew: false,
+        },
+      ];
+
+      renderEditorWorkspace({ initialTabs });
+
+      const toolbarSection = document.querySelector(
+        ".flex.items-center.gap-1.overflow-visible",
+      );
+      expect(toolbarSection).toBeTruthy();
+      const toolbarButtons = Array.from(
+        toolbarSection?.querySelectorAll("button") ?? [],
+      );
+      expect(toolbarButtons.length).toBeGreaterThan(4);
+
+      const viewHistoryButton = toolbarButtons.at(4);
+      expect(viewHistoryButton).toBeDefined();
+      await user.click(viewHistoryButton as HTMLElement);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("mock-history-panel")).toHaveAttribute(
+          "data-query-id-filter",
+          "q1",
+        );
+      });
+      expect(useActivityBarStore.getState().activeView).toBe("history");
+      expect(screen.queryByTestId("mock-sidebar")).not.toBeInTheDocument();
+    });
+
+    it("returns to editor with the rerun tab active when opening from history", async () => {
+      const user = userEvent.setup();
+
+      useActivityBarStore.setState({
+        activeView: "history",
+        historyQueryIdFilter: "query-123",
+      });
+
+      renderEditorWorkspace();
+
+      expect(screen.getByTestId("mock-history-panel")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("mock-history-rerun"));
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("mock-history-panel"),
+        ).not.toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("editor-textarea")).toHaveValue(
+          "SELECT SubscriberKey FROM _Subscribers",
+        );
+      });
+      expect(useActivityBarStore.getState().activeView).toBeNull();
     });
   });
 

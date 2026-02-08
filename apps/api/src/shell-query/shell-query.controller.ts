@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Inject,
   InternalServerErrorException,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -14,6 +15,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import { HistoryQueryParamsSchema } from '@qpp/shared-types';
 import type { Observable } from 'rxjs';
 import { z } from 'zod';
 
@@ -32,6 +34,7 @@ const createRunSchema = z.object({
   snippetName: z.string().max(1000).optional(),
   targetDeCustomerKey: z.string().trim().min(1).max(200).optional(),
   targetUpdateType: z.enum(['Overwrite', 'Append', 'Update']).optional(),
+  savedQueryId: z.string().uuid().optional(),
   tableMetadata: z
     .record(
       z.string().max(128),
@@ -79,6 +82,7 @@ export class ShellQueryController {
       snippetName,
       targetDeCustomerKey,
       targetUpdateType,
+      savedQueryId,
       tableMetadata,
     } = result.data;
 
@@ -128,6 +132,7 @@ export class ShellQueryController {
         tableMetadata,
         targetDeCustomerKey,
         targetUpdateType,
+        savedQueryId,
       );
 
       return { runId, status: 'queued' };
@@ -140,6 +145,60 @@ export class ShellQueryController {
         error instanceof Error ? error.message : 'Unknown error',
       );
     }
+  }
+
+  @Get('history')
+  async getHistory(@CurrentUser() user: UserSession, @Query() query: unknown) {
+    const { features: tenantFeatures } =
+      await this.featuresService.getTenantFeatures(user.tenantId);
+
+    if (!tenantFeatures.executionHistory) {
+      throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+        operation: 'getHistory',
+        reason: 'Execution History requires Pro subscription',
+      });
+    }
+
+    const result = HistoryQueryParamsSchema.safeParse(query);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+
+    return this.shellQueryService.listHistory(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      result.data,
+    );
+  }
+
+  @Get(':runId/sql')
+  async getRunSqlText(
+    @Param('runId') runId: string,
+    @CurrentUser() user: UserSession,
+  ) {
+    const { features: tenantFeatures } =
+      await this.featuresService.getTenantFeatures(user.tenantId);
+
+    if (!tenantFeatures.executionHistory) {
+      throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+        operation: 'getRunSqlText',
+        reason: 'Execution History requires Pro subscription',
+      });
+    }
+
+    const sql = await this.shellQueryService.getRunSqlText(
+      runId,
+      user.tenantId,
+      user.mid,
+      user.userId,
+    );
+
+    if (sql === null) {
+      throw new NotFoundException('SQL text not found for this run');
+    }
+
+    return { sql };
   }
 
   @Get(':runId')

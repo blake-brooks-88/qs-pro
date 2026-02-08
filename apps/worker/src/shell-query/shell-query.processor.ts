@@ -639,7 +639,7 @@ export class ShellQueryProcessor extends WorkerHost {
           this.logger.log(
             `Run ${runId}: Row probe found rows (count=${probeResult.count}, items=${probeResult.itemsLength}), marking ready (fast-path)`,
           );
-          await this.markReady(tenantId, userId, mid, runId);
+          await this.markReady(tenantId, userId, mid, runId, probeResult.count);
           await this.rlsContext.runWithUserContext(
             tenantId,
             mid,
@@ -892,7 +892,7 @@ export class ShellQueryProcessor extends WorkerHost {
       return { status: "completed", runId };
     }
 
-    const isReady = await this.rlsContext.runWithUserContext(
+    const readyResult = await this.rlsContext.runWithUserContext(
       tenantId,
       mid,
       userId,
@@ -906,9 +906,9 @@ export class ShellQueryProcessor extends WorkerHost {
       },
     );
 
-    if (isReady) {
+    if (readyResult.ready) {
       this.logger.log(`Run ${runId}: Rowset is ready, marking complete`);
-      await this.markReady(tenantId, userId, mid, runId);
+      await this.markReady(tenantId, userId, mid, runId, readyResult.rowCount);
       await this.rlsContext.runWithUserContext(
         tenantId,
         mid,
@@ -988,11 +988,18 @@ export class ShellQueryProcessor extends WorkerHost {
     userId: string,
     mid: string,
     deName: string,
-  ): Promise<boolean> {
+  ): Promise<{ ready: boolean; rowCount?: number }> {
     try {
-      await this.restDataService.getRowset(tenantId, userId, mid, deName, 1, 1);
+      const response: RowsetResponse = await this.restDataService.getRowset(
+        tenantId,
+        userId,
+        mid,
+        deName,
+        1,
+        1,
+      );
 
-      return true;
+      return { ready: true, rowCount: response.count ?? undefined };
     } catch (error) {
       if (isUnrecoverable(error)) {
         throw error;
@@ -1002,7 +1009,7 @@ export class ShellQueryProcessor extends WorkerHost {
       this.logger.debug(
         `Rowset readiness check failed for "${deName}": ${message}`,
       );
-      return false;
+      return { ready: false };
     }
   }
 
@@ -1108,11 +1115,13 @@ export class ShellQueryProcessor extends WorkerHost {
     userId: string,
     mid: string,
     runId: string,
+    rowCount?: number,
   ) {
     this.logger.log(`Run ${runId} completed successfully`);
     await this.publishStatusEvent(runId, "fetching_results");
     await this.updateStatus(tenantId, userId, mid, runId, "ready", {
       completedAt: new Date(),
+      rowCount,
     });
     await this.publishStatusEvent(runId, "ready");
     (

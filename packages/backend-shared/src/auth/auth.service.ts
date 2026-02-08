@@ -13,6 +13,8 @@ import { RlsContextService } from "../database/rls-context.service";
 import { EncryptionService } from "../encryption";
 import { SeatLimitService } from "./seat-limit.service";
 
+const MCE_HTTP_TIMEOUT_MS = 15_000;
+
 export interface MceTokenResponse {
   access_token: string;
   refresh_token: string;
@@ -154,6 +156,7 @@ export class AuthService {
 
     const response = await axios.post<MceTokenResponse>(tokenUrl, body, {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: MCE_HTTP_TIMEOUT_MS,
     });
 
     return response.data;
@@ -208,7 +211,7 @@ export class AuthService {
   async exchangeCodeForToken(
     tssd: string,
     code: string,
-    fallbackCode?: string,
+    embeddedCode?: string,
     accountId?: string,
   ): Promise<MceTokenResponse> {
     const clientId = this.configService.get<string>("MCE_CLIENT_ID");
@@ -224,10 +227,19 @@ export class AuthService {
       });
     }
 
-    const codes =
-      fallbackCode && fallbackCode !== code ? [code, fallbackCode] : [code];
+    const codes = this.buildCodeExchangeAttempts(code, embeddedCode);
+    this.logger.log(
+      `OAuth token exchange starting tssd=${tssd} attempts=${codes.length} hasAccountId=${Boolean(accountId)}`,
+    );
 
-    for (const attemptCode of codes) {
+    for (const [index, attemptCode] of codes.entries()) {
+      const attemptStartedAt = Date.now();
+      const attemptSource =
+        embeddedCode && attemptCode === embeddedCode ? "embedded" : "original";
+      this.logger.log(
+        `OAuth token exchange attempt ${index + 1}/${codes.length} source=${attemptSource} codeLen=${attemptCode.length}`,
+      );
+
       const body = new URLSearchParams({
         grant_type: "authorization_code",
         code: attemptCode,
@@ -243,13 +255,26 @@ export class AuthService {
       try {
         const response = await axios.post<MceTokenResponse>(tokenUrl, body, {
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          timeout: MCE_HTTP_TIMEOUT_MS,
         });
+        this.logger.log(
+          `OAuth token exchange succeeded attempt=${index + 1} durationMs=${Date.now() - attemptStartedAt}`,
+        );
         return response.data;
       } catch (error) {
         const errorCode = this.getOAuthErrorCode(error);
+        const status = this.getAxiosStatus(error);
+        const networkCode = this.getAxiosNetworkCode(error);
         const isLastAttempt = attemptCode === codes[codes.length - 1];
+        const shouldRetry =
+          !isLastAttempt &&
+          this.shouldTryAlternateCodeAttempt(error, errorCode);
 
-        if (!isLastAttempt && errorCode === "invalid_token") {
+        this.logger.warn(
+          `OAuth token exchange failed attempt=${index + 1}/${codes.length} source=${attemptSource} durationMs=${Date.now() - attemptStartedAt} status=${status ?? "unknown"} oauthError=${errorCode ?? "unknown"} networkCode=${networkCode ?? "unknown"} retry=${shouldRetry}`,
+        );
+
+        if (shouldRetry) {
           this.logger.warn(
             "Auth code exchange failed, retrying with alternate code",
           );
@@ -317,17 +342,21 @@ export class AuthService {
       return;
     }
 
-    await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-      await this.credRepo.upsert({
-        tenantId,
-        userId,
-        mid,
-        accessToken: creds.accessToken,
-        refreshToken: creds.refreshToken,
-        expiresAt: new Date(0),
-        updatedAt: new Date(),
-      });
-    });
+    await this.rlsContext.runWithIsolatedTenantContext(
+      tenantId,
+      mid,
+      async () => {
+        await this.credRepo.upsert({
+          tenantId,
+          userId,
+          mid,
+          accessToken: creds.accessToken,
+          refreshToken: creds.refreshToken,
+          expiresAt: new Date(0),
+          updatedAt: new Date(),
+        });
+      },
+    );
   }
 
   async saveTokens(
@@ -336,32 +365,79 @@ export class AuthService {
     mid: string,
     tokenData: MceTokenResponse,
   ) {
+    const saveStartedAt = Date.now();
+    this.logger.log(
+      `saveTokens start tenantId=${tenantId} userId=${userId} mid=${mid}`,
+    );
+
+    const encryptAccessStartedAt = Date.now();
     const encryptedAccessToken = this.encryptionService.encrypt(
       tokenData.access_token,
     ) as string;
+    this.logger.log(
+      `saveTokens access token encrypted durationMs=${Date.now() - encryptAccessStartedAt}`,
+    );
+
+    const encryptRefreshStartedAt = Date.now();
     const encryptedRefreshToken = this.encryptionService.encrypt(
       tokenData.refresh_token,
     ) as string;
+    this.logger.log(
+      `saveTokens refresh token encrypted durationMs=${Date.now() - encryptRefreshStartedAt}`,
+    );
 
-    await this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
-      await this.credRepo.upsert({
-        tenantId,
-        userId,
-        mid,
-        accessToken: encryptedAccessToken,
-        refreshToken: encryptedRefreshToken,
-        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
-        updatedAt: new Date(),
-      });
-    });
+    const rlsStartedAt = Date.now();
+    this.logger.log("saveTokens entering runWithIsolatedTenantContext");
+    await this.rlsContext.runWithIsolatedTenantContext(
+      tenantId,
+      mid,
+      async () => {
+        const upsertStartedAt = Date.now();
+        this.logger.log("saveTokens credentials upsert starting");
+        await this.credRepo.upsert({
+          tenantId,
+          userId,
+          mid,
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
+          expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+          updatedAt: new Date(),
+        });
+        this.logger.log(
+          `saveTokens credentials upsert completed durationMs=${Date.now() - upsertStartedAt}`,
+        );
+      },
+    );
+    this.logger.log(
+      `saveTokens runWithIsolatedTenantContext completed durationMs=${Date.now() - rlsStartedAt}`,
+    );
+    this.logger.log(
+      `saveTokens completed totalDurationMs=${Date.now() - saveStartedAt}`,
+    );
   }
 
   async getUserInfo(tssd: string, accessToken: string) {
     const url = `https://${tssd}.auth.marketingcloudapis.com/v2/userinfo`;
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return response.data;
+    const startedAt = Date.now();
+    this.logger.log(`OAuth userinfo request starting tssd=${tssd}`);
+
+    try {
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: MCE_HTTP_TIMEOUT_MS,
+      });
+      this.logger.log(
+        `OAuth userinfo request succeeded durationMs=${Date.now() - startedAt}`,
+      );
+      return response.data;
+    } catch (error) {
+      const status = this.getAxiosStatus(error);
+      const networkCode = this.getAxiosNetworkCode(error);
+      this.logger.warn(
+        `OAuth userinfo request failed durationMs=${Date.now() - startedAt} status=${status ?? "unknown"} networkCode=${networkCode ?? "unknown"}`,
+      );
+      throw error;
+    }
   }
 
   async handleCallback(
@@ -373,18 +449,25 @@ export class AuthService {
     name?: string,
     mid?: string,
   ) {
+    const callbackStartedAt = Date.now();
     const embedded = this.extractAuthCode(code);
     const embeddedEid = embedded?.eid;
-    const fallbackCode = embedded?.authCode;
+    const embeddedCode = embedded?.authCode;
+    const codeSegments = code.split(".").length;
+    this.logger.log(
+      `OAuth callback pipeline start tssd=${tssd} codeLen=${code.length} codeSegments=${codeSegments} hasEmbeddedAuthCode=${Boolean(embeddedCode)} hasProvidedSfUserId=${Boolean(sfUserId)} hasProvidedEid=${Boolean(eid)} hasProvidedMid=${Boolean(mid)}`,
+    );
 
     const tokenData = await this.exchangeCodeForToken(
       tssd,
       code,
-      fallbackCode,
+      embeddedCode,
       mid,
     );
+    this.logger.log("OAuth callback token exchange step complete");
 
     const info = await this.getUserInfo(tssd, tokenData.access_token);
+    this.logger.log("OAuth callback userinfo step complete");
 
     if (!info?.sub && !info?.user_id && !info?.user?.sub) {
       this.logger.warn("Userinfo response missing user identifiers", {
@@ -438,12 +521,15 @@ export class AuthService {
       derivedSfUserId &&
       providedSfUserId !== derivedSfUserId
     ) {
+      this.logger.warn("OAuth callback identity mismatch detected: sfUserId");
       throw new AppError(ErrorCode.AUTH_IDENTITY_MISMATCH);
     }
     if (providedEid && derivedEid && providedEid !== derivedEid) {
+      this.logger.warn("OAuth callback identity mismatch detected: eid");
       throw new AppError(ErrorCode.AUTH_IDENTITY_MISMATCH);
     }
     if (providedMid && derivedMid && providedMid !== derivedMid) {
+      this.logger.warn("OAuth callback identity mismatch detected: mid");
       throw new AppError(ErrorCode.AUTH_IDENTITY_MISMATCH);
     }
 
@@ -460,25 +546,55 @@ export class AuthService {
       });
     }
 
+    const tenantUpsertStartedAt = Date.now();
+    this.logger.log("OAuth callback tenant upsert starting");
     const tenant = await this.tenantRepo.upsert({ eid: effectiveEid, tssd });
+    this.logger.log(
+      `OAuth callback tenant upsert completed durationMs=${Date.now() - tenantUpsertStartedAt}`,
+    );
 
     // sfUserId is a Salesforce User ID (18-char format), which is globally unique
     // across all MCE enterprises. A user belongs to exactly one MCE enterprise,
     // so we check globally rather than per-tenant.
+    const userLookupStartedAt = Date.now();
+    this.logger.log("OAuth callback user lookup starting");
     const existingUser = await this.userRepo.findBySfUserId(effectiveSfUserId);
+    this.logger.log(
+      `OAuth callback user lookup completed durationMs=${Date.now() - userLookupStartedAt} found=${Boolean(existingUser)}`,
+    );
 
     if (!existingUser) {
+      const seatLimitStartedAt = Date.now();
+      this.logger.log("OAuth callback seat limit check starting");
       await this.seatLimitService.checkSeatLimit(tenant.id);
+      this.logger.log(
+        `OAuth callback seat limit check completed durationMs=${Date.now() - seatLimitStartedAt}`,
+      );
     }
 
+    const userUpsertStartedAt = Date.now();
+    this.logger.log("OAuth callback user upsert starting");
     const user = await this.userRepo.upsert({
       sfUserId: effectiveSfUserId,
       tenantId: tenant.id,
       email: effectiveEmail,
       name: effectiveName,
     });
+    this.logger.log(
+      `OAuth callback user upsert completed durationMs=${Date.now() - userUpsertStartedAt}`,
+    );
 
+    const saveTokensStartedAt = Date.now();
+    this.logger.log(
+      `OAuth callback token persistence starting tenantId=${tenant.id} mid=${effectiveMid}`,
+    );
     await this.saveTokens(tenant.id, user.id, effectiveMid, tokenData);
+    this.logger.log(
+      `OAuth callback token persistence completed durationMs=${Date.now() - saveTokensStartedAt}`,
+    );
+    this.logger.log(
+      `OAuth callback pipeline complete durationMs=${Date.now() - callbackStartedAt}`,
+    );
 
     return { user, tenant, mid: effectiveMid };
   }
@@ -558,6 +674,51 @@ export class AuthService {
       );
       return undefined;
     }
+  }
+
+  private buildCodeExchangeAttempts(
+    code: string,
+    embeddedCode?: string,
+  ): string[] {
+    if (!embeddedCode || embeddedCode === code) {
+      return [code];
+    }
+
+    // Prefer embedded auth_code from wrapped code payloads used by MCE iframe flow.
+    return [embeddedCode, code];
+  }
+
+  private shouldTryAlternateCodeAttempt(
+    error: unknown,
+    errorCode?: string,
+  ): boolean {
+    if (errorCode === "invalid_token" || errorCode === "invalid_grant") {
+      return true;
+    }
+
+    if (!axios.isAxiosError(error)) {
+      return false;
+    }
+
+    if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+      return true;
+    }
+
+    return !error.response;
+  }
+
+  private getAxiosStatus(error: unknown): number | undefined {
+    if (!axios.isAxiosError(error)) {
+      return undefined;
+    }
+    return error.response?.status;
+  }
+
+  private getAxiosNetworkCode(error: unknown): string | undefined {
+    if (!axios.isAxiosError(error)) {
+      return undefined;
+    }
+    return error.code;
   }
 
   private logTokenError(message: string, error: unknown) {
@@ -664,6 +825,7 @@ export class AuthService {
 
       const response = await axios.post<MceTokenResponse>(tokenUrl, body, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        timeout: MCE_HTTP_TIMEOUT_MS,
       });
 
       const tokenData = response.data;

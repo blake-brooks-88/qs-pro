@@ -166,6 +166,36 @@ describe("QueryTreeView", () => {
         expect(screen.getByText("Delete")).toBeInTheDocument();
       });
     });
+
+    it("triggers run history callback from query context menu", async () => {
+      const user = userEvent.setup();
+      const onViewQueryHistory = vi.fn();
+
+      render(
+        <QueryTreeView
+          searchQuery=""
+          onSelectQuery={vi.fn()}
+          onViewQueryHistory={onViewQueryHistory}
+        />,
+        {
+          wrapper: createWrapper(),
+        },
+      );
+
+      await waitFor(() =>
+        expect(screen.getByText("Query One")).toBeInTheDocument(),
+      );
+
+      fireEvent.contextMenu(screen.getByText("Query One"));
+
+      await waitFor(() => {
+        expect(screen.getByText("View Run History")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("View Run History"));
+
+      expect(onViewQueryHistory).toHaveBeenCalledWith("q1");
+    });
   });
 
   describe("inline rename", () => {

@@ -13,7 +13,29 @@ export interface CreateShellQueryRunParams {
   targetDeCustomerKey?: string;
   targetUpdateType?: string;
   sqlTextHash: string;
+  sqlTextEncrypted?: string;
+  savedQueryId?: string;
   status: ShellQueryRunStatus;
+}
+
+export interface ListRunsParams {
+  tenantId: string;
+  mid: string;
+  userId: string;
+  page: number;
+  pageSize: number;
+  sortBy: 'createdAt' | 'durationMs' | 'rowCount' | 'status';
+  sortDir: 'asc' | 'desc';
+  status?: string[];
+  dateFrom?: Date;
+  dateTo?: Date;
+  queryId?: string;
+  search?: string;
+}
+
+export interface ListRunsResult {
+  runs: ShellQueryRun[];
+  total: number;
 }
 
 export interface ShellQueryRunRepository {
@@ -40,4 +62,5 @@ export interface ShellQueryRunRepository {
     mid: string,
     userId: string,
   ): Promise<number>;
+  listRuns(params: ListRunsParams): Promise<ListRunsResult>;
 }

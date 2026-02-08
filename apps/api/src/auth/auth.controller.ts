@@ -37,6 +37,8 @@ interface OAuthStatePayload {
   nonce: string;
 }
 
+const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
@@ -54,9 +56,7 @@ export class AuthController {
     session.set('tenantId', undefined);
     session.set('mid', undefined);
     session.set('csrfToken', undefined);
-    session.set('oauth_state_nonce', undefined);
-    session.set('oauth_state_tssd', undefined);
-    session.set('oauth_state_created_at', undefined);
+    this.clearOAuthState(session);
   }
 
   private ensureCsrfToken(session: SecureSession): string {
@@ -68,6 +68,12 @@ export class AuthController {
     const token = randomBytes(32).toString('base64url');
     session.set('csrfToken', token);
     return token;
+  }
+
+  private clearOAuthState(session: SecureSession): void {
+    session.set('oauth_state_nonce', undefined);
+    session.set('oauth_state_tssd', undefined);
+    session.set('oauth_state_created_at', undefined);
   }
 
   @Post('login')
@@ -261,6 +267,8 @@ export class AuthController {
     @Query('eid') eid?: string,
     @Query('mid') mid?: string,
   ) {
+    const callbackStartedAt = Date.now();
+
     if (!req.session) {
       throw new InternalServerErrorException('Session not available');
     }
@@ -269,8 +277,27 @@ export class AuthController {
       throw new UnauthorizedException('Missing code or state in callback');
     }
 
-    const effectiveTssd = this.validateAndConsumeOAuthState(state, req.session);
+    const codeSegments = code.split('.').length;
+    const hasSessionNonce =
+      typeof req.session.get('oauth_state_nonce') === 'string';
+    const hasSessionTssd =
+      typeof req.session.get('oauth_state_tssd') === 'string';
+    const hasSessionCreatedAt =
+      typeof req.session.get('oauth_state_created_at') === 'string';
+    this.logger.log(
+      `OAuth callback received codeLen=${code.length} codeSegments=${codeSegments} stateLen=${state.length} hasSessionState=${hasSessionNonce && hasSessionTssd && hasSessionCreatedAt} hasSfUserId=${Boolean(
+        sfUserId,
+      )} hasEid=${Boolean(eid)} hasMid=${Boolean(mid)}`,
+    );
 
+    const validateStateStartedAt = Date.now();
+    const effectiveTssd = this.validateOAuthState(state, req.session);
+    this.logger.log(
+      `OAuth callback state validated tssd=${effectiveTssd} durationMs=${Date.now() - validateStateStartedAt}`,
+    );
+    this.logger.log('OAuth callback state consumed');
+
+    const authServiceStartedAt = Date.now();
     const result = await this.authService.handleCallback(
       effectiveTssd,
       code,
@@ -280,12 +307,18 @@ export class AuthController {
       undefined,
       mid,
     );
+    this.logger.log(
+      `OAuth callback AuthService completed durationMs=${Date.now() - authServiceStartedAt}`,
+    );
 
     this.ensureCsrfToken(req.session);
     req.session.set('userId', result.user.id);
     req.session.set('tenantId', result.tenant.id);
     req.session.set('mid', result.mid);
 
+    this.logger.log(
+      `OAuth callback completed durationMs=${Date.now() - callbackStartedAt}`,
+    );
     return { url: '/', statusCode: 302 };
   }
 
@@ -335,37 +368,38 @@ export class AuthController {
     return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
   }
 
-  private validateAndConsumeOAuthState(
-    state: string,
-    session: SecureSession,
-  ): string {
+  private validateOAuthState(state: string, session: SecureSession): string {
     const expectedNonce = session.get('oauth_state_nonce');
     const expectedTssd = session.get('oauth_state_tssd');
     const createdAt = session.get('oauth_state_created_at');
-
-    session.set('oauth_state_nonce', undefined);
-    session.set('oauth_state_tssd', undefined);
-    session.set('oauth_state_created_at', undefined);
+    this.clearOAuthState(session);
 
     if (
       typeof expectedNonce !== 'string' ||
       typeof expectedTssd !== 'string' ||
       typeof createdAt !== 'string'
     ) {
+      this.logger.warn('OAuth callback rejected: session state missing');
       throw new UnauthorizedException('OAuth state not initialized');
     }
 
     const statePayload = this.decodeOAuthState(state);
     if (!statePayload) {
+      this.logger.warn('OAuth callback rejected: state payload invalid');
       throw new UnauthorizedException('Invalid OAuth state');
     }
 
-    const maxAgeMs = 10 * 60 * 1000;
     const createdAtMs = Number(createdAt);
     if (!Number.isFinite(createdAtMs)) {
+      this.logger.warn(
+        'OAuth callback rejected: session state timestamp is invalid',
+      );
       throw new UnauthorizedException('OAuth state not initialized');
     }
-    if (Date.now() - createdAtMs > maxAgeMs) {
+    if (Date.now() - createdAtMs > OAUTH_STATE_MAX_AGE_MS) {
+      this.logger.warn(
+        `OAuth callback rejected: session state expired ageMs=${Date.now() - createdAtMs}`,
+      );
       throw new UnauthorizedException('OAuth state expired');
     }
 
@@ -373,6 +407,9 @@ export class AuthController {
       statePayload.nonce !== expectedNonce ||
       statePayload.tssd !== expectedTssd
     ) {
+      this.logger.warn(
+        'OAuth callback rejected: session state nonce/tssd mismatch',
+      );
       throw new UnauthorizedException('OAuth state mismatch');
     }
 

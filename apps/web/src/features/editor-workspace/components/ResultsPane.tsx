@@ -1,13 +1,6 @@
-import {
-  AltArrowLeft,
-  AltArrowRight,
-  CloseCircle,
-  DoubleAltArrowLeft,
-  DoubleAltArrowRight,
-  InfoCircle,
-  LinkCircle,
-} from "@solar-icons/react";
+import { CloseCircle, InfoCircle, LinkCircle } from "@solar-icons/react";
 
+import { Pagination } from "@/components/ui/pagination";
 import type {
   ExecutionResult,
   ExecutionStatus,
@@ -94,12 +87,6 @@ export function ResultsPane({
       : 1;
   const columns = result.columns.length > 0 ? result.columns : ["Results"];
   const hasRows = result.rows.length > 0;
-  const startRow =
-    result.totalRows > 0 ? (result.currentPage - 1) * result.pageSize + 1 : 0;
-  const endRow =
-    result.totalRows > 0
-      ? Math.min(result.currentPage * result.pageSize, result.totalRows)
-      : 0;
 
   const statusMessage = getStatusMessage(result);
 
@@ -220,66 +207,14 @@ export function ResultsPane({
       </div>
 
       {/* Intelligent Pagination */}
-      <div className="h-10 border-t border-border bg-card flex items-center justify-between px-4 shrink-0">
-        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-          Showing {startRow} - {endRow}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <button
-            disabled={result.currentPage === 1}
-            onClick={() => onPageChange?.(1)}
-            className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors"
-          >
-            <DoubleAltArrowLeft size={16} />
-          </button>
-          <button
-            disabled={result.currentPage === 1}
-            onClick={() => onPageChange?.(result.currentPage - 1)}
-            className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors"
-          >
-            <AltArrowLeft size={16} />
-          </button>
-
-          <div className="flex items-center gap-1 px-2">
-            {[...Array(Math.min(5, totalPages))].map((_, i) => {
-              const pageNum = i + 1;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => onPageChange?.(pageNum)}
-                  className={cn(
-                    "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold transition-all",
-                    result.currentPage === pageNum
-                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/40"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-            {totalPages > 5 && (
-              <span className="text-muted-foreground text-[10px]">...</span>
-            )}
-          </div>
-
-          <button
-            disabled={result.currentPage === totalPages}
-            onClick={() => onPageChange?.(result.currentPage + 1)}
-            className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors"
-          >
-            <AltArrowRight size={16} />
-          </button>
-          <button
-            disabled={result.currentPage === totalPages}
-            onClick={() => onPageChange?.(totalPages)}
-            className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors"
-          >
-            <DoubleAltArrowRight size={16} />
-          </button>
-        </div>
-      </div>
+      <Pagination
+        currentPage={result.currentPage}
+        totalPages={totalPages}
+        totalItems={result.totalRows}
+        pageSize={result.pageSize}
+        onPageChange={onPageChange}
+        pageControl="buttons"
+      />
     </div>
   );
 }

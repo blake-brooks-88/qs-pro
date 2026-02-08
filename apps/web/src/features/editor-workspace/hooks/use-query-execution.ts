@@ -12,6 +12,7 @@ import { extractTableReferences } from "@/features/editor-workspace/utils/sql-co
 import { usageQueryKeys } from "@/hooks/use-run-usage";
 import api from "@/services/api";
 
+import { executionHistoryKeys } from "./use-execution-history";
 import { metadataQueryKeys } from "./use-metadata";
 import {
   runResultsQueryKeys,
@@ -80,6 +81,7 @@ interface UseQueryExecutionResult {
     snippetName?: string,
     targetDeCustomerKey?: string,
     targetUpdateType?: TargetUpdateType,
+    savedQueryId?: string,
   ) => Promise<void>;
   cancel: () => Promise<void>;
   status: QueryExecutionStatus;
@@ -260,6 +262,7 @@ export function useQueryExecution(
       snippetName?: string,
       targetDeCustomerKey?: string,
       targetUpdateType?: TargetUpdateType,
+      savedQueryId?: string,
     ): Promise<void> => {
       setCurrentPage(1);
       if (runId) {
@@ -281,6 +284,7 @@ export function useQueryExecution(
           tableMetadata,
           targetDeCustomerKey,
           targetUpdateType,
+          savedQueryId,
         });
 
         const { runId: newRunId, status: newStatus } = response.data;
@@ -293,6 +297,9 @@ export function useQueryExecution(
         subscribeToSSE(newRunId);
 
         void queryClient.invalidateQueries({ queryKey: usageQueryKeys.all });
+        void queryClient.invalidateQueries({
+          queryKey: executionHistoryKeys.all,
+        });
       } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 429) {
           toast.error(

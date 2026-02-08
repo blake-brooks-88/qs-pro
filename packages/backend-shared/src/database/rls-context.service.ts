@@ -51,12 +51,36 @@ export class RlsContextService {
     mid: string,
     fn: () => Promise<T>,
   ): Promise<T> {
+    return this.runWithTenantContextInternal(tenantId, mid, fn, false);
+  }
+
+  async runWithIsolatedTenantContext<T>(
+    tenantId: string,
+    mid: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    return this.runWithTenantContextInternal(tenantId, mid, fn, true);
+  }
+
+  private async runWithTenantContextInternal<T>(
+    tenantId: string,
+    mid: string,
+    fn: () => Promise<T>,
+    isolated: boolean,
+  ): Promise<T> {
     const existing = getDbFromContext();
-    if (existing) {
+    if (existing && !isolated) {
       return fn();
     }
 
+    const reserveStartedAt = Date.now();
     const reserved = await this.sql.reserve();
+    const reserveDuration = Date.now() - reserveStartedAt;
+    if (reserveDuration > 500) {
+      this.logger.warn(
+        `runWithTenantContext reserve wait was slow durationMs=${reserveDuration}`,
+      );
+    }
     try {
       // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
       await reserved`BEGIN`;
@@ -83,6 +107,14 @@ export class RlsContextService {
       );
       throw error;
     } finally {
+      try {
+        await reserved`RESET app.user_id`;
+      } catch (resetError) {
+        this.logger.warn(
+          "Failed to reset app.user_id before releasing connection",
+          resetError instanceof Error ? resetError.message : String(resetError),
+        );
+      }
       reserved.release();
     }
   }
@@ -97,13 +129,21 @@ export class RlsContextService {
     const existingReservedSql = getReservedSqlFromContext();
 
     if (existing && existingReservedSql) {
-      // Reuse the existing reserved connection within the same transaction.
-      // set_config with true (local) applies to current transaction only.
-      await existingReservedSql`SELECT set_config('app.user_id', ${userId}, true)`;
+      // Reuse the existing reserved connection (from the onRequest hook).
+      // The hook's connection has no active transaction, so is_local=false
+      // (session-scoped) is required for the setting to persist across statements.
+      await existingReservedSql`SELECT set_config('app.user_id', ${userId}, false)`;
       return fn();
     }
 
+    const reserveStartedAt = Date.now();
     const reserved = await this.sql.reserve();
+    const reserveDuration = Date.now() - reserveStartedAt;
+    if (reserveDuration > 500) {
+      this.logger.warn(
+        `runWithUserContext reserve wait was slow durationMs=${reserveDuration}`,
+      );
+    }
     try {
       // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
       await reserved`BEGIN`;
@@ -131,6 +171,14 @@ export class RlsContextService {
       );
       throw error;
     } finally {
+      try {
+        await reserved`RESET app.user_id`;
+      } catch (resetError) {
+        this.logger.warn(
+          "Failed to reset app.user_id before releasing connection",
+          resetError instanceof Error ? resetError.message : String(resetError),
+        );
+      }
       reserved.release();
     }
   }

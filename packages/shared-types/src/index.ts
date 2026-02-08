@@ -90,3 +90,17 @@ export { CreateQueryActivitySchema } from "./query-activities.js";
 // Usage
 export type { UsageResponse } from "./usage.js";
 export { UsageResponseSchema } from "./usage.js";
+
+// Execution History
+export type {
+  ExecutionHistoryItem,
+  HistoryListResponse,
+  HistoryQueryParams,
+  RunSqlTextResponse,
+} from "./execution-history.js";
+export {
+  ExecutionHistoryItemSchema,
+  HistoryListResponseSchema,
+  HistoryQueryParamsSchema,
+  RunSqlTextResponseSchema,
+} from "./execution-history.js";

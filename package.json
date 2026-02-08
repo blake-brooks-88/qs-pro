@@ -10,6 +10,7 @@
     "web:dev": "pnpm --filter @qpp/web dev",
     "web:dev:preview": "pnpm --filter @qpp/web dev:preview",
     "tunnel:dev": "concurrently \"pnpm dev\" \"cloudflared tunnel run queryplusplus-dev\"",
+    "tunnel:dev:http2": "concurrently \"pnpm dev\" \"cloudflared tunnel run --protocol http2 queryplusplus-dev\"",
     "pretest": "pnpm -r --filter \"./packages/**\" build",
     "test": "pnpm -r test",
     "test:api": "pnpm -r --filter \"./packages/**\" build && pnpm --filter api test",

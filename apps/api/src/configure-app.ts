@@ -113,6 +113,7 @@ export async function configureApp(
             try {
               await reserved`RESET app.tenant_id`;
               await reserved`RESET app.mid`;
+              await reserved`RESET app.user_id`;
             } catch {
               // ignore
             }
@@ -135,7 +136,7 @@ export async function configureApp(
           const db = createDatabaseFromClient(
             makeDrizzleCompatibleSql(reserved),
           );
-          runWithDbContext(db, done);
+          runWithDbContext(db, done, makeDrizzleCompatibleSql(reserved));
         })().catch((error: Error) => done(error));
       });
   }

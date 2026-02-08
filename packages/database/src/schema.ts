@@ -68,23 +68,6 @@ export const credentials = pgTable(
   }),
 );
 
-// 4. Query History (The "Smart" Layer)
-export const queryHistory = pgTable("query_history", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id),
-  tenantId: uuid("tenant_id").references(() => tenants.id),
-  mid: varchar("mid"), // Specific Business Unit context
-  queryName: varchar("query_name").default("Untitled Query"),
-  sqlText: text("sql_text").notNull(),
-  targetDe: varchar("target_de"),
-  executionTimeMs: integer("execution_time_ms"),
-  status: varchar("status")
-    .$type<"PENDING" | "SUCCESS" | "FAILED">()
-    .default("PENDING"),
-  errorMessage: text("error_message"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
 // 5. Saved Snippets
 export const snippets = pgTable("snippets", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -127,6 +110,9 @@ export const shellQueryRuns = pgTable(
     targetUpdateType: varchar("target_update_type"),
     pollStartedAt: timestamp("poll_started_at"),
     errorMessage: text("error_message"),
+    sqlTextEncrypted: text("sql_text_encrypted"),
+    rowCount: integer("row_count"),
+    savedQueryId: uuid("saved_query_id").references(() => savedQueries.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),
@@ -213,9 +199,6 @@ export const insertUserSchema = createInsertSchema(users);
 
 export const selectCredentialsSchema = createSelectSchema(credentials);
 export const insertCredentialsSchema = createInsertSchema(credentials);
-
-export const selectQueryHistorySchema = createSelectSchema(queryHistory);
-export const insertQueryHistorySchema = createInsertSchema(queryHistory);
 
 export const selectSnippetSchema = createSelectSchema(snippets);
 export const insertSnippetSchema = createInsertSchema(snippets);

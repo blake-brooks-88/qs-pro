@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WorkspaceSidebar } from "@/features/editor-workspace/components/WorkspaceSidebar";
-import {
+import type {
   DataExtension,
   Folder,
   SavedQuery,
@@ -32,16 +32,16 @@ const renderSidebar = (
   folders: Folder[],
   dataExtensions: DataExtension[],
   savedQueries: SavedQuery[] = [],
+  activeView: "dataExtensions" | "queries" = "dataExtensions",
 ) => {
   const queryClient = createQueryClient();
   return render(
     <WorkspaceSidebar
+      activeView={activeView}
       tenantId="tenant-1"
       folders={folders}
       savedQueries={savedQueries}
       dataExtensions={dataExtensions}
-      isCollapsed={false}
-      onToggle={() => undefined}
     />,
     { wrapper: createWrapper(queryClient) },
   );
@@ -225,7 +225,7 @@ describe("WorkspaceSidebar", () => {
     expect(screen.getByRole("button", { name: /other/i })).toBeInTheDocument();
   });
 
-  it("SidebarSearch_OnQueriesTab_FiltersQueries", async () => {
+  it("SidebarSearch_OnQueriesView_FiltersQueries", async () => {
     const user = userEvent.setup();
     const queries: SavedQuery[] = [
       {
@@ -244,10 +244,7 @@ describe("WorkspaceSidebar", () => {
       },
     ];
 
-    renderSidebar([], [], queries);
-
-    // Switch to queries tab
-    await user.click(screen.getByRole("button", { name: /queries/i }));
+    renderSidebar([], [], queries, "queries");
 
     const searchInput = screen.getByPlaceholderText(/search/i);
     await user.type(searchInput, "Select");
@@ -294,12 +291,11 @@ describe("WorkspaceSidebar", () => {
       const queryClient = createQueryClient();
       render(
         <WorkspaceSidebar
+          activeView="dataExtensions"
           tenantId="tenant-1"
           folders={folders}
           savedQueries={[]}
           dataExtensions={dataExtensions}
-          isCollapsed={false}
-          onToggle={() => undefined}
           onSelectDE={onSelectDE}
         />,
         { wrapper: createWrapper(queryClient) },
@@ -314,7 +310,7 @@ describe("WorkspaceSidebar", () => {
       expect(onSelectDE).toHaveBeenCalledWith("de-1");
     });
 
-    it("calls onSelectQuery when query is clicked in queries tab", async () => {
+    it("calls onSelectQuery when query is clicked in queries view", async () => {
       const user = userEvent.setup();
       const onSelectQuery = vi.fn();
 
@@ -345,19 +341,15 @@ describe("WorkspaceSidebar", () => {
       const queryClient = createQueryClient();
       render(
         <WorkspaceSidebar
+          activeView="queries"
           tenantId="tenant-1"
           folders={[]}
           savedQueries={[]}
           dataExtensions={[]}
-          isCollapsed={false}
-          onToggle={() => undefined}
           onSelectQuery={onSelectQuery}
         />,
         { wrapper: createWrapper(queryClient) },
       );
-
-      // Switch to queries tab
-      await user.click(screen.getByRole("button", { name: /^Queries$/i }));
 
       // Wait for data to load and expand the folder
       await waitFor(() =>
@@ -375,51 +367,35 @@ describe("WorkspaceSidebar", () => {
     });
   });
 
-  describe("Collapsed state", () => {
-    it("renders collapsed sidebar without search input", () => {
+  describe("Panel header", () => {
+    it("displays correct title for each view", () => {
       const queryClient = createQueryClient();
-      render(
+      const { rerender } = render(
         <WorkspaceSidebar
+          activeView="dataExtensions"
           tenantId="tenant-1"
           folders={[]}
           savedQueries={[]}
           dataExtensions={[]}
-          isCollapsed={true}
-          onToggle={() => undefined}
         />,
         { wrapper: createWrapper(queryClient) },
       );
 
-      // Collapsed sidebar should not show search input
-      expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
-    });
+      expect(screen.getAllByText("Data Extensions").length).toBeGreaterThan(0);
 
-    it("calls onToggle when expand button clicked in collapsed state", async () => {
-      const user = userEvent.setup();
-      const onToggle = vi.fn();
-
-      const queryClient = createQueryClient();
-      render(
-        <WorkspaceSidebar
-          tenantId="tenant-1"
-          folders={[]}
-          savedQueries={[]}
-          dataExtensions={[]}
-          isCollapsed={true}
-          onToggle={onToggle}
-        />,
-        { wrapper: createWrapper(queryClient) },
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <WorkspaceSidebar
+            activeView="queries"
+            tenantId="tenant-1"
+            folders={[]}
+            savedQueries={[]}
+            dataExtensions={[]}
+          />
+        </QueryClientProvider>,
       );
 
-      // Find and click the expand button (first button in collapsed sidebar)
-      const buttons = screen.getAllByRole("button");
-      const expandButton = buttons[0];
-      if (!expandButton) {
-        throw new Error("Expand button not found");
-      }
-      await user.click(expandButton);
-
-      expect(onToggle).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Queries")).toBeInTheDocument();
     });
   });
 
@@ -455,12 +431,11 @@ describe("WorkspaceSidebar", () => {
       const queryClient = createQueryClient();
       render(
         <WorkspaceSidebar
+          activeView="dataExtensions"
           tenantId="tenant-1"
           folders={folders}
           savedQueries={[]}
           dataExtensions={dataExtensions}
-          isCollapsed={false}
-          onToggle={() => undefined}
           onSelectDE={onSelectDE}
         />,
         { wrapper: createWrapper(queryClient) },

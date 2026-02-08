@@ -4,13 +4,13 @@ import {
   CodeFile,
   Database,
   Folder as FolderIcon,
-  Folder2,
 } from "@solar-icons/react";
 import Fuse from "fuse.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { QuotaCountBadge } from "@/components/QuotaGate";
 import { useDataExtensionFields } from "@/features/editor-workspace/hooks/use-metadata";
+import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import type {
   DataExtension,
   Folder,
@@ -30,17 +30,17 @@ import {
 } from "./SidebarSearch";
 
 interface WorkspaceSidebarProps {
+  activeView: "dataExtensions" | "queries";
   tenantId?: string | null;
   folders: Folder[];
   savedQueries?: SavedQuery[];
   dataExtensions: DataExtension[];
-  isCollapsed: boolean;
   isDataExtensionsFetching?: boolean;
-  onToggle: () => void;
   onSelectQuery?: (id: string) => void;
   onSelectDE?: (id: string) => void;
   onCreateDE?: () => void;
   onCreateFolder?: (parentId: string | null) => void;
+  onViewQueryHistory?: (queryId: string) => void;
 }
 
 interface DataExtensionNodeProps {
@@ -55,6 +55,11 @@ interface DataExtensionNodeProps {
 
 const sortByName = (a: { name: string }, b: { name: string }) =>
   a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+
+const VIEW_TITLES = new Map<WorkspaceSidebarProps["activeView"], string>([
+  ["dataExtensions", "Data Extensions"],
+  ["queries", "Queries"],
+]);
 
 function DataExtensionNode({
   dataExtension,
@@ -171,21 +176,21 @@ function toggleExpandedDeId(
 }
 
 export function WorkspaceSidebar({
+  activeView,
   tenantId,
   folders,
   savedQueries = [],
   dataExtensions,
-  isCollapsed,
   isDataExtensionsFetching = false,
-  onToggle,
   onSelectQuery,
   onSelectDE,
   onCreateFolder,
+  onViewQueryHistory,
 }: WorkspaceSidebarProps) {
+  const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { tier } = useTier();
   const { data: usageData } = useRunUsage();
 
-  const [activeTab, setActiveTab] = useState<"de" | "queries">("de");
   const [expandedFolderIds, setExpandedFolderIds] = useState<
     Record<string, boolean>
   >({});
@@ -277,7 +282,7 @@ export function WorkspaceSidebar({
       return [];
     }
 
-    if (activeTab === "de") {
+    if (activeView === "dataExtensions") {
       const data = [
         ...folders.map((f) => ({ ...f, searchType: "folder" as const })),
         ...dataExtensions.map((de) => ({ ...de, searchType: "de" as const })),
@@ -320,7 +325,7 @@ export function WorkspaceSidebar({
         path: getFolderPath(folders, result.item.folderId),
       }))
       .slice(0, 50);
-  }, [activeTab, searchQuery, folders, dataExtensions, savedQueries]);
+  }, [activeView, searchQuery, folders, dataExtensions, savedQueries]);
 
   const handleSelectResult = (id: string, type: "de" | "query" | "folder") => {
     if (!focusedItemId) {
@@ -513,43 +518,10 @@ export function WorkspaceSidebar({
     );
   };
 
-  if (isCollapsed) {
-    return (
-      <div className="w-12 border-r border-border bg-background flex flex-col items-center py-4 gap-6 shrink-0">
-        <button
-          onClick={onToggle}
-          className="p-2 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-        >
-          <AltArrowRight size={20} />
-        </button>
-        <div className="h-px w-6 bg-border" />
-        <button
-          onClick={() => {
-            setActiveTab("de");
-            onToggle();
-          }}
-          className="p-2 text-muted-foreground hover:text-primary"
-        >
-          <Database size={20} weight={activeTab === "de" ? "Bold" : "Linear"} />
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab("queries");
-            onToggle();
-          }}
-          className="p-2 text-muted-foreground hover:text-primary"
-        >
-          <Folder2
-            size={20}
-            weight={activeTab === "queries" ? "Bold" : "Linear"}
-          />
-        </button>
-      </div>
-    );
-  }
-
   const rootFolders = foldersByParent.get(null) ?? [];
   const rootDataExtensions = dataExtensionsByFolder.get(null) ?? [];
+
+  const showSearch = true;
 
   return (
     <div
@@ -573,133 +545,99 @@ export function WorkspaceSidebar({
         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors z-50"
       />
 
-      {/* Tab Switcher */}
-      <div className="flex border-b border-border bg-card">
+      {/* Panel Header */}
+      <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2.5">
+        <span className="text-xs font-bold uppercase tracking-widest text-foreground">
+          {VIEW_TITLES.get(activeView)}
+        </span>
         <button
-          onClick={() => {
-            setActiveTab("de");
-            handleClearSearch();
-          }}
-          className={cn(
-            "flex-1 py-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 border-b-2 transition-colors",
-            activeTab === "de"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Database
-            size={16}
-            weight={activeTab === "de" ? "Bold" : "Linear"}
-            className="shrink-0"
-          />
-          Data
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab("queries");
-            handleClearSearch();
-          }}
-          className={cn(
-            "flex-1 py-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 border-b-2 transition-colors",
-            activeTab === "queries"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Folder2
-            size={16}
-            weight={activeTab === "queries" ? "Bold" : "Linear"}
-            className="shrink-0"
-          />
-          Queries
-        </button>
-        <button
-          onClick={onToggle}
-          className="px-3 text-muted-foreground hover:text-foreground shrink-0"
+          onClick={() => setActiveView(null)}
+          className="text-muted-foreground hover:text-foreground shrink-0"
         >
           <AltArrowLeft size={18} />
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="p-2 border-b border-border/50 bg-muted/20">
-        <SidebarSearchRoot onOpenChange={setIsSearchOpen}>
-          <SidebarSearch
-            placeholder={
-              activeTab === "de"
-                ? "Search Data Extensions..."
-                : "Search Queries..."
-            }
-            density="compact"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setIsSearchOpen(true);
-              setActiveIndex(-1);
-            }}
-            onFocus={() => setIsSearchOpen(true)}
-            onKeyDown={handleKeyDown}
-            onClear={handleClearSearch}
-            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Empty string means "no active search"
-            showClear={Boolean(focusedItemId || searchQuery)}
-          />
-          <SidebarSearchResults
-            isOpen={isSearchOpen ? searchResults.length > 0 : false}
-          >
-            {searchResults.map((result, idx) => (
-              <SidebarSearchResultItem
-                key={`${result.type}-${result.id}`}
-                active={idx === activeIndex}
-                onClick={() => handleSelectResult(result.id, result.type)}
-                onMouseEnter={() => setActiveIndex(idx)}
-              >
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1.5">
-                    {result.type === "de" && (
-                      <Database
-                        size={14}
-                        className="text-primary/70 shrink-0"
-                      />
-                    )}
-                    {result.type === "folder" && (
-                      <FolderIcon
-                        size={14}
-                        className="text-muted-foreground/70 shrink-0"
-                      />
-                    )}
-                    {result.type === "query" && (
-                      <CodeFile
-                        size={14}
-                        className="text-secondary/70 shrink-0"
-                      />
-                    )}
-                    <span className="font-medium truncate">{result.name}</span>
+      {/* Search Bar (DE and Queries views only) */}
+      {showSearch ? (
+        <div className="p-2 border-b border-border/50 bg-muted/20">
+          <SidebarSearchRoot onOpenChange={setIsSearchOpen}>
+            <SidebarSearch
+              placeholder={
+                activeView === "dataExtensions"
+                  ? "Search Data Extensions..."
+                  : "Search Queries..."
+              }
+              density="compact"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setIsSearchOpen(true);
+                setActiveIndex(-1);
+              }}
+              onFocus={() => setIsSearchOpen(true)}
+              onKeyDown={handleKeyDown}
+              onClear={handleClearSearch}
+              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Empty string means "no active search"
+              showClear={Boolean(focusedItemId || searchQuery)}
+            />
+            <SidebarSearchResults
+              isOpen={isSearchOpen ? searchResults.length > 0 : false}
+            >
+              {searchResults.map((result, idx) => (
+                <SidebarSearchResultItem
+                  key={`${result.type}-${result.id}`}
+                  active={idx === activeIndex}
+                  onClick={() => handleSelectResult(result.id, result.type)}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      {result.type === "de" && (
+                        <Database
+                          size={14}
+                          className="text-primary/70 shrink-0"
+                        />
+                      )}
+                      {result.type === "folder" && (
+                        <FolderIcon
+                          size={14}
+                          className="text-muted-foreground/70 shrink-0"
+                        />
+                      )}
+                      {result.type === "query" && (
+                        <CodeFile
+                          size={14}
+                          className="text-secondary/70 shrink-0"
+                        />
+                      )}
+                      <span className="font-medium truncate">
+                        {result.name}
+                      </span>
+                    </div>
+                    {result.path ? (
+                      <span className="text-xs opacity-70 text-muted-foreground truncate pl-5">
+                        {result.path}
+                      </span>
+                    ) : null}
                   </div>
-                  {result.path ? (
-                    <span className="text-xs opacity-70 text-muted-foreground truncate pl-5">
-                      {result.path}
-                    </span>
-                  ) : null}
-                </div>
-              </SidebarSearchResultItem>
-            ))}
-          </SidebarSearchResults>
-        </SidebarSearchRoot>
-      </div>
+                </SidebarSearchResultItem>
+              ))}
+            </SidebarSearchResults>
+          </SidebarSearchRoot>
+        </div>
+      ) : null}
 
-      {/* Tree Content */}
+      {/* Tree Content (DE and Queries views) */}
       <div className="flex-1 overflow-y-auto p-2">
         <div className="space-y-1">
-          {activeTab === "de" && (
-            <div className="flex items-center justify-between px-2 py-1 mb-2">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Data Extensions
-              </span>
-            </div>
-          )}
-
-          {activeTab === "de" ? (
+          {activeView === "dataExtensions" && (
             <>
+              <div className="flex items-center justify-between px-2 py-1 mb-2">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Data Extensions
+                </span>
+              </div>
               {rootFolders.map((folder) => renderFolderNode(folder, 0))}
               {rootDataExtensions
                 .filter((de) => isVisible(de.id, "de"))
@@ -718,11 +656,14 @@ export function WorkspaceSidebar({
                   />
                 ))}
             </>
-          ) : (
+          )}
+
+          {activeView === "queries" && (
             <QueryTreeView
               searchQuery={searchQuery}
               onSelectQuery={(queryId) => onSelectQuery?.(queryId)}
               onCreateFolder={() => onCreateFolder?.(null)}
+              onViewQueryHistory={onViewQueryHistory}
             />
           )}
         </div>

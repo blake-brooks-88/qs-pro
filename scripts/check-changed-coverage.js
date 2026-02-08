@@ -99,8 +99,13 @@ function isCoveredSourceFile(file) {
   const excluded =
     normalized.includes("/__tests__/") ||
     normalized.includes("/test/") ||
+    normalized.includes("/stubs/") ||
     normalized.endsWith(".test.ts") ||
     normalized.endsWith(".test.tsx") ||
+    normalized.endsWith(".stub.ts") ||
+    normalized.endsWith(".stub.tsx") ||
+    normalized.endsWith(".stub.js") ||
+    normalized.endsWith(".stub.jsx") ||
     normalized.endsWith(".spec.ts") ||
     normalized.endsWith(".spec.tsx") ||
     normalized.endsWith(".integration.test.ts") ||
@@ -110,6 +115,34 @@ function isCoveredSourceFile(file) {
     normalized.includes("/dist/");
 
   return !excluded;
+}
+
+function isTypeOnlyFile(file, repoRoot) {
+  const abs = path.resolve(repoRoot, file);
+  let content = "";
+  try {
+    content = fs.readFileSync(abs, "utf8");
+  } catch {
+    return false;
+  }
+
+  // Strip comments
+  content = content.replace(/\/\*[\s\S]*?\*\//g, "");
+  content = content.replace(/\/\/.*$/gm, "");
+
+  const trimmed = content.replace(/\s+/g, " ").trim();
+  if (!trimmed) return false;
+
+  // A file is type-only if every import uses `import type` and every export
+  // is a type alias or interface.  Detect runtime code by its absence:
+  // no const/let/var, no function/class declarations, no default exports,
+  // no non-type imports, no require().
+  const hasRuntimeImport = /\bimport\s+(?!type\b)/.test(trimmed);
+  const hasRuntimeDecl = /\b(const|let|var|function|class|enum)\s/.test(trimmed);
+  const hasDefaultExport = /\bexport\s+default\b/.test(trimmed);
+  const hasRequire = /\brequire\s*\(/.test(trimmed);
+
+  return !hasRuntimeImport && !hasRuntimeDecl && !hasDefaultExport && !hasRequire;
 }
 
 function isBarrelIndexFile(file, repoRoot) {
@@ -221,7 +254,9 @@ function main() {
     .filter(Boolean)
     .filter(isCoveredSourceFile);
 
-  const coveredChanged = changed.filter((file) => !isBarrelIndexFile(file, repoRoot));
+  const coveredChanged = changed.filter(
+    (file) => !isBarrelIndexFile(file, repoRoot) && !isTypeOnlyFile(file, repoRoot),
+  );
 
   if (coveredChanged.length === 0) {
     console.log("No changed covered source files.");

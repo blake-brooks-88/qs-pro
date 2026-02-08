@@ -3,6 +3,7 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import {
   AddFolder,
   AltArrowRight,
+  ClockCircle,
   CodeFile,
   Folder as FolderIcon,
   Pen,
@@ -28,6 +29,7 @@ interface QueryTreeViewProps {
   searchQuery: string;
   onSelectQuery: (queryId: string) => void;
   onCreateFolder?: () => void;
+  onViewQueryHistory?: (queryId: string) => void;
 }
 
 interface FolderNodeProps {
@@ -50,6 +52,7 @@ interface FolderNodeProps {
   onDeleteFolder: (id: string) => void;
   onRenameQuery: (id: string, name: string) => void;
   onDeleteQuery: (id: string) => void;
+  onViewQueryHistory?: (queryId: string) => void;
 }
 
 interface QueryNodeProps {
@@ -61,6 +64,7 @@ interface QueryNodeProps {
   onFinishRename: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onViewHistory?: () => void;
 }
 
 function QueryNode({
@@ -72,6 +76,7 @@ function QueryNode({
   onFinishRename,
   onRename,
   onDelete,
+  onViewHistory,
 }: QueryNodeProps) {
   if (isRenaming) {
     return (
@@ -112,6 +117,15 @@ function QueryNode({
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content className="min-w-[160px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
+          {onViewHistory ? (
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              onSelect={onViewHistory}
+            >
+              <ClockCircle size={14} />
+              View Run History
+            </ContextMenu.Item>
+          ) : null}
           <ContextMenu.Item
             className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
             onSelect={onStartRename}
@@ -153,6 +167,7 @@ function FolderNode({
   onDeleteFolder,
   onRenameQuery,
   onDeleteQuery,
+  onViewQueryHistory,
 }: FolderNodeProps) {
   const isRenaming = renamingId === `folder-${folder.id}`;
 
@@ -256,6 +271,7 @@ function FolderNode({
                 onDeleteFolder={onDeleteFolder}
                 onRenameQuery={onRenameQuery}
                 onDeleteQuery={onDeleteQuery}
+                onViewQueryHistory={onViewQueryHistory}
               />
             );
           })}
@@ -270,6 +286,11 @@ function FolderNode({
               onFinishRename={onFinishRename}
               onRename={(name) => onRenameQuery(query.id, name)}
               onDelete={() => onDeleteQuery(query.id)}
+              onViewHistory={
+                onViewQueryHistory
+                  ? () => onViewQueryHistory(query.id)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -282,6 +303,7 @@ export function QueryTreeView({
   searchQuery,
   onSelectQuery,
   onCreateFolder,
+  onViewQueryHistory,
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
@@ -441,6 +463,7 @@ export function QueryTreeView({
                 onDeleteFolder={handleDeleteFolder}
                 onRenameQuery={handleRenameQuery}
                 onDeleteQuery={handleDeleteQuery}
+                onViewQueryHistory={onViewQueryHistory}
               />
             );
           })}
@@ -455,6 +478,11 @@ export function QueryTreeView({
               onFinishRename={() => setRenamingId(null)}
               onRename={(name) => handleRenameQuery(query.id, name)}
               onDelete={() => handleDeleteQuery(query.id)}
+              onViewHistory={
+                onViewQueryHistory
+                  ? () => onViewQueryHistory(query.id)
+                  : undefined
+              }
             />
           ))}
         </>

@@ -1,9 +1,26 @@
 import { getDbFromContext, type RlsContextService } from '@qpp/backend-shared';
 import type { createDatabaseFromClient } from '@qpp/database';
-import { and, count, eq, gte, notInArray, shellQueryRuns } from '@qpp/database';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  notInArray,
+  or,
+  shellQueryRuns,
+  type ShellQueryRunStatus,
+  sql,
+} from '@qpp/database';
 
 import type {
   CreateShellQueryRunParams,
+  ListRunsParams,
+  ListRunsResult,
   ShellQueryRun,
   ShellQueryRunRepository,
 } from './shell-query-run.repository';
@@ -40,6 +57,8 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
           targetDeCustomerKey: params.targetDeCustomerKey,
           targetUpdateType: params.targetUpdateType,
           sqlTextHash: params.sqlTextHash,
+          sqlTextEncrypted: params.sqlTextEncrypted,
+          savedQueryId: params.savedQueryId,
           status: params.status,
         });
       },
@@ -162,5 +181,91 @@ export class DrizzleShellQueryRunRepository implements ShellQueryRunRepository {
         return result[0]?.count ?? 0;
       },
     );
+  }
+
+  async listRuns(params: ListRunsParams): Promise<ListRunsResult> {
+    return this.rlsContext.runWithUserContext(
+      params.tenantId,
+      params.mid,
+      params.userId,
+      async () => {
+        const conditions = [
+          eq(shellQueryRuns.tenantId, params.tenantId),
+          eq(shellQueryRuns.mid, params.mid),
+          eq(shellQueryRuns.userId, params.userId),
+        ];
+
+        if (params.status && params.status.length > 0) {
+          conditions.push(
+            inArray(
+              shellQueryRuns.status,
+              params.status as ShellQueryRunStatus[],
+            ),
+          );
+        }
+
+        if (params.dateFrom) {
+          conditions.push(gte(shellQueryRuns.createdAt, params.dateFrom));
+        }
+
+        if (params.dateTo) {
+          conditions.push(lte(shellQueryRuns.createdAt, params.dateTo));
+        }
+
+        if (params.queryId) {
+          conditions.push(eq(shellQueryRuns.savedQueryId, params.queryId));
+        }
+
+        if (params.search) {
+          const pattern = `%${params.search}%`;
+          const searchCondition = or(
+            ilike(shellQueryRuns.snippetName, pattern),
+            ilike(shellQueryRuns.targetDeCustomerKey, pattern),
+          );
+          if (searchCondition) {
+            conditions.push(searchCondition);
+          }
+        }
+
+        const whereClause = and(...conditions);
+
+        const sortColumn = this.getSortColumn(params.sortBy);
+        const sortDirection = params.sortDir === 'asc' ? asc : desc;
+        const orderByClause = sortDirection(sortColumn);
+
+        const db = this.getDb();
+
+        const [runs, countResult] = await Promise.all([
+          db
+            .select()
+            .from(shellQueryRuns)
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .offset((params.page - 1) * params.pageSize)
+            .limit(params.pageSize),
+          db.select({ count: count() }).from(shellQueryRuns).where(whereClause),
+        ]);
+
+        return {
+          runs,
+          total: countResult[0]?.count ?? 0,
+        };
+      },
+    );
+  }
+
+  private getSortColumn(sortBy: ListRunsParams['sortBy']) {
+    switch (sortBy) {
+      case 'createdAt':
+        return shellQueryRuns.createdAt;
+      case 'status':
+        return shellQueryRuns.status;
+      case 'rowCount':
+        return sql`COALESCE(${shellQueryRuns.rowCount}, 0)`;
+      case 'durationMs':
+        return sql`COALESCE(EXTRACT(EPOCH FROM (${shellQueryRuns.completedAt} - ${shellQueryRuns.startedAt})) * 1000, 0)`;
+      default:
+        return shellQueryRuns.createdAt;
+    }
   }
 }
