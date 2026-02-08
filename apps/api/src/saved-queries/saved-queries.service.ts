@@ -1,3 +1,5 @@
+import * as crypto from 'node:crypto';
+
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AppError,
@@ -11,6 +13,7 @@ import type {
 } from '@qpp/shared-types';
 
 import type { FoldersRepository } from '../folders/folders.repository';
+import type { QueryVersionsRepository } from '../query-versions/query-versions.repository';
 import type {
   SavedQueriesRepository,
   SavedQuery,
@@ -33,6 +36,8 @@ export class SavedQueriesService {
     private readonly savedQueriesRepository: SavedQueriesRepository,
     @Inject('FOLDERS_REPOSITORY')
     private readonly foldersRepository: FoldersRepository,
+    @Inject('QUERY_VERSIONS_REPOSITORY')
+    private readonly queryVersionsRepository: QueryVersionsRepository,
     private readonly encryptionService: EncryptionService,
     private readonly rlsContext: RlsContextService,
   ) {}
@@ -72,6 +77,17 @@ export class SavedQueriesService {
           name: dto.name,
           sqlTextEncrypted,
           folderId: dto.folderId ?? null,
+        });
+
+        await this.queryVersionsRepository.create({
+          savedQueryId: query.id,
+          tenantId,
+          mid,
+          userId,
+          sqlTextEncrypted,
+          sqlTextHash: this.hashSqlText(dto.sqlText),
+          lineCount: dto.sqlText.split('\n').length,
+          source: 'save',
         });
 
         return this.decryptQuery(query);
@@ -164,6 +180,22 @@ export class SavedQueriesService {
             });
           }
           updateParams.sqlTextEncrypted = sqlTextEncrypted;
+
+          const sqlTextHash = this.hashSqlText(dto.sqlText);
+          const latestVersion =
+            await this.queryVersionsRepository.findLatestBySavedQueryId(id);
+          if (!latestVersion || latestVersion.sqlTextHash !== sqlTextHash) {
+            await this.queryVersionsRepository.create({
+              savedQueryId: id,
+              tenantId,
+              mid,
+              userId,
+              sqlTextEncrypted,
+              sqlTextHash,
+              lineCount: dto.sqlText.split('\n').length,
+              source: 'save',
+            });
+          }
         }
         if (dto.folderId !== undefined) {
           updateParams.folderId = dto.folderId;
@@ -214,6 +246,10 @@ export class SavedQueriesService {
     return this.rlsContext.runWithUserContext(tenantId, mid, userId, () =>
       this.savedQueriesRepository.countByUser(),
     );
+  }
+
+  private hashSqlText(sqlText: string): string {
+    return crypto.createHash('sha256').update(sqlText).digest('hex');
   }
 
   private decryptQuery(query: SavedQuery): DecryptedSavedQuery {
