@@ -1266,13 +1266,13 @@ describe("AuthService Integration", () => {
             callCount++;
             const body = await request.text();
 
-            if (body.includes("code=fallback-code")) {
+            if (body.includes("code=embedded-code")) {
               return HttpResponse.json(
                 { error: "invalid_token" },
                 { status: 400 },
               );
             }
-            if (body.includes("code=primary-code")) {
+            if (body.includes("code=original-code")) {
               return HttpResponse.json({
                 access_token: "success-token",
                 refresh_token: "success-refresh",
@@ -1291,8 +1291,8 @@ describe("AuthService Integration", () => {
 
       const result = await authService.exchangeCodeForToken(
         AUTH_TEST_TSSD,
-        "primary-code",
-        "fallback-code",
+        "original-code",
+        "embedded-code",
       );
 
       expect(result.access_token).toBe("success-token");

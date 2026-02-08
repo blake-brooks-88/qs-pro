@@ -211,7 +211,7 @@ export class AuthService {
   async exchangeCodeForToken(
     tssd: string,
     code: string,
-    fallbackCode?: string,
+    embeddedCode?: string,
     accountId?: string,
   ): Promise<MceTokenResponse> {
     const clientId = this.configService.get<string>("MCE_CLIENT_ID");
@@ -227,7 +227,7 @@ export class AuthService {
       });
     }
 
-    const codes = this.buildCodeExchangeAttempts(code, fallbackCode);
+    const codes = this.buildCodeExchangeAttempts(code, embeddedCode);
     this.logger.log(
       `OAuth token exchange starting tssd=${tssd} attempts=${codes.length} hasAccountId=${Boolean(accountId)}`,
     );
@@ -235,7 +235,7 @@ export class AuthService {
     for (const [index, attemptCode] of codes.entries()) {
       const attemptStartedAt = Date.now();
       const attemptSource =
-        fallbackCode && attemptCode === fallbackCode ? "embedded" : "original";
+        embeddedCode && attemptCode === embeddedCode ? "embedded" : "original";
       this.logger.log(
         `OAuth token exchange attempt ${index + 1}/${codes.length} source=${attemptSource} codeLen=${attemptCode.length}`,
       );
@@ -452,16 +452,16 @@ export class AuthService {
     const callbackStartedAt = Date.now();
     const embedded = this.extractAuthCode(code);
     const embeddedEid = embedded?.eid;
-    const fallbackCode = embedded?.authCode;
+    const embeddedCode = embedded?.authCode;
     const codeSegments = code.split(".").length;
     this.logger.log(
-      `OAuth callback pipeline start tssd=${tssd} codeLen=${code.length} codeSegments=${codeSegments} hasEmbeddedAuthCode=${Boolean(fallbackCode)} hasProvidedSfUserId=${Boolean(sfUserId)} hasProvidedEid=${Boolean(eid)} hasProvidedMid=${Boolean(mid)}`,
+      `OAuth callback pipeline start tssd=${tssd} codeLen=${code.length} codeSegments=${codeSegments} hasEmbeddedAuthCode=${Boolean(embeddedCode)} hasProvidedSfUserId=${Boolean(sfUserId)} hasProvidedEid=${Boolean(eid)} hasProvidedMid=${Boolean(mid)}`,
     );
 
     const tokenData = await this.exchangeCodeForToken(
       tssd,
       code,
-      fallbackCode,
+      embeddedCode,
       mid,
     );
     this.logger.log("OAuth callback token exchange step complete");
@@ -678,14 +678,14 @@ export class AuthService {
 
   private buildCodeExchangeAttempts(
     code: string,
-    fallbackCode?: string,
+    embeddedCode?: string,
   ): string[] {
-    if (!fallbackCode || fallbackCode === code) {
+    if (!embeddedCode || embeddedCode === code) {
       return [code];
     }
 
-    // Try the original code first; fall back to the extracted embedded auth_code.
-    return [code, fallbackCode];
+    // Prefer embedded auth_code from wrapped code payloads used by MCE iframe flow.
+    return [embeddedCode, code];
   }
 
   private shouldTryAlternateCodeAttempt(
