@@ -14,6 +14,7 @@ export const defaultFeatures: TenantFeatures = {
   systemDataViews: true,
   runToTargetDE: false,
   executionHistory: false,
+  versionHistory: false,
 };
 
 export const handlers = [

@@ -77,6 +77,7 @@ describe('FeaturesService', () => {
         deployToAutomation: false,
         runToTargetDE: false,
         executionHistory: false,
+        versionHistory: false,
       },
     });
   });
@@ -113,6 +114,7 @@ describe('FeaturesService', () => {
         deployToAutomation: true,
         runToTargetDE: true,
         executionHistory: true,
+        versionHistory: true,
       },
     });
   });
@@ -159,6 +161,7 @@ describe('FeaturesService', () => {
         deployToAutomation: false,
         runToTargetDE: false,
         executionHistory: false,
+        versionHistory: false,
       },
     });
   });
@@ -206,6 +209,7 @@ describe('FeaturesService', () => {
         deployToAutomation: true,
         runToTargetDE: true,
         executionHistory: true,
+        versionHistory: true,
       },
     });
   });
@@ -241,6 +245,7 @@ describe('FeaturesService', () => {
         deployToAutomation: true,
         runToTargetDE: true,
         executionHistory: true,
+        versionHistory: true,
       },
     });
   });

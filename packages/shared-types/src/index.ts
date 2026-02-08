@@ -104,3 +104,17 @@ export {
   HistoryQueryParamsSchema,
   RunSqlTextResponseSchema,
 } from "./execution-history.js";
+
+// Query Versions
+export type {
+  UpdateVersionNameDto,
+  VersionDetail,
+  VersionListItem,
+  VersionListResponse,
+} from "./query-versions.js";
+export {
+  UpdateVersionNameSchema,
+  VersionDetailSchema,
+  VersionListItemSchema,
+  VersionListResponseSchema,
+} from "./query-versions.js";
