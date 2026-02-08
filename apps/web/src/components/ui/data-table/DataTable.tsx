@@ -8,9 +8,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 
+import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
-
-import { DataTablePagination } from "./data-table-pagination";
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData, unknown>[];
@@ -61,6 +60,8 @@ function DataTable<TData>({
   const headerGroups = table.getHeaderGroups();
   const rows = table.getRowModel().rows;
   const colCount = columns.length;
+  const { pageIndex, pageSize } = table.getState().pagination;
+  const totalPages = Math.max(1, table.getPageCount());
 
   return (
     <div className={cn("w-full", className)}>
@@ -127,7 +128,16 @@ function DataTable<TData>({
       </div>
 
       {isServerSide ? (
-        <DataTablePagination table={table} totalItems={totalItems ?? 0} />
+        <Pagination
+          currentPage={pageIndex + 1}
+          totalPages={totalPages}
+          totalItems={totalItems ?? 0}
+          pageSize={pageSize}
+          onPageChange={(page) => {
+            table.setPageIndex(page - 1);
+          }}
+          pageControl="input"
+        />
       ) : null}
     </div>
   );
