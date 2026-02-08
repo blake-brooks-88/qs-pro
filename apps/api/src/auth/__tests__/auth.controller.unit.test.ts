@@ -87,6 +87,11 @@ function encodeOAuthState(payload: OAuthStatePayload): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 }
 
+function decodeOAuthState(state: string): OAuthStatePayload {
+  const json = Buffer.from(state, 'base64url').toString('utf8');
+  return JSON.parse(json) as OAuthStatePayload;
+}
+
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: ReturnType<typeof createMockAuthService>;
@@ -97,6 +102,7 @@ describe('AuthController', () => {
 
     authService = createMockAuthService();
     configService = createMockConfigService();
+    configService.get.mockReturnValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -561,6 +567,39 @@ describe('AuthController', () => {
       );
       expect(result).toEqual({ url: expectedAuthUrl, statusCode: 302 });
     });
+
+    it('always generates a fresh OAuth state for login calls', async () => {
+      // Arrange
+      const existingNonce = 'stale-nonce';
+      const expectedAuthUrl =
+        'https://test-tssd.auth.marketingcloudapis.com/v2/authorize?state=fresh';
+      configService.get.mockReturnValue('test-tssd');
+      authService.getAuthUrl.mockReturnValue(expectedAuthUrl);
+
+      const session = createMockSession({
+        oauth_state_nonce: existingNonce,
+        oauth_state_tssd: 'test-tssd',
+        oauth_state_created_at: String(Date.now() - 5 * 60 * 1000),
+      });
+      const request = createMockRequest({ session });
+
+      // Act
+      const result = await controller.login(undefined, undefined, request);
+
+      // Assert
+      const stateArg = authService.getAuthUrl.mock.calls[0]?.[1] as
+        | string
+        | undefined;
+      expect(typeof stateArg).toBe('string');
+      const decoded = decodeOAuthState(stateArg as string);
+      expect(decoded.tssd).toBe('test-tssd');
+      expect(decoded.nonce).not.toBe(existingNonce);
+      expect(session.set).toHaveBeenCalledWith(
+        'oauth_state_nonce',
+        expect.any(String) as string,
+      );
+      expect(result).toEqual({ url: expectedAuthUrl, statusCode: 302 });
+    });
   });
 
   describe('callback()', () => {
@@ -681,10 +720,46 @@ describe('AuthController', () => {
         undefined,
         undefined,
       );
+      expect(session.set).toHaveBeenCalledWith('oauth_state_nonce', undefined);
+      expect(session.set).toHaveBeenCalledWith('oauth_state_tssd', undefined);
+      expect(session.set).toHaveBeenCalledWith(
+        'oauth_state_created_at',
+        undefined,
+      );
       expect(session.set).toHaveBeenCalledWith('userId', mockUser.id);
       expect(session.set).toHaveBeenCalledWith('tenantId', mockTenant.id);
       expect(session.set).toHaveBeenCalledWith('mid', mockMid);
       expect(result).toEqual({ url: '/', statusCode: 302 });
+    });
+
+    it('consumes OAuth state before callback token exchange', async () => {
+      // Arrange
+      const nonce = 'test-nonce';
+      const tssd = 'test-tssd';
+      const validTime = String(Date.now());
+      const state = encodeOAuthState({ tssd, nonce });
+
+      authService.handleCallback.mockRejectedValue(
+        new UnauthorizedException('Token exchange failed'),
+      );
+
+      const session = createMockSession({
+        oauth_state_nonce: nonce,
+        oauth_state_tssd: tssd,
+        oauth_state_created_at: validTime,
+      });
+      const request = createMockRequest({ session });
+
+      // Act + Assert
+      await expect(
+        controller.callback('auth-code', state, request),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(session.set).toHaveBeenCalledWith('oauth_state_nonce', undefined);
+      expect(session.set).toHaveBeenCalledWith('oauth_state_tssd', undefined);
+      expect(session.set).toHaveBeenCalledWith(
+        'oauth_state_created_at',
+        undefined,
+      );
     });
   });
 

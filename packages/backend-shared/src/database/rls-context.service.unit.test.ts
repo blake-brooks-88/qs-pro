@@ -221,10 +221,11 @@ describe("RlsContextService", () => {
       });
 
       // The nested call should have used the outer reserved connection for set_config
+      // is_local=false because the hook's connection has no active transaction
       expect(outerReservedSql.configCalls).toContainEqual({
         key: "app.user_id",
         value: "user-nested",
-        local: true,
+        local: false,
       });
 
       // Should NOT have reserved a new connection for the nested call
@@ -267,10 +268,11 @@ describe("RlsContextService", () => {
           "user-123",
           async () => {
             // Now user_id should also be set on the SAME connection
+            // is_local=false because the hook's connection has no active transaction
             expect(outerReservedSql.configCalls).toContainEqual({
               key: "app.user_id",
               value: "user-123",
-              local: true,
+              local: false,
             });
             return "inner";
           },

@@ -341,7 +341,11 @@ describe('configureApp', () => {
         ]),
       );
       expect(createDatabaseFromClient).toHaveBeenCalled();
-      expect(runWithDbContext).toHaveBeenCalledWith(expect.anything(), done);
+      expect(runWithDbContext).toHaveBeenCalledWith(
+        expect.anything(),
+        done,
+        expect.anything(),
+      );
     });
   });
 
