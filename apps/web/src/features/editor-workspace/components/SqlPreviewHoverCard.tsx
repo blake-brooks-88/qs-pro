@@ -1,6 +1,6 @@
 import * as HoverCard from "@radix-ui/react-hover-card";
 import { Copy } from "@solar-icons/react";
-import { type MouseEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { copyToClipboard } from "@/lib/clipboard";
@@ -63,15 +63,6 @@ export function SqlPreviewHoverCard({
     });
   }, [hasSql, fullSql, refetch, onOpenInNewTab]);
 
-  const handleTriggerClick = useCallback(
-    (event: MouseEvent<HTMLElement>) => {
-      if (event.detail === 2) {
-        handleDoubleClick();
-      }
-    },
-    [handleDoubleClick],
-  );
-
   if (!hasSql) {
     return <>{children}</>;
   }
@@ -88,7 +79,6 @@ export function SqlPreviewHoverCard({
           type="button"
           className="cursor-pointer select-none bg-transparent border-0 p-0 text-left"
           onDoubleClick={handleDoubleClick}
-          onClick={handleTriggerClick}
         >
           {children}
         </button>
@@ -101,7 +91,6 @@ export function SqlPreviewHoverCard({
           collisionPadding={16}
           avoidCollisions
           onDoubleClick={handleDoubleClick}
-          onClick={handleTriggerClick}
         >
           <div className="relative">
             {isFetching && !fullSql ? (
