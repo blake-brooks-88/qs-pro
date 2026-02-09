@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
@@ -7,6 +8,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -180,6 +182,10 @@ export const savedQueries = pgTable(
     folderId: uuid("folder_id").references(() => folders.id),
     name: varchar("name").notNull(),
     sqlTextEncrypted: text("sql_text_encrypted").notNull(),
+    linkedQaObjectId: varchar("linked_qa_object_id"),
+    linkedQaCustomerKey: varchar("linked_qa_customer_key"),
+    linkedQaName: varchar("linked_qa_name"),
+    linkedAt: timestamp("linked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -187,6 +193,9 @@ export const savedQueries = pgTable(
     tenantIdIdx: index("saved_queries_tenant_id_idx").on(t.tenantId),
     userIdIdx: index("saved_queries_user_id_idx").on(t.userId),
     folderIdIdx: index("saved_queries_folder_id_idx").on(t.folderId),
+    linkedQaUnique: uniqueIndex("saved_queries_linked_qa_unique")
+      .on(t.tenantId, t.mid, t.linkedQaCustomerKey)
+      .where(sql`${t.linkedQaCustomerKey} IS NOT NULL`),
   }),
 );
 

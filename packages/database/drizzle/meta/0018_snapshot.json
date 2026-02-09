@@ -1,6 +1,6 @@
 {
-  "id": "d068889f-a217-464c-acdf-960599910fbe",
-  "prevId": "92be8400-ad8b-40af-a64a-f5603276af17",
+  "id": "87c12e26-5e0d-4566-b471-98b1f57515fc",
+  "prevId": "ef25c9fd-86d1-4432-83d0-f1e392ca44c5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -254,6 +254,180 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.query_versions": {
+      "name": "query_versions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "saved_query_id": {
+          "name": "saved_query_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mid": {
+          "name": "mid",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sql_text_encrypted": {
+          "name": "sql_text_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sql_text_hash": {
+          "name": "sql_text_hash",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_name": {
+          "name": "version_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "line_count": {
+          "name": "line_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'save'"
+        },
+        "restored_from_id": {
+          "name": "restored_from_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "query_versions_saved_query_id_idx": {
+          "name": "query_versions_saved_query_id_idx",
+          "columns": [
+            {
+              "expression": "saved_query_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "query_versions_tenant_id_idx": {
+          "name": "query_versions_tenant_id_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "query_versions_created_at_idx": {
+          "name": "query_versions_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "query_versions_saved_query_id_saved_queries_id_fk": {
+          "name": "query_versions_saved_query_id_saved_queries_id_fk",
+          "tableFrom": "query_versions",
+          "columnsFrom": [
+            "saved_query_id"
+          ],
+          "tableTo": "saved_queries",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "query_versions_tenant_id_tenants_id_fk": {
+          "name": "query_versions_tenant_id_tenants_id_fk",
+          "tableFrom": "query_versions",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "query_versions_user_id_users_id_fk": {
+          "name": "query_versions_user_id_users_id_fk",
+          "tableFrom": "query_versions",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "tableTo": "users",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.saved_queries": {
       "name": "saved_queries",
       "schema": "",
@@ -300,6 +474,30 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "linked_qa_object_id": {
+          "name": "linked_qa_object_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linked_qa_customer_key": {
+          "name": "linked_qa_customer_key",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linked_qa_name": {
+          "name": "linked_qa_name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linked_at": {
+          "name": "linked_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -360,6 +558,34 @@
           "isUnique": false,
           "with": {},
           "method": "btree",
+          "concurrently": false
+        },
+        "saved_queries_linked_qa_unique": {
+          "name": "saved_queries_linked_qa_unique",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "mid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "linked_qa_customer_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "where": "\"saved_queries\".\"linked_qa_customer_key\" IS NOT NULL",
           "concurrently": false
         }
       },
@@ -494,6 +720,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "sql_text_encrypted": {
+          "name": "sql_text_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "row_count": {
+          "name": "row_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "saved_query_id": {
+          "name": "saved_query_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -510,24 +754,6 @@
         "completed_at": {
           "name": "completed_at",
           "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sql_text_encrypted": {
-          "name": "sql_text_encrypted",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "row_count": {
-          "name": "row_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "saved_query_id": {
-          "name": "saved_query_id",
-          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         }
@@ -985,180 +1211,6 @@
           "nullsNotDistinct": false
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.query_versions": {
-      "name": "query_versions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "saved_query_id": {
-          "name": "saved_query_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mid": {
-          "name": "mid",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sql_text_encrypted": {
-          "name": "sql_text_encrypted",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sql_text_hash": {
-          "name": "sql_text_hash",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version_name": {
-          "name": "version_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "line_count": {
-          "name": "line_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'save'"
-        },
-        "restored_from_id": {
-          "name": "restored_from_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "query_versions_saved_query_id_idx": {
-          "name": "query_versions_saved_query_id_idx",
-          "columns": [
-            {
-              "expression": "saved_query_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "query_versions_tenant_id_idx": {
-          "name": "query_versions_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "query_versions_created_at_idx": {
-          "name": "query_versions_created_at_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "query_versions_saved_query_id_saved_queries_id_fk": {
-          "name": "query_versions_saved_query_id_saved_queries_id_fk",
-          "tableFrom": "query_versions",
-          "columnsFrom": [
-            "saved_query_id"
-          ],
-          "tableTo": "saved_queries",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "query_versions_tenant_id_tenants_id_fk": {
-          "name": "query_versions_tenant_id_tenants_id_fk",
-          "tableFrom": "query_versions",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "query_versions_user_id_users_id_fk": {
-          "name": "query_versions_user_id_users_id_fk",
-          "tableFrom": "query_versions",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
