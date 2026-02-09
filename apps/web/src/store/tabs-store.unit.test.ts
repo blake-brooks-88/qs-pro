@@ -211,6 +211,85 @@ describe("useTabsStore", () => {
     });
   });
 
+  describe("updateTabLinkState", () => {
+    it("updates link fields on the target tab", () => {
+      useTabsStore.getState().openQuery("q1", "Query 1", "SELECT 1");
+
+      useTabsStore.getState().updateTabLinkState("query-q1", {
+        linkedQaCustomerKey: "qa-key-1",
+        linkedQaName: "My QA",
+      });
+
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.linkedQaCustomerKey).toBe("qa-key-1");
+      expect(tab?.linkedQaName).toBe("My QA");
+    });
+
+    it("does not affect other tabs", () => {
+      useTabsStore.getState().openQuery("q1", "Query 1", "SELECT 1");
+      useTabsStore.getState().openQuery("q2", "Query 2", "SELECT 2");
+
+      useTabsStore.getState().updateTabLinkState("query-q1", {
+        linkedQaCustomerKey: "qa-key-1",
+        linkedQaName: "My QA",
+      });
+
+      const tab2 = useTabsStore.getState().tabs.at(1);
+      expect(tab2?.linkedQaCustomerKey).toBeNull();
+      expect(tab2?.linkedQaName).toBeNull();
+    });
+
+    it("can clear link state by setting null", () => {
+      useTabsStore.getState().openQuery("q1", "Query 1", "SELECT 1", {
+        linkedQaCustomerKey: "qa-key-1",
+        linkedQaName: "My QA",
+      });
+
+      useTabsStore.getState().updateTabLinkState("query-q1", {
+        linkedQaCustomerKey: null,
+        linkedQaName: null,
+      });
+
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.linkedQaCustomerKey).toBeNull();
+      expect(tab?.linkedQaName).toBeNull();
+    });
+
+    it("does nothing for non-existent tabId", () => {
+      useTabsStore.getState().openQuery("q1", "Query 1", "SELECT 1");
+
+      useTabsStore.getState().updateTabLinkState("non-existent", {
+        linkedQaCustomerKey: "qa-key-1",
+        linkedQaName: "My QA",
+      });
+
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.linkedQaCustomerKey).toBeNull();
+      expect(tab?.linkedQaName).toBeNull();
+    });
+  });
+
+  describe("openQuery with link state", () => {
+    it("sets link fields when linkState is provided", () => {
+      useTabsStore.getState().openQuery("q1", "Query 1", "SELECT 1", {
+        linkedQaCustomerKey: "qa-key-1",
+        linkedQaName: "My QA",
+      });
+
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.linkedQaCustomerKey).toBe("qa-key-1");
+      expect(tab?.linkedQaName).toBe("My QA");
+    });
+
+    it("defaults link fields to null when no linkState", () => {
+      useTabsStore.getState().openQuery("q1", "Query 1", "SELECT 1");
+
+      const tab = useTabsStore.getState().tabs.at(0);
+      expect(tab?.linkedQaCustomerKey).toBeNull();
+      expect(tab?.linkedQaName).toBeNull();
+    });
+  });
+
   describe("renameTab", () => {
     it("updates tab name and marks dirty", () => {
       useTabsStore.getState().openQuery("q1", "Original", "SELECT 1");
