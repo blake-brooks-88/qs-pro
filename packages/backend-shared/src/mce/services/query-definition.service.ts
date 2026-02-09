@@ -9,8 +9,10 @@ import {
   buildCreateQueryDefinition,
   buildDeleteQueryDefinition,
   buildPerformQueryDefinition,
+  buildRetrieveAllQueryDefinitions,
   buildRetrieveQueryDefinition,
   buildRetrieveQueryDefinitionByNameAndFolder,
+  buildRetrieveQueryDefinitionDetail,
 } from "../soap/request-bodies";
 import {
   SoapCreateResponse,
@@ -21,11 +23,16 @@ import {
 import type {
   CreateQueryDefinitionParams,
   QueryDefinition,
+  QueryDefinitionDetail,
 } from "../types/query-definition";
 
 const MAX_PAGES = 10;
 
-export type { CreateQueryDefinitionParams, QueryDefinition };
+export type {
+  CreateQueryDefinitionParams,
+  QueryDefinition,
+  QueryDefinitionDetail,
+};
 
 @Injectable()
 export class QueryDefinitionService {
@@ -242,6 +249,159 @@ export class QueryDefinitionService {
     }
 
     return results;
+  }
+
+  async retrieveAll(
+    tenantId: string,
+    userId: string,
+    mid: string,
+  ): Promise<
+    (QueryDefinition & {
+      targetUpdateType?: string;
+      modifiedDate?: string;
+      status?: string;
+    })[]
+  > {
+    const results: (QueryDefinition & {
+      targetUpdateType?: string;
+      modifiedDate?: string;
+      status?: string;
+    })[] = [];
+    let currentRequestId: string | undefined;
+    let page = 0;
+
+    const processResponse = (
+      response: SoapRetrieveResponse,
+    ): string | undefined => {
+      const msg = response.Body?.RetrieveResponseMsg;
+      const status = msg?.OverallStatus;
+
+      if (status && status !== "OK" && status !== "MoreDataAvailable") {
+        throw mceSoapFailure("RetrieveAllQueryDefinitions", status);
+      }
+
+      const rawResults = msg?.Results;
+      if (rawResults) {
+        const items = Array.isArray(rawResults) ? rawResults : [rawResults];
+        for (const item of items) {
+          results.push({
+            objectId: String(item.ObjectID ?? ""),
+            customerKey: String(item.CustomerKey ?? ""),
+            name: String(item.Name ?? ""),
+            categoryId: item.CategoryID
+              ? parseInt(String(item.CategoryID), 10)
+              : undefined,
+            targetUpdateType: item.TargetUpdateType
+              ? String(item.TargetUpdateType)
+              : undefined,
+            modifiedDate: item.ModifiedDate
+              ? String(item.ModifiedDate)
+              : undefined,
+            status: item.Status ? String(item.Status) : undefined,
+          });
+        }
+      }
+
+      return status === "MoreDataAvailable" ? msg?.RequestID : undefined;
+    };
+
+    const initialSoapBody = buildRetrieveAllQueryDefinitions();
+
+    const firstResponse =
+      await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+        tenantId,
+        userId,
+        mid,
+        initialSoapBody,
+        "Retrieve",
+        MCE_TIMEOUTS.METADATA,
+      );
+    currentRequestId = processResponse(firstResponse);
+    page++;
+
+    while (currentRequestId) {
+      if (page >= MAX_PAGES) {
+        throw new AppError(ErrorCode.MCE_PAGINATION_EXCEEDED, undefined, {
+          operation: "RetrieveAllQueryDefinitions",
+          maxPages: MAX_PAGES,
+        });
+      }
+
+      const continueBody = buildContinueRequest(currentRequestId);
+      const response = await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+        tenantId,
+        userId,
+        mid,
+        continueBody,
+        "Retrieve",
+        MCE_TIMEOUTS.METADATA,
+      );
+      currentRequestId = processResponse(response);
+      page++;
+    }
+
+    return results;
+  }
+
+  async retrieveDetail(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    customerKey: string,
+  ): Promise<QueryDefinitionDetail | null> {
+    const soapBody = buildRetrieveQueryDefinitionDetail(customerKey);
+
+    const response = await this.mceBridge.soapRequest<SoapRetrieveResponse>(
+      tenantId,
+      userId,
+      mid,
+      soapBody,
+      "Retrieve",
+      MCE_TIMEOUTS.METADATA,
+    );
+
+    const msg = response.Body?.RetrieveResponseMsg;
+    const status = msg?.OverallStatus;
+
+    if (status && status !== "OK" && status !== "MoreDataAvailable") {
+      if (status === "Error" && !msg?.Results) {
+        return null;
+      }
+      throw mceSoapFailure("RetrieveQueryDefinitionDetail", status);
+    }
+
+    const rawResults = msg?.Results;
+    if (!rawResults) {
+      return null;
+    }
+
+    const item = Array.isArray(rawResults) ? rawResults[0] : rawResults;
+    if (!item) {
+      return null;
+    }
+
+    const deTarget = item.DataExtensionTarget as
+      | { Name?: string; CustomerKey?: string }
+      | undefined;
+
+    return {
+      objectId: String(item.ObjectID ?? ""),
+      customerKey: String(item.CustomerKey ?? ""),
+      name: String(item.Name ?? ""),
+      categoryId: item.CategoryID
+        ? parseInt(String(item.CategoryID), 10)
+        : undefined,
+      queryText: String(item.QueryText ?? ""),
+      targetUpdateType: item.TargetUpdateType
+        ? (String(item.TargetUpdateType) as "Overwrite" | "Append" | "Update")
+        : undefined,
+      targetDEName: deTarget?.Name ? String(deTarget.Name) : undefined,
+      targetDECustomerKey: deTarget?.CustomerKey
+        ? String(deTarget.CustomerKey)
+        : undefined,
+      modifiedDate: item.ModifiedDate ? String(item.ModifiedDate) : undefined,
+      status: item.Status ? String(item.Status) : undefined,
+    };
   }
 
   async create(
