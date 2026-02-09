@@ -106,6 +106,46 @@ export function buildPerformQueryDefinition(objectId: string): string {
 </PerformRequestMsg>`;
 }
 
+export function buildRetrieveAllQueryDefinitions(): string {
+  return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+  <RetrieveRequest>
+    <ObjectType>QueryDefinition</ObjectType>
+    <Properties>ObjectID</Properties>
+    <Properties>CustomerKey</Properties>
+    <Properties>Name</Properties>
+    <Properties>CategoryID</Properties>
+    <Properties>TargetUpdateType</Properties>
+    <Properties>ModifiedDate</Properties>
+    <Properties>Status</Properties>
+  </RetrieveRequest>
+</RetrieveRequestMsg>`;
+}
+
+export function buildRetrieveQueryDefinitionDetail(
+  customerKey: string,
+): string {
+  return `<RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">
+  <RetrieveRequest>
+    <ObjectType>QueryDefinition</ObjectType>
+    <Properties>ObjectID</Properties>
+    <Properties>CustomerKey</Properties>
+    <Properties>Name</Properties>
+    <Properties>CategoryID</Properties>
+    <Properties>QueryText</Properties>
+    <Properties>TargetUpdateType</Properties>
+    <Properties>DataExtensionTarget.Name</Properties>
+    <Properties>DataExtensionTarget.CustomerKey</Properties>
+    <Properties>ModifiedDate</Properties>
+    <Properties>Status</Properties>
+    <Filter xsi:type="SimpleFilterPart">
+      <Property>CustomerKey</Property>
+      <SimpleOperator>equals</SimpleOperator>
+      <Value>${escapeXml(customerKey)}</Value>
+    </Filter>
+  </RetrieveRequest>
+</RetrieveRequestMsg>`;
+}
+
 export function buildDeleteQueryDefinition(objectId: string): string {
   return `<DeleteRequest xmlns="http://exacttarget.com/wsdl/partnerAPI">
   <Objects xsi:type="QueryDefinition">
