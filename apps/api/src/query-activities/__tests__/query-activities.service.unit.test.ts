@@ -131,7 +131,10 @@ describe('QueryActivitiesService', () => {
       );
 
       // Assert
-      expect(result).toEqual({ objectId: 'created-obj-id' });
+      expect(result).toEqual({
+        objectId: 'created-obj-id',
+        customerKey: expect.any(String),
+      });
       expect(queryDefinitionService.create).toHaveBeenCalledWith(
         mockTenantId,
         mockUserId,
@@ -203,7 +206,10 @@ describe('QueryActivitiesService', () => {
       );
 
       // Assert
-      expect(result).toEqual({ objectId: 'created-obj-id' });
+      expect(result).toEqual({
+        objectId: 'created-obj-id',
+        customerKey: expect.any(String),
+      });
     });
 
     it('throws DUPLICATE_QUERY_ACTIVITY_NAME when name already exists in folder', async () => {

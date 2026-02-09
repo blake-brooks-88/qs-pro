@@ -1,4 +1,5 @@
 import type { CreateDataExtensionDto } from "@qpp/shared-types";
+import type { LinkQueryResponse } from "@qpp/shared-types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   AltArrowUp,
@@ -8,6 +9,7 @@ import {
   Diskette,
   Download,
   History,
+  LinkMinimalistic,
   Rocket,
 } from "@solar-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,6 +38,7 @@ import {
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
 import { useCreateQueryActivity } from "@/features/editor-workspace/hooks/use-create-query-activity";
+import { useLinkQuery } from "@/features/editor-workspace/hooks/use-link-query";
 import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
 import {
   queryActivityFoldersQueryKeys,
@@ -63,6 +66,7 @@ import {
   hasBlockingDiagnostics as checkHasBlockingDiagnostics,
 } from "@/features/editor-workspace/utils/sql-lint";
 import { useSqlDiagnostics } from "@/features/editor-workspace/utils/sql-lint/use-sql-diagnostics";
+import { useFeature } from "@/hooks/use-feature";
 import { useRunUsage } from "@/hooks/use-run-usage";
 import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -73,6 +77,8 @@ import { useTabsStore } from "@/store/tabs-store";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { DataExtensionModal } from "./DataExtensionModal";
 import { HistoryPanel } from "./HistoryPanel";
+import { LinkedBadge } from "./LinkedBadge";
+import { LinkQueryModal } from "./LinkQueryModal";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
 import { QueryActivityModal } from "./QueryActivityModal";
 import { QueryTabBar } from "./QueryTabBar";
@@ -129,6 +135,10 @@ export function EditorWorkspace({
     [],
   );
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkTargetQueryId, setLinkTargetQueryId] = useState<string | null>(
+    null,
+  );
 
   // Version History state
   const versionHistoryIsOpen = useVersionHistoryStore((s) => s.isOpen);
@@ -181,6 +191,8 @@ export function EditorWorkspace({
   // Query Activity hooks
   const { data: qaFolders = [] } = useQueryActivityFolders(eid);
   const createQueryActivityMutation = useCreateQueryActivity();
+  const linkMutation = useLinkQuery();
+  const { enabled: isDeployFeatureEnabled } = useFeature("deployToAutomation");
 
   // Zustand store - single source of truth for tabs
   const tabs = useTabsStore((state) => state.tabs);
@@ -194,6 +206,9 @@ export function EditorWorkspace({
   const storeCreateNewTab = useTabsStore((state) => state.createNewTab);
   const storeReset = useTabsStore((state) => state.reset);
   const storeFindTabByQueryId = useTabsStore((state) => state.findTabByQueryId);
+  const storeUpdateTabLinkState = useTabsStore(
+    (state) => state.updateTabLinkState,
+  );
 
   const [isResultsOpen, setIsResultsOpen] = useState(false);
   const [resultsHeight, setResultsHeight] = useState(280);
@@ -312,6 +327,18 @@ export function EditorWorkspace({
     return "Execute SQL (Ctrl+Enter)";
   }, [isRunning, isAtRunLimit, hasBlockingDiagnostics, runBlockMessage]);
 
+  // Derive link target info for LinkQueryModal
+  const linkTargetInfo = useMemo(() => {
+    if (!linkTargetQueryId) {
+      return null;
+    }
+    const tab = storeFindTabByQueryId(linkTargetQueryId);
+    if (tab) {
+      return { id: linkTargetQueryId, name: tab.name, sql: tab.content };
+    }
+    return { id: linkTargetQueryId, name: "Query", sql: "" };
+  }, [linkTargetQueryId, storeFindTabByQueryId]);
+
   const executionResult: ExecutionResult = useMemo(() => {
     const legacyStatus =
       executionStatus === "ready"
@@ -355,7 +382,17 @@ export function EditorWorkspace({
   // Effect to open tab when pending query loads
   useEffect(() => {
     if (pendingQuery && pendingQueryId) {
-      storeOpenQuery(pendingQuery.id, pendingQuery.name, pendingQuery.sqlText);
+      storeOpenQuery(
+        pendingQuery.id,
+        pendingQuery.name,
+        pendingQuery.sqlText,
+        pendingQuery.linkedQaCustomerKey || pendingQuery.linkedQaName
+          ? {
+              linkedQaCustomerKey: pendingQuery.linkedQaCustomerKey,
+              linkedQaName: pendingQuery.linkedQaName,
+            }
+          : undefined,
+      );
       setPendingQueryId(null);
     }
   }, [pendingQuery, pendingQueryId, storeOpenQuery]);
@@ -452,9 +489,31 @@ export function EditorWorkspace({
           queryKey: queryActivityFoldersQueryKeys.all,
         });
 
-        toast.success(`Query Activity "${draft.name}" deployed`, {
-          description: `Object ID: ${result.objectId}`,
-        });
+        // Auto-link if this is a saved query tab
+        const savedQueryId = safeActiveTab.queryId;
+        if (savedQueryId && result.customerKey) {
+          try {
+            const linkResponse = await linkMutation.mutateAsync({
+              savedQueryId,
+              qaCustomerKey: result.customerKey,
+            });
+            if (activeTabId) {
+              storeUpdateTabLinkState(activeTabId, {
+                linkedQaCustomerKey: linkResponse.linkedQaCustomerKey,
+                linkedQaName: linkResponse.linkedQaName,
+              });
+            }
+            toast.success(`Query Activity "${draft.name}" deployed and linked`);
+          } catch {
+            toast.success(`Query Activity "${draft.name}" deployed`, {
+              description: `Object ID: ${result.objectId}`,
+            });
+          }
+        } else {
+          toast.success(`Query Activity "${draft.name}" deployed`, {
+            description: `Object ID: ${result.objectId}`,
+          });
+        }
         setIsQueryActivityModalOpen(false);
       } catch (error) {
         // Extract detailed error message from API response (RFC 9457 Problem Details format)
@@ -469,8 +528,51 @@ export function EditorWorkspace({
         // Keep modal open on error - do not close or rethrow
       }
     },
-    [createQueryActivityMutation, queryClient],
+    [
+      createQueryActivityMutation,
+      queryClient,
+      safeActiveTab.queryId,
+      activeTabId,
+      linkMutation,
+      storeUpdateTabLinkState,
+    ],
   );
+
+  const handleOpenLinkModal = useCallback((queryId: string) => {
+    setLinkTargetQueryId(queryId);
+    setIsLinkModalOpen(true);
+  }, []);
+
+  const handleLinkComplete = useCallback(
+    (linkResponse: LinkQueryResponse) => {
+      setIsLinkModalOpen(false);
+      setLinkTargetQueryId(null);
+
+      // Update tab link state if the linked query is open
+      const linkedQueryId = linkTargetQueryId ?? safeActiveTab.queryId;
+      if (linkedQueryId) {
+        const tab = storeFindTabByQueryId(linkedQueryId);
+        if (tab) {
+          storeUpdateTabLinkState(tab.id, {
+            linkedQaCustomerKey: linkResponse.linkedQaCustomerKey,
+            linkedQaName: linkResponse.linkedQaName,
+          });
+        }
+      }
+    },
+    [
+      linkTargetQueryId,
+      safeActiveTab.queryId,
+      storeFindTabByQueryId,
+      storeUpdateTabLinkState,
+    ],
+  );
+
+  const handleLinkCreateNew = useCallback(() => {
+    setIsLinkModalOpen(false);
+    setLinkTargetQueryId(null);
+    setIsQueryActivityModalOpen(true);
+  }, []);
 
   const handleCloseTab = useCallback(
     (id: string) => {
@@ -828,6 +930,9 @@ export function EditorWorkspace({
                 onViewVersionHistory={(queryId) =>
                   handleOpenVersionHistory(queryId)
                 }
+                onLinkQuery={
+                  isDeployFeatureEnabled ? handleOpenLinkModal : undefined
+                }
               />
             ) : null}
 
@@ -911,6 +1016,28 @@ export function EditorWorkspace({
                               label="Version History"
                               onClick={() => handleOpenVersionHistory()}
                             />
+                            {isDeployFeatureEnabled ? (
+                              <>
+                                <div className="h-4 w-px bg-border mx-1" />
+                                {safeActiveTab.linkedQaCustomerKey ? (
+                                  <LinkedBadge
+                                    size="md"
+                                    qaName={safeActiveTab.linkedQaName}
+                                  />
+                                ) : (
+                                  <ToolbarButton
+                                    icon={<LinkMinimalistic size={18} />}
+                                    label="Link to Query Activity"
+                                    onClick={() => {
+                                      const qId = safeActiveTab.queryId;
+                                      if (qId) {
+                                        handleOpenLinkModal(qId);
+                                      }
+                                    }}
+                                  />
+                                )}
+                              </>
+                            ) : null}
                           </>
                         ) : null}
                       </div>
@@ -1097,6 +1224,21 @@ export function EditorWorkspace({
           onClose={() => setIsQueryActivityModalOpen(false)}
           onSubmit={handleCreateQueryActivity}
         />
+
+        {linkTargetInfo ? (
+          <LinkQueryModal
+            isOpen={isLinkModalOpen}
+            onClose={() => {
+              setIsLinkModalOpen(false);
+              setLinkTargetQueryId(null);
+            }}
+            savedQueryId={linkTargetInfo.id}
+            savedQueryName={linkTargetInfo.name}
+            currentSql={linkTargetInfo.sql}
+            onLinkComplete={handleLinkComplete}
+            onCreateNew={handleLinkCreateNew}
+          />
+        ) : null}
 
         <TargetDataExtensionModal
           isOpen={isTargetDEModalOpen}

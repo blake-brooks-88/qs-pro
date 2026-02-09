@@ -166,7 +166,7 @@ export class QueryActivitiesService {
     userId: string,
     mid: string,
     dto: CreateQueryActivityDto,
-  ): Promise<{ objectId: string }> {
+  ): Promise<{ objectId: string; customerKey: string }> {
     const targetDE = await this.dataExtensionService.retrieveByCustomerKey(
       tenantId,
       userId,
@@ -242,16 +242,23 @@ export class QueryActivitiesService {
       }
     }
 
-    return this.queryDefinitionService.create(tenantId, userId, mid, {
-      name: dto.name,
-      customerKey,
-      categoryId: dto.categoryId,
-      targetId: targetDE.objectId,
-      targetCustomerKey: targetDE.customerKey,
-      targetName: targetDE.name,
-      queryText: dto.queryText,
-      description: dto.description,
-      targetUpdateType: dto.targetUpdateType,
-    });
+    const result = await this.queryDefinitionService.create(
+      tenantId,
+      userId,
+      mid,
+      {
+        name: dto.name,
+        customerKey,
+        categoryId: dto.categoryId,
+        targetId: targetDE.objectId,
+        targetCustomerKey: targetDE.customerKey,
+        targetName: targetDE.name,
+        queryText: dto.queryText,
+        description: dto.description,
+        targetUpdateType: dto.targetUpdateType,
+      },
+    );
+
+    return { objectId: result.objectId, customerKey };
   }
 }
