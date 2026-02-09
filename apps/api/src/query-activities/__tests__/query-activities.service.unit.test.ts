@@ -8,6 +8,7 @@ import {
 import type { CreateQueryActivityDto } from '@qpp/shared-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SavedQueriesService } from '../../saved-queries/saved-queries.service';
 import { QueryActivitiesService } from '../query-activities.service';
 
 describe('QueryActivitiesService', () => {
@@ -15,6 +16,7 @@ describe('QueryActivitiesService', () => {
   let dataExtensionService: DataExtensionService;
   let queryDefinitionService: QueryDefinitionService;
   let metadataService: MetadataService;
+  let savedQueriesService: SavedQueriesService;
 
   const mockTenantId = 'tenant-123';
   const mockUserId = 'user-456';
@@ -48,6 +50,8 @@ describe('QueryActivitiesService', () => {
           useValue: {
             retrieveByNameAndFolder: vi.fn().mockResolvedValue(null),
             retrieve: vi.fn().mockResolvedValue(null),
+            retrieveAll: vi.fn().mockResolvedValue([]),
+            retrieveDetail: vi.fn().mockResolvedValue(null),
             create: vi.fn().mockResolvedValue({ objectId: 'created-obj-id' }),
           },
         },
@@ -55,6 +59,50 @@ describe('QueryActivitiesService', () => {
           provide: MetadataService,
           useValue: {
             getFields: vi.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: SavedQueriesService,
+          useValue: {
+            findAllLinkedQaKeys: vi
+              .fn()
+              .mockResolvedValue(new Map<string, string>()),
+            linkToQA: vi.fn().mockResolvedValue({
+              id: 'sq-1',
+              name: 'My Query',
+              sqlText: 'SELECT 1',
+              folderId: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              linkedQaObjectId: 'qa-obj-1',
+              linkedQaCustomerKey: 'qa-key-1',
+              linkedQaName: 'QA One',
+              linkedAt: new Date(),
+            }),
+            unlinkFromQA: vi.fn().mockResolvedValue({
+              id: 'sq-1',
+              name: 'My Query',
+              sqlText: 'SELECT 1',
+              folderId: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              linkedQaObjectId: null,
+              linkedQaCustomerKey: null,
+              linkedQaName: null,
+              linkedAt: null,
+            }),
+            update: vi.fn().mockResolvedValue({
+              id: 'sq-1',
+              name: 'My Query',
+              sqlText: 'SELECT 1',
+              folderId: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              linkedQaObjectId: null,
+              linkedQaCustomerKey: null,
+              linkedQaName: null,
+              linkedAt: null,
+            }),
           },
         },
       ],
@@ -67,6 +115,7 @@ describe('QueryActivitiesService', () => {
       QueryDefinitionService,
     );
     metadataService = module.get<MetadataService>(MetadataService);
+    savedQueriesService = module.get<SavedQueriesService>(SavedQueriesService);
   });
 
   describe('create', () => {
@@ -279,6 +328,221 @@ describe('QueryActivitiesService', () => {
         mockMid,
         validDto.targetDataExtensionCustomerKey,
         'enterprise-123',
+      );
+    });
+  });
+
+  describe('listAllWithLinkStatus', () => {
+    it('returns QA list with link status merged from saved queries', async () => {
+      // Arrange
+      vi.mocked(queryDefinitionService.retrieveAll).mockResolvedValue([
+        {
+          objectId: 'qa-obj-1',
+          customerKey: 'qa-key-1',
+          name: 'QA One',
+          targetUpdateType: 'Overwrite',
+        },
+        {
+          objectId: 'qa-obj-2',
+          customerKey: 'qa-key-2',
+          name: 'QA Two',
+          targetUpdateType: 'Append',
+        },
+      ]);
+      const linkedMap = new Map([['qa-key-1', 'My Saved Query']]);
+      vi.mocked(savedQueriesService.findAllLinkedQaKeys).mockResolvedValue(
+        linkedMap,
+      );
+
+      // Act
+      const result = await service.listAllWithLinkStatus(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+      );
+
+      // Assert
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        customerKey: 'qa-key-1',
+        isLinked: true,
+        linkedToQueryName: 'My Saved Query',
+      });
+      expect(result[1]).toMatchObject({
+        customerKey: 'qa-key-2',
+        isLinked: false,
+        linkedToQueryName: null,
+      });
+    });
+  });
+
+  describe('getDetail', () => {
+    it('returns QA detail with link status', async () => {
+      // Arrange
+      vi.mocked(queryDefinitionService.retrieveDetail).mockResolvedValue({
+        objectId: 'qa-obj-1',
+        customerKey: 'qa-key-1',
+        name: 'QA One',
+        queryText: 'SELECT * FROM [DE]',
+        targetUpdateType: 'Overwrite',
+        targetDEName: 'Target DE',
+        targetDECustomerKey: 'de-key-1',
+      });
+      vi.mocked(savedQueriesService.findAllLinkedQaKeys).mockResolvedValue(
+        new Map([['qa-key-1', 'My Query']]),
+      );
+
+      // Act
+      const result = await service.getDetail(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'qa-key-1',
+      );
+
+      // Assert
+      expect(result).toMatchObject({
+        customerKey: 'qa-key-1',
+        queryText: 'SELECT * FROM [DE]',
+        isLinked: true,
+        linkedToQueryName: 'My Query',
+      });
+    });
+
+    it('throws RESOURCE_NOT_FOUND when QA does not exist', async () => {
+      // Arrange
+      vi.mocked(queryDefinitionService.retrieveDetail).mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.getDetail(mockTenantId, mockUserId, mockMid, 'nonexistent'),
+      ).rejects.toMatchObject({
+        code: ErrorCode.RESOURCE_NOT_FOUND,
+      });
+    });
+  });
+
+  describe('linkQuery', () => {
+    it('links saved query to QA and returns link response', async () => {
+      // Arrange
+      const now = new Date();
+      vi.mocked(queryDefinitionService.retrieveDetail).mockResolvedValue({
+        objectId: 'qa-obj-1',
+        customerKey: 'qa-key-1',
+        name: 'QA One',
+        queryText: 'SELECT * FROM [DE]',
+      });
+      vi.mocked(savedQueriesService.linkToQA).mockResolvedValue({
+        id: 'sq-1',
+        name: 'My Query',
+        sqlText: 'SELECT 1',
+        folderId: null,
+        createdAt: now,
+        updatedAt: now,
+        linkedQaObjectId: 'qa-obj-1',
+        linkedQaCustomerKey: 'qa-key-1',
+        linkedQaName: 'QA One',
+        linkedAt: now,
+      });
+
+      // Act
+      const result = await service.linkQuery(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'sq-1',
+        'qa-key-1',
+      );
+
+      // Assert
+      expect(result).toMatchObject({
+        linkedQaObjectId: 'qa-obj-1',
+        linkedQaCustomerKey: 'qa-key-1',
+        linkedQaName: 'QA One',
+        sqlUpdated: false,
+      });
+      expect(savedQueriesService.update).not.toHaveBeenCalled();
+    });
+
+    it('updates saved query SQL when conflict resolution is keep-remote', async () => {
+      // Arrange
+      const now = new Date();
+      vi.mocked(queryDefinitionService.retrieveDetail).mockResolvedValue({
+        objectId: 'qa-obj-1',
+        customerKey: 'qa-key-1',
+        name: 'QA One',
+        queryText: 'SELECT Remote FROM [DE]',
+      });
+      vi.mocked(savedQueriesService.linkToQA).mockResolvedValue({
+        id: 'sq-1',
+        name: 'My Query',
+        sqlText: 'SELECT Remote FROM [DE]',
+        folderId: null,
+        createdAt: now,
+        updatedAt: now,
+        linkedQaObjectId: 'qa-obj-1',
+        linkedQaCustomerKey: 'qa-key-1',
+        linkedQaName: 'QA One',
+        linkedAt: now,
+      });
+
+      // Act
+      const result = await service.linkQuery(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'sq-1',
+        'qa-key-1',
+        'keep-remote',
+      );
+
+      // Assert
+      expect(result.sqlUpdated).toBe(true);
+      expect(savedQueriesService.update).toHaveBeenCalledWith(
+        mockTenantId,
+        mockMid,
+        mockUserId,
+        'sq-1',
+        { sqlText: 'SELECT Remote FROM [DE]' },
+      );
+    });
+
+    it('throws RESOURCE_NOT_FOUND when QA does not exist', async () => {
+      // Arrange
+      vi.mocked(queryDefinitionService.retrieveDetail).mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.linkQuery(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+          'nonexistent',
+        ),
+      ).rejects.toMatchObject({
+        code: ErrorCode.RESOURCE_NOT_FOUND,
+      });
+    });
+  });
+
+  describe('unlinkQuery', () => {
+    it('unlinks saved query and returns success', async () => {
+      // Act
+      const result = await service.unlinkQuery(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'sq-1',
+      );
+
+      // Assert
+      expect(result).toEqual({ success: true });
+      expect(savedQueriesService.unlinkFromQA).toHaveBeenCalledWith(
+        mockTenantId,
+        mockMid,
+        mockUserId,
+        'sq-1',
       );
     });
   });

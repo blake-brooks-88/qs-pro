@@ -76,6 +76,9 @@ export function useCreateSavedQuery() {
             name: newQuery.name,
             folderId: newQuery.folderId,
             updatedAt: newQuery.updatedAt,
+            linkedQaCustomerKey: newQuery.linkedQaCustomerKey,
+            linkedQaName: newQuery.linkedQaName,
+            linkedAt: newQuery.linkedAt,
           },
         ],
       );
