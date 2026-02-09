@@ -84,8 +84,20 @@ export {
 } from "./data-extensions.js";
 
 // Query Activities
-export type { CreateQueryActivityDto } from "./query-activities.js";
-export { CreateQueryActivitySchema } from "./query-activities.js";
+export type {
+  CreateQueryActivityDto,
+  LinkQueryRequest,
+  LinkQueryResponse,
+  QADetail,
+  QAListItem,
+} from "./query-activities.js";
+export {
+  CreateQueryActivitySchema,
+  LinkQueryRequestSchema,
+  LinkQueryResponseSchema,
+  QADetailSchema,
+  QAListItemSchema,
+} from "./query-activities.js";
 
 // Usage
 export type { UsageResponse } from "./usage.js";

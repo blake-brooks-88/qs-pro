@@ -40,3 +40,39 @@ export const CreateQueryActivitySchema = z.object({
 
 /** DTO for creating a new Query Activity in MCE */
 export type CreateQueryActivityDto = z.infer<typeof CreateQueryActivitySchema>;
+
+export const QAListItemSchema = z.object({
+  objectId: z.string(),
+  customerKey: z.string(),
+  name: z.string(),
+  categoryId: z.number().optional(),
+  targetUpdateType: z.string().optional(),
+  modifiedDate: z.string().optional(),
+  status: z.string().optional(),
+  isLinked: z.boolean(),
+  linkedToQueryName: z.string().nullable(),
+});
+
+export const QADetailSchema = QAListItemSchema.extend({
+  queryText: z.string(),
+  targetDEName: z.string().optional(),
+  targetDECustomerKey: z.string().optional(),
+});
+
+export const LinkQueryRequestSchema = z.object({
+  qaCustomerKey: z.string().min(1),
+  conflictResolution: z.enum(["keep-local", "keep-remote"]).optional(),
+});
+
+export const LinkQueryResponseSchema = z.object({
+  linkedQaObjectId: z.string(),
+  linkedQaCustomerKey: z.string(),
+  linkedQaName: z.string(),
+  linkedAt: z.string().datetime(),
+  sqlUpdated: z.boolean(),
+});
+
+export type QAListItem = z.infer<typeof QAListItemSchema>;
+export type QADetail = z.infer<typeof QADetailSchema>;
+export type LinkQueryRequest = z.infer<typeof LinkQueryRequestSchema>;
+export type LinkQueryResponse = z.infer<typeof LinkQueryResponseSchema>;
