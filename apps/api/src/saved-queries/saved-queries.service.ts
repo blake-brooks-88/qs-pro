@@ -15,8 +15,10 @@ import type {
 import type { FoldersRepository } from '../folders/folders.repository';
 import type { QueryVersionsRepository } from '../query-versions/query-versions.repository';
 import type {
+  LinkToQAParams,
   SavedQueriesRepository,
   SavedQuery,
+  SavedQueryListItem,
   UpdateSavedQueryParams,
 } from './saved-queries.repository';
 
@@ -27,6 +29,10 @@ export interface DecryptedSavedQuery {
   folderId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  linkedQaObjectId: string | null;
+  linkedQaCustomerKey: string | null;
+  linkedQaName: string | null;
+  linkedAt: Date | null;
 }
 
 @Injectable()
@@ -115,9 +121,7 @@ export class SavedQueriesService {
     tenantId: string,
     mid: string,
     userId: string,
-  ): Promise<
-    { id: string; name: string; folderId: string | null; updatedAt: Date }[]
-  > {
+  ): Promise<SavedQueryListItem[]> {
     return this.rlsContext.runWithUserContext(tenantId, mid, userId, () =>
       this.savedQueriesRepository.findAllListItems(),
     );
@@ -251,6 +255,62 @@ export class SavedQueriesService {
     );
   }
 
+  async linkToQA(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    id: string,
+    params: LinkToQAParams,
+  ): Promise<DecryptedSavedQuery> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const query = await this.savedQueriesRepository.linkToQA(id, params);
+        if (!query) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'link_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+        return this.decryptQuery(query);
+      },
+    );
+  }
+
+  async unlinkFromQA(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    id: string,
+  ): Promise<DecryptedSavedQuery> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const query = await this.savedQueriesRepository.unlinkFromQA(id);
+        if (!query) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'unlink_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+        return this.decryptQuery(query);
+      },
+    );
+  }
+
+  async findAllLinkedQaKeys(
+    tenantId: string,
+    mid: string,
+  ): Promise<Map<string, string>> {
+    return this.rlsContext.runWithTenantContext(tenantId, mid, () =>
+      this.savedQueriesRepository.findAllLinkedQaKeys(),
+    );
+  }
+
   private hashSqlText(sqlText: string): string {
     return crypto.createHash('sha256').update(sqlText).digest('hex');
   }
@@ -269,6 +329,10 @@ export class SavedQueriesService {
       folderId: query.folderId,
       createdAt: query.createdAt,
       updatedAt: query.updatedAt,
+      linkedQaObjectId: query.linkedQaObjectId,
+      linkedQaCustomerKey: query.linkedQaCustomerKey,
+      linkedQaName: query.linkedQaName,
+      linkedAt: query.linkedAt,
     };
   }
 }
