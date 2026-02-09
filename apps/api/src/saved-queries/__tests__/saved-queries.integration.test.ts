@@ -324,8 +324,9 @@ describe('SavedQueriesService (integration)', () => {
       }
     });
 
-    it('should enforce RLS - only return user queries', async () => {
-      // Create query for test user
+    it('should enforce RLS - queries visible to other users in same BU', async () => {
+      // RLS is now tenant_id + mid scoped (broadened for linking).
+      // Users in the same BU can see each other's queries.
       const created = await savedQueriesService.create(
         testTenantId,
         TEST_MID,
@@ -334,7 +335,7 @@ describe('SavedQueriesService (integration)', () => {
       );
       createdSavedQueryIds.push(created.id);
 
-      // Try to list with different user ID - should return empty
+      // List with different user ID in same tenant + mid — should still be visible
       const otherUserId = crypto.randomUUID();
       const results = await savedQueriesService.findAll(
         testTenantId,
@@ -342,9 +343,8 @@ describe('SavedQueriesService (integration)', () => {
         otherUserId,
       );
 
-      // RLS should filter out the query
       const found = results.find((q) => q.id === created.id);
-      expect(found).toBeUndefined();
+      expect(found).toBeDefined();
     });
   });
 
@@ -387,28 +387,28 @@ describe('SavedQueriesService (integration)', () => {
       });
     });
 
-    it('should enforce RLS - not return other user query', async () => {
+    it('should enforce RLS - query visible to other users in same BU', async () => {
+      // RLS is now tenant_id + mid scoped (broadened for linking).
       const created = await savedQueriesService.create(
         testTenantId,
         TEST_MID,
         testUserId,
-        { name: 'Private Query', sqlText: 'SELECT 1' },
+        { name: 'BU Query', sqlText: 'SELECT 1' },
       );
       createdSavedQueryIds.push(created.id);
 
-      // Try to access with different user ID
+      // Access with different user ID in same tenant + mid — should succeed
       const otherUserId = crypto.randomUUID();
 
-      await expect(
-        savedQueriesService.findById(
-          testTenantId,
-          TEST_MID,
-          otherUserId,
-          created.id,
-        ),
-      ).rejects.toMatchObject({
-        code: 'RESOURCE_NOT_FOUND',
-      });
+      const found = await savedQueriesService.findById(
+        testTenantId,
+        TEST_MID,
+        otherUserId,
+        created.id,
+      );
+
+      expect(found.id).toBe(created.id);
+      expect(found.name).toBe('BU Query');
     });
   });
 
@@ -570,7 +570,9 @@ describe('SavedQueriesService (integration)', () => {
       expect(count).toBe(2);
     });
 
-    it('should enforce RLS - only count user queries', async () => {
+    it('should enforce RLS - count includes all BU queries after RLS broadening', async () => {
+      // RLS is now tenant_id + mid scoped (broadened for linking).
+      // countByUser counts all queries in the BU visible to the RLS policy.
       const created = await savedQueriesService.create(
         testTenantId,
         TEST_MID,
@@ -579,7 +581,7 @@ describe('SavedQueriesService (integration)', () => {
       );
       createdSavedQueryIds.push(created.id);
 
-      // Count for different user should be 0
+      // Count for different user in same BU should see the query
       const otherUserId = crypto.randomUUID();
       const count = await savedQueriesService.countByUser(
         testTenantId,
@@ -587,7 +589,7 @@ describe('SavedQueriesService (integration)', () => {
         otherUserId,
       );
 
-      expect(count).toBe(0);
+      expect(count).toBeGreaterThanOrEqual(1);
     });
   });
 });

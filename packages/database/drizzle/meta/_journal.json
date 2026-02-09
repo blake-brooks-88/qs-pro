@@ -134,6 +134,13 @@
       "when": 1770612075414,
       "tag": "0018_rls_query_versions_broadened",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1770615129000,
+      "tag": "0019_rls_saved_queries_broadened",
+      "breakpoints": true
     }
   ]
 }
