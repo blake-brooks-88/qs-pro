@@ -172,7 +172,7 @@ function setupHooks({
     isError: false,
     error: null,
     refetch: vi.fn(),
-  } as ReturnType<typeof useRunUsage>);
+  } as unknown as ReturnType<typeof useRunUsage>);
 }
 
 interface RenderSidebarOptions {
@@ -422,7 +422,7 @@ describe("WorkspaceSidebar", () => {
       });
 
       const options = screen.getAllByRole("option");
-      await user.click(options[0]);
+      await user.click(options[0] as HTMLElement);
 
       // Assert
       expect(onSelectDE).toHaveBeenCalledWith("de-child");
@@ -445,7 +445,7 @@ describe("WorkspaceSidebar", () => {
       });
 
       const options = screen.getAllByRole("option");
-      await user.click(options[0]);
+      await user.click(options[0] as HTMLElement);
 
       // Assert — the search should close and the folder should now be visible in the tree
       await waitFor(() => {
@@ -492,7 +492,7 @@ describe("WorkspaceSidebar", () => {
       });
 
       const options = screen.getAllByRole("option");
-      await user.click(options[0]);
+      await user.click(options[0] as HTMLElement);
 
       // Assert
       expect(onSelectQuery).toHaveBeenCalledWith("sq-1");
@@ -530,7 +530,7 @@ describe("WorkspaceSidebar", () => {
       });
 
       const options = screen.getAllByRole("option");
-      await user.click(options[0]);
+      await user.click(options[0] as HTMLElement);
 
       // Assert — after focusing a DE, the root DE (not in the ancestor chain) should be hidden
       // The "Root DE" at the root level should be filtered out
@@ -575,7 +575,7 @@ describe("WorkspaceSidebar", () => {
       });
 
       const options = screen.getAllByRole("option");
-      await user.click(options[0]);
+      await user.click(options[0] as HTMLElement);
 
       // Assert
       expect(onSelectQuery).toHaveBeenCalledWith("sq-in-folder");
@@ -598,7 +598,7 @@ describe("WorkspaceSidebar", () => {
       });
 
       const options = screen.getAllByRole("option");
-      await user.click(options[0]);
+      await user.click(options[0] as HTMLElement);
 
       await waitFor(() => {
         expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
@@ -765,7 +765,7 @@ describe("WorkspaceSidebar", () => {
       // Act — the close button is adjacent to the header title, inside the
       // border-b header div. Use getAllByText to handle the duplicate "Data Extensions".
       const titleElements = screen.getAllByText("Data Extensions");
-      const headerTitle = titleElements[0];
+      const headerTitle = titleElements[0] as HTMLElement;
       const headerDiv = headerTitle.closest("div") as HTMLDivElement;
       const closeButton = headerDiv.querySelector(
         "button",
@@ -853,7 +853,7 @@ describe("WorkspaceSidebar", () => {
       });
 
       const options = screen.getAllByRole("option");
-      await user.click(options[0]);
+      await user.click(options[0] as HTMLElement);
 
       // Assert — after focusing, folders should be hidden since the DE has no folder
       await waitFor(() => {
