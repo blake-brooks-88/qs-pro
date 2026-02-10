@@ -20,6 +20,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { Sql } from 'postgres';
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -196,6 +197,10 @@ describe('UsageService (integration)', () => {
     await app.close();
   }, 30000);
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(async () => {
     await setTenantTier('free');
 
@@ -334,7 +339,10 @@ describe('UsageService (integration)', () => {
     });
 
     it('resetDate mid-month', async () => {
-      vi.useFakeTimers({ now: new Date(Date.UTC(2026, 1, 15, 10, 30, 0)) });
+      vi.useFakeTimers({
+        now: new Date(Date.UTC(2026, 1, 15, 10, 30, 0)),
+        toFake: ['Date'],
+      });
 
       const result = await usageService.getUsage(
         testTenantId,
@@ -350,7 +358,10 @@ describe('UsageService (integration)', () => {
     });
 
     it('resetDate December rollover', async () => {
-      vi.useFakeTimers({ now: new Date(Date.UTC(2026, 11, 20, 8, 0, 0)) });
+      vi.useFakeTimers({
+        now: new Date(Date.UTC(2026, 11, 20, 8, 0, 0)),
+        toFake: ['Date'],
+      });
 
       const result = await usageService.getUsage(
         testTenantId,
