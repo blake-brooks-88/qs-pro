@@ -307,6 +307,49 @@ describe("RlsContextService", () => {
     });
   });
 
+  describe("runWithIsolatedUserContext", () => {
+    it("should always reserve a new connection and run inside its own transaction", async () => {
+      const outerReservedSql = createMockReservedSql();
+      const innerReservedSql = createMockReservedSql();
+
+      mockSqlClient.reserve
+        .mockResolvedValueOnce(outerReservedSql)
+        .mockResolvedValueOnce(innerReservedSql);
+
+      await service.runWithTenantContext("tenant-1", "mid-1", async () => {
+        await service.runWithIsolatedUserContext(
+          "tenant-1",
+          "mid-1",
+          "user-iso",
+          async () => {
+            expect(getReservedSqlFromContext()).toBe(innerReservedSql);
+          },
+        );
+      });
+
+      // Two reserves: one for the outer context, one for isolated user context.
+      expect(mockSqlClient.reserve).toHaveBeenCalledTimes(2);
+
+      // Isolated call should have its own transaction.
+      expect(innerReservedSql.transactionCalls).toEqual(["BEGIN", "COMMIT"]);
+      expect(innerReservedSql.configCalls).toContainEqual({
+        key: "app.tenant_id",
+        value: "tenant-1",
+        local: true,
+      });
+      expect(innerReservedSql.configCalls).toContainEqual({
+        key: "app.mid",
+        value: "mid-1",
+        local: true,
+      });
+      expect(innerReservedSql.configCalls).toContainEqual({
+        key: "app.user_id",
+        value: "user-iso",
+        local: true,
+      });
+    });
+  });
+
   describe("edge cases", () => {
     it("should handle error in nested callback and rollback outer transaction", async () => {
       const outerReservedSql = createMockReservedSql();

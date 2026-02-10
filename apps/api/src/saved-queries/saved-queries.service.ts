@@ -57,7 +57,7 @@ export class SavedQueriesService {
     userId: string,
     dto: CreateSavedQueryDto,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(
+    return this.rlsContext.runWithIsolatedUserContext(
       tenantId,
       mid,
       userId,
@@ -182,7 +182,7 @@ export class SavedQueriesService {
     id: string,
     dto: UpdateSavedQueryDto,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(
+    return this.rlsContext.runWithIsolatedUserContext(
       tenantId,
       mid,
       userId,
@@ -354,7 +354,7 @@ export class SavedQueriesService {
     sqlText: string,
     linkParams: LinkToQAParams,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(
+    return this.rlsContext.runWithIsolatedUserContext(
       tenantId,
       mid,
       userId,
@@ -490,7 +490,21 @@ export class SavedQueriesService {
     try {
       return await this.savedQueriesRepository.linkToQA(id, params);
     } catch (error) {
-      if (error instanceof postgres.PostgresError && error.code === '23505') {
+      const pgError =
+        error instanceof postgres.PostgresError
+          ? error
+          : error && typeof error === 'object' && 'cause' in error
+            ? error.cause
+            : null;
+
+      const isUniqueViolation =
+        (pgError &&
+          typeof pgError === 'object' &&
+          'code' in pgError &&
+          pgError.code === '23505') ||
+        (error instanceof postgres.PostgresError && error.code === '23505');
+
+      if (isUniqueViolation) {
         throw new AppError(ErrorCode.LINK_CONFLICT, undefined, {
           operation: 'link_saved_query',
           reason: `Query Activity ${params.linkedQaCustomerKey} is already linked to another saved query`,
