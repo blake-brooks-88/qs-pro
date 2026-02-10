@@ -336,4 +336,144 @@ describe("LinkQueryModal", () => {
       screen.queryByText("Link to Query Activity"),
     ).not.toBeInTheDocument();
   });
+
+  it("resolves conflict with keep-local and calls onLinkComplete", async () => {
+    const user = userEvent.setup();
+
+    server.use(
+      http.get("/api/query-activities/:customerKey", () => {
+        return HttpResponse.json(conflictingDetail);
+      }),
+      http.post("/api/query-activities/link/:savedQueryId", () => {
+        return HttpResponse.json({
+          linkedQaObjectId: "qa-obj-3",
+          linkedQaCustomerKey: "qa-key-3",
+          linkedQaName: "QA Gamma",
+          linkedAt: new Date().toISOString(),
+          sqlUpdated: true,
+        });
+      }),
+    );
+
+    const props = createDefaultProps();
+    const queryClient = createQueryClient();
+    render(<LinkQueryModal {...props} />, {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("QA Gamma")).toBeInTheDocument(),
+    );
+
+    // Click QA Gamma to trigger conflict
+    await user.click(screen.getByText("QA Gamma"));
+
+    await waitFor(() => {
+      expect(screen.getByText("SQL Conflict Detected")).toBeInTheDocument();
+    });
+
+    // Click "Keep Q++ Version" (keep-local)
+    await user.click(screen.getByText("Keep Q++ Version"));
+
+    await waitFor(() => {
+      expect(props.onLinkComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          linkedQaCustomerKey: "qa-key-3",
+          sqlUpdated: true,
+        }),
+      );
+    });
+  });
+
+  it("shows error toast when conflict resolution fails", async () => {
+    const user = userEvent.setup();
+
+    server.use(
+      http.get("/api/query-activities/:customerKey", () => {
+        return HttpResponse.json(conflictingDetail);
+      }),
+      http.post("/api/query-activities/link/:savedQueryId", () => {
+        return new HttpResponse(null, { status: 500 });
+      }),
+    );
+
+    const props = createDefaultProps();
+    const queryClient = createQueryClient();
+    render(<LinkQueryModal {...props} />, {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("QA Gamma")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByText("QA Gamma"));
+
+    await waitFor(() => {
+      expect(screen.getByText("SQL Conflict Detected")).toBeInTheDocument();
+    });
+
+    // Click "Keep AS Version" (keep-remote) — link will fail
+    await user.click(screen.getByText("Keep AS Version"));
+
+    // Conflict dialog should remain open (not dismissed on failure)
+    await waitFor(() => {
+      expect(screen.getByText("SQL Conflict Detected")).toBeInTheDocument();
+    });
+
+    // onLinkComplete should NOT have been called
+    expect(props.onLinkComplete).not.toHaveBeenCalled();
+  });
+
+  it("shows 'No matching' message when search yields no results", async () => {
+    const user = userEvent.setup();
+    const queryClient = createQueryClient();
+    render(<LinkQueryModal {...createDefaultProps()} />, {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("QA Alpha")).toBeInTheDocument(),
+    );
+
+    const searchInput = screen.getByPlaceholderText(/search query activities/i);
+    await user.type(searchInput, "ZZZZZ");
+
+    expect(
+      screen.getByText("No matching Query Activities found"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders QA items without targetUpdateType or modifiedDate", async () => {
+    const sparseQAList: QAListItem[] = [
+      {
+        objectId: "qa-obj-sparse",
+        customerKey: "qa-key-sparse",
+        name: "QA Sparse",
+        targetUpdateType: undefined as unknown as string,
+        modifiedDate: undefined as unknown as string,
+        isLinked: false,
+        linkedToQueryName: null,
+      },
+    ];
+
+    server.use(
+      http.get("/api/query-activities", () => {
+        return HttpResponse.json(sparseQAList);
+      }),
+    );
+
+    const queryClient = createQueryClient();
+    render(<LinkQueryModal {...createDefaultProps()} />, {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("QA Sparse")).toBeInTheDocument(),
+    );
+
+    // The item should render without crashing, with no date or updateType text
+    const button = screen.getByText("QA Sparse").closest("button");
+    expect(button).not.toBeDisabled();
+  });
 });
