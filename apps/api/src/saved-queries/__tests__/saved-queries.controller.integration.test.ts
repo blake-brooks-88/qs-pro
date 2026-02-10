@@ -14,6 +14,7 @@
  * - Validation errors for invalid inputs
  * - CRUD operations via HTTP API
  */
+import type { ExecutionContext } from '@nestjs/common';
 import {
   FastifyAdapter,
   NestFastifyApplication,
@@ -57,7 +58,7 @@ describe('SavedQueriesController (HTTP integration)', () => {
     })
       .overrideGuard(SessionGuard)
       .useValue({
-        canActivate: (context) => {
+        canActivate: (context: ExecutionContext) => {
           const req = context.switchToHttp().getRequest();
           req.user = {
             userId: testUserId,
@@ -263,7 +264,9 @@ describe('SavedQueriesController (HTTP integration)', () => {
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThan(0);
 
-      const query = res.body.find((q) => q.id === createRes.body.id);
+      const query = res.body.find(
+        (q: Record<string, unknown>) => q.id === createRes.body.id,
+      );
       expect(query).toBeDefined();
       expect(query.id).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,

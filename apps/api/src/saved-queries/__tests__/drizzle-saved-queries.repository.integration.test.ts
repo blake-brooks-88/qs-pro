@@ -23,7 +23,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
-import type { SavedQueriesRepository } from '../saved-queries.repository';
+import type {
+  SavedQueriesRepository,
+  SavedQuery,
+} from '../saved-queries.repository';
+
+type LinkedQaKeyRow = Awaited<
+  ReturnType<SavedQueriesRepository['findAllLinkedQaKeys']>
+>[number];
 
 function getRequiredEnv(key: string): string {
   // eslint-disable-next-line security/detect-object-injection -- trusted string
@@ -161,7 +168,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('create()', () => {
     it('should insert row and return all fields', async () => {
-      let result;
+      let result: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -201,7 +208,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('findById()', () => {
     it('should return the created row', async () => {
-      let created;
+      let created: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -220,15 +227,16 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!created) {
         throw new Error('Expected created query');
       }
-      createdSavedQueryIds.push(created.id);
+      const createdId = created.id;
+      createdSavedQueryIds.push(createdId);
 
-      let found;
+      let found: SavedQuery | null | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          found = await repo.findById(created.id);
+          found = await repo.findById(createdId);
         },
       );
 
@@ -236,7 +244,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!found) {
         throw new Error('Expected found query');
       }
-      expect(found.id).toBe(created.id);
+      expect(found.id).toBe(createdId);
       expect(found.name).toBe('FindById Test');
       expect(found.sqlTextEncrypted).toBe('encrypted:SELECT 2');
     });
@@ -244,7 +252,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
     it('should return null for nonexistent UUID', async () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
 
-      let found;
+      let found: SavedQuery | null | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -260,7 +268,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('findAll()', () => {
     it('should return only own queries when querySharingEnabled=false', async () => {
-      let created;
+      let created: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -279,9 +287,10 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!created) {
         throw new Error('Expected created query');
       }
-      createdSavedQueryIds.push(created.id);
+      const createdId = created.id;
+      createdSavedQueryIds.push(createdId);
 
-      let results;
+      let results: SavedQuery[] | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -295,7 +304,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
         throw new Error('Expected results');
       }
       expect(results.length).toBeGreaterThan(0);
-      const found = results.find((q) => q.id === created.id);
+      const found = results.find((q) => q.id === createdId);
       expect(found).toBeDefined();
       expect(found?.name).toBe('My Private Query');
     });
@@ -313,7 +322,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       const otherUserId = otherUserRow.id;
 
-      let query1;
+      let query1: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -332,9 +341,10 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!query1) {
         throw new Error('Expected query1');
       }
-      createdSavedQueryIds.push(query1.id);
+      const query1Id = query1.id;
+      createdSavedQueryIds.push(query1Id);
 
-      let query2;
+      let query2: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -353,9 +363,10 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!query2) {
         throw new Error('Expected query2');
       }
-      createdSavedQueryIds.push(query2.id);
+      const query2Id = query2.id;
+      createdSavedQueryIds.push(query2Id);
 
-      let results;
+      let results: SavedQuery[] | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -368,8 +379,8 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!results) {
         throw new Error('Expected results');
       }
-      const found1 = results.find((q) => q.id === query1.id);
-      const found2 = results.find((q) => q.id === query2.id);
+      const found1 = results.find((q) => q.id === query1Id);
+      const found2 = results.find((q) => q.id === query2Id);
       expect(found1).toBeDefined();
       expect(found2).toBeDefined();
 
@@ -389,7 +400,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('update()', () => {
     it('should update name and sqlTextEncrypted and return updated row', async () => {
-      let created;
+      let created: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -408,15 +419,16 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!created) {
         throw new Error('Expected created query');
       }
-      createdSavedQueryIds.push(created.id);
+      const createdId = created.id;
+      createdSavedQueryIds.push(createdId);
 
-      let updated;
+      let updated: SavedQuery | null | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          updated = await repo.update(created.id, {
+          updated = await repo.update(createdId, {
             name: 'Updated Name',
             sqlTextEncrypted: 'encrypted:SELECT 7',
           });
@@ -427,7 +439,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!updated) {
         throw new Error('Expected updated query');
       }
-      expect(updated.id).toBe(created.id);
+      expect(updated.id).toBe(createdId);
       expect(updated.name).toBe('Updated Name');
       expect(updated.sqlTextEncrypted).toBe('encrypted:SELECT 7');
     });
@@ -435,7 +447,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
     it('should return null for nonexistent ID', async () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
 
-      let updated;
+      let updated: SavedQuery | null | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -451,7 +463,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('delete()', () => {
     it('should remove row and return true', async () => {
-      let created;
+      let created: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -470,26 +482,27 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!created) {
         throw new Error('Expected created query');
       }
+      const createdId = created.id;
 
-      let deleted;
+      let deleted: boolean | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          deleted = await repo.delete(created.id);
+          deleted = await repo.delete(createdId);
         },
       );
 
       expect(deleted).toBe(true);
 
-      let found;
+      let found: SavedQuery | null | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          found = await repo.findById(created.id);
+          found = await repo.findById(createdId);
         },
       );
 
@@ -499,7 +512,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
     it('should return false for nonexistent ID', async () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
 
-      let deleted;
+      let deleted: boolean | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -515,7 +528,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('countByUser()', () => {
     it('should return accurate count', async () => {
-      let q1;
+      let q1: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -536,7 +549,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       createdSavedQueryIds.push(q1.id);
 
-      let q2;
+      let q2: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -557,7 +570,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       createdSavedQueryIds.push(q2.id);
 
-      let count;
+      let count: number | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -573,7 +586,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('linkToQA()', () => {
     it('should set all 4 link columns', async () => {
-      let created;
+      let created: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -592,15 +605,16 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       if (!created) {
         throw new Error('Expected created query');
       }
-      createdSavedQueryIds.push(created.id);
+      const createdId = created.id;
+      createdSavedQueryIds.push(createdId);
 
-      let linked;
+      let linked: SavedQuery | null | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          linked = await repo.linkToQA(created.id, {
+          linked = await repo.linkToQA(createdId, {
             linkedQaObjectId: 'qa-obj-1',
             linkedQaCustomerKey: 'qa-key-1',
             linkedQaName: 'My QA',
@@ -619,7 +633,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
     });
 
     it('should throw unique constraint violation when linking two queries to same QA customerKey', async () => {
-      let q1;
+      let q1: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -640,7 +654,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       createdSavedQueryIds.push(q1.id);
 
-      let q2;
+      let q2: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -661,12 +675,15 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       createdSavedQueryIds.push(q2.id);
 
+      const q1Id = q1.id;
+      const q2Id = q2.id;
+
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          await repo.linkToQA(q1.id, {
+          await repo.linkToQA(q1Id, {
             linkedQaObjectId: 'qa-obj-dup',
             linkedQaCustomerKey: 'qa-key-dup',
             linkedQaName: 'Duplicate QA',
@@ -681,7 +698,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
           TEST_MID,
           testUserId,
           async () => {
-            await repo.linkToQA(q2.id, {
+            await repo.linkToQA(q2Id, {
               linkedQaObjectId: 'qa-obj-dup-2',
               linkedQaCustomerKey: 'qa-key-dup',
               linkedQaName: 'Duplicate QA 2',
@@ -705,7 +722,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('unlinkFromQA()', () => {
     it('should null all 4 link columns', async () => {
-      let created;
+      let created: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -726,12 +743,14 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       createdSavedQueryIds.push(created.id);
 
+      const createdId = created.id;
+
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          await repo.linkToQA(created.id, {
+          await repo.linkToQA(createdId, {
             linkedQaObjectId: 'qa-obj-unlink',
             linkedQaCustomerKey: 'qa-key-unlink',
             linkedQaName: 'Unlink QA',
@@ -739,13 +758,13 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
         },
       );
 
-      let unlinked;
+      let unlinked: SavedQuery | null | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          unlinked = await repo.unlinkFromQA(created.id);
+          unlinked = await repo.unlinkFromQA(createdId);
         },
       );
 
@@ -762,7 +781,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
 
   describe('findAllLinkedQaKeys()', () => {
     it('should return only rows with non-null linkedQaCustomerKey', async () => {
-      let q1;
+      let q1: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -783,7 +802,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       createdSavedQueryIds.push(q1.id);
 
-      let q2;
+      let q2: SavedQuery | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
@@ -804,12 +823,14 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
       }
       createdSavedQueryIds.push(q2.id);
 
+      const q1Id = q1.id;
+
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
         testUserId,
         async () => {
-          await repo.linkToQA(q1.id, {
+          await repo.linkToQA(q1Id, {
             linkedQaObjectId: 'qa-obj-find',
             linkedQaCustomerKey: 'qa-key-find',
             linkedQaName: 'Find QA',
@@ -817,7 +838,7 @@ describe('DrizzleSavedQueriesRepository (integration)', () => {
         },
       );
 
-      let results;
+      let results: LinkedQaKeyRow[] | undefined;
       await rlsContext.runWithUserContext(
         testTenantId,
         TEST_MID,
