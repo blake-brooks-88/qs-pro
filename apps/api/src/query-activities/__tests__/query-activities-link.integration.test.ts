@@ -19,6 +19,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ErrorCode } from '@qpp/backend-shared';
 import type { Sql } from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -326,7 +327,7 @@ describe('QueryActivitiesService link integration', () => {
         },
       );
 
-      // Linking a second saved query to the same QA key should fail
+      // Linking a second saved query to the same QA key should fail with LINK_CONFLICT
       await expect(
         savedQueriesService.linkToQA(
           testTenantId,
@@ -339,7 +340,11 @@ describe('QueryActivitiesService link integration', () => {
             linkedQaName: 'Duplicate QA',
           },
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        expect.objectContaining({
+          code: ErrorCode.LINK_CONFLICT,
+        }),
+      );
     });
 
     it('should throw RESOURCE_NOT_FOUND for non-existent saved query', async () => {
@@ -476,7 +481,11 @@ describe('QueryActivitiesService link integration', () => {
             linkedQaName: 'Shared QA',
           },
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        expect.objectContaining({
+          code: ErrorCode.LINK_CONFLICT,
+        }),
+      );
 
       // Unlink q1
       await savedQueriesService.unlinkFromQA(

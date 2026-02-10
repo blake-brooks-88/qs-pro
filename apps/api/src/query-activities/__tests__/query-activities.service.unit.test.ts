@@ -103,6 +103,18 @@ describe('QueryActivitiesService', () => {
               linkedQaName: null,
               linkedAt: null,
             }),
+            updateSqlAndLink: vi.fn().mockResolvedValue({
+              id: 'sq-1',
+              name: 'My Query',
+              sqlText: 'SELECT Remote FROM [DE]',
+              folderId: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              linkedQaObjectId: 'qa-obj-1',
+              linkedQaCustomerKey: 'qa-key-1',
+              linkedQaName: 'QA One',
+              linkedAt: new Date(),
+            }),
           },
         },
       ],
@@ -433,24 +445,11 @@ describe('QueryActivitiesService', () => {
   describe('linkQuery', () => {
     it('links saved query to QA and returns link response', async () => {
       // Arrange
-      const now = new Date();
       vi.mocked(queryDefinitionService.retrieveDetail).mockResolvedValue({
         objectId: 'qa-obj-1',
         customerKey: 'qa-key-1',
         name: 'QA One',
         queryText: 'SELECT * FROM [DE]',
-      });
-      vi.mocked(savedQueriesService.linkToQA).mockResolvedValue({
-        id: 'sq-1',
-        name: 'My Query',
-        sqlText: 'SELECT 1',
-        folderId: null,
-        createdAt: now,
-        updatedAt: now,
-        linkedQaObjectId: 'qa-obj-1',
-        linkedQaCustomerKey: 'qa-key-1',
-        linkedQaName: 'QA One',
-        linkedAt: now,
       });
 
       // Act
@@ -469,29 +468,16 @@ describe('QueryActivitiesService', () => {
         linkedQaName: 'QA One',
         sqlUpdated: false,
       });
-      expect(savedQueriesService.update).not.toHaveBeenCalled();
+      expect(savedQueriesService.updateSqlAndLink).not.toHaveBeenCalled();
     });
 
-    it('updates saved query SQL when conflict resolution is keep-remote', async () => {
+    it('calls updateSqlAndLink atomically when conflict resolution is keep-remote', async () => {
       // Arrange
-      const now = new Date();
       vi.mocked(queryDefinitionService.retrieveDetail).mockResolvedValue({
         objectId: 'qa-obj-1',
         customerKey: 'qa-key-1',
         name: 'QA One',
         queryText: 'SELECT Remote FROM [DE]',
-      });
-      vi.mocked(savedQueriesService.linkToQA).mockResolvedValue({
-        id: 'sq-1',
-        name: 'My Query',
-        sqlText: 'SELECT Remote FROM [DE]',
-        folderId: null,
-        createdAt: now,
-        updatedAt: now,
-        linkedQaObjectId: 'qa-obj-1',
-        linkedQaCustomerKey: 'qa-key-1',
-        linkedQaName: 'QA One',
-        linkedAt: now,
       });
 
       // Act
@@ -506,13 +492,19 @@ describe('QueryActivitiesService', () => {
 
       // Assert
       expect(result.sqlUpdated).toBe(true);
-      expect(savedQueriesService.update).toHaveBeenCalledWith(
+      expect(savedQueriesService.updateSqlAndLink).toHaveBeenCalledWith(
         mockTenantId,
         mockMid,
         mockUserId,
         'sq-1',
-        { sqlText: 'SELECT Remote FROM [DE]' },
+        'SELECT Remote FROM [DE]',
+        {
+          linkedQaObjectId: 'qa-obj-1',
+          linkedQaCustomerKey: 'qa-key-1',
+          linkedQaName: 'QA One',
+        },
       );
+      expect(savedQueriesService.linkToQA).not.toHaveBeenCalled();
     });
 
     it('throws RESOURCE_NOT_FOUND when QA does not exist', async () => {

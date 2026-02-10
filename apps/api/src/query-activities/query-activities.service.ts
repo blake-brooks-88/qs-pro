@@ -113,36 +113,39 @@ export class QueryActivitiesService {
       });
     }
 
+    const linkParams = {
+      linkedQaObjectId: qaDetail.objectId,
+      linkedQaCustomerKey: qaDetail.customerKey,
+      linkedQaName: qaDetail.name,
+    };
+
     let sqlUpdated = false;
 
     if (conflictResolution === 'keep-remote' && qaDetail.queryText) {
-      await this.savedQueriesService.update(
+      await this.savedQueriesService.updateSqlAndLink(
         tenantId,
         mid,
         userId,
         savedQueryId,
-        { sqlText: qaDetail.queryText },
+        qaDetail.queryText,
+        linkParams,
       );
       sqlUpdated = true;
+    } else {
+      await this.savedQueriesService.linkToQA(
+        tenantId,
+        mid,
+        userId,
+        savedQueryId,
+        linkParams,
+      );
     }
 
-    const linked = await this.savedQueriesService.linkToQA(
-      tenantId,
-      mid,
-      userId,
-      savedQueryId,
-      {
-        linkedQaObjectId: qaDetail.objectId,
-        linkedQaCustomerKey: qaDetail.customerKey,
-        linkedQaName: qaDetail.name,
-      },
-    );
-
     return {
-      linkedQaObjectId: linked.linkedQaObjectId ?? qaDetail.objectId,
-      linkedQaCustomerKey: linked.linkedQaCustomerKey ?? qaDetail.customerKey,
-      linkedQaName: linked.linkedQaName ?? qaDetail.name,
-      linkedAt: (linked.linkedAt ?? new Date()).toISOString(),
+      linkedQaObjectId: qaDetail.objectId,
+      linkedQaCustomerKey: qaDetail.customerKey,
+      linkedQaName: qaDetail.name,
+      linkedAt: new Date().toISOString(),
       sqlUpdated,
     };
   }

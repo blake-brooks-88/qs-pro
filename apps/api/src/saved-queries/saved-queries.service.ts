@@ -11,6 +11,7 @@ import type {
   CreateSavedQueryDto,
   UpdateSavedQueryDto,
 } from '@qpp/shared-types';
+import postgres from 'postgres';
 
 import { FeaturesService } from '../features/features.service';
 import type { FoldersRepository } from '../folders/folders.repository';
@@ -333,7 +334,7 @@ export class SavedQueriesService {
           }
         }
 
-        const query = await this.savedQueriesRepository.linkToQA(id, params);
+        const query = await this.linkToQAWithConflictCheck(id, params);
         if (!query || (!querySharingEnabled && query.userId !== userId)) {
           throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
             operation: 'link_saved_query',
@@ -341,6 +342,79 @@ export class SavedQueriesService {
           });
         }
         return this.decryptQuery(query);
+      },
+    );
+  }
+
+  async updateSqlAndLink(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    id: string,
+    sqlText: string,
+    linkParams: LinkToQAParams,
+  ): Promise<DecryptedSavedQuery> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
+        if (!querySharingEnabled) {
+          const existing = await this.savedQueriesRepository.findById(id);
+          if (existing?.userId !== userId) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'update_and_link_saved_query',
+              reason: `Saved query not found: ${id}`,
+            });
+          }
+        }
+
+        const sqlTextEncrypted = this.encryptionService.encrypt(sqlText);
+        if (!sqlTextEncrypted) {
+          throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+            reason: 'Failed to encrypt SQL text',
+          });
+        }
+
+        const updated = await this.savedQueriesRepository.update(id, {
+          sqlTextEncrypted,
+        });
+        if (!updated || (!querySharingEnabled && updated.userId !== userId)) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'update_and_link_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+
+        const sqlTextHash = this.hashSqlText(sqlText);
+        const latestVersion =
+          await this.queryVersionsRepository.findLatestBySavedQueryId(id);
+        if (latestVersion?.sqlTextHash !== sqlTextHash) {
+          await this.queryVersionsRepository.create({
+            savedQueryId: id,
+            tenantId,
+            mid,
+            userId,
+            sqlTextEncrypted,
+            sqlTextHash,
+            lineCount: sqlText.split('\n').length,
+            source: 'save',
+          });
+        }
+
+        const linked = await this.linkToQAWithConflictCheck(id, linkParams);
+        if (!linked || (!querySharingEnabled && linked.userId !== userId)) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'update_and_link_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+
+        return this.decryptQuery(linked);
       },
     );
   }
@@ -407,6 +481,23 @@ export class SavedQueriesService {
       }
       return map;
     });
+  }
+
+  private async linkToQAWithConflictCheck(
+    id: string,
+    params: LinkToQAParams,
+  ): Promise<SavedQuery | null> {
+    try {
+      return await this.savedQueriesRepository.linkToQA(id, params);
+    } catch (error) {
+      if (error instanceof postgres.PostgresError && error.code === '23505') {
+        throw new AppError(ErrorCode.LINK_CONFLICT, undefined, {
+          operation: 'link_saved_query',
+          reason: `Query Activity ${params.linkedQaCustomerKey} is already linked to another saved query`,
+        });
+      }
+      throw error;
+    }
   }
 
   private hashSqlText(sqlText: string): string {

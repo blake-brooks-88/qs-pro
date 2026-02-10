@@ -54,6 +54,8 @@ export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCode.RESOURCE_NOT_FOUND]: "The requested resource was not found.",
   [ErrorCode.INVALID_STATE]:
     "Operation not allowed in current state. Please try again.",
+  [ErrorCode.LINK_CONFLICT]:
+    "This Query Activity is already linked to another saved query.",
   [ErrorCode.VALIDATION_ERROR]: "Invalid input. Please check your request.",
   [ErrorCode.FEATURE_NOT_ENABLED]:
     "This feature is not enabled for your subscription.",
