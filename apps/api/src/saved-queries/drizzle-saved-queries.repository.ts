@@ -53,12 +53,22 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
     return results[0] ?? null;
   }
 
-  async findAll(): Promise<SavedQuery[]> {
-    return this.getDb().select().from(savedQueries);
+  async findAll(
+    userId: string,
+    querySharingEnabled: boolean,
+  ): Promise<SavedQuery[]> {
+    const base = this.getDb().select().from(savedQueries);
+    if (querySharingEnabled) {
+      return base;
+    }
+    return base.where(eq(savedQueries.userId, userId));
   }
 
-  async findAllListItems(): Promise<SavedQueryListItem[]> {
-    return this.getDb()
+  async findAllListItems(
+    userId: string,
+    querySharingEnabled: boolean,
+  ): Promise<SavedQueryListItem[]> {
+    const base = this.getDb()
       .select({
         id: savedQueries.id,
         name: savedQueries.name,
@@ -69,6 +79,11 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
         linkedAt: savedQueries.linkedAt,
       })
       .from(savedQueries);
+
+    if (querySharingEnabled) {
+      return base;
+    }
+    return base.where(eq(savedQueries.userId, userId));
   }
 
   async update(
@@ -104,11 +119,12 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
     return result.length > 0;
   }
 
-  async countByUser(): Promise<number> {
-    const results = await this.getDb()
+  async countByUser(userId: string): Promise<number> {
+    const filtered = await this.getDb()
       .select({ count: count() })
-      .from(savedQueries);
-    return results[0]?.count ?? 0;
+      .from(savedQueries)
+      .where(eq(savedQueries.userId, userId));
+    return filtered[0]?.count ?? 0;
   }
 
   async linkToQA(
@@ -144,21 +160,30 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
     return results[0] ?? null;
   }
 
-  async findAllLinkedQaKeys(): Promise<Map<string, string>> {
+  async findAllLinkedQaKeys(): Promise<
+    Array<{ linkedQaCustomerKey: string; name: string; userId: string }>
+  > {
     const rows = await this.getDb()
       .select({
         linkedQaCustomerKey: savedQueries.linkedQaCustomerKey,
         name: savedQueries.name,
+        userId: savedQueries.userId,
       })
       .from(savedQueries)
       .where(isNotNull(savedQueries.linkedQaCustomerKey));
-
-    const map = new Map<string, string>();
-    for (const row of rows) {
-      if (row.linkedQaCustomerKey) {
-        map.set(row.linkedQaCustomerKey, row.name);
-      }
-    }
-    return map;
+    return rows
+      .filter(
+        (
+          r,
+        ): r is { linkedQaCustomerKey: string; name: string; userId: string } =>
+          typeof r.linkedQaCustomerKey === 'string' &&
+          typeof r.name === 'string' &&
+          typeof r.userId === 'string',
+      )
+      .map((r) => ({
+        linkedQaCustomerKey: r.linkedQaCustomerKey,
+        name: r.name,
+        userId: r.userId,
+      }));
   }
 }

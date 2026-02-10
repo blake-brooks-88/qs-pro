@@ -36,15 +36,24 @@ export interface SavedQueryListItem {
 export interface SavedQueriesRepository {
   create(params: CreateSavedQueryParams): Promise<SavedQuery>;
   findById(id: string): Promise<SavedQuery | null>;
-  findAll(): Promise<SavedQuery[]>;
-  findAllListItems(): Promise<SavedQueryListItem[]>;
+  findAll(userId: string, querySharingEnabled: boolean): Promise<SavedQuery[]>;
+  findAllListItems(
+    userId: string,
+    querySharingEnabled: boolean,
+  ): Promise<SavedQueryListItem[]>;
   update(
     id: string,
     params: UpdateSavedQueryParams,
   ): Promise<SavedQuery | null>;
   delete(id: string): Promise<boolean>;
-  countByUser(): Promise<number>;
+  countByUser(userId: string): Promise<number>;
   linkToQA(id: string, params: LinkToQAParams): Promise<SavedQuery | null>;
   unlinkFromQA(id: string): Promise<SavedQuery | null>;
-  findAllLinkedQaKeys(): Promise<Map<string, string>>;
+  findAllLinkedQaKeys(): Promise<
+    Array<{
+      linkedQaCustomerKey: string;
+      name: string;
+      userId: string;
+    }>
+  >;
 }

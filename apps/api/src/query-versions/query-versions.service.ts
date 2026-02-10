@@ -44,14 +44,7 @@ export class QueryVersionsService {
       mid,
       userId,
       async () => {
-        const savedQuery =
-          await this.savedQueriesRepository.findById(savedQueryId);
-        if (!savedQuery) {
-          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-            operation: 'listVersions',
-            reason: `Saved query not found: ${savedQueryId}`,
-          });
-        }
+        await this.assertSavedQueryAccessible(tenantId, userId, savedQueryId);
 
         const versions =
           await this.queryVersionsRepository.findBySavedQueryId(savedQueryId);
@@ -93,6 +86,8 @@ export class QueryVersionsService {
             reason: `Version not found: ${versionId}`,
           });
         }
+
+        await this.assertSavedQueryAccessible(tenantId, userId, savedQueryId);
 
         const sqlText = this.encryptionService.decrypt(
           version.sqlTextEncrypted,
@@ -138,6 +133,8 @@ export class QueryVersionsService {
             reason: `Version not found: ${versionId}`,
           });
         }
+
+        await this.assertSavedQueryAccessible(tenantId, userId, savedQueryId);
 
         const restoredVersion = await this.queryVersionsRepository.create({
           savedQueryId,
@@ -203,6 +200,8 @@ export class QueryVersionsService {
           });
         }
 
+        await this.assertSavedQueryAccessible(tenantId, userId, savedQueryId);
+
         const updated = await this.queryVersionsRepository.updateName(
           versionId,
           dto.versionName,
@@ -234,6 +233,29 @@ export class QueryVersionsService {
       throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
         operation: 'queryVersions',
         reason: 'Version History requires Pro subscription',
+      });
+    }
+  }
+
+  private async assertSavedQueryAccessible(
+    tenantId: string,
+    userId: string,
+    savedQueryId: string,
+  ): Promise<void> {
+    const { features } = await this.featuresService.getTenantFeatures(tenantId);
+    const querySharingEnabled = features.querySharing === true;
+    const savedQuery = await this.savedQueriesRepository.findById(savedQueryId);
+    if (!savedQuery) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'assertSavedQueryAccessible',
+        reason: `Saved query not found: ${savedQueryId}`,
+      });
+    }
+
+    if (!querySharingEnabled && savedQuery.userId !== userId) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'assertSavedQueryAccessible',
+        reason: `Saved query not found: ${savedQueryId}`,
       });
     }
   }

@@ -75,9 +75,9 @@ function createSavedQueriesRepoStub() {
 
 function createFeaturesServiceStub() {
   return {
-    getTenantFeatures: vi
-      .fn()
-      .mockResolvedValue({ features: { versionHistory: true } }),
+    getTenantFeatures: vi.fn().mockResolvedValue({
+      features: { versionHistory: true, querySharing: true },
+    }),
   };
 }
 
@@ -165,7 +165,7 @@ describe('QueryVersionsService', () => {
 
     it('throws FEATURE_NOT_ENABLED when feature is disabled', async () => {
       featuresStub.getTenantFeatures.mockResolvedValue({
-        features: { versionHistory: false },
+        features: { versionHistory: false, querySharing: true },
       });
 
       await expect(

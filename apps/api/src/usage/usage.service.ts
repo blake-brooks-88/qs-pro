@@ -30,7 +30,7 @@ export class UsageService {
     const [runCount, savedQueryCount] = await Promise.all([
       this.runRepo.countMonthlyRuns(tenantId, mid, userId),
       this.rlsContext.runWithUserContext(tenantId, mid, userId, () =>
-        this.savedQueriesRepo.countByUser(),
+        this.savedQueriesRepo.countByUser(userId),
       ),
     ]);
 

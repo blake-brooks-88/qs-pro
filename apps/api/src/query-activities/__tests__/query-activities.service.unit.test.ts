@@ -66,7 +66,7 @@ describe('QueryActivitiesService', () => {
           useValue: {
             findAllLinkedQaKeys: vi
               .fn()
-              .mockResolvedValue(new Map<string, string>()),
+              .mockResolvedValue(new Map<string, string | null>()),
             linkToQA: vi.fn().mockResolvedValue({
               id: 'sq-1',
               name: 'My Query',
@@ -355,7 +355,9 @@ describe('QueryActivitiesService', () => {
           targetUpdateType: 'Append',
         },
       ]);
-      const linkedMap = new Map([['qa-key-1', 'My Saved Query']]);
+      const linkedMap = new Map<string, string | null>([
+        ['qa-key-1', 'My Saved Query'],
+      ]);
       vi.mocked(savedQueriesService.findAllLinkedQaKeys).mockResolvedValue(
         linkedMap,
       );
@@ -395,7 +397,7 @@ describe('QueryActivitiesService', () => {
         targetDECustomerKey: 'de-key-1',
       });
       vi.mocked(savedQueriesService.findAllLinkedQaKeys).mockResolvedValue(
-        new Map([['qa-key-1', 'My Query']]),
+        new Map<string, string | null>([['qa-key-1', 'My Query']]),
       );
 
       // Act

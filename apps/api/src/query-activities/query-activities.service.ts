@@ -33,7 +33,7 @@ export class QueryActivitiesService {
   ): Promise<QAListItem[]> {
     const [qaList, linkedMap] = await Promise.all([
       this.queryDefinitionService.retrieveAll(tenantId, userId, mid),
-      this.savedQueriesService.findAllLinkedQaKeys(tenantId, mid),
+      this.savedQueriesService.findAllLinkedQaKeys(tenantId, mid, userId),
     ]);
 
     return qaList.map((qa) => ({
@@ -72,6 +72,7 @@ export class QueryActivitiesService {
     const linkedMap = await this.savedQueriesService.findAllLinkedQaKeys(
       tenantId,
       mid,
+      userId,
     );
 
     return {

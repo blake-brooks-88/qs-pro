@@ -7,6 +7,7 @@ export const defaultFeatures: TenantFeatures = {
   quickFixes: false,
   minimap: false,
   advancedAutocomplete: false,
+  querySharing: false,
   teamSnippets: false,
   auditLogs: false,
   createDataExtension: false,

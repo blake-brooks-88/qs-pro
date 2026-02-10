@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
 
 import { CsrfGuard } from '../auth/csrf.guard';
+import { FeaturesModule } from '../features/features.module';
 import { FoldersModule } from '../folders/folders.module';
 import { DrizzleQueryVersionsRepository } from '../query-versions/drizzle-query-versions.repository';
 import { DrizzleSavedQueriesRepository } from './drizzle-saved-queries.repository';
@@ -9,7 +10,7 @@ import { SavedQueriesController } from './saved-queries.controller';
 import { SavedQueriesService } from './saved-queries.service';
 
 @Module({
-  imports: [DatabaseModule, FoldersModule],
+  imports: [DatabaseModule, FoldersModule, FeaturesModule],
   controllers: [SavedQueriesController],
   providers: [
     SavedQueriesService,
