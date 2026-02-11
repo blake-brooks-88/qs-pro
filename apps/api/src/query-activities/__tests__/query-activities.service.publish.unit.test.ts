@@ -541,8 +541,8 @@ describe('QueryActivitiesService (publish)', () => {
 
       expect(mceBridgeService.request).toHaveBeenCalledTimes(2);
       expect(result.automations).toHaveLength(2);
-      expect(result.automations[0]!.name).toBe('Page 1 Auto');
-      expect(result.automations[1]!.name).toBe('Page 2 Auto');
+      expect(result.automations[0]?.name).toBe('Page 1 Auto');
+      expect(result.automations[1]?.name).toBe('Page 2 Auto');
     });
 
     it('throws RESOURCE_NOT_FOUND when saved query is not linked', async () => {

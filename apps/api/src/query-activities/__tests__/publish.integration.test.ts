@@ -306,11 +306,12 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
       });
 
       expect(mockMceBridge.request).toHaveBeenCalledOnce();
-      const callArgs = mockMceBridge.request.mock.calls[0]!;
-      expect(callArgs[0]).toBe(testTenantId);
-      expect(callArgs[1]).toBe(testUserId);
-      expect(callArgs[2]).toBe(TEST_MID);
-      expect(callArgs[3]).toMatchObject({
+      const callArgs = mockMceBridge.request.mock.calls[0];
+      expect(callArgs).toBeDefined();
+      expect(callArgs?.[0]).toBe(testTenantId);
+      expect(callArgs?.[1]).toBe(testUserId);
+      expect(callArgs?.[2]).toBe(TEST_MID);
+      expect(callArgs?.[3]).toMatchObject({
         method: 'PATCH',
         url: expect.stringContaining('/automation/v1/queries/'),
         data: { queryText: 'SELECT name FROM [Subscribers]' },
@@ -349,8 +350,9 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
       expect(res.status).toBe(201);
       expect(res.body.versionId).toBe(v1Id);
 
-      const patchCall = mockMceBridge.request.mock.calls[0]!;
-      expect(patchCall[3].data.queryText).toBe('SELECT v1 FROM [DE]');
+      const patchCall = mockMceBridge.request.mock.calls[0];
+      expect(patchCall).toBeDefined();
+      expect(patchCall?.[3].data.queryText).toBe('SELECT v1 FROM [DE]');
     });
   });
 
