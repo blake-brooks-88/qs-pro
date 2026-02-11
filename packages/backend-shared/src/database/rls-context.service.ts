@@ -182,4 +182,65 @@ export class RlsContextService {
       reserved.release();
     }
   }
+
+  /**
+   * Runs the callback inside a dedicated transaction, even if a DB context
+   * already exists (e.g. when the HTTP onRequest hook has reserved a connection
+   * without an active transaction).
+   *
+   * Use this for multi-statement operations that must be atomic.
+   */
+  async runWithIsolatedUserContext<T>(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const reserveStartedAt = Date.now();
+    const reserved = await this.sql.reserve();
+    const reserveDuration = Date.now() - reserveStartedAt;
+    if (reserveDuration > 500) {
+      this.logger.warn(
+        `runWithIsolatedUserContext reserve wait was slow durationMs=${reserveDuration}`,
+      );
+    }
+
+    try {
+      // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
+      await reserved`BEGIN`;
+      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await reserved`SELECT set_config('app.mid', ${mid}, true)`;
+      await reserved`SELECT set_config('app.user_id', ${userId}, true)`;
+
+      const db = this.createDatabaseFromClient(
+        this.makeDrizzleCompatibleSql(reserved),
+      );
+
+      const result = await runWithDbContext(db, fn, reserved);
+
+      await reserved`COMMIT`;
+      return result;
+    } catch (error) {
+      try {
+        await reserved`ROLLBACK`;
+      } catch {
+        // Best-effort rollback
+      }
+      this.logger.error(
+        "Failed to run with isolated user context",
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    } finally {
+      try {
+        await reserved`RESET app.user_id`;
+      } catch (resetError) {
+        this.logger.warn(
+          "Failed to reset app.user_id before releasing connection",
+          resetError instanceof Error ? resetError.message : String(resetError),
+        );
+      }
+      reserved.release();
+    }
+  }
 }

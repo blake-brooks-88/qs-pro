@@ -11,12 +11,16 @@ import type {
   CreateSavedQueryDto,
   UpdateSavedQueryDto,
 } from '@qpp/shared-types';
+import postgres from 'postgres';
 
+import { FeaturesService } from '../features/features.service';
 import type { FoldersRepository } from '../folders/folders.repository';
 import type { QueryVersionsRepository } from '../query-versions/query-versions.repository';
 import type {
+  LinkToQAParams,
   SavedQueriesRepository,
   SavedQuery,
+  SavedQueryListItem,
   UpdateSavedQueryParams,
 } from './saved-queries.repository';
 
@@ -27,6 +31,10 @@ export interface DecryptedSavedQuery {
   folderId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  linkedQaObjectId: string | null;
+  linkedQaCustomerKey: string | null;
+  linkedQaName: string | null;
+  linkedAt: Date | null;
 }
 
 @Injectable()
@@ -38,6 +46,7 @@ export class SavedQueriesService {
     private readonly foldersRepository: FoldersRepository,
     @Inject('QUERY_VERSIONS_REPOSITORY')
     private readonly queryVersionsRepository: QueryVersionsRepository,
+    private readonly featuresService: FeaturesService,
     private readonly encryptionService: EncryptionService,
     private readonly rlsContext: RlsContextService,
   ) {}
@@ -48,7 +57,7 @@ export class SavedQueriesService {
     userId: string,
     dto: CreateSavedQueryDto,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(
+    return this.rlsContext.runWithIsolatedUserContext(
       tenantId,
       mid,
       userId,
@@ -105,7 +114,14 @@ export class SavedQueriesService {
       mid,
       userId,
       async () => {
-        const queries = await this.savedQueriesRepository.findAll();
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
+        const queries = await this.savedQueriesRepository.findAll(
+          userId,
+          querySharingEnabled,
+        );
         return queries.map((q) => this.decryptQuery(q));
       },
     );
@@ -115,11 +131,20 @@ export class SavedQueriesService {
     tenantId: string,
     mid: string,
     userId: string,
-  ): Promise<
-    { id: string; name: string; folderId: string | null; updatedAt: Date }[]
-  > {
-    return this.rlsContext.runWithUserContext(tenantId, mid, userId, () =>
-      this.savedQueriesRepository.findAllListItems(),
+  ): Promise<SavedQueryListItem[]> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+        return this.savedQueriesRepository.findAllListItems(
+          userId,
+          querySharingEnabled,
+        );
+      },
     );
   }
 
@@ -134,8 +159,12 @@ export class SavedQueriesService {
       mid,
       userId,
       async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
         const query = await this.savedQueriesRepository.findById(id);
-        if (!query) {
+        if (!query || (!querySharingEnabled && query.userId !== userId)) {
           throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
             operation: 'find_saved_query',
             reason: `Saved query not found: ${id}`,
@@ -153,11 +182,25 @@ export class SavedQueriesService {
     id: string,
     dto: UpdateSavedQueryDto,
   ): Promise<DecryptedSavedQuery> {
-    return this.rlsContext.runWithUserContext(
+    return this.rlsContext.runWithIsolatedUserContext(
       tenantId,
       mid,
       userId,
       async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
+        if (!querySharingEnabled) {
+          const existing = await this.savedQueriesRepository.findById(id);
+          if (existing?.userId !== userId) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'update_saved_query',
+              reason: `Saved query not found: ${id}`,
+            });
+          }
+        }
+
         if (dto.folderId) {
           const folder = await this.foldersRepository.findById(dto.folderId);
           if (!folder) {
@@ -189,7 +232,7 @@ export class SavedQueriesService {
           id,
           updateParams,
         );
-        if (!query) {
+        if (!query || (!querySharingEnabled && query.userId !== userId)) {
           throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
             operation: 'update_saved_query',
             reason: `Saved query not found: ${id}`,
@@ -230,6 +273,20 @@ export class SavedQueriesService {
       mid,
       userId,
       async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
+        if (!querySharingEnabled) {
+          const existing = await this.savedQueriesRepository.findById(id);
+          if (existing?.userId !== userId) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'delete_saved_query',
+              reason: `Saved query not found: ${id}`,
+            });
+          }
+        }
+
         const deleted = await this.savedQueriesRepository.delete(id);
         if (!deleted) {
           throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
@@ -247,8 +304,214 @@ export class SavedQueriesService {
     userId: string,
   ): Promise<number> {
     return this.rlsContext.runWithUserContext(tenantId, mid, userId, () =>
-      this.savedQueriesRepository.countByUser(),
+      this.savedQueriesRepository.countByUser(userId),
     );
+  }
+
+  async linkToQA(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    id: string,
+    params: LinkToQAParams,
+  ): Promise<DecryptedSavedQuery> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
+        if (!querySharingEnabled) {
+          const existing = await this.savedQueriesRepository.findById(id);
+          if (existing?.userId !== userId) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'link_saved_query',
+              reason: `Saved query not found: ${id}`,
+            });
+          }
+        }
+
+        const query = await this.linkToQAWithConflictCheck(id, params);
+        if (!query || (!querySharingEnabled && query.userId !== userId)) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'link_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+        return this.decryptQuery(query);
+      },
+    );
+  }
+
+  async updateSqlAndLink(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    id: string,
+    sqlText: string,
+    linkParams: LinkToQAParams,
+  ): Promise<DecryptedSavedQuery> {
+    return this.rlsContext.runWithIsolatedUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
+        if (!querySharingEnabled) {
+          const existing = await this.savedQueriesRepository.findById(id);
+          if (existing?.userId !== userId) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'update_and_link_saved_query',
+              reason: `Saved query not found: ${id}`,
+            });
+          }
+        }
+
+        const sqlTextEncrypted = this.encryptionService.encrypt(sqlText);
+        if (!sqlTextEncrypted) {
+          throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+            reason: 'Failed to encrypt SQL text',
+          });
+        }
+
+        const updated = await this.savedQueriesRepository.update(id, {
+          sqlTextEncrypted,
+        });
+        if (!updated || (!querySharingEnabled && updated.userId !== userId)) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'update_and_link_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+
+        const sqlTextHash = this.hashSqlText(sqlText);
+        const latestVersion =
+          await this.queryVersionsRepository.findLatestBySavedQueryId(id);
+        if (latestVersion?.sqlTextHash !== sqlTextHash) {
+          await this.queryVersionsRepository.create({
+            savedQueryId: id,
+            tenantId,
+            mid,
+            userId,
+            sqlTextEncrypted,
+            sqlTextHash,
+            lineCount: sqlText.split('\n').length,
+            source: 'save',
+          });
+        }
+
+        const linked = await this.linkToQAWithConflictCheck(id, linkParams);
+        if (!linked || (!querySharingEnabled && linked.userId !== userId)) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'update_and_link_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+
+        return this.decryptQuery(linked);
+      },
+    );
+  }
+
+  async unlinkFromQA(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    id: string,
+  ): Promise<DecryptedSavedQuery> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const { features } =
+          await this.featuresService.getTenantFeatures(tenantId);
+        const querySharingEnabled = features.querySharing === true;
+
+        if (!querySharingEnabled) {
+          const existing = await this.savedQueriesRepository.findById(id);
+          if (existing?.userId !== userId) {
+            throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+              operation: 'unlink_saved_query',
+              reason: `Saved query not found: ${id}`,
+            });
+          }
+        }
+
+        const query = await this.savedQueriesRepository.unlinkFromQA(id);
+        if (!query || (!querySharingEnabled && query.userId !== userId)) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'unlink_saved_query',
+            reason: `Saved query not found: ${id}`,
+          });
+        }
+        return this.decryptQuery(query);
+      },
+    );
+  }
+
+  async findAllLinkedQaKeys(
+    tenantId: string,
+    mid: string,
+    userId?: string,
+  ): Promise<Map<string, string | null>> {
+    return this.rlsContext.runWithTenantContext(tenantId, mid, async () => {
+      const { features } =
+        await this.featuresService.getTenantFeatures(tenantId);
+      const querySharingEnabled = features.querySharing === true;
+
+      const rows = await this.savedQueriesRepository.findAllLinkedQaKeys();
+      const map = new Map<string, string | null>();
+      for (const row of rows) {
+        if (!row.linkedQaCustomerKey) {
+          continue;
+        }
+
+        if (querySharingEnabled || (userId && row.userId === userId)) {
+          map.set(row.linkedQaCustomerKey, row.name);
+        } else {
+          map.set(row.linkedQaCustomerKey, null);
+        }
+      }
+      return map;
+    });
+  }
+
+  private async linkToQAWithConflictCheck(
+    id: string,
+    params: LinkToQAParams,
+  ): Promise<SavedQuery | null> {
+    try {
+      return await this.savedQueriesRepository.linkToQA(id, params);
+    } catch (error) {
+      const pgError =
+        error instanceof postgres.PostgresError
+          ? error
+          : error && typeof error === 'object' && 'cause' in error
+            ? error.cause
+            : null;
+
+      const isUniqueViolation =
+        (pgError &&
+          typeof pgError === 'object' &&
+          'code' in pgError &&
+          pgError.code === '23505') ||
+        (error instanceof postgres.PostgresError && error.code === '23505');
+
+      if (isUniqueViolation) {
+        throw new AppError(ErrorCode.LINK_CONFLICT, undefined, {
+          operation: 'link_saved_query',
+          reason: `Query Activity ${params.linkedQaCustomerKey} is already linked to another saved query`,
+        });
+      }
+      throw error;
+    }
   }
 
   private hashSqlText(sqlText: string): string {
@@ -269,6 +532,10 @@ export class SavedQueriesService {
       folderId: query.folderId,
       createdAt: query.createdAt,
       updatedAt: query.updatedAt,
+      linkedQaObjectId: query.linkedQaObjectId,
+      linkedQaCustomerKey: query.linkedQaCustomerKey,
+      linkedQaName: query.linkedQaName,
+      linkedAt: query.linkedAt,
     };
   }
 }

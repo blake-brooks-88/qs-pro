@@ -3,13 +3,16 @@ import {
   count,
   createDatabaseFromClient,
   eq,
+  isNotNull,
   savedQueries,
 } from '@qpp/database';
 
 import type {
   CreateSavedQueryParams,
+  LinkToQAParams,
   SavedQueriesRepository,
   SavedQuery,
+  SavedQueryListItem,
   UpdateSavedQueryParams,
 } from './saved-queries.repository';
 
@@ -50,21 +53,37 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
     return results[0] ?? null;
   }
 
-  async findAll(): Promise<SavedQuery[]> {
-    return this.getDb().select().from(savedQueries);
+  async findAll(
+    userId: string,
+    querySharingEnabled: boolean,
+  ): Promise<SavedQuery[]> {
+    const base = this.getDb().select().from(savedQueries);
+    if (querySharingEnabled) {
+      return base;
+    }
+    return base.where(eq(savedQueries.userId, userId));
   }
 
-  async findAllListItems(): Promise<
-    { id: string; name: string; folderId: string | null; updatedAt: Date }[]
-  > {
-    return this.getDb()
+  async findAllListItems(
+    userId: string,
+    querySharingEnabled: boolean,
+  ): Promise<SavedQueryListItem[]> {
+    const base = this.getDb()
       .select({
         id: savedQueries.id,
         name: savedQueries.name,
         folderId: savedQueries.folderId,
         updatedAt: savedQueries.updatedAt,
+        linkedQaCustomerKey: savedQueries.linkedQaCustomerKey,
+        linkedQaName: savedQueries.linkedQaName,
+        linkedAt: savedQueries.linkedAt,
       })
       .from(savedQueries);
+
+    if (querySharingEnabled) {
+      return base;
+    }
+    return base.where(eq(savedQueries.userId, userId));
   }
 
   async update(
@@ -100,10 +119,71 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
     return result.length > 0;
   }
 
-  async countByUser(): Promise<number> {
-    const results = await this.getDb()
+  async countByUser(userId: string): Promise<number> {
+    const filtered = await this.getDb()
       .select({ count: count() })
-      .from(savedQueries);
-    return results[0]?.count ?? 0;
+      .from(savedQueries)
+      .where(eq(savedQueries.userId, userId));
+    return filtered[0]?.count ?? 0;
+  }
+
+  async linkToQA(
+    id: string,
+    params: LinkToQAParams,
+  ): Promise<SavedQuery | null> {
+    const results = await this.getDb()
+      .update(savedQueries)
+      .set({
+        linkedQaObjectId: params.linkedQaObjectId,
+        linkedQaCustomerKey: params.linkedQaCustomerKey,
+        linkedQaName: params.linkedQaName,
+        linkedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(savedQueries.id, id))
+      .returning();
+    return results[0] ?? null;
+  }
+
+  async unlinkFromQA(id: string): Promise<SavedQuery | null> {
+    const results = await this.getDb()
+      .update(savedQueries)
+      .set({
+        linkedQaObjectId: null,
+        linkedQaCustomerKey: null,
+        linkedQaName: null,
+        linkedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(savedQueries.id, id))
+      .returning();
+    return results[0] ?? null;
+  }
+
+  async findAllLinkedQaKeys(): Promise<
+    Array<{ linkedQaCustomerKey: string; name: string; userId: string }>
+  > {
+    const rows = await this.getDb()
+      .select({
+        linkedQaCustomerKey: savedQueries.linkedQaCustomerKey,
+        name: savedQueries.name,
+        userId: savedQueries.userId,
+      })
+      .from(savedQueries)
+      .where(isNotNull(savedQueries.linkedQaCustomerKey));
+    return rows
+      .filter(
+        (
+          r,
+        ): r is { linkedQaCustomerKey: string; name: string; userId: string } =>
+          typeof r.linkedQaCustomerKey === 'string' &&
+          typeof r.name === 'string' &&
+          typeof r.userId === 'string',
+      )
+      .map((r) => ({
+        linkedQaCustomerKey: r.linkedQaCustomerKey,
+        name: r.name,
+        userId: r.userId,
+      }));
   }
 }

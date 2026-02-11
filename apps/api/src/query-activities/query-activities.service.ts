@@ -8,7 +8,14 @@ import {
   MetadataService,
   QueryDefinitionService,
 } from '@qpp/backend-shared';
-import type { CreateQueryActivityDto } from '@qpp/shared-types';
+import type {
+  CreateQueryActivityDto,
+  LinkQueryResponse,
+  QADetail,
+  QAListItem,
+} from '@qpp/shared-types';
+
+import { SavedQueriesService } from '../saved-queries/saved-queries.service';
 
 @Injectable()
 export class QueryActivitiesService {
@@ -16,15 +23,154 @@ export class QueryActivitiesService {
     private readonly dataExtensionService: DataExtensionService,
     private readonly queryDefinitionService: QueryDefinitionService,
     private readonly metadataService: MetadataService,
+    private readonly savedQueriesService: SavedQueriesService,
   ) {}
+
+  async listAllWithLinkStatus(
+    tenantId: string,
+    userId: string,
+    mid: string,
+  ): Promise<QAListItem[]> {
+    const [qaList, linkedMap] = await Promise.all([
+      this.queryDefinitionService.retrieveAll(tenantId, userId, mid),
+      this.savedQueriesService.findAllLinkedQaKeys(tenantId, mid, userId),
+    ]);
+
+    return qaList.map((qa) => ({
+      objectId: qa.objectId,
+      customerKey: qa.customerKey,
+      name: qa.name,
+      categoryId: qa.categoryId,
+      targetUpdateType: qa.targetUpdateType,
+      modifiedDate: qa.modifiedDate,
+      status: qa.status,
+      isLinked: linkedMap.has(qa.customerKey),
+      linkedToQueryName: linkedMap.get(qa.customerKey) ?? null,
+    }));
+  }
+
+  async getDetail(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    customerKey: string,
+  ): Promise<QADetail> {
+    const detail = await this.queryDefinitionService.retrieveDetail(
+      tenantId,
+      userId,
+      mid,
+      customerKey,
+    );
+
+    if (!detail) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'getQueryActivityDetail',
+        reason: `Query Activity not found: ${customerKey}`,
+      });
+    }
+
+    const linkedMap = await this.savedQueriesService.findAllLinkedQaKeys(
+      tenantId,
+      mid,
+      userId,
+    );
+
+    return {
+      objectId: detail.objectId,
+      customerKey: detail.customerKey,
+      name: detail.name,
+      categoryId: detail.categoryId,
+      queryText: detail.queryText,
+      targetUpdateType: detail.targetUpdateType,
+      targetDEName: detail.targetDEName,
+      targetDECustomerKey: detail.targetDECustomerKey,
+      modifiedDate: detail.modifiedDate,
+      status: detail.status,
+      isLinked: linkedMap.has(detail.customerKey),
+      linkedToQueryName: linkedMap.get(detail.customerKey) ?? null,
+    };
+  }
+
+  async linkQuery(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    savedQueryId: string,
+    qaCustomerKey: string,
+    conflictResolution?: 'keep-local' | 'keep-remote',
+  ): Promise<LinkQueryResponse> {
+    const qaDetail = await this.queryDefinitionService.retrieveDetail(
+      tenantId,
+      userId,
+      mid,
+      qaCustomerKey,
+    );
+
+    if (!qaDetail) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'linkQuery',
+        reason: `Query Activity not found: ${qaCustomerKey}`,
+      });
+    }
+
+    const linkParams = {
+      linkedQaObjectId: qaDetail.objectId,
+      linkedQaCustomerKey: qaDetail.customerKey,
+      linkedQaName: qaDetail.name,
+    };
+
+    let sqlUpdated = false;
+
+    if (conflictResolution === 'keep-remote' && qaDetail.queryText) {
+      await this.savedQueriesService.updateSqlAndLink(
+        tenantId,
+        mid,
+        userId,
+        savedQueryId,
+        qaDetail.queryText,
+        linkParams,
+      );
+      sqlUpdated = true;
+    } else {
+      await this.savedQueriesService.linkToQA(
+        tenantId,
+        mid,
+        userId,
+        savedQueryId,
+        linkParams,
+      );
+    }
+
+    return {
+      linkedQaObjectId: qaDetail.objectId,
+      linkedQaCustomerKey: qaDetail.customerKey,
+      linkedQaName: qaDetail.name,
+      linkedAt: new Date().toISOString(),
+      sqlUpdated,
+    };
+  }
+
+  async unlinkQuery(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    savedQueryId: string,
+  ): Promise<{ success: true }> {
+    await this.savedQueriesService.unlinkFromQA(
+      tenantId,
+      mid,
+      userId,
+      savedQueryId,
+    );
+    return { success: true };
+  }
 
   async create(
     tenantId: string,
     userId: string,
     mid: string,
     dto: CreateQueryActivityDto,
-  ): Promise<{ objectId: string }> {
-    // 1. Validate target DE exists (pass eid for Shared DE context)
+  ): Promise<{ objectId: string; customerKey: string }> {
     const targetDE = await this.dataExtensionService.retrieveByCustomerKey(
       tenantId,
       userId,
@@ -41,7 +187,6 @@ export class QueryActivitiesService {
       });
     }
 
-    // 1b. Validate Primary Key requirement for Update mode
     if (dto.targetUpdateType === 'Update') {
       const fields = await this.metadataService.getFields(
         tenantId,
@@ -64,7 +209,6 @@ export class QueryActivitiesService {
       }
     }
 
-    // 2. Check name uniqueness in folder
     const existingByName =
       await this.queryDefinitionService.retrieveByNameAndFolder(
         tenantId,
@@ -82,11 +226,9 @@ export class QueryActivitiesService {
       });
     }
 
-    // 3. Generate or validate customerKey
     const customerKey =
       dto.customerKey?.trim() || crypto.randomUUID().toUpperCase();
 
-    // 4. Check customerKey uniqueness if provided by user
     if (dto.customerKey?.trim()) {
       const existingByKey = await this.queryDefinitionService.retrieve(
         tenantId,
@@ -104,16 +246,23 @@ export class QueryActivitiesService {
       }
     }
 
-    return this.queryDefinitionService.create(tenantId, userId, mid, {
-      name: dto.name,
-      customerKey,
-      categoryId: dto.categoryId,
-      targetId: targetDE.objectId,
-      targetCustomerKey: targetDE.customerKey,
-      targetName: targetDE.name,
-      queryText: dto.queryText,
-      description: dto.description,
-      targetUpdateType: dto.targetUpdateType,
-    });
+    const result = await this.queryDefinitionService.create(
+      tenantId,
+      userId,
+      mid,
+      {
+        name: dto.name,
+        customerKey,
+        categoryId: dto.categoryId,
+        targetId: targetDE.objectId,
+        targetCustomerKey: targetDE.customerKey,
+        targetName: targetDE.name,
+        queryText: dto.queryText,
+        description: dto.description,
+        targetUpdateType: dto.targetUpdateType,
+      },
+    );
+
+    return { objectId: result.objectId, customerKey };
   }
 }

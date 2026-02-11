@@ -7,6 +7,7 @@ export const defaultFeatures: TenantFeatures = {
   quickFixes: false,
   minimap: false,
   advancedAutocomplete: false,
+  querySharing: false,
   teamSnippets: false,
   auditLogs: false,
   createDataExtension: false,
@@ -101,5 +102,30 @@ export const handlers = [
       versionName: null,
       createdAt: new Date().toISOString(),
     });
+  }),
+
+  http.get("/api/query-activities", () => {
+    return HttpResponse.json([]);
+  }),
+
+  http.post("/api/query-activities", () => {
+    return HttpResponse.json({
+      objectId: "qa-obj-new",
+      customerKey: "qa-key-new",
+    });
+  }),
+
+  http.post("/api/query-activities/link/:savedQueryId", () => {
+    return HttpResponse.json({
+      linkedQaObjectId: "qa-obj-1",
+      linkedQaCustomerKey: "qa-key-1",
+      linkedQaName: "Linked QA",
+      linkedAt: new Date().toISOString(),
+      sqlUpdated: false,
+    });
+  }),
+
+  http.delete("/api/query-activities/link/:savedQueryId", () => {
+    return HttpResponse.json({ success: true });
   }),
 ];

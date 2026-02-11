@@ -62,6 +62,9 @@ export class SavedQueriesController {
       name: q.name,
       folderId: q.folderId,
       updatedAt: q.updatedAt.toISOString(),
+      linkedQaCustomerKey: q.linkedQaCustomerKey,
+      linkedQaName: q.linkedQaName,
+      linkedAt: q.linkedAt?.toISOString() ?? null,
     }));
   }
 
@@ -129,6 +132,10 @@ export class SavedQueriesController {
       folderId: query.folderId,
       createdAt: query.createdAt.toISOString(),
       updatedAt: query.updatedAt.toISOString(),
+      linkedQaObjectId: query.linkedQaObjectId,
+      linkedQaCustomerKey: query.linkedQaCustomerKey,
+      linkedQaName: query.linkedQaName,
+      linkedAt: query.linkedAt?.toISOString() ?? null,
     };
   }
 }

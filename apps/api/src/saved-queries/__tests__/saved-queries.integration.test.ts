@@ -54,6 +54,14 @@ describe('SavedQueriesService (integration)', () => {
   const createdSavedQueryIds: string[] = [];
   const createdFolderIds: string[] = [];
 
+  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
+    await sqlClient`
+      UPDATE tenants
+      SET subscription_tier = ${tier}
+      WHERE id = ${testTenantId}::uuid
+    `;
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -110,6 +118,9 @@ describe('SavedQueriesService (integration)', () => {
       throw new Error('Failed to insert test user');
     }
     testUserId = userRow.id;
+
+    // Default to free tier for this suite; individual tests can override.
+    await setTenantTier('free');
 
     // Clean up any leftover saved queries/folders from previous runs
     const reserved = await sqlClient.reserve();
@@ -171,6 +182,9 @@ describe('SavedQueriesService (integration)', () => {
   }, 30000);
 
   beforeEach(async () => {
+    // Default each test to free tier; tests can override as needed.
+    await setTenantTier('free');
+
     // Clean up resources before each test
     for (const id of [...createdSavedQueryIds]) {
       try {
@@ -324,8 +338,7 @@ describe('SavedQueriesService (integration)', () => {
       }
     });
 
-    it('should enforce RLS - only return user queries', async () => {
-      // Create query for test user
+    it('should enforce creator-only visibility for free tier', async () => {
       const created = await savedQueriesService.create(
         testTenantId,
         TEST_MID,
@@ -334,7 +347,7 @@ describe('SavedQueriesService (integration)', () => {
       );
       createdSavedQueryIds.push(created.id);
 
-      // Try to list with different user ID - should return empty
+      // List with different user ID in same tenant + mid — should NOT be visible
       const otherUserId = crypto.randomUUID();
       const results = await savedQueriesService.findAll(
         testTenantId,
@@ -342,9 +355,30 @@ describe('SavedQueriesService (integration)', () => {
         otherUserId,
       );
 
-      // RLS should filter out the query
       const found = results.find((q) => q.id === created.id);
       expect(found).toBeUndefined();
+    });
+
+    it('should allow BU sharing when querySharing is enabled (pro tier)', async () => {
+      await setTenantTier('pro');
+
+      const created = await savedQueriesService.create(
+        testTenantId,
+        TEST_MID,
+        testUserId,
+        { name: 'BU Visible Query', sqlText: 'SELECT 1' },
+      );
+      createdSavedQueryIds.push(created.id);
+
+      const otherUserId = crypto.randomUUID();
+      const results = await savedQueriesService.findAll(
+        testTenantId,
+        TEST_MID,
+        otherUserId,
+      );
+
+      const found = results.find((q) => q.id === created.id);
+      expect(found).toBeDefined();
     });
   });
 
@@ -387,16 +421,16 @@ describe('SavedQueriesService (integration)', () => {
       });
     });
 
-    it('should enforce RLS - not return other user query', async () => {
+    it('should enforce creator-only visibility for free tier', async () => {
       const created = await savedQueriesService.create(
         testTenantId,
         TEST_MID,
         testUserId,
-        { name: 'Private Query', sqlText: 'SELECT 1' },
+        { name: 'BU Query', sqlText: 'SELECT 1' },
       );
       createdSavedQueryIds.push(created.id);
 
-      // Try to access with different user ID
+      // Access with different user ID in same tenant + mid — should NOT succeed
       const otherUserId = crypto.randomUUID();
 
       await expect(
@@ -406,9 +440,7 @@ describe('SavedQueriesService (integration)', () => {
           otherUserId,
           created.id,
         ),
-      ).rejects.toMatchObject({
-        code: 'RESOURCE_NOT_FOUND',
-      });
+      ).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND' });
     });
   });
 
@@ -570,7 +602,7 @@ describe('SavedQueriesService (integration)', () => {
       expect(count).toBe(2);
     });
 
-    it('should enforce RLS - only count user queries', async () => {
+    it('should enforce creator-only visibility for free tier', async () => {
       const created = await savedQueriesService.create(
         testTenantId,
         TEST_MID,
@@ -579,7 +611,7 @@ describe('SavedQueriesService (integration)', () => {
       );
       createdSavedQueryIds.push(created.id);
 
-      // Count for different user should be 0
+      // Count for different user in same BU should not include the query
       const otherUserId = crypto.randomUUID();
       const count = await savedQueriesService.countByUser(
         testTenantId,

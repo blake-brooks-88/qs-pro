@@ -8,6 +8,8 @@ export interface Tab {
   originalContent: string; // content when opened/saved, for dirty detection
   isDirty: boolean;
   isNew: boolean; // true for Untitled tabs that haven't been saved
+  linkedQaCustomerKey?: string | null;
+  linkedQaName?: string | null;
 }
 
 interface TabsState {
@@ -17,12 +19,27 @@ interface TabsState {
 
   // Tab operations
   createNewTab: () => string;
-  openQuery: (queryId: string, name: string, content: string) => string;
+  openQuery: (
+    queryId: string,
+    name: string,
+    content: string,
+    linkState?: {
+      linkedQaCustomerKey: string | null;
+      linkedQaName: string | null;
+    },
+  ) => string;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTabContent: (tabId: string, content: string) => void;
   markTabSaved: (tabId: string, queryId: string, name: string) => void;
   renameTab: (tabId: string, name: string) => void;
+  updateTabLinkState: (
+    tabId: string,
+    linkState: {
+      linkedQaCustomerKey: string | null;
+      linkedQaName: string | null;
+    },
+  ) => void;
 
   // Query helpers
   findTabByQueryId: (queryId: string) => Tab | undefined;
@@ -65,7 +82,15 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return id;
   },
 
-  openQuery: (queryId: string, name: string, content: string) => {
+  openQuery: (
+    queryId: string,
+    name: string,
+    content: string,
+    linkState?: {
+      linkedQaCustomerKey: string | null;
+      linkedQaName: string | null;
+    },
+  ) => {
     const { tabs } = get();
 
     // Check if query is already open - switch to existing tab
@@ -85,6 +110,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       originalContent: content,
       isDirty: false,
       isNew: false,
+      linkedQaCustomerKey: linkState?.linkedQaCustomerKey ?? null,
+      linkedQaName: linkState?.linkedQaName ?? null,
     };
 
     set({
@@ -171,6 +198,27 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set({
       tabs: tabs.map((t) =>
         t.id === tabId ? { ...t, name, isDirty: true } : t,
+      ),
+    });
+  },
+
+  updateTabLinkState: (
+    tabId: string,
+    linkState: {
+      linkedQaCustomerKey: string | null;
+      linkedQaName: string | null;
+    },
+  ) => {
+    const { tabs } = get();
+    set({
+      tabs: tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              linkedQaCustomerKey: linkState.linkedQaCustomerKey,
+              linkedQaName: linkState.linkedQaName,
+            }
+          : t,
       ),
     });
   },

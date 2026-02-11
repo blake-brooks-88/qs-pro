@@ -115,6 +115,100 @@ const buildDeleteResponse = (statusCode = "OK"): string => {
 </soap:Envelope>`;
 };
 
+const buildRetrieveAllResponse = (
+  items: Array<{
+    objectId: string;
+    customerKey: string;
+    name: string;
+    categoryId?: number;
+    targetUpdateType?: string;
+    modifiedDate?: string;
+    status?: string;
+  }>,
+  overallStatus = "OK",
+  requestId?: string,
+): string => {
+  const resultsXml = items
+    .map(
+      (item) => `
+    <Results xsi:type="QueryDefinition">
+      <ObjectID>${item.objectId}</ObjectID>
+      <CustomerKey>${item.customerKey}</CustomerKey>
+      <Name>${item.name}</Name>
+      ${item.categoryId !== undefined ? `<CategoryID>${item.categoryId}</CategoryID>` : ""}
+      ${item.targetUpdateType ? `<TargetUpdateType>${item.targetUpdateType}</TargetUpdateType>` : ""}
+      ${item.modifiedDate ? `<ModifiedDate>${item.modifiedDate}</ModifiedDate>` : ""}
+      ${item.status ? `<Status>${item.status}</Status>` : ""}
+    </Results>`,
+    )
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <soap:Body>
+    <RetrieveResponseMsg>
+      <OverallStatus>${overallStatus}</OverallStatus>
+      ${requestId ? `<RequestID>${requestId}</RequestID>` : ""}
+      ${resultsXml}
+    </RetrieveResponseMsg>
+  </soap:Body>
+</soap:Envelope>`;
+};
+
+const buildRetrieveDetailResponse = (
+  detail: {
+    objectId: string;
+    customerKey: string;
+    name: string;
+    categoryId?: number;
+    queryText?: string;
+    targetUpdateType?: string;
+    targetDEName?: string;
+    targetDECustomerKey?: string;
+    modifiedDate?: string;
+    status?: string;
+  } | null,
+  overallStatus = "OK",
+): string => {
+  if (!detail) {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <soap:Body>
+    <RetrieveResponseMsg>
+      <OverallStatus>${overallStatus}</OverallStatus>
+    </RetrieveResponseMsg>
+  </soap:Body>
+</soap:Envelope>`;
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <soap:Body>
+    <RetrieveResponseMsg>
+      <OverallStatus>${overallStatus}</OverallStatus>
+      <Results xsi:type="QueryDefinition">
+        <ObjectID>${detail.objectId}</ObjectID>
+        <CustomerKey>${detail.customerKey}</CustomerKey>
+        <Name>${detail.name}</Name>
+        ${detail.categoryId !== undefined ? `<CategoryID>${detail.categoryId}</CategoryID>` : ""}
+        ${detail.queryText ? `<QueryText>${detail.queryText}</QueryText>` : ""}
+        ${detail.targetUpdateType ? `<TargetUpdateType>${detail.targetUpdateType}</TargetUpdateType>` : ""}
+        ${detail.modifiedDate ? `<ModifiedDate>${detail.modifiedDate}</ModifiedDate>` : ""}
+        ${detail.status ? `<Status>${detail.status}</Status>` : ""}
+        ${
+          detail.targetDEName || detail.targetDECustomerKey
+            ? `<DataExtensionTarget>
+          ${detail.targetDEName ? `<Name>${detail.targetDEName}</Name>` : ""}
+          ${detail.targetDECustomerKey ? `<CustomerKey>${detail.targetDECustomerKey}</CustomerKey>` : ""}
+        </DataExtensionTarget>`
+            : ""
+        }
+      </Results>
+    </RetrieveResponseMsg>
+  </soap:Body>
+</soap:Envelope>`;
+};
+
 // Default MSW handler
 const defaultHandler = http.post(
   `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
@@ -145,17 +239,17 @@ describe("QueryDefinitionService (integration)", () => {
     service = module.get(QueryDefinitionService);
   });
 
-  afterAll(async () => {
-    server.close();
-    await module.close();
-  });
-
   beforeEach(() => {
     capturedBody = "";
   });
 
   afterEach(() => {
     server.resetHandlers();
+  });
+
+  afterAll(async () => {
+    server.close();
+    await module.close();
   });
 
   describe("retrieve", () => {
@@ -770,6 +864,338 @@ describe("QueryDefinitionService (integration)", () => {
       await expect(
         service.delete(TEST_TENANT_ID, TEST_USER_ID, TEST_MID, "qd-obj"),
       ).rejects.toThrow();
+    });
+  });
+
+  describe("retrieveAll", () => {
+    it("sends SOAP request with correct extended properties and no filter", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            capturedBody = await request.text();
+            return HttpResponse.xml(buildRetrieveAllResponse([]));
+          },
+        ),
+      );
+
+      await service.retrieveAll(TEST_TENANT_ID, TEST_USER_ID, TEST_MID);
+
+      expect(capturedBody).toContain(
+        "<ObjectType>QueryDefinition</ObjectType>",
+      );
+      expect(capturedBody).toContain("<Properties>ObjectID</Properties>");
+      expect(capturedBody).toContain("<Properties>CustomerKey</Properties>");
+      expect(capturedBody).toContain("<Properties>Name</Properties>");
+      expect(capturedBody).toContain("<Properties>CategoryID</Properties>");
+      expect(capturedBody).toContain(
+        "<Properties>TargetUpdateType</Properties>",
+      );
+      expect(capturedBody).toContain("<Properties>ModifiedDate</Properties>");
+      expect(capturedBody).toContain("<Properties>Status</Properties>");
+
+      expect(capturedBody).not.toContain("<Filter");
+    });
+
+    it("parses multiple results with extended fields", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async () => {
+            return HttpResponse.xml(
+              buildRetrieveAllResponse([
+                {
+                  objectId: "obj-a",
+                  customerKey: "key-a",
+                  name: "Query A",
+                  categoryId: 10,
+                  targetUpdateType: "Overwrite",
+                  modifiedDate: "2026-02-01T12:00:00Z",
+                  status: "Active",
+                },
+                {
+                  objectId: "obj-b",
+                  customerKey: "key-b",
+                  name: "Query B",
+                  categoryId: 20,
+                  targetUpdateType: "Append",
+                  modifiedDate: "2026-02-05T08:30:00Z",
+                  status: "Inactive",
+                },
+              ]),
+            );
+          },
+        ),
+      );
+
+      const result = await service.retrieveAll(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        objectId: "obj-a",
+        customerKey: "key-a",
+        name: "Query A",
+        categoryId: 10,
+        targetUpdateType: "Overwrite",
+        modifiedDate: "2026-02-01T12:00:00Z",
+        status: "Active",
+      });
+      expect(result[1]).toEqual({
+        objectId: "obj-b",
+        customerKey: "key-b",
+        name: "Query B",
+        categoryId: 20,
+        targetUpdateType: "Append",
+        modifiedDate: "2026-02-05T08:30:00Z",
+        status: "Inactive",
+      });
+    });
+
+    it("handles pagination with MoreDataAvailable and ContinueRequest", async () => {
+      let callCount = 0;
+
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            callCount++;
+            const body = await request.text();
+
+            if (callCount === 1) {
+              return HttpResponse.xml(
+                buildRetrieveAllResponse(
+                  [
+                    {
+                      objectId: "page1-obj",
+                      customerKey: "page1-key",
+                      name: "Page 1 Query",
+                      targetUpdateType: "Overwrite",
+                    },
+                  ],
+                  "MoreDataAvailable",
+                  "continue-token-abc",
+                ),
+              );
+            }
+
+            expect(body).toContain("ContinueRequest");
+            expect(body).toContain("continue-token-abc");
+
+            return HttpResponse.xml(
+              buildRetrieveAllResponse([
+                {
+                  objectId: "page2-obj",
+                  customerKey: "page2-key",
+                  name: "Page 2 Query",
+                  targetUpdateType: "Append",
+                },
+              ]),
+            );
+          },
+        ),
+      );
+
+      const result = await service.retrieveAll(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+      );
+
+      expect(callCount).toBe(2);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        objectId: "page1-obj",
+        customerKey: "page1-key",
+      });
+      expect(result[1]).toMatchObject({
+        objectId: "page2-obj",
+        customerKey: "page2-key",
+      });
+    });
+
+    it("handles empty response", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async () => {
+            return HttpResponse.xml(buildRetrieveAllResponse([]));
+          },
+        ),
+      );
+
+      const result = await service.retrieveAll(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+      );
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("retrieveDetail", () => {
+    it("sends correct SOAP request with CustomerKey filter and extended properties", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async ({ request }) => {
+            capturedBody = await request.text();
+            return HttpResponse.xml(buildRetrieveDetailResponse(null));
+          },
+        ),
+      );
+
+      await service.retrieveDetail(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+        "detail-key-1",
+      );
+
+      expect(capturedBody).toContain(
+        "<ObjectType>QueryDefinition</ObjectType>",
+      );
+      expect(capturedBody).toContain("<Properties>ObjectID</Properties>");
+      expect(capturedBody).toContain("<Properties>CustomerKey</Properties>");
+      expect(capturedBody).toContain("<Properties>Name</Properties>");
+      expect(capturedBody).toContain("<Properties>CategoryID</Properties>");
+      expect(capturedBody).toContain("<Properties>QueryText</Properties>");
+      expect(capturedBody).toContain(
+        "<Properties>TargetUpdateType</Properties>",
+      );
+      expect(capturedBody).toContain(
+        "<Properties>DataExtensionTarget.Name</Properties>",
+      );
+      expect(capturedBody).toContain(
+        "<Properties>DataExtensionTarget.CustomerKey</Properties>",
+      );
+      expect(capturedBody).toContain("<Properties>ModifiedDate</Properties>");
+      expect(capturedBody).toContain("<Properties>Status</Properties>");
+
+      expect(capturedBody).toContain("<Property>CustomerKey</Property>");
+      expect(capturedBody).toContain("<SimpleOperator>equals</SimpleOperator>");
+      expect(capturedBody).toContain("<Value>detail-key-1</Value>");
+    });
+
+    it("parses response with all detail fields", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async () => {
+            return HttpResponse.xml(
+              buildRetrieveDetailResponse({
+                objectId: "detail-obj-1",
+                customerKey: "detail-key-1",
+                name: "Detail Query",
+                categoryId: 42,
+                queryText: "SELECT Email FROM Subscribers",
+                targetUpdateType: "Overwrite",
+                targetDEName: "Result DE",
+                targetDECustomerKey: "result-de-key",
+                modifiedDate: "2026-02-10T10:00:00Z",
+                status: "Active",
+              }),
+            );
+          },
+        ),
+      );
+
+      const result = await service.retrieveDetail(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+        "detail-key-1",
+      );
+
+      expect(result).toEqual({
+        objectId: "detail-obj-1",
+        customerKey: "detail-key-1",
+        name: "Detail Query",
+        categoryId: 42,
+        queryText: "SELECT Email FROM Subscribers",
+        targetUpdateType: "Overwrite",
+        targetDEName: "Result DE",
+        targetDECustomerKey: "result-de-key",
+        modifiedDate: "2026-02-10T10:00:00Z",
+        status: "Active",
+      });
+    });
+
+    it("returns null when not found (empty response)", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async () => {
+            return HttpResponse.xml(buildRetrieveDetailResponse(null));
+          },
+        ),
+      );
+
+      const result = await service.retrieveDetail(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+        "nonexistent-key",
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null on Error status with no results", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async () => {
+            return HttpResponse.xml(buildRetrieveDetailResponse(null, "Error"));
+          },
+        ),
+      );
+
+      const result = await service.retrieveDetail(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+        "error-key",
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("parses DataExtensionTarget nested fields", async () => {
+      server.use(
+        http.post(
+          `https://${TEST_TSSD}.soap.marketingcloudapis.com/Service.asmx`,
+          async () => {
+            return HttpResponse.xml(
+              buildRetrieveDetailResponse({
+                objectId: "nested-obj",
+                customerKey: "nested-key",
+                name: "Nested Query",
+                queryText: "SELECT 1",
+                targetDEName: "My Target DE",
+                targetDECustomerKey: "my-target-de-key",
+              }),
+            );
+          },
+        ),
+      );
+
+      const result = await service.retrieveDetail(
+        TEST_TENANT_ID,
+        TEST_USER_ID,
+        TEST_MID,
+        "nested-key",
+      );
+
+      expect(result).not.toBeNull();
+
+      const detail = result as NonNullable<typeof result>;
+      expect(detail.targetDEName).toBe("My Target DE");
+      expect(detail.targetDECustomerKey).toBe("my-target-de-key");
     });
   });
 });

@@ -4,7 +4,10 @@ import {
   buildCreateQueryDefinition,
   buildDeleteQueryDefinition,
   buildPerformQueryDefinition,
+  buildRetrieveAllQueryDefinitions,
   buildRetrieveQueryDefinition,
+  buildRetrieveQueryDefinitionByNameAndFolder,
+  buildRetrieveQueryDefinitionDetail,
 } from "./query-definition";
 
 const VALID_QUERY_DEFINITION_PROPERTIES = [
@@ -15,8 +18,12 @@ const VALID_QUERY_DEFINITION_PROPERTIES = [
   "QueryText",
   "TargetType",
   "DataExtensionTarget",
+  "DataExtensionTarget.Name",
+  "DataExtensionTarget.CustomerKey",
   "Description",
   "TargetUpdateType",
+  "ModifiedDate",
+  "Status",
 ];
 
 function extractRequestedProperties(xml: string): string[] {
@@ -30,6 +37,14 @@ function extractRequestedProperties(xml: string): string[] {
 function extractFilterValue(xml: string): string | null {
   const match = xml.match(/<Value>([^<]*)<\/Value>/);
   return match?.[1] ?? null;
+}
+
+function extractAllFilterValues(xml: string): string[] {
+  const matches = xml.match(/<Value>([^<]*)<\/Value>/g);
+  if (!matches) {
+    return [];
+  }
+  return matches.map((m) => m.replace(/<\/?Value>/g, ""));
 }
 
 function extractObjectType(xml: string): string | null {
@@ -84,6 +99,104 @@ function hasRequestType(xml: string, type: string): boolean {
 }
 
 describe("QueryDefinition SOAP Request Builders", () => {
+  describe("buildRetrieveQueryDefinitionByNameAndFolder", () => {
+    it("should be a Retrieve request for QueryDefinition", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "My Query",
+      });
+
+      expect(hasRequestType(xml, "Retrieve")).toBe(true);
+      expect(extractObjectType(xml)).toBe("QueryDefinition");
+    });
+
+    it("should request ObjectID, CustomerKey, Name and CategoryID properties", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "My Query",
+      });
+      const requestedProps = extractRequestedProperties(xml);
+
+      expect(requestedProps).toEqual([
+        "ObjectID",
+        "CustomerKey",
+        "Name",
+        "CategoryID",
+      ]);
+    });
+
+    it("should build a SimpleFilterPart when categoryId is not provided", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "My Query",
+      });
+
+      expect(xml).toContain('xsi:type="SimpleFilterPart"');
+      expect(xml).not.toContain("ComplexFilterPart");
+      expect(xml).not.toContain("<LogicalOperator>");
+      expect(extractFilterValue(xml)).toBe("My Query");
+    });
+
+    it("should build a ComplexFilterPart with AND when categoryId is provided", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "My Query",
+        categoryId: 42,
+      });
+
+      expect(xml).toContain('xsi:type="ComplexFilterPart"');
+      expect(xml).toContain("<LogicalOperator>AND</LogicalOperator>");
+
+      const values = extractAllFilterValues(xml);
+      expect(values).toContain("My Query");
+      expect(values).toContain("42");
+    });
+
+    it("should filter by Name property in the SimpleFilterPart branch", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "Simple Query",
+      });
+
+      expect(xml).toContain("<Property>Name</Property>");
+      expect(xml).toContain("<SimpleOperator>equals</SimpleOperator>");
+      expect(extractFilterValue(xml)).toBe("Simple Query");
+    });
+
+    it("should filter by Name and CategoryID in the ComplexFilterPart branch", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "Complex Query",
+        categoryId: 99,
+      });
+
+      expect(xml).toContain("<Property>Name</Property>");
+      expect(xml).toContain("<Property>CategoryID</Property>");
+
+      const values = extractAllFilterValues(xml);
+      expect(values[0]).toBe("Complex Query");
+      expect(values[1]).toBe("99");
+    });
+
+    it("should escape XML special characters in name", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "Query<>&\"'Test",
+      });
+      const filterValue = extractFilterValue(xml);
+
+      expect(filterValue).toContain("&lt;");
+      expect(filterValue).toContain("&gt;");
+      expect(filterValue).toContain("&amp;");
+      expect(filterValue).toContain("&quot;");
+      expect(filterValue).toContain("&apos;");
+    });
+
+    it("should escape XML special characters in name within ComplexFilterPart", () => {
+      const xml = buildRetrieveQueryDefinitionByNameAndFolder({
+        name: "Name<>",
+        categoryId: 10,
+      });
+      const values = extractAllFilterValues(xml);
+
+      expect(values[0]).toContain("&lt;");
+      expect(values[0]).toContain("&gt;");
+    });
+  });
+
   describe("buildRetrieveQueryDefinition", () => {
     it("should be a Retrieve request for QueryDefinition", () => {
       const xml = buildRetrieveQueryDefinition("test-key");
@@ -188,6 +301,65 @@ describe("QueryDefinition SOAP Request Builders", () => {
       expect(xml).toContain("&amp;");
       expect(xml).toContain("&quot;");
     });
+
+    it("should omit CategoryID when categoryId is 0", () => {
+      const xml = buildCreateQueryDefinition({
+        ...defaultParams,
+        categoryId: 0,
+      });
+
+      expect(xml).not.toContain("<CategoryID>");
+    });
+
+    it("should omit CategoryID when categoryId is undefined", () => {
+      const xml = buildCreateQueryDefinition({
+        ...defaultParams,
+        categoryId: undefined,
+      });
+
+      expect(xml).not.toContain("<CategoryID>");
+    });
+
+    it("should use default description when not provided", () => {
+      const xml = buildCreateQueryDefinition(defaultParams);
+
+      expect(extractElementValue(xml, "Description")).toBe("Query++ execution");
+    });
+
+    it("should use explicit description when provided", () => {
+      const xml = buildCreateQueryDefinition({
+        ...defaultParams,
+        description: "Custom description",
+      });
+
+      expect(extractElementValue(xml, "Description")).toBe(
+        "Custom description",
+      );
+    });
+
+    it("should use default targetUpdateType 'Overwrite' when not provided", () => {
+      const xml = buildCreateQueryDefinition(defaultParams);
+
+      expect(extractElementValue(xml, "TargetUpdateType")).toBe("Overwrite");
+    });
+
+    it("should use explicit targetUpdateType when provided", () => {
+      const xml = buildCreateQueryDefinition({
+        ...defaultParams,
+        targetUpdateType: "Append",
+      });
+
+      expect(extractElementValue(xml, "TargetUpdateType")).toBe("Append");
+    });
+
+    it("should use 'Update' targetUpdateType when provided", () => {
+      const xml = buildCreateQueryDefinition({
+        ...defaultParams,
+        targetUpdateType: "Update",
+      });
+
+      expect(extractElementValue(xml, "TargetUpdateType")).toBe("Update");
+    });
   });
 
   describe("buildPerformQueryDefinition", () => {
@@ -234,6 +406,94 @@ describe("QueryDefinition SOAP Request Builders", () => {
       expect(objectId).toContain("&lt;");
       expect(objectId).toContain("&gt;");
       expect(objectId).toContain("&amp;");
+    });
+  });
+
+  describe("buildRetrieveAllQueryDefinitions", () => {
+    it("should be a Retrieve request for QueryDefinition", () => {
+      const xml = buildRetrieveAllQueryDefinitions();
+
+      expect(hasRequestType(xml, "Retrieve")).toBe(true);
+      expect(extractObjectType(xml)).toBe("QueryDefinition");
+    });
+
+    it("should request correct properties", () => {
+      const xml = buildRetrieveAllQueryDefinitions();
+      const requestedProps = extractRequestedProperties(xml);
+
+      expect(requestedProps).toEqual([
+        "ObjectID",
+        "CustomerKey",
+        "Name",
+        "CategoryID",
+        "TargetUpdateType",
+        "ModifiedDate",
+        "Status",
+      ]);
+    });
+
+    it("should not include a Filter element", () => {
+      const xml = buildRetrieveAllQueryDefinitions();
+
+      expect(xml).not.toContain("<Filter");
+    });
+
+    it("should not request the invalid ID property", () => {
+      const xml = buildRetrieveAllQueryDefinitions();
+      const requestedProps = extractRequestedProperties(xml);
+
+      expect(requestedProps).not.toContain("ID");
+    });
+  });
+
+  describe("buildRetrieveQueryDefinitionDetail", () => {
+    it("should be a Retrieve request for QueryDefinition", () => {
+      const xml = buildRetrieveQueryDefinitionDetail("test-key");
+
+      expect(hasRequestType(xml, "Retrieve")).toBe(true);
+      expect(extractObjectType(xml)).toBe("QueryDefinition");
+    });
+
+    it("should request extended properties including target DE details", () => {
+      const xml = buildRetrieveQueryDefinitionDetail("test-key");
+      const requestedProps = extractRequestedProperties(xml);
+
+      expect(requestedProps).toEqual([
+        "ObjectID",
+        "CustomerKey",
+        "Name",
+        "CategoryID",
+        "QueryText",
+        "TargetUpdateType",
+        "DataExtensionTarget.Name",
+        "DataExtensionTarget.CustomerKey",
+        "ModifiedDate",
+        "Status",
+      ]);
+    });
+
+    it("should filter by customerKey", () => {
+      const xml = buildRetrieveQueryDefinitionDetail("my-query-key");
+
+      expect(extractFilterValue(xml)).toBe("my-query-key");
+    });
+
+    it("should escape XML special characters in customerKey", () => {
+      const xml = buildRetrieveQueryDefinitionDetail("key<>&\"'test");
+      const filterValue = extractFilterValue(xml);
+
+      expect(filterValue).toContain("&lt;");
+      expect(filterValue).toContain("&gt;");
+      expect(filterValue).toContain("&amp;");
+      expect(filterValue).toContain("&quot;");
+      expect(filterValue).toContain("&apos;");
+    });
+
+    it("should not request the invalid ID property", () => {
+      const xml = buildRetrieveQueryDefinitionDetail("test-key");
+      const requestedProps = extractRequestedProperties(xml);
+
+      expect(requestedProps).not.toContain("ID");
     });
   });
 });

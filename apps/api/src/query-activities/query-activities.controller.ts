@@ -2,12 +2,18 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  Get,
+  Param,
   Post,
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
-import { CreateQueryActivitySchema } from '@qpp/shared-types';
+import {
+  CreateQueryActivitySchema,
+  LinkQueryRequestSchema,
+} from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
@@ -17,7 +23,7 @@ import { FeaturesService } from '../features/features.service';
 import { QueryActivitiesService } from './query-activities.service';
 
 @Controller('query-activities')
-@UseGuards(SessionGuard, CsrfGuard)
+@UseGuards(SessionGuard)
 @UseFilters(GlobalExceptionFilter)
 export class QueryActivitiesController {
   constructor(
@@ -25,17 +31,20 @@ export class QueryActivitiesController {
     private readonly featuresService: FeaturesService,
   ) {}
 
-  @Post()
-  async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
-    const { features } = await this.featuresService.getTenantFeatures(
-      user.tenantId,
-    );
+  private async requireDeployFeature(tenantId: string): Promise<void> {
+    const { features } = await this.featuresService.getTenantFeatures(tenantId);
     if (!features.deployToAutomation) {
       throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
-        operation: 'createQueryActivity',
+        operation: 'queryActivities',
         reason: 'Deploy to Automation requires Pro subscription',
       });
     }
+  }
+
+  @Post()
+  @UseGuards(CsrfGuard)
+  async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
+    await this.requireDeployFeature(user.tenantId);
 
     const result = CreateQueryActivitySchema.safeParse(body);
     if (!result.success) {
@@ -47,6 +56,72 @@ export class QueryActivitiesController {
       user.userId,
       user.mid,
       result.data,
+    );
+  }
+
+  @Get()
+  async findAll(@CurrentUser() user: UserSession) {
+    await this.requireDeployFeature(user.tenantId);
+
+    return this.queryActivitiesService.listAllWithLinkStatus(
+      user.tenantId,
+      user.userId,
+      user.mid,
+    );
+  }
+
+  @Post('link/:savedQueryId')
+  @UseGuards(CsrfGuard)
+  async linkQuery(
+    @CurrentUser() user: UserSession,
+    @Param('savedQueryId') savedQueryId: string,
+    @Body() body: unknown,
+  ) {
+    await this.requireDeployFeature(user.tenantId);
+
+    const result = LinkQueryRequestSchema.safeParse(body);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+
+    return this.queryActivitiesService.linkQuery(
+      user.tenantId,
+      user.userId,
+      user.mid,
+      savedQueryId,
+      result.data.qaCustomerKey,
+      result.data.conflictResolution,
+    );
+  }
+
+  @Delete('link/:savedQueryId')
+  @UseGuards(CsrfGuard)
+  async unlinkQuery(
+    @CurrentUser() user: UserSession,
+    @Param('savedQueryId') savedQueryId: string,
+  ) {
+    await this.requireDeployFeature(user.tenantId);
+
+    return this.queryActivitiesService.unlinkQuery(
+      user.tenantId,
+      user.userId,
+      user.mid,
+      savedQueryId,
+    );
+  }
+
+  @Get(':customerKey')
+  async findOne(
+    @CurrentUser() user: UserSession,
+    @Param('customerKey') customerKey: string,
+  ) {
+    await this.requireDeployFeature(user.tenantId);
+
+    return this.queryActivitiesService.getDetail(
+      user.tenantId,
+      user.userId,
+      user.mid,
+      customerKey,
     );
   }
 }

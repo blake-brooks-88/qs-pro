@@ -19,6 +19,10 @@ export const SavedQueryResponseSchema = z.object({
   name: z.string(),
   sqlText: z.string(),
   folderId: z.string().uuid().nullable(),
+  linkedQaObjectId: z.string().nullable(),
+  linkedQaCustomerKey: z.string().nullable(),
+  linkedQaName: z.string().nullable(),
+  linkedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -28,6 +32,9 @@ export const SavedQueryListItemSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   folderId: z.string().uuid().nullable(),
+  linkedQaCustomerKey: z.string().nullable(),
+  linkedQaName: z.string().nullable(),
+  linkedAt: z.string().datetime().nullable(),
   updatedAt: z.string().datetime(),
 });
 

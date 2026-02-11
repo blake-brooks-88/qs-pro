@@ -15,6 +15,9 @@ export interface SavedQuery {
   folderId: string;
   content: string;
   updatedAt: string;
+  linkedQaCustomerKey: string | null;
+  linkedQaName: string | null;
+  linkedAt: string | null;
 }
 
 export type SFMCFieldType =
@@ -100,6 +103,8 @@ export interface QueryTab {
   content: string;
   isDirty: boolean;
   isNew?: boolean;
+  linkedQaCustomerKey?: string | null;
+  linkedQaName?: string | null;
 }
 
 export interface DataExtensionDraft {

@@ -5,6 +5,15 @@ export interface QueryDefinition {
   categoryId?: number;
 }
 
+export interface QueryDefinitionDetail extends QueryDefinition {
+  queryText: string;
+  targetUpdateType?: "Overwrite" | "Append" | "Update";
+  targetDEName?: string;
+  targetDECustomerKey?: string;
+  modifiedDate?: string;
+  status?: string;
+}
+
 export interface CreateQueryDefinitionParams {
   name: string;
   customerKey: string;

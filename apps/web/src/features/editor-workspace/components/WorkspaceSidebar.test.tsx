@@ -234,6 +234,9 @@ describe("WorkspaceSidebar", () => {
         folderId: "root",
         content: "SELECT *",
         updatedAt: "",
+        linkedQaCustomerKey: null,
+        linkedQaName: null,
+        linkedAt: null,
       },
       {
         id: "q2",
@@ -241,6 +244,9 @@ describe("WorkspaceSidebar", () => {
         folderId: "root",
         content: "SELECT *",
         updatedAt: "",
+        linkedQaCustomerKey: null,
+        linkedQaName: null,
+        linkedAt: null,
       },
     ];
 

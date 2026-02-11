@@ -32,6 +32,7 @@ const TERMINAL_CODES = new Set<ErrorCode>([
   ErrorCode.QUOTA_EXCEEDED,
   ErrorCode.RESOURCE_NOT_FOUND,
   ErrorCode.INVALID_STATE,
+  ErrorCode.LINK_CONFLICT,
   ErrorCode.VALIDATION_ERROR,
   ErrorCode.FEATURE_NOT_ENABLED,
 
@@ -152,6 +153,8 @@ export function getHttpStatus(code: ErrorCode): number {
       return 404;
     case ErrorCode.INVALID_STATE:
       return 409; // Conflict
+    case ErrorCode.LINK_CONFLICT:
+      return 409;
     case ErrorCode.FEATURE_NOT_ENABLED:
       return 403;
 
@@ -196,6 +199,7 @@ export function getErrorTitle(code: ErrorCode): string {
     [ErrorCode.QUOTA_EXCEEDED]: "Usage Quota Exceeded",
     [ErrorCode.RESOURCE_NOT_FOUND]: "Resource Not Found",
     [ErrorCode.INVALID_STATE]: "Invalid State",
+    [ErrorCode.LINK_CONFLICT]: "Link Conflict",
     [ErrorCode.VALIDATION_ERROR]: "Validation Error",
     [ErrorCode.FEATURE_NOT_ENABLED]: "Feature Not Enabled",
     [ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME]: "Duplicate Query Activity Name",

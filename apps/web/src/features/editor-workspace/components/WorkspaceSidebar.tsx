@@ -42,6 +42,7 @@ interface WorkspaceSidebarProps {
   onCreateFolder?: (parentId: string | null) => void;
   onViewQueryHistory?: (queryId: string) => void;
   onViewVersionHistory?: (queryId: string) => void;
+  onLinkQuery?: (queryId: string) => void;
 }
 
 interface DataExtensionNodeProps {
@@ -188,6 +189,7 @@ export function WorkspaceSidebar({
   onCreateFolder,
   onViewQueryHistory,
   onViewVersionHistory,
+  onLinkQuery,
 }: WorkspaceSidebarProps) {
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { tier } = useTier();
@@ -667,6 +669,7 @@ export function WorkspaceSidebar({
               onCreateFolder={() => onCreateFolder?.(null)}
               onViewQueryHistory={onViewQueryHistory}
               onViewVersionHistory={onViewVersionHistory}
+              onLinkQuery={onLinkQuery}
             />
           )}
         </div>

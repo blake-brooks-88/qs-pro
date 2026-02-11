@@ -7,6 +7,7 @@ import {
   CodeFile,
   Folder as FolderIcon,
   History,
+  LinkMinimalistic,
   Pen,
   TrashBinMinimalistic,
 } from "@solar-icons/react";
@@ -25,6 +26,7 @@ import {
   useUpdateSavedQuery,
 } from "../hooks/use-saved-queries";
 import { InlineRenameInput } from "./InlineRenameInput";
+import { LinkedBadge } from "./LinkedBadge";
 
 interface QueryTreeViewProps {
   searchQuery: string;
@@ -32,6 +34,7 @@ interface QueryTreeViewProps {
   onCreateFolder?: () => void;
   onViewQueryHistory?: (queryId: string) => void;
   onViewVersionHistory?: (queryId: string) => void;
+  onLinkQuery?: (queryId: string) => void;
 }
 
 interface FolderNodeProps {
@@ -56,6 +59,7 @@ interface FolderNodeProps {
   onDeleteQuery: (id: string) => void;
   onViewQueryHistory?: (queryId: string) => void;
   onViewVersionHistory?: (queryId: string) => void;
+  onLinkQuery?: (queryId: string) => void;
 }
 
 interface QueryNodeProps {
@@ -69,6 +73,7 @@ interface QueryNodeProps {
   onDelete: () => void;
   onViewHistory?: () => void;
   onViewVersionHistory?: () => void;
+  onLinkQuery?: () => void;
 }
 
 function QueryNode({
@@ -82,6 +87,7 @@ function QueryNode({
   onDelete,
   onViewHistory,
   onViewVersionHistory,
+  onLinkQuery,
 }: QueryNodeProps) {
   if (isRenaming) {
     return (
@@ -118,6 +124,13 @@ function QueryNode({
             className="text-secondary/60 group-hover:text-secondary shrink-0"
           />
           <span className="truncate">{query.name}</span>
+          {query.linkedQaCustomerKey ? (
+            <LinkedBadge
+              size="sm"
+              qaName={query.linkedQaName}
+              className="shrink-0"
+            />
+          ) : null}
         </button>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
@@ -138,6 +151,15 @@ function QueryNode({
             >
               <History size={14} />
               Version History
+            </ContextMenu.Item>
+          ) : null}
+          {onLinkQuery && !query.linkedQaCustomerKey ? (
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              onSelect={onLinkQuery}
+            >
+              <LinkMinimalistic size={14} />
+              Link to Query Activity
             </ContextMenu.Item>
           ) : null}
           <ContextMenu.Item
@@ -183,6 +205,7 @@ function FolderNode({
   onDeleteQuery,
   onViewQueryHistory,
   onViewVersionHistory,
+  onLinkQuery,
 }: FolderNodeProps) {
   const isRenaming = renamingId === `folder-${folder.id}`;
 
@@ -288,6 +311,7 @@ function FolderNode({
                 onDeleteQuery={onDeleteQuery}
                 onViewQueryHistory={onViewQueryHistory}
                 onViewVersionHistory={onViewVersionHistory}
+                onLinkQuery={onLinkQuery}
               />
             );
           })}
@@ -312,6 +336,9 @@ function FolderNode({
                   ? () => onViewVersionHistory(query.id)
                   : undefined
               }
+              onLinkQuery={
+                onLinkQuery ? () => onLinkQuery(query.id) : undefined
+              }
             />
           ))}
         </div>
@@ -326,6 +353,7 @@ export function QueryTreeView({
   onCreateFolder,
   onViewQueryHistory,
   onViewVersionHistory,
+  onLinkQuery,
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
@@ -487,6 +515,7 @@ export function QueryTreeView({
                 onDeleteQuery={handleDeleteQuery}
                 onViewQueryHistory={onViewQueryHistory}
                 onViewVersionHistory={onViewVersionHistory}
+                onLinkQuery={onLinkQuery}
               />
             );
           })}
@@ -510,6 +539,9 @@ export function QueryTreeView({
                 onViewVersionHistory
                   ? () => onViewVersionHistory(query.id)
                   : undefined
+              }
+              onLinkQuery={
+                onLinkQuery ? () => onLinkQuery(query.id) : undefined
               }
             />
           ))}
