@@ -394,6 +394,7 @@ describe('QueryActivitiesService', () => {
           customerKey: 'qa-key-1',
           name: 'QA One',
           targetUpdateType: 'Overwrite',
+          targetDEName: 'Subscriber_Weekly',
         },
         {
           objectId: 'qa-obj-2',
@@ -422,12 +423,14 @@ describe('QueryActivitiesService', () => {
         customerKey: 'qa-key-1',
         isLinked: true,
         linkedToQueryName: 'My Saved Query',
+        targetDEName: 'Subscriber_Weekly',
       });
       expect(result[1]).toMatchObject({
         customerKey: 'qa-key-2',
         isLinked: false,
         linkedToQueryName: null,
       });
+      expect(result[1].targetDEName).toBeUndefined();
     });
   });
 

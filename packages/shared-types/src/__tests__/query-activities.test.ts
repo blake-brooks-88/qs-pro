@@ -108,6 +108,23 @@ describe("QAListItemSchema", () => {
     expect(parsed.linkedToQueryName).toBe("Saved Query A");
   });
 
+  it("accepts targetDEName as optional string", () => {
+    const parsed = QAListItemSchema.parse({
+      ...validItem,
+      targetDEName: "Subscriber_Weekly",
+    });
+    expect(parsed.targetDEName).toBe("Subscriber_Weekly");
+  });
+
+  it("accepts item without targetDEName (optional field)", () => {
+    const { targetDEName: _, ...noTargetDEName } = validItem as Record<
+      string,
+      unknown
+    >;
+    const parsed = QAListItemSchema.parse(noTargetDEName);
+    expect(parsed.targetDEName).toBeUndefined();
+  });
+
   it("accepts isLinked as false", () => {
     const parsed = QAListItemSchema.parse({
       ...validItem,
