@@ -230,10 +230,10 @@ export function QueryActivityModal({
             </div>
             <div className="min-w-0">
               <DialogTitle className="font-display text-2xl font-bold tracking-tight">
-                Deploy to Automation
+                Create Query Activity
               </DialogTitle>
               <p className="text-sm text-muted-foreground">
-                Configure your query activity for Salesforce Marketing Cloud
+                Create a new query activity in Automation Studio
               </p>
             </div>
           </div>
@@ -572,7 +572,7 @@ export function QueryActivityModal({
               className="bg-primary hover:bg-primary-600 text-primary-foreground text-xs font-bold px-6 h-10 shadow-lg shadow-primary/20 disabled:opacity-50 transition-all active:scale-95"
             >
               <Rocket size={16} weight="Bold" className="mr-2" />
-              {isPending ? "Deploying..." : "Deploy Activity"}
+              {isPending ? "Creating..." : "Create Activity"}
             </Button>
           </div>
         </DialogFooter>

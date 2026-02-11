@@ -1,5 +1,5 @@
 import type { VersionListItem } from "@qpp/shared-types";
-import { CloseSquare, RestartCircle } from "@solar-icons/react";
+import { CloseSquare, Export, RestartCircle } from "@solar-icons/react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -24,6 +24,8 @@ interface VersionHistoryPanelProps {
   onClose: () => void;
   onRestore: (sqlText: string) => void;
   onUpgradeClick: () => void;
+  onPublishVersion?: (versionId: string) => void;
+  isLinked?: boolean;
 }
 
 function findPreviousVersionId(
@@ -56,6 +58,8 @@ export function VersionHistoryPanel({
   onClose,
   onRestore,
   onUpgradeClick,
+  onPublishVersion,
+  isLinked,
 }: VersionHistoryPanelProps) {
   const { enabled: hasAccess } = useFeature("versionHistory");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
@@ -210,18 +214,31 @@ export function VersionHistoryPanel({
             </div>
           </button>
           {effectiveSelectedId && versions.length > 0 ? (
-            <Button
-              onClick={() => setIsRestoreDialogOpen(true)}
-              disabled={isViewingLatest || restoreMutation.isPending}
-              size="sm"
-              variant="default"
-              className="text-[11px] h-7 gap-1.5 px-2.5"
-            >
-              <RestartCircle size={14} />
-              {restoreMutation.isPending
-                ? "Restoring..."
-                : "Restore this version"}
-            </Button>
+            <>
+              {isLinked && onPublishVersion ? (
+                <Button
+                  onClick={() => onPublishVersion(effectiveSelectedId)}
+                  size="sm"
+                  variant="outline"
+                  className="text-[11px] h-7 gap-1.5 px-2.5"
+                >
+                  <Export size={14} />
+                  Publish
+                </Button>
+              ) : null}
+              <Button
+                onClick={() => setIsRestoreDialogOpen(true)}
+                disabled={isViewingLatest || restoreMutation.isPending}
+                size="sm"
+                variant="default"
+                className="text-[11px] h-7 gap-1.5 px-2.5"
+              >
+                <RestartCircle size={14} />
+                {restoreMutation.isPending
+                  ? "Restoring..."
+                  : "Restore this version"}
+              </Button>
+            </>
           ) : null}
           <button
             type="button"
