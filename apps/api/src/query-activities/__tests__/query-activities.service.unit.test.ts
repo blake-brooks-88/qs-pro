@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   DataExtensionService,
   ErrorCode,
+  MceBridgeService,
   MetadataService,
   QueryDefinitionService,
+  RlsContextService,
 } from '@qpp/backend-shared';
 import type { CreateQueryActivityDto } from '@qpp/shared-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -59,6 +61,39 @@ describe('QueryActivitiesService', () => {
           provide: MetadataService,
           useValue: {
             getFields: vi.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: MceBridgeService,
+          useValue: {
+            request: vi.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: RlsContextService,
+          useValue: {
+            runWithUserContext: vi
+              .fn()
+              .mockImplementation(
+                (_t: string, _m: string, _u: string, fn: () => unknown) => fn(),
+              ),
+          },
+        },
+        {
+          provide: 'QUERY_PUBLISH_EVENT_REPOSITORY',
+          useValue: {
+            create: vi.fn().mockResolvedValue({
+              id: 'pe-1',
+              savedQueryId: 'sq-1',
+              versionId: 'v-1',
+              tenantId: 'tenant-123',
+              mid: '12345',
+              userId: 'user-456',
+              linkedQaCustomerKey: 'qa-key-1',
+              publishedSqlHash: 'abc123',
+              createdAt: new Date(),
+            }),
+            findLatestBySavedQueryId: vi.fn().mockResolvedValue(null),
           },
         },
         {

@@ -13,6 +13,7 @@ import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import {
   CreateQueryActivitySchema,
   LinkQueryRequestSchema,
+  PublishQueryRequestSchema,
 } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
@@ -103,6 +104,59 @@ export class QueryActivitiesController {
     await this.requireDeployFeature(user.tenantId);
 
     return this.queryActivitiesService.unlinkQuery(
+      user.tenantId,
+      user.userId,
+      user.mid,
+      savedQueryId,
+    );
+  }
+
+  @Post('publish/:savedQueryId')
+  @UseGuards(CsrfGuard)
+  async publishQuery(
+    @CurrentUser() user: UserSession,
+    @Param('savedQueryId') savedQueryId: string,
+    @Body() body: unknown,
+  ) {
+    await this.requireDeployFeature(user.tenantId);
+
+    const result = PublishQueryRequestSchema.safeParse(body);
+    if (!result.success) {
+      throw new BadRequestException(result.error.errors);
+    }
+
+    return this.queryActivitiesService.publish(
+      user.tenantId,
+      user.userId,
+      user.mid,
+      savedQueryId,
+      result.data.versionId,
+    );
+  }
+
+  @Get('drift/:savedQueryId')
+  async checkDrift(
+    @CurrentUser() user: UserSession,
+    @Param('savedQueryId') savedQueryId: string,
+  ) {
+    await this.requireDeployFeature(user.tenantId);
+
+    return this.queryActivitiesService.checkDrift(
+      user.tenantId,
+      user.userId,
+      user.mid,
+      savedQueryId,
+    );
+  }
+
+  @Get('blast-radius/:savedQueryId')
+  async getBlastRadius(
+    @CurrentUser() user: UserSession,
+    @Param('savedQueryId') savedQueryId: string,
+  ) {
+    await this.requireDeployFeature(user.tenantId);
+
+    return this.queryActivitiesService.getBlastRadius(
       user.tenantId,
       user.userId,
       user.mid,
