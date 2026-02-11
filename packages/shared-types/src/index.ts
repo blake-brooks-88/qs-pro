@@ -99,6 +99,22 @@ export {
   QAListItemSchema,
 } from "./query-activities.js";
 
+// Query Publish
+export type {
+  AutomationInfo,
+  BlastRadiusResponse,
+  DriftCheckResponse,
+  PublishQueryRequest,
+  PublishQueryResponse,
+} from "./query-publish.js";
+export {
+  AutomationInfoSchema,
+  BlastRadiusResponseSchema,
+  DriftCheckResponseSchema,
+  PublishQueryRequestSchema,
+  PublishQueryResponseSchema,
+} from "./query-publish.js";
+
 // Usage
 export type { UsageResponse } from "./usage.js";
 export { UsageResponseSchema } from "./usage.js";

@@ -234,6 +234,37 @@ export const queryVersions = pgTable(
   }),
 );
 
+// 11. Query Publish Events (Annotation model: tags an existing version as published)
+export const queryPublishEvents = pgTable(
+  "query_publish_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    savedQueryId: uuid("saved_query_id")
+      .references(() => savedQueries.id, { onDelete: "cascade" })
+      .notNull(),
+    versionId: uuid("version_id")
+      .references(() => queryVersions.id, { onDelete: "cascade" })
+      .notNull(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    mid: varchar("mid").notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    linkedQaCustomerKey: varchar("linked_qa_customer_key").notNull(),
+    publishedSqlHash: varchar("published_sql_hash").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    savedQueryIdIdx: index("query_publish_events_saved_query_id_idx").on(
+      t.savedQueryId,
+    ),
+    versionIdIdx: index("query_publish_events_version_id_idx").on(t.versionId),
+    tenantIdIdx: index("query_publish_events_tenant_id_idx").on(t.tenantId),
+  }),
+);
+
 // --- Zod Validation Schemas ---
 export const selectTenantSchema = createSelectSchema(tenants);
 export const insertTenantSchema = createInsertSchema(tenants);
@@ -268,3 +299,8 @@ export const insertSavedQuerySchema = createInsertSchema(savedQueries);
 
 export const selectQueryVersionSchema = createSelectSchema(queryVersions);
 export const insertQueryVersionSchema = createInsertSchema(queryVersions);
+
+export const selectQueryPublishEventSchema =
+  createSelectSchema(queryPublishEvents);
+export const insertQueryPublishEventSchema =
+  createInsertSchema(queryPublishEvents);
