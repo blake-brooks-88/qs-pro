@@ -108,6 +108,22 @@ export const handlers = [
     return HttpResponse.json([]);
   }),
 
+  http.get("/api/query-activities/:customerKey", ({ params }) => {
+    return HttpResponse.json({
+      objectId: `qa-obj-${params.customerKey}`,
+      customerKey: params.customerKey,
+      name: `Query Activity ${params.customerKey}`,
+      queryText: "SELECT SubscriberKey FROM _Subscribers",
+      targetUpdateType: "Overwrite",
+      targetDEName: "Target DE",
+      targetDECustomerKey: "target-de-key",
+      modifiedDate: new Date().toISOString(),
+      status: "Active",
+      isLinked: false,
+      linkedToQueryName: null,
+    });
+  }),
+
   http.post("/api/query-activities", () => {
     return HttpResponse.json({
       objectId: "qa-obj-new",
