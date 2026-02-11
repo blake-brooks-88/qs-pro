@@ -35,9 +35,9 @@ const FEATURE_CONFIG: Record<
     tier: "pro",
   },
   deployToAutomation: {
-    title: "Deploy to Automation",
+    title: "Automation Studio",
     description:
-      "Deploy queries as permanent MCE Query Activities for scheduled automation workflows.",
+      "Create and publish Query Activities for scheduled automation workflows in MCE.",
     tier: "enterprise",
   },
   teamSnippets: {

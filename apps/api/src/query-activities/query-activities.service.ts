@@ -1,21 +1,76 @@
 import * as crypto from 'node:crypto';
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   AppError,
+  buildGetAutomationsRequest,
+  buildUpdateQueryTextRequest,
   DataExtensionService,
   ErrorCode,
+  MCE_TIMEOUTS,
+  MceBridgeService,
   MetadataService,
   QueryDefinitionService,
+  RlsContextService,
 } from '@qpp/backend-shared';
 import type {
+  BlastRadiusResponse,
   CreateQueryActivityDto,
+  DriftCheckResponse,
   LinkQueryResponse,
+  PublishQueryResponse,
   QADetail,
   QAListItem,
 } from '@qpp/shared-types';
 
 import { SavedQueriesService } from '../saved-queries/saved-queries.service';
+import type { QueryPublishEventsRepository } from './query-publish-events.repository';
+
+const AUTOMATION_STATUS_MAP: Record<number, string> = {
+  [-1]: 'Error',
+  0: 'BuildError',
+  1: 'Building',
+  2: 'Ready',
+  3: 'Running',
+  4: 'Paused',
+  5: 'Stopped',
+  6: 'Scheduled',
+  7: 'Awaiting Trigger',
+  8: 'InactiveTrigger',
+};
+
+const HIGH_RISK_STATUSES = new Set([3, 6, 7]);
+
+const MAX_AUTOMATION_PAGES = 10;
+const AUTOMATIONS_PAGE_SIZE = 200;
+const QUERY_ACTIVITY_OBJECT_TYPE_ID = 300;
+
+interface AutomationActivity {
+  id: string;
+  name: string;
+  objectTypeId: number;
+  activityObjectId: string;
+}
+
+interface AutomationStep {
+  stepNumber: number;
+  activities: AutomationActivity[];
+}
+
+interface AutomationItem {
+  id: string;
+  name: string;
+  description?: string;
+  statusId: number;
+  steps: AutomationStep[];
+}
+
+interface AutomationListResponse {
+  items: AutomationItem[];
+  page: number;
+  pageSize: number;
+  count: number;
+}
 
 @Injectable()
 export class QueryActivitiesService {
@@ -24,6 +79,10 @@ export class QueryActivitiesService {
     private readonly queryDefinitionService: QueryDefinitionService,
     private readonly metadataService: MetadataService,
     private readonly savedQueriesService: SavedQueriesService,
+    private readonly mceBridgeService: MceBridgeService,
+    private readonly rlsContext: RlsContextService,
+    @Inject('QUERY_PUBLISH_EVENT_REPOSITORY')
+    private readonly publishEventRepo: QueryPublishEventsRepository,
   ) {}
 
   async listAllWithLinkStatus(
@@ -264,5 +323,225 @@ export class QueryActivitiesService {
     );
 
     return { objectId: result.objectId, customerKey };
+  }
+
+  async publish(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    savedQueryId: string,
+    versionId: string,
+  ): Promise<PublishQueryResponse> {
+    const savedQuery = await this.savedQueriesService.findById(
+      tenantId,
+      mid,
+      userId,
+      savedQueryId,
+    );
+
+    if (!savedQuery.linkedQaObjectId || !savedQuery.linkedQaCustomerKey) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'publishQuery',
+        reason: 'Saved query is not linked to a Query Activity',
+      });
+    }
+
+    const { linkedQaObjectId, linkedQaCustomerKey } = savedQuery;
+
+    const versionSql = await this.savedQueriesService.getVersionSql(
+      tenantId,
+      mid,
+      userId,
+      savedQueryId,
+      versionId,
+    );
+
+    if (!versionSql) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'publishQuery',
+        reason: `Version not found: ${versionId}`,
+      });
+    }
+
+    const request = buildUpdateQueryTextRequest(
+      linkedQaObjectId,
+      versionSql.sqlText,
+    );
+    await this.mceBridgeService.request(
+      tenantId,
+      userId,
+      mid,
+      request,
+      MCE_TIMEOUTS.METADATA,
+    );
+
+    const publishedSqlHash = this.hashSqlText(versionSql.sqlText);
+
+    const event = await this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      () =>
+        this.publishEventRepo.create({
+          savedQueryId,
+          versionId,
+          tenantId,
+          mid,
+          userId,
+          linkedQaCustomerKey,
+          publishedSqlHash,
+        }),
+    );
+
+    return {
+      publishEventId: event.id,
+      versionId: event.versionId,
+      savedQueryId: event.savedQueryId,
+      publishedSqlHash: event.publishedSqlHash,
+      publishedAt: event.createdAt.toISOString(),
+    };
+  }
+
+  async checkDrift(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    savedQueryId: string,
+  ): Promise<DriftCheckResponse> {
+    const savedQuery = await this.savedQueriesService.findById(
+      tenantId,
+      mid,
+      userId,
+      savedQueryId,
+    );
+
+    if (!savedQuery.linkedQaCustomerKey) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'checkDrift',
+        reason: 'Saved query is not linked to a Query Activity',
+      });
+    }
+
+    const localVersion = await this.savedQueriesService.getLatestVersionSql(
+      tenantId,
+      mid,
+      userId,
+      savedQueryId,
+    );
+
+    const localSql = localVersion?.sqlText ?? '';
+
+    const remoteDetail = await this.queryDefinitionService.retrieveDetail(
+      tenantId,
+      userId,
+      mid,
+      savedQuery.linkedQaCustomerKey,
+    );
+
+    const remoteSql = remoteDetail?.queryText ?? '';
+
+    const localHash = this.hashSqlText(localSql);
+    const remoteHash = this.hashSqlText(remoteSql);
+
+    return {
+      hasDrift: localHash !== remoteHash,
+      localSql,
+      remoteSql,
+      localHash,
+      remoteHash,
+    };
+  }
+
+  async getBlastRadius(
+    tenantId: string,
+    userId: string,
+    mid: string,
+    savedQueryId: string,
+  ): Promise<BlastRadiusResponse> {
+    const savedQuery = await this.savedQueriesService.findById(
+      tenantId,
+      mid,
+      userId,
+      savedQueryId,
+    );
+
+    if (!savedQuery.linkedQaObjectId) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        operation: 'getBlastRadius',
+        reason: 'Saved query is not linked to a Query Activity',
+      });
+    }
+
+    const targetObjectId = savedQuery.linkedQaObjectId;
+    const automations: BlastRadiusResponse['automations'] = [];
+    let page = 1;
+    let totalCount = 0;
+
+    while (page <= MAX_AUTOMATION_PAGES) {
+      const request = buildGetAutomationsRequest(page, AUTOMATIONS_PAGE_SIZE);
+      const response =
+        await this.mceBridgeService.request<AutomationListResponse>(
+          tenantId,
+          userId,
+          mid,
+          request,
+          MCE_TIMEOUTS.METADATA,
+        );
+
+      if (response.items) {
+        for (const automation of response.items) {
+          const containsQa = this.automationContainsQa(
+            automation,
+            targetObjectId,
+          );
+          if (containsQa) {
+            const statusId = automation.statusId ?? 0;
+            automations.push({
+              id: automation.id,
+              name: automation.name,
+              description: automation.description,
+              status: AUTOMATION_STATUS_MAP[statusId] ?? 'Unknown',
+              isHighRisk: HIGH_RISK_STATUSES.has(statusId),
+            });
+          }
+        }
+      }
+
+      totalCount = response.count ?? 0;
+      const fetched = page * AUTOMATIONS_PAGE_SIZE;
+      if (fetched >= totalCount) {
+        break;
+      }
+      page++;
+    }
+
+    return { automations, totalCount: automations.length };
+  }
+
+  private automationContainsQa(
+    automation: AutomationItem,
+    qaObjectId: string,
+  ): boolean {
+    if (!automation.steps) {
+      return false;
+    }
+    for (const step of automation.steps) {
+      if (!step.activities) {
+        continue;
+      }
+      for (const activity of step.activities) {
+        if (
+          activity.objectTypeId === QUERY_ACTIVITY_OBJECT_TYPE_ID &&
+          activity.activityObjectId === qaObjectId
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private hashSqlText(sqlText: string): string {
+    return crypto.createHash('sha256').update(sqlText).digest('hex');
   }
 }

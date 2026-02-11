@@ -41,6 +41,10 @@ export {
   buildRowsetRequest,
 } from "./mce/rest/request-bodies";
 export {
+  buildGetAutomationsRequest,
+  buildUpdateQueryTextRequest,
+} from "./mce/rest/request-bodies/query-update";
+export {
   type IsRunningResponse,
   type RowsetItem,
   type RowsetResponse,

@@ -176,7 +176,7 @@ describe("QueryActivityModal", () => {
       const clearButtons = screen.getAllByRole("button");
       const closeButton = clearButtons.find(
         (btn) =>
-          btn.querySelector("svg") && !btn.textContent?.includes("Deploy"),
+          btn.querySelector("svg") && !btn.textContent?.includes("Create"),
       );
       expect(closeButton).toBeDefined();
     });
@@ -189,7 +189,7 @@ describe("QueryActivityModal", () => {
 
       // Assert - Deploy button should be disabled when no target is selected
       const deployButton = screen.getByRole("button", {
-        name: /deploy activity/i,
+        name: /create activity/i,
       });
       expect(deployButton).toBeDisabled();
     });
@@ -213,7 +213,7 @@ describe("QueryActivityModal", () => {
 
       // Act - Click deploy
       const deployButton = screen.getByRole("button", {
-        name: /deploy activity/i,
+        name: /create activity/i,
       });
       expect(deployButton).not.toBeDisabled();
       await user.click(deployButton);
@@ -261,7 +261,7 @@ describe("QueryActivityModal", () => {
 
       // Act - Click deploy
       const deployButton = screen.getByRole("button", {
-        name: /deploy activity/i,
+        name: /create activity/i,
       });
       await user.click(deployButton);
 
@@ -425,7 +425,7 @@ describe("QueryActivityModal", () => {
 
       // Assert - Deploy button should be disabled
       const deployButton = screen.getByRole("button", {
-        name: /deploy activity/i,
+        name: /create activity/i,
       });
       expect(deployButton).toBeDisabled();
     });

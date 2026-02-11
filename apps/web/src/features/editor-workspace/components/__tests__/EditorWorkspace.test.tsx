@@ -161,10 +161,28 @@ vi.mock("../QueryActivityModal", () => ({
   }) =>
     isOpen ? (
       <div data-testid="mock-qa-modal" role="dialog">
-        <h2>Deploy to Automation</h2>
+        <h2>Create Query Activity</h2>
         <button onClick={onClose} data-testid="qa-modal-close">
           Close
         </button>
+      </div>
+    ) : null,
+}));
+
+vi.mock("../PublishConfirmationDialog", () => ({
+  PublishConfirmationDialog: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? (
+      <div data-testid="mock-publish-confirm-dialog" role="dialog">
+        Publish Confirmation
+      </div>
+    ) : null,
+}));
+
+vi.mock("../DriftDetectionDialog", () => ({
+  DriftDetectionDialog: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? (
+      <div data-testid="mock-drift-dialog" role="dialog">
+        Drift Detection
       </div>
     ) : null,
 }));
@@ -335,6 +353,45 @@ vi.mock("@/features/editor-workspace/hooks/use-saved-queries", () => ({
     data: id && mockSavedQueryData?.id === id ? mockSavedQueryData : undefined,
     isLoading: false,
     isError: false,
+  }),
+}));
+
+vi.mock("@/features/editor-workspace/hooks/use-query-versions", () => ({
+  versionHistoryKeys: {
+    all: ["versionHistory"] as const,
+    list: (savedQueryId: string) =>
+      ["versionHistory", "list", savedQueryId] as const,
+    detail: (savedQueryId: string, versionId: string) =>
+      ["versionHistory", "detail", savedQueryId, versionId] as const,
+  },
+  useQueryVersions: () => ({
+    data: { versions: [], total: 0 },
+    isLoading: false,
+  }),
+  useVersionDetail: () => ({ data: undefined }),
+  useRestoreVersion: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateVersionName: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+vi.mock("@/features/editor-workspace/hooks/use-drift-check", () => ({
+  useDriftCheck: () => ({
+    data: null,
+    refetch: vi.fn().mockResolvedValue({ data: { hasDrift: false } }),
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/features/editor-workspace/hooks/use-publish-query", () => ({
+  usePublishQuery: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({}),
+    isPending: false,
+  }),
+}));
+
+vi.mock("@/features/editor-workspace/hooks/use-blast-radius", () => ({
+  useBlastRadius: () => ({
+    data: { automations: [] },
+    isLoading: false,
   }),
 }));
 
@@ -555,9 +612,9 @@ describe("EditorWorkspace", () => {
       const user = userEvent.setup();
       renderEditorWorkspace();
 
-      // Find and click Deploy to Automation button - has specific text
+      // Find and click Create in AS button - has specific text
       const deployButton = screen.getByRole("button", {
-        name: /deploy to automation/i,
+        name: /create in as/i,
       });
       await user.click(deployButton);
 

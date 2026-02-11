@@ -23,7 +23,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 })
 class TestAppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AdminAuthMiddleware).forRoutes('/admin/*');
+    consumer.apply(AdminAuthMiddleware).forRoutes('/admin/*path');
   }
 }
 
@@ -132,7 +132,7 @@ describe('AdminAuthMiddleware - No API Key Configured', () => {
   })
   class NoKeyModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
-      consumer.apply(AdminAuthMiddleware).forRoutes('/admin/*');
+      consumer.apply(AdminAuthMiddleware).forRoutes('/admin/*path');
     }
   }
 

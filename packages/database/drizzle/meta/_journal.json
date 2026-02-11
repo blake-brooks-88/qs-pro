@@ -141,6 +141,34 @@
       "when": 1770615129000,
       "tag": "0019_rls_saved_queries_broadened",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1770768601138,
+      "tag": "0020_query_publish_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1770768605392,
+      "tag": "0021_rls_query_publish_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1770837406465,
+      "tag": "0022_rls_query_publish_events_hardened",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1770837410943,
+      "tag": "0023_rls_broadened_with_check",
+      "breakpoints": true
     }
   ]
 }

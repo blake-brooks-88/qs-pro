@@ -1,6 +1,9 @@
 import type {
+  BlastRadiusResponse,
   CreateQueryActivityDto,
+  DriftCheckResponse,
   LinkQueryResponse,
+  PublishQueryResponse,
   QADetail,
   QAListItem,
 } from "@qpp/shared-types";
@@ -45,4 +48,33 @@ export async function linkQuery(
 
 export async function unlinkQuery(savedQueryId: string): Promise<void> {
   await api.delete(`/query-activities/link/${savedQueryId}`);
+}
+
+export async function publishQuery(
+  savedQueryId: string,
+  params: { versionId: string },
+): Promise<PublishQueryResponse> {
+  const response = await api.post<PublishQueryResponse>(
+    `/query-activities/publish/${savedQueryId}`,
+    params,
+  );
+  return response.data;
+}
+
+export async function checkDrift(
+  savedQueryId: string,
+): Promise<DriftCheckResponse> {
+  const response = await api.get<DriftCheckResponse>(
+    `/query-activities/drift/${savedQueryId}`,
+  );
+  return response.data;
+}
+
+export async function getBlastRadius(
+  savedQueryId: string,
+): Promise<BlastRadiusResponse> {
+  const response = await api.get<BlastRadiusResponse>(
+    `/query-activities/blast-radius/${savedQueryId}`,
+  );
+  return response.data;
 }

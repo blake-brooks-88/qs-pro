@@ -50,6 +50,6 @@ import { ShellQueryModule } from "./shell-query/shell-query.module";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AdminAuthMiddleware).forRoutes("/admin/*");
+    consumer.apply(AdminAuthMiddleware).forRoutes("/admin/*path");
   }
 }

@@ -8,6 +8,7 @@ import {
   Database,
   Diskette,
   Download,
+  Export,
   History,
   LinkMinimalistic,
   Rocket,
@@ -37,15 +38,21 @@ import {
 } from "@/components/ui/dialog";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
+import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
 import { useCreateQueryActivity } from "@/features/editor-workspace/hooks/use-create-query-activity";
+import { useDriftCheck } from "@/features/editor-workspace/hooks/use-drift-check";
 import { useLinkQuery } from "@/features/editor-workspace/hooks/use-link-query";
 import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
+import { usePublishQuery } from "@/features/editor-workspace/hooks/use-publish-query";
 import {
   queryActivityFoldersQueryKeys,
   useQueryActivityFolders,
 } from "@/features/editor-workspace/hooks/use-query-activity-folders";
 import { useQueryExecution } from "@/features/editor-workspace/hooks/use-query-execution";
-import { versionHistoryKeys } from "@/features/editor-workspace/hooks/use-query-versions";
+import {
+  useQueryVersions,
+  versionHistoryKeys,
+} from "@/features/editor-workspace/hooks/use-query-versions";
 import {
   useSavedQuery,
   useUpdateSavedQuery,
@@ -76,10 +83,12 @@ import { useTabsStore } from "@/store/tabs-store";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { DataExtensionModal } from "./DataExtensionModal";
+import { DriftDetectionDialog } from "./DriftDetectionDialog";
 import { HistoryPanel } from "./HistoryPanel";
 import { LinkedBadge } from "./LinkedBadge";
 import { LinkQueryModal } from "./LinkQueryModal";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
+import { PublishConfirmationDialog } from "./PublishConfirmationDialog";
 import { QueryActivityModal } from "./QueryActivityModal";
 import { QueryTabBar } from "./QueryTabBar";
 import { ResultsPane } from "./ResultsPane";
@@ -140,6 +149,11 @@ export function EditorWorkspace({
     null,
   );
 
+  // Publish flow state
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [showDriftDialog, setShowDriftDialog] = useState(false);
+  const [publishVersionId, setPublishVersionId] = useState<string | null>(null);
+
   // Version History state
   const versionHistoryIsOpen = useVersionHistoryStore((s) => s.isOpen);
   const versionHistorySavedQueryId = useVersionHistoryStore(
@@ -192,6 +206,7 @@ export function EditorWorkspace({
   const { data: qaFolders = [] } = useQueryActivityFolders(eid);
   const createQueryActivityMutation = useCreateQueryActivity();
   const linkMutation = useLinkQuery();
+  const publishMutation = usePublishQuery();
   const { enabled: isDeployFeatureEnabled } = useFeature("deployToAutomation");
 
   // Zustand store - single source of truth for tabs
@@ -269,6 +284,52 @@ export function EditorWorkspace({
       isNew: true,
     };
   }, [activeTab, tabs]);
+
+  // Publish-related: derive linked saved query ID for the active tab
+  const activeTabLinkedSavedQueryId = useMemo(() => {
+    if (safeActiveTab.queryId && safeActiveTab.linkedQaCustomerKey) {
+      return safeActiveTab.queryId;
+    }
+    return undefined;
+  }, [safeActiveTab.queryId, safeActiveTab.linkedQaCustomerKey]);
+
+  const driftCheck = useDriftCheck(activeTabLinkedSavedQueryId);
+  const blastRadius = useBlastRadius(
+    showPublishConfirm ? activeTabLinkedSavedQueryId : undefined,
+  );
+  const { data: versionsData } = useQueryVersions(activeTabLinkedSavedQueryId);
+
+  const latestVersionId = useMemo(() => {
+    const versions = versionsData?.versions;
+    if (!versions || versions.length === 0) {
+      return null;
+    }
+    const sorted = [...versions].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    return sorted[0]?.id ?? null;
+  }, [versionsData?.versions]);
+
+  // Drift check on linked query open (once per tab)
+  const driftCheckedTabsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (
+      !activeTabId ||
+      !activeTabLinkedSavedQueryId ||
+      driftCheckedTabsRef.current.has(activeTabId)
+    ) {
+      return;
+    }
+    driftCheckedTabsRef.current.add(activeTabId);
+    void driftCheck.refetch().then((result) => {
+      if (result.data?.hasDrift) {
+        setShowDriftDialog(true);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on tab/link change
+  }, [activeTabId, activeTabLinkedSavedQueryId]);
 
   // Use the new hook that merges sync (legacy/prereq) and async (AST worker) diagnostics
   const sqlDiagnostics = useSqlDiagnostics(safeActiveTab.content, {
@@ -572,6 +633,108 @@ export function EditorWorkspace({
     setIsLinkModalOpen(false);
     setLinkTargetQueryId(null);
     setIsQueryActivityModalOpen(true);
+  }, []);
+
+  // Publish flow handlers
+  const handlePublishClick = useCallback(async () => {
+    if (!safeActiveTab.queryId || !safeActiveTab.linkedQaCustomerKey) {
+      return;
+    }
+
+    if (safeActiveTab.isNew) {
+      toast.warning("Save your query before publishing.");
+      return;
+    }
+    if (safeActiveTab.isDirty) {
+      toast.warning("Save your changes before publishing.");
+      return;
+    }
+
+    const result = await driftCheck.refetch();
+    if (result.data?.hasDrift) {
+      setShowDriftDialog(true);
+    } else {
+      setPublishVersionId(null);
+      setShowPublishConfirm(true);
+    }
+  }, [
+    safeActiveTab.queryId,
+    safeActiveTab.linkedQaCustomerKey,
+    safeActiveTab.isNew,
+    safeActiveTab.isDirty,
+    driftCheck,
+  ]);
+
+  const handleDriftKeepMine = useCallback(() => {
+    setShowDriftDialog(false);
+    setPublishVersionId(null);
+    setShowPublishConfirm(true);
+  }, []);
+
+  const handleDriftAcceptTheirs = useCallback(async () => {
+    if (!safeActiveTab.queryId || !driftCheck.data?.remoteSql) {
+      return;
+    }
+    try {
+      await updateQuery.mutateAsync({
+        id: safeActiveTab.queryId,
+        data: { sqlText: driftCheck.data.remoteSql },
+      });
+      if (activeTabId) {
+        storeUpdateTabContent(activeTabId, driftCheck.data.remoteSql);
+        storeMarkTabSaved(
+          activeTabId,
+          safeActiveTab.queryId,
+          safeActiveTab.name,
+        );
+      }
+      toast.success("Accepted Automation Studio version as new local version.");
+      setShowDriftDialog(false);
+    } catch {
+      toast.error("Failed to accept remote version.");
+    }
+  }, [
+    safeActiveTab.queryId,
+    safeActiveTab.name,
+    driftCheck.data?.remoteSql,
+    activeTabId,
+    updateQuery,
+    storeUpdateTabContent,
+    storeMarkTabSaved,
+  ]);
+
+  const handlePublishConfirm = useCallback(async () => {
+    if (!safeActiveTab.queryId) {
+      return;
+    }
+    const versionId = publishVersionId ?? latestVersionId;
+    if (!versionId) {
+      toast.error("No version available to publish.");
+      return;
+    }
+    try {
+      await publishMutation.mutateAsync({
+        savedQueryId: safeActiveTab.queryId,
+        versionId,
+      });
+      setShowPublishConfirm(false);
+      setPublishVersionId(null);
+      toast.success("Published to Automation Studio.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "An error occurred";
+      toast.error("Failed to publish", { description: message });
+    }
+  }, [
+    safeActiveTab.queryId,
+    publishVersionId,
+    latestVersionId,
+    publishMutation,
+  ]);
+
+  const handleVersionPublish = useCallback((versionId: string) => {
+    setPublishVersionId(versionId);
+    setShowPublishConfirm(true);
   }, []);
 
   const handleCloseTab = useCallback(
@@ -948,6 +1111,12 @@ export function EditorWorkspace({
                   onClose={closeVersionHistory}
                   onRestore={handleVersionRestore}
                   onUpgradeClick={() => setIsUpgradeModalOpen(true)}
+                  onPublishVersion={
+                    isDeployFeatureEnabled && safeActiveTab.linkedQaCustomerKey
+                      ? handleVersionPublish
+                      : undefined
+                  }
+                  isLinked={!!safeActiveTab.linkedQaCustomerKey}
                 />
               ) : (
                 <>
@@ -1020,10 +1189,36 @@ export function EditorWorkspace({
                               <>
                                 <div className="h-4 w-px bg-border mx-1" />
                                 {safeActiveTab.linkedQaCustomerKey ? (
-                                  <LinkedBadge
-                                    size="md"
-                                    qaName={safeActiveTab.linkedQaName}
-                                  />
+                                  <>
+                                    <LinkedBadge
+                                      size="md"
+                                      qaName={safeActiveTab.linkedQaName}
+                                    />
+                                    <Tooltip.Root>
+                                      <Tooltip.Trigger asChild>
+                                        <button
+                                          onClick={() =>
+                                            void handlePublishClick()
+                                          }
+                                          disabled={publishMutation.isPending}
+                                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground rounded-md transition-all active:scale-95 disabled:opacity-50"
+                                        >
+                                          <Export size={16} />
+                                          Publish
+                                        </button>
+                                      </Tooltip.Trigger>
+                                      <Tooltip.Portal>
+                                        <Tooltip.Content
+                                          className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50 font-bold uppercase tracking-tight"
+                                          sideOffset={5}
+                                          collisionPadding={10}
+                                        >
+                                          Push SQL to linked Query Activity
+                                          <Tooltip.Arrow className="fill-foreground" />
+                                        </Tooltip.Content>
+                                      </Tooltip.Portal>
+                                    </Tooltip.Root>
+                                  </>
                                 ) : (
                                   <ToolbarButton
                                     icon={<LinkMinimalistic size={18} />}
@@ -1070,7 +1265,7 @@ export function EditorWorkspace({
                                 weight="Bold"
                                 className="group-hover:animate-bounce"
                               />
-                              Deploy to Automation
+                              Create in AS
                             </button>
                           </Tooltip.Trigger>
                           <Tooltip.Portal>
@@ -1239,6 +1434,32 @@ export function EditorWorkspace({
             onCreateNew={handleLinkCreateNew}
           />
         ) : null}
+
+        <PublishConfirmationDialog
+          isOpen={showPublishConfirm}
+          onClose={() => {
+            setShowPublishConfirm(false);
+            setPublishVersionId(null);
+          }}
+          onConfirm={() => void handlePublishConfirm()}
+          isPending={publishMutation.isPending}
+          qaName={safeActiveTab.linkedQaName ?? "Query Activity"}
+          currentAsSql={driftCheck.data?.remoteSql ?? null}
+          versionSql={safeActiveTab.content}
+          automations={blastRadius.data?.automations ?? []}
+          isLoadingBlastRadius={blastRadius.isLoading}
+        />
+
+        <DriftDetectionDialog
+          isOpen={showDriftDialog}
+          onClose={() => setShowDriftDialog(false)}
+          localSql={driftCheck.data?.localSql ?? safeActiveTab.content}
+          remoteSql={driftCheck.data?.remoteSql ?? ""}
+          qaName={safeActiveTab.linkedQaName ?? "Query Activity"}
+          onKeepMine={handleDriftKeepMine}
+          onAcceptTheirs={() => void handleDriftAcceptTheirs()}
+          isPending={updateQuery.isPending}
+        />
 
         <TargetDataExtensionModal
           isOpen={isTargetDEModalOpen}

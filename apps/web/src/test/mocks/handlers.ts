@@ -128,4 +128,31 @@ export const handlers = [
   http.delete("/api/query-activities/link/:savedQueryId", () => {
     return HttpResponse.json({ success: true });
   }),
+
+  http.post("/api/query-activities/publish/:savedQueryId", () => {
+    return HttpResponse.json({
+      publishEventId: "pub-evt-1",
+      versionId: "ver-1",
+      savedQueryId: "sq-1",
+      publishedSqlHash: "abc123",
+      publishedAt: new Date().toISOString(),
+    });
+  }),
+
+  http.get("/api/query-activities/drift/:savedQueryId", () => {
+    return HttpResponse.json({
+      hasDrift: false,
+      localSql: "SELECT 1",
+      remoteSql: "SELECT 1",
+      localHash: "hash1",
+      remoteHash: "hash1",
+    });
+  }),
+
+  http.get("/api/query-activities/blast-radius/:savedQueryId", () => {
+    return HttpResponse.json({
+      automations: [],
+      totalCount: 0,
+    });
+  }),
 ];

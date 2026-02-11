@@ -21,7 +21,7 @@ const PRO_BENEFITS = [
   "Unlimited saved queries",
   "Query execution history",
   "Target DE runs",
-  "Deploy to Automation Studio",
+  "Automation Studio integration",
   "Advanced autocomplete",
   "Code minimap and quick fixes",
 ] as const;

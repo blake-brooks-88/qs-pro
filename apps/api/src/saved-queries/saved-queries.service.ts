@@ -483,6 +483,77 @@ export class SavedQueriesService {
     });
   }
 
+  async getLatestVersionSql(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    savedQueryId: string,
+  ): Promise<{
+    versionId: string;
+    sqlText: string;
+    sqlTextHash: string;
+  } | null> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const version =
+          await this.queryVersionsRepository.findLatestBySavedQueryId(
+            savedQueryId,
+          );
+        if (!version) {
+          return null;
+        }
+        const sqlText = this.encryptionService.decrypt(
+          version.sqlTextEncrypted,
+        );
+        if (sqlText === null || sqlText === undefined) {
+          throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+            reason: 'Failed to decrypt version SQL text',
+          });
+        }
+        return {
+          versionId: version.id,
+          sqlText,
+          sqlTextHash: version.sqlTextHash,
+        };
+      },
+    );
+  }
+
+  async getVersionSql(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    savedQueryId: string,
+    versionId: string,
+  ): Promise<{ sqlText: string; sqlTextHash: string } | null> {
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const version = await this.queryVersionsRepository.findById(versionId);
+        if (version?.savedQueryId !== savedQueryId) {
+          return null;
+        }
+        const sqlText = this.encryptionService.decrypt(
+          version.sqlTextEncrypted,
+        );
+        if (sqlText === null || sqlText === undefined) {
+          throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+            reason: 'Failed to decrypt version SQL text',
+          });
+        }
+        return {
+          sqlText,
+          sqlTextHash: version.sqlTextHash,
+        };
+      },
+    );
+  }
+
   private async linkToQAWithConflictCheck(
     id: string,
     params: LinkToQAParams,
