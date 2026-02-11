@@ -430,7 +430,7 @@ describe('QueryActivitiesService', () => {
         isLinked: false,
         linkedToQueryName: null,
       });
-      expect(result[1].targetDEName).toBeUndefined();
+      expect(result[1]?.targetDEName).toBeUndefined();
     });
   });
 
