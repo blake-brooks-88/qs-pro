@@ -103,6 +103,7 @@ export class QueryActivitiesService {
       targetUpdateType: qa.targetUpdateType,
       modifiedDate: qa.modifiedDate,
       status: qa.status,
+      targetDEName: qa.targetDEName,
       isLinked: linkedMap.has(qa.customerKey),
       linkedToQueryName: linkedMap.get(qa.customerKey) ?? null,
     }));

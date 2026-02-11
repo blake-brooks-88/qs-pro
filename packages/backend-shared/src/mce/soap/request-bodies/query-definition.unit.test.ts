@@ -429,6 +429,7 @@ describe("QueryDefinition SOAP Request Builders", () => {
         "TargetUpdateType",
         "ModifiedDate",
         "Status",
+        "DataExtensionTarget.Name",
       ]);
     });
 

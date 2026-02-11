@@ -117,6 +117,7 @@ export function buildRetrieveAllQueryDefinitions(): string {
     <Properties>TargetUpdateType</Properties>
     <Properties>ModifiedDate</Properties>
     <Properties>Status</Properties>
+    <Properties>DataExtensionTarget.Name</Properties>
   </RetrieveRequest>
 </RetrieveRequestMsg>`;
 }

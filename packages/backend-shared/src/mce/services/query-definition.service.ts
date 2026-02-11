@@ -260,12 +260,14 @@ export class QueryDefinitionService {
       targetUpdateType?: string;
       modifiedDate?: string;
       status?: string;
+      targetDEName?: string;
     })[]
   > {
     const results: (QueryDefinition & {
       targetUpdateType?: string;
       modifiedDate?: string;
       status?: string;
+      targetDEName?: string;
     })[] = [];
     let currentRequestId: string | undefined;
     let page = 0;
@@ -298,6 +300,11 @@ export class QueryDefinitionService {
               ? String(item.ModifiedDate)
               : undefined,
             status: item.Status ? String(item.Status) : undefined,
+            targetDEName: (
+              item.DataExtensionTarget as { Name?: string } | undefined
+            )?.Name
+              ? String((item.DataExtensionTarget as { Name?: string }).Name)
+              : undefined,
           });
         }
       }
