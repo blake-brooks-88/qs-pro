@@ -161,8 +161,23 @@ describe("query-activities service", () => {
 
       expect(api.delete).toHaveBeenCalledWith(
         `/query-activities/link/${savedQueryId}`,
+        { data: undefined },
       );
       expect(result).toBeUndefined();
+    });
+
+    it("sends options in delete body when provided", async () => {
+      const savedQueryId = "sq-unlink-456";
+      const options = { deleteLocal: true, deleteRemote: false };
+
+      vi.mocked(api.delete).mockResolvedValueOnce({});
+
+      await unlinkQuery(savedQueryId, options);
+
+      expect(api.delete).toHaveBeenCalledWith(
+        `/query-activities/link/${savedQueryId}`,
+        { data: options },
+      );
     });
   });
 });

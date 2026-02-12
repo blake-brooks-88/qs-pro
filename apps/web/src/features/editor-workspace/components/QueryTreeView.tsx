@@ -7,6 +7,7 @@ import {
   CodeFile,
   Folder as FolderIcon,
   History,
+  LinkBrokenMinimalistic,
   LinkMinimalistic,
   Pen,
   TrashBinMinimalistic,
@@ -35,6 +36,7 @@ interface QueryTreeViewProps {
   onViewQueryHistory?: (queryId: string) => void;
   onViewVersionHistory?: (queryId: string) => void;
   onLinkQuery?: (queryId: string) => void;
+  onUnlinkQuery?: (queryId: string) => void;
 }
 
 interface FolderNodeProps {
@@ -60,6 +62,7 @@ interface FolderNodeProps {
   onViewQueryHistory?: (queryId: string) => void;
   onViewVersionHistory?: (queryId: string) => void;
   onLinkQuery?: (queryId: string) => void;
+  onUnlinkQuery?: (queryId: string) => void;
 }
 
 interface QueryNodeProps {
@@ -74,6 +77,7 @@ interface QueryNodeProps {
   onViewHistory?: () => void;
   onViewVersionHistory?: () => void;
   onLinkQuery?: () => void;
+  onUnlinkQuery?: () => void;
 }
 
 function QueryNode({
@@ -88,6 +92,7 @@ function QueryNode({
   onViewHistory,
   onViewVersionHistory,
   onLinkQuery,
+  onUnlinkQuery,
 }: QueryNodeProps) {
   if (isRenaming) {
     return (
@@ -162,6 +167,15 @@ function QueryNode({
               Link to Query Activity
             </ContextMenu.Item>
           ) : null}
+          {onUnlinkQuery && query.linkedQaCustomerKey ? (
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              onSelect={onUnlinkQuery}
+            >
+              <LinkBrokenMinimalistic size={14} />
+              Unlink from Query Activity
+            </ContextMenu.Item>
+          ) : null}
           <ContextMenu.Item
             className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
             onSelect={onStartRename}
@@ -206,6 +220,7 @@ function FolderNode({
   onViewQueryHistory,
   onViewVersionHistory,
   onLinkQuery,
+  onUnlinkQuery,
 }: FolderNodeProps) {
   const isRenaming = renamingId === `folder-${folder.id}`;
 
@@ -312,6 +327,7 @@ function FolderNode({
                 onViewQueryHistory={onViewQueryHistory}
                 onViewVersionHistory={onViewVersionHistory}
                 onLinkQuery={onLinkQuery}
+                onUnlinkQuery={onUnlinkQuery}
               />
             );
           })}
@@ -339,6 +355,9 @@ function FolderNode({
               onLinkQuery={
                 onLinkQuery ? () => onLinkQuery(query.id) : undefined
               }
+              onUnlinkQuery={
+                onUnlinkQuery ? () => onUnlinkQuery(query.id) : undefined
+              }
             />
           ))}
         </div>
@@ -354,6 +373,7 @@ export function QueryTreeView({
   onViewQueryHistory,
   onViewVersionHistory,
   onLinkQuery,
+  onUnlinkQuery,
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
@@ -516,6 +536,7 @@ export function QueryTreeView({
                 onViewQueryHistory={onViewQueryHistory}
                 onViewVersionHistory={onViewVersionHistory}
                 onLinkQuery={onLinkQuery}
+                onUnlinkQuery={onUnlinkQuery}
               />
             );
           })}
@@ -542,6 +563,9 @@ export function QueryTreeView({
               }
               onLinkQuery={
                 onLinkQuery ? () => onLinkQuery(query.id) : undefined
+              }
+              onUnlinkQuery={
+                onUnlinkQuery ? () => onUnlinkQuery(query.id) : undefined
               }
             />
           ))}

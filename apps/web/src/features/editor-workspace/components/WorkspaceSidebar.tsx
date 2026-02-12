@@ -43,6 +43,7 @@ interface WorkspaceSidebarProps {
   onViewQueryHistory?: (queryId: string) => void;
   onViewVersionHistory?: (queryId: string) => void;
   onLinkQuery?: (queryId: string) => void;
+  onUnlinkQuery?: (queryId: string) => void;
 }
 
 interface DataExtensionNodeProps {
@@ -190,6 +191,7 @@ export function WorkspaceSidebar({
   onViewQueryHistory,
   onViewVersionHistory,
   onLinkQuery,
+  onUnlinkQuery,
 }: WorkspaceSidebarProps) {
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { tier } = useTier();
@@ -670,6 +672,7 @@ export function WorkspaceSidebar({
               onViewQueryHistory={onViewQueryHistory}
               onViewVersionHistory={onViewVersionHistory}
               onLinkQuery={onLinkQuery}
+              onUnlinkQuery={onUnlinkQuery}
             />
           )}
         </div>
