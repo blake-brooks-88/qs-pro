@@ -369,13 +369,13 @@ describe('QueryActivitiesService (publish)', () => {
     const makeAutomation = (
       id: string,
       name: string,
-      statusId: number,
+      status: number,
       qaObjectId: string,
       objectTypeId = 300,
     ) => ({
       id,
       name,
-      statusId,
+      status,
       steps: [
         {
           stepNumber: 1,
@@ -393,13 +393,11 @@ describe('QueryActivitiesService (publish)', () => {
 
     it('returns automations that contain the linked QA (objectTypeId 300)', async () => {
       vi.mocked(mceBridgeService.request).mockResolvedValue({
-        items: [
+        entry: [
           makeAutomation('auto-1', 'Daily Export', 2, 'qa-obj-100'),
           makeAutomation('auto-2', 'Weekly Sync', 3, 'qa-obj-999'),
         ],
-        page: 1,
-        pageSize: 200,
-        count: 2,
+        totalResults: 2,
       });
 
       const result = await service.getBlastRadius(
@@ -418,10 +416,8 @@ describe('QueryActivitiesService (publish)', () => {
 
     it('returns empty automations array when no automations contain the QA', async () => {
       vi.mocked(mceBridgeService.request).mockResolvedValue({
-        items: [makeAutomation('auto-1', 'Unrelated', 2, 'qa-obj-other')],
-        page: 1,
-        pageSize: 200,
-        count: 1,
+        entry: [makeAutomation('auto-1', 'Unrelated', 2, 'qa-obj-other')],
+        totalResults: 1,
       });
 
       const result = await service.getBlastRadius(
@@ -437,14 +433,12 @@ describe('QueryActivitiesService (publish)', () => {
 
     it('marks statuses 3 (Running), 6 (Scheduled), 7 (Awaiting Trigger) as isHighRisk: true', async () => {
       vi.mocked(mceBridgeService.request).mockResolvedValue({
-        items: [
+        entry: [
           makeAutomation('auto-running', 'Running Auto', 3, 'qa-obj-100'),
           makeAutomation('auto-sched', 'Scheduled Auto', 6, 'qa-obj-100'),
           makeAutomation('auto-trigger', 'Trigger Auto', 7, 'qa-obj-100'),
         ],
-        page: 1,
-        pageSize: 200,
-        count: 3,
+        totalResults: 3,
       });
 
       const result = await service.getBlastRadius(
@@ -467,10 +461,8 @@ describe('QueryActivitiesService (publish)', () => {
       );
 
       vi.mocked(mceBridgeService.request).mockResolvedValue({
-        items,
-        page: 1,
-        pageSize: 200,
-        count: items.length,
+        entry: items,
+        totalResults: items.length,
       });
 
       const result = await service.getBlastRadius(
@@ -488,16 +480,14 @@ describe('QueryActivitiesService (publish)', () => {
 
     it('maps status codes to human-readable strings', async () => {
       vi.mocked(mceBridgeService.request).mockResolvedValue({
-        items: [
+        entry: [
           makeAutomation('a1', 'Running', 3, 'qa-obj-100'),
           makeAutomation('a2', 'Ready', 2, 'qa-obj-100'),
           makeAutomation('a3', 'Scheduled', 6, 'qa-obj-100'),
           makeAutomation('a4', 'Error', -1, 'qa-obj-100'),
           makeAutomation('a5', 'Awaiting', 7, 'qa-obj-100'),
         ],
-        page: 1,
-        pageSize: 200,
-        count: 5,
+        totalResults: 5,
       });
 
       const result = await service.getBlastRadius(
@@ -520,16 +510,12 @@ describe('QueryActivitiesService (publish)', () => {
     it('handles pagination when first page count exceeds pageSize', async () => {
       vi.mocked(mceBridgeService.request)
         .mockResolvedValueOnce({
-          items: [makeAutomation('auto-p1', 'Page 1 Auto', 2, 'qa-obj-100')],
-          page: 1,
-          pageSize: 200,
-          count: 300,
+          entry: [makeAutomation('auto-p1', 'Page 1 Auto', 2, 'qa-obj-100')],
+          totalResults: 300,
         })
         .mockResolvedValueOnce({
-          items: [makeAutomation('auto-p2', 'Page 2 Auto', 3, 'qa-obj-100')],
-          page: 2,
-          pageSize: 200,
-          count: 300,
+          entry: [makeAutomation('auto-p2', 'Page 2 Auto', 3, 'qa-obj-100')],
+          totalResults: 300,
         });
 
       const result = await service.getBlastRadius(
@@ -559,14 +545,12 @@ describe('QueryActivitiesService (publish)', () => {
 
     it('returns totalCount matching the number of matching automations', async () => {
       vi.mocked(mceBridgeService.request).mockResolvedValue({
-        items: [
+        entry: [
           makeAutomation('auto-1', 'Match 1', 2, 'qa-obj-100'),
           makeAutomation('auto-2', 'No Match', 2, 'qa-obj-other'),
           makeAutomation('auto-3', 'Match 2', 5, 'qa-obj-100'),
         ],
-        page: 1,
-        pageSize: 200,
-        count: 3,
+        totalResults: 3,
       });
 
       const result = await service.getBlastRadius(
@@ -582,12 +566,10 @@ describe('QueryActivitiesService (publish)', () => {
 
     it('ignores activities with objectTypeId other than 300', async () => {
       vi.mocked(mceBridgeService.request).mockResolvedValue({
-        items: [
+        entry: [
           makeAutomation('auto-1', 'Non-QA Activity', 2, 'qa-obj-100', 42),
         ],
-        page: 1,
-        pageSize: 200,
-        count: 1,
+        totalResults: 1,
       });
 
       const result = await service.getBlastRadius(

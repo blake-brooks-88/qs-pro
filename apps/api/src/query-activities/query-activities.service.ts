@@ -62,15 +62,13 @@ interface AutomationItem {
   id: string;
   name: string;
   description?: string;
-  statusId: number;
+  status: number;
   steps: AutomationStep[];
 }
 
 interface AutomationListResponse {
-  items: AutomationItem[];
-  page: number;
-  pageSize: number;
-  count: number;
+  entry: AutomationItem[];
+  totalResults: number;
 }
 
 @Injectable()
@@ -534,26 +532,26 @@ export class QueryActivitiesService {
           MCE_TIMEOUTS.METADATA,
         );
 
-      if (response.items) {
-        for (const automation of response.items) {
+      if (response.entry) {
+        for (const automation of response.entry) {
           const containsQa = this.automationContainsQa(
             automation,
             targetObjectId,
           );
           if (containsQa) {
-            const statusId = automation.statusId ?? 0;
+            const status = automation.status ?? 0;
             automations.push({
               id: automation.id,
               name: automation.name,
               description: automation.description,
-              status: AUTOMATION_STATUS_MAP[statusId] ?? 'Unknown',
-              isHighRisk: HIGH_RISK_STATUSES.has(statusId),
+              status: AUTOMATION_STATUS_MAP[status] ?? 'Unknown',
+              isHighRisk: HIGH_RISK_STATUSES.has(status),
             });
           }
         }
       }
 
-      totalCount = response.count ?? 0;
+      totalCount = response.totalResults ?? 0;
       const fetched = page * AUTOMATIONS_PAGE_SIZE;
       if (fetched >= totalCount) {
         break;

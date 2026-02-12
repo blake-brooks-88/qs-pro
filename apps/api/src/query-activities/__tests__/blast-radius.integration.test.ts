@@ -68,9 +68,7 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
   const createdSavedQueryIds: string[] = [];
 
   const mockMceBridge = {
-    request: vi
-      .fn()
-      .mockResolvedValue({ items: [], page: 1, pageSize: 200, count: 0 }),
+    request: vi.fn().mockResolvedValue({ entry: [], totalResults: 0 }),
   };
 
   const mockQDService = {
@@ -147,17 +145,17 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
       id: string;
       name: string;
       description?: string;
-      statusId: number;
+      status: number;
       qaObjectId: string;
     }>,
-    opts?: { page?: number; pageSize?: number; count?: number },
+    opts?: { totalResults?: number },
   ) {
     return {
-      items: automations.map((a) => ({
+      entry: automations.map((a) => ({
         id: a.id,
         name: a.name,
         description: a.description,
-        statusId: a.statusId,
+        status: a.status,
         steps: [
           {
             stepNumber: 1,
@@ -172,9 +170,7 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
           },
         ],
       })),
-      page: opts?.page ?? 1,
-      pageSize: opts?.pageSize ?? 200,
-      count: opts?.count ?? automations.length,
+      totalResults: opts?.totalResults ?? automations.length,
     };
   }
 
@@ -291,10 +287,8 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
 
     vi.clearAllMocks();
     mockMceBridge.request.mockResolvedValue({
-      items: [],
-      page: 1,
-      pageSize: 200,
-      count: 0,
+      entry: [],
+      totalResults: 0,
     });
   });
 
@@ -308,14 +302,14 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
             id: 'auto-1',
             name: 'Daily Extract',
             description: 'Runs daily at 8am',
-            statusId: 3,
+            status: 3,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
           {
             id: 'auto-2',
             name: 'Weekly Report',
             description: 'Weekly rollup',
-            statusId: 4,
+            status: 4,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
         ]),
@@ -351,7 +345,7 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
           {
             id: 'auto-other',
             name: 'Other Automation',
-            statusId: 2,
+            status: 2,
             qaObjectId: 'some-other-qa-obj',
           },
         ]),
@@ -376,37 +370,37 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
           {
             id: 'auto-running',
             name: 'Running Auto',
-            statusId: 3,
+            status: 3,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
           {
             id: 'auto-scheduled',
             name: 'Scheduled Auto',
-            statusId: 6,
+            status: 6,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
           {
             id: 'auto-awaiting',
             name: 'Awaiting Auto',
-            statusId: 7,
+            status: 7,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
           {
             id: 'auto-ready',
             name: 'Ready Auto',
-            statusId: 2,
+            status: 2,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
           {
             id: 'auto-paused',
             name: 'Paused Auto',
-            statusId: 4,
+            status: 4,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
           {
             id: 'auto-stopped',
             name: 'Stopped Auto',
-            statusId: 5,
+            status: 5,
             qaObjectId: TEST_QA_OBJECT_ID,
           },
         ]),
@@ -488,11 +482,11 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
                 {
                   id: 'auto-p1',
                   name: 'Page 1 Auto',
-                  statusId: 3,
+                  status: 3,
                   qaObjectId: TEST_QA_OBJECT_ID,
                 },
               ],
-              { page: 1, pageSize: 200, count: 250 },
+              { totalResults: 250 },
             ),
           );
         }
@@ -502,11 +496,11 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
               {
                 id: 'auto-p2',
                 name: 'Page 2 Auto',
-                statusId: 2,
+                status: 2,
                 qaObjectId: TEST_QA_OBJECT_ID,
               },
             ],
-            { page: 2, pageSize: 200, count: 250 },
+            { totalResults: 250 },
           ),
         );
       });
