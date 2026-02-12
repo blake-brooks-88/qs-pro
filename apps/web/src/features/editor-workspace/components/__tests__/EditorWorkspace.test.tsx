@@ -354,6 +354,14 @@ vi.mock("@/features/editor-workspace/hooks/use-saved-queries", () => ({
     isLoading: false,
     isError: false,
   }),
+  useCreateSavedQuery: () => ({
+    mutateAsync: vi
+      .fn()
+      .mockResolvedValue({ id: "new-q", name: "Imported Query" }),
+    isPending: false,
+  }),
+  useSavedQueries: () => ({ data: [], isLoading: false }),
+  useSavedQueryCount: () => ({ data: 0, isLoading: false }),
 }));
 
 vi.mock("@/features/editor-workspace/hooks/use-query-versions", () => ({

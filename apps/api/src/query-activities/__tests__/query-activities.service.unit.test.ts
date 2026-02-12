@@ -394,6 +394,7 @@ describe('QueryActivitiesService', () => {
           customerKey: 'qa-key-1',
           name: 'QA One',
           targetUpdateType: 'Overwrite',
+          targetDEName: 'Subscriber_Weekly',
         },
         {
           objectId: 'qa-obj-2',
@@ -422,11 +423,54 @@ describe('QueryActivitiesService', () => {
         customerKey: 'qa-key-1',
         isLinked: true,
         linkedToQueryName: 'My Saved Query',
+        targetDEName: 'Subscriber_Weekly',
       });
       expect(result[1]).toMatchObject({
         customerKey: 'qa-key-2',
         isLinked: false,
         linkedToQueryName: null,
+      });
+      expect(result[1]?.targetDEName).toBeUndefined();
+    });
+
+    it('excludes ephemeral QPP shell queries from the list', async () => {
+      // Arrange
+      vi.mocked(queryDefinitionService.retrieveAll).mockResolvedValue([
+        {
+          objectId: 'qa-obj-1',
+          customerKey: 'qa-key-1',
+          name: 'Legit QA',
+          targetUpdateType: 'Overwrite',
+        },
+        {
+          objectId: 'shell-obj-1',
+          customerKey: 'QPP_Query_user-456',
+          name: 'QPP_Query_user-456',
+          targetUpdateType: 'Overwrite',
+        },
+        {
+          objectId: 'shell-obj-2',
+          customerKey: 'QPP_Query_user-789',
+          name: 'QPP_Query_user-789',
+          targetUpdateType: 'Overwrite',
+        },
+      ]);
+      vi.mocked(savedQueriesService.findAllLinkedQaKeys).mockResolvedValue(
+        new Map<string, string | null>(),
+      );
+
+      // Act
+      const result = await service.listAllWithLinkStatus(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+      );
+
+      // Assert
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        customerKey: 'qa-key-1',
+        name: 'Legit QA',
       });
     });
   });

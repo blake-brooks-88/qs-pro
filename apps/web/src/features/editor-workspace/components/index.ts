@@ -3,6 +3,7 @@ export * from "./ConfirmationDialog";
 export * from "./DataExtensionForm";
 export * from "./DataExtensionModal";
 export * from "./DriftDetectionDialog";
+export * from "./ImportQueryModal";
 export * from "./MonacoQueryEditor";
 export * from "./PublishConfirmationDialog";
 export * from "./QueryActivityModal";

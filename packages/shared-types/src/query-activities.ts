@@ -49,6 +49,7 @@ export const QAListItemSchema = z.object({
   targetUpdateType: z.string().optional(),
   modifiedDate: z.string().optional(),
   status: z.string().optional(),
+  targetDEName: z.string().optional(),
   isLinked: z.boolean(),
   linkedToQueryName: z.string().nullable(),
 });

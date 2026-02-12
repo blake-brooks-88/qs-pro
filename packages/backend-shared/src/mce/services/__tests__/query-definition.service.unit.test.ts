@@ -552,6 +552,7 @@ describe("QueryDefinitionService", () => {
                 TargetUpdateType: "Overwrite",
                 ModifiedDate: "2026-02-01T12:00:00Z",
                 Status: "Active",
+                DataExtensionTarget: { Name: "Subscriber_Weekly" },
               },
             ],
           },
@@ -569,6 +570,7 @@ describe("QueryDefinitionService", () => {
         targetUpdateType: "Overwrite",
         modifiedDate: "2026-02-01T12:00:00Z",
         status: "Active",
+        targetDEName: "Subscriber_Weekly",
       });
     });
 
@@ -587,6 +589,7 @@ describe("QueryDefinitionService", () => {
       expect(results[0]?.targetUpdateType).toBeUndefined();
       expect(results[0]?.modifiedDate).toBeUndefined();
       expect(results[0]?.status).toBeUndefined();
+      expect(results[0]?.targetDEName).toBeUndefined();
     });
 
     it("handles a single (non-array) Result", async () => {

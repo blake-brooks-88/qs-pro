@@ -10,6 +10,7 @@ import {
   Download,
   Export,
   History,
+  Import,
   LinkMinimalistic,
   Rocket,
 } from "@solar-icons/react";
@@ -85,6 +86,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog";
 import { DataExtensionModal } from "./DataExtensionModal";
 import { DriftDetectionDialog } from "./DriftDetectionDialog";
 import { HistoryPanel } from "./HistoryPanel";
+import { ImportQueryModal } from "./ImportQueryModal";
 import { LinkedBadge } from "./LinkedBadge";
 import { LinkQueryModal } from "./LinkQueryModal";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
@@ -144,6 +146,7 @@ export function EditorWorkspace({
     [],
   );
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkTargetQueryId, setLinkTargetQueryId] = useState<string | null>(
     null,
@@ -1167,6 +1170,16 @@ export function EditorWorkspace({
                             className="text-primary hover:text-primary-foreground hover:bg-primary"
                           />
                         </FeatureGate>
+                        {isDeployFeatureEnabled ? (
+                          <>
+                            <div className="h-4 w-px bg-border mx-1" />
+                            <ToolbarButton
+                              icon={<Import size={18} />}
+                              label="Import from Automation Studio"
+                              onClick={() => setIsImportModalOpen(true)}
+                            />
+                          </>
+                        ) : null}
                         {safeActiveTab.queryId ? (
                           <>
                             <div className="h-4 w-px bg-border mx-1" />
@@ -1434,6 +1447,21 @@ export function EditorWorkspace({
             onCreateNew={handleLinkCreateNew}
           />
         ) : null}
+
+        <ImportQueryModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImportSaved={(queryId, name, sqlText) => {
+            storeOpenQuery(queryId, name, sqlText);
+            setIsImportModalOpen(false);
+          }}
+          onOpenInEditor={(sqlText, qaName) => {
+            const tabId = storeCreateNewTab();
+            storeUpdateTabContent(tabId, sqlText);
+            setIsImportModalOpen(false);
+            toast.success(`Opened "${qaName}" in editor`);
+          }}
+        />
 
         <PublishConfirmationDialog
           isOpen={showPublishConfirm}
