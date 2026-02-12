@@ -44,6 +44,7 @@ const HIGH_RISK_STATUSES = new Set([3, 6, 7]);
 const MAX_AUTOMATION_PAGES = 10;
 const AUTOMATIONS_PAGE_SIZE = 200;
 const QUERY_ACTIVITY_OBJECT_TYPE_ID = 300;
+const QPP_SHELL_QUERY_PREFIX = 'QPP_Query_';
 
 interface AutomationActivity {
   id: string;
@@ -90,10 +91,14 @@ export class QueryActivitiesService {
     userId: string,
     mid: string,
   ): Promise<QAListItem[]> {
-    const [qaList, linkedMap] = await Promise.all([
+    const [allQaList, linkedMap] = await Promise.all([
       this.queryDefinitionService.retrieveAll(tenantId, userId, mid),
       this.savedQueriesService.findAllLinkedQaKeys(tenantId, mid, userId),
     ]);
+
+    const qaList = allQaList.filter(
+      (qa) => !qa.customerKey.startsWith(QPP_SHELL_QUERY_PREFIX),
+    );
 
     return qaList.map((qa) => ({
       objectId: qa.objectId,
