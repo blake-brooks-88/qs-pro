@@ -202,7 +202,7 @@ describe("use-link-query hooks", () => {
         wrapper: createWrapper(queryClient),
       });
 
-      result.current.mutate("sq-456");
+      result.current.mutate({ savedQueryId: "sq-456" });
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
@@ -223,7 +223,7 @@ describe("use-link-query hooks", () => {
         wrapper: createWrapper(queryClient),
       });
 
-      result.current.mutate("sq-456");
+      result.current.mutate({ savedQueryId: "sq-456" });
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
@@ -247,7 +247,7 @@ describe("use-link-query hooks", () => {
         wrapper: createWrapper(queryClient),
       });
 
-      result.current.mutate("sq-456");
+      result.current.mutate({ savedQueryId: "sq-456" });
 
       await waitFor(() => expect(result.current.isError).toBe(true));
     });

@@ -48,8 +48,13 @@ export async function linkQuery(
   return response.data;
 }
 
-export async function unlinkQuery(savedQueryId: string): Promise<void> {
-  await api.delete(`/query-activities/link/${savedQueryId}`);
+export async function unlinkQuery(
+  savedQueryId: string,
+  options?: { deleteLocal?: boolean; deleteRemote?: boolean },
+): Promise<void> {
+  await api.delete(`/query-activities/link/${savedQueryId}`, {
+    data: options,
+  });
 }
 
 export async function publishQuery(
