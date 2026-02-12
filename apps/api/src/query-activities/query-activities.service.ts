@@ -220,13 +220,53 @@ export class QueryActivitiesService {
     userId: string,
     mid: string,
     savedQueryId: string,
+    options: { deleteLocal: boolean; deleteRemote: boolean } = {
+      deleteLocal: false,
+      deleteRemote: false,
+    },
   ): Promise<{ success: true }> {
+    const savedQuery = await this.savedQueriesService.findById(
+      tenantId,
+      mid,
+      userId,
+      savedQueryId,
+    );
+
+    const { linkedQaObjectId } = savedQuery;
+
+    if (options.deleteRemote && !linkedQaObjectId) {
+      throw new AppError(ErrorCode.INVALID_STATE, undefined, {
+        operation: 'unlinkQuery',
+        reason:
+          'Cannot delete remote Query Activity: saved query is not linked',
+      });
+    }
+
     await this.savedQueriesService.unlinkFromQA(
       tenantId,
       mid,
       userId,
       savedQueryId,
     );
+
+    if (options.deleteRemote && linkedQaObjectId) {
+      await this.queryDefinitionService.delete(
+        tenantId,
+        userId,
+        mid,
+        linkedQaObjectId,
+      );
+    }
+
+    if (options.deleteLocal) {
+      await this.savedQueriesService.delete(
+        tenantId,
+        mid,
+        userId,
+        savedQueryId,
+      );
+    }
+
     return { success: true };
   }
 

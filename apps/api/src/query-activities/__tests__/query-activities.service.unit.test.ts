@@ -55,6 +55,7 @@ describe('QueryActivitiesService', () => {
             retrieveAll: vi.fn().mockResolvedValue([]),
             retrieveDetail: vi.fn().mockResolvedValue(null),
             create: vi.fn().mockResolvedValue({ objectId: 'created-obj-id' }),
+            delete: vi.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -99,6 +100,19 @@ describe('QueryActivitiesService', () => {
         {
           provide: SavedQueriesService,
           useValue: {
+            findById: vi.fn().mockResolvedValue({
+              id: 'sq-1',
+              name: 'My Query',
+              sqlText: 'SELECT 1',
+              folderId: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              linkedQaObjectId: 'qa-obj-1',
+              linkedQaCustomerKey: 'qa-key-1',
+              linkedQaName: 'QA One',
+              linkedAt: new Date(),
+            }),
+            delete: vi.fn().mockResolvedValue(undefined),
             findAllLinkedQaKeys: vi
               .fn()
               .mockResolvedValue(new Map<string, string | null>()),
@@ -606,7 +620,7 @@ describe('QueryActivitiesService', () => {
   });
 
   describe('unlinkQuery', () => {
-    it('unlinks saved query and returns success', async () => {
+    it('unlinks saved query and returns success (no options — backwards compatible)', async () => {
       // Act
       const result = await service.unlinkQuery(
         mockTenantId,
@@ -617,12 +631,118 @@ describe('QueryActivitiesService', () => {
 
       // Assert
       expect(result).toEqual({ success: true });
+      expect(savedQueriesService.findById).toHaveBeenCalledWith(
+        mockTenantId,
+        mockMid,
+        mockUserId,
+        'sq-1',
+      );
       expect(savedQueriesService.unlinkFromQA).toHaveBeenCalledWith(
         mockTenantId,
         mockMid,
         mockUserId,
         'sq-1',
       );
+      expect(savedQueriesService.delete).not.toHaveBeenCalled();
+      expect(queryDefinitionService.delete).not.toHaveBeenCalled();
+    });
+
+    it('unlinks and deletes local saved query when deleteLocal is true', async () => {
+      // Act
+      const result = await service.unlinkQuery(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'sq-1',
+        { deleteLocal: true, deleteRemote: false },
+      );
+
+      // Assert
+      expect(result).toEqual({ success: true });
+      expect(savedQueriesService.unlinkFromQA).toHaveBeenCalled();
+      expect(savedQueriesService.delete).toHaveBeenCalledWith(
+        mockTenantId,
+        mockMid,
+        mockUserId,
+        'sq-1',
+      );
+      expect(queryDefinitionService.delete).not.toHaveBeenCalled();
+    });
+
+    it('unlinks and deletes remote QA when deleteRemote is true and query is linked', async () => {
+      // Act
+      const result = await service.unlinkQuery(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'sq-1',
+        { deleteLocal: false, deleteRemote: true },
+      );
+
+      // Assert
+      expect(result).toEqual({ success: true });
+      expect(savedQueriesService.unlinkFromQA).toHaveBeenCalled();
+      expect(queryDefinitionService.delete).toHaveBeenCalledWith(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'qa-obj-1',
+      );
+      expect(savedQueriesService.delete).not.toHaveBeenCalled();
+    });
+
+    it('unlinks then deletes both local and remote when both flags are true', async () => {
+      // Act
+      const result = await service.unlinkQuery(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'sq-1',
+        { deleteLocal: true, deleteRemote: true },
+      );
+
+      // Assert
+      expect(result).toEqual({ success: true });
+      expect(savedQueriesService.unlinkFromQA).toHaveBeenCalled();
+      expect(queryDefinitionService.delete).toHaveBeenCalledWith(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'qa-obj-1',
+      );
+      expect(savedQueriesService.delete).toHaveBeenCalledWith(
+        mockTenantId,
+        mockMid,
+        mockUserId,
+        'sq-1',
+      );
+    });
+
+    it('throws INVALID_STATE when deleteRemote is true but query has no linked QA', async () => {
+      // Arrange
+      vi.mocked(savedQueriesService.findById).mockResolvedValueOnce({
+        id: 'sq-1',
+        name: 'My Query',
+        sqlText: 'SELECT 1',
+        folderId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        linkedQaObjectId: null,
+        linkedQaCustomerKey: null,
+        linkedQaName: null,
+        linkedAt: null,
+      });
+
+      // Act & Assert
+      await expect(
+        service.unlinkQuery(mockTenantId, mockUserId, mockMid, 'sq-1', {
+          deleteLocal: false,
+          deleteRemote: true,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.INVALID_STATE,
+      });
+      expect(savedQueriesService.unlinkFromQA).not.toHaveBeenCalled();
     });
   });
 });

@@ -90,6 +90,7 @@ export type {
   LinkQueryResponse,
   QADetail,
   QAListItem,
+  UnlinkRequest,
 } from "./query-activities.js";
 export {
   CreateQueryActivitySchema,
@@ -97,6 +98,7 @@ export {
   LinkQueryResponseSchema,
   QADetailSchema,
   QAListItemSchema,
+  UnlinkRequestSchema,
 } from "./query-activities.js";
 
 // Query Publish
