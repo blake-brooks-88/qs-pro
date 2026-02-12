@@ -28,7 +28,9 @@ export async function listQueryActivities(): Promise<QAListItem[]> {
 export async function getQueryActivityDetail(
   customerKey: string,
 ): Promise<QADetail> {
-  const response = await api.get<QADetail>(`/query-activities/${customerKey}`);
+  const response = await api.get<QADetail>(
+    `/query-activities/${encodeURIComponent(customerKey)}`,
+  );
   return response.data;
 }
 

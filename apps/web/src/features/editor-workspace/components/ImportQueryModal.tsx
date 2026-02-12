@@ -105,11 +105,10 @@ export function ImportQueryModal({
   }
 
   function handleOpenInEditor() {
-    if (!fetchedSql || !selectedQA) {
+    if (fetchedSql === null || !selectedQA) {
       return;
     }
     onOpenInEditor(fetchedSql, selectedQA.name);
-    toast.success(`Opened "${selectedQA.name}" in editor`);
     resetState();
     onClose();
   }
@@ -125,7 +124,7 @@ export function ImportQueryModal({
   }
 
   async function handleImport() {
-    if (!fetchedSql || !importName.trim()) {
+    if (fetchedSql === null || !importName.trim()) {
       return;
     }
 
