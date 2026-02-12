@@ -744,5 +744,57 @@ describe('QueryActivitiesService', () => {
       });
       expect(savedQueriesService.unlinkFromQA).not.toHaveBeenCalled();
     });
+
+    it('propagates SOAP deletion error after unlink has already completed', async () => {
+      // Arrange
+      const soapError = new Error('SOAP fault: delete failed');
+      vi.mocked(queryDefinitionService.delete).mockRejectedValueOnce(soapError);
+
+      // Act & Assert — error propagates to caller
+      await expect(
+        service.unlinkQuery(mockTenantId, mockUserId, mockMid, 'sq-1', {
+          deleteLocal: false,
+          deleteRemote: true,
+        }),
+      ).rejects.toThrow('SOAP fault: delete failed');
+
+      // Assert — unlinkFromQA was still called before the error
+      expect(savedQueriesService.unlinkFromQA).toHaveBeenCalledWith(
+        mockTenantId,
+        mockMid,
+        mockUserId,
+        'sq-1',
+      );
+    });
+
+    it('captures linkedQaObjectId before unlinking so remote deletion uses pre-unlink value', async () => {
+      // Arrange — simulate unlinkFromQA clearing the link columns
+      vi.mocked(savedQueriesService.findById).mockResolvedValueOnce({
+        id: 'sq-1',
+        name: 'My Query',
+        sqlText: 'SELECT 1',
+        folderId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        linkedQaObjectId: 'qa-obj-captured',
+        linkedQaCustomerKey: 'qa-key-captured',
+        linkedQaName: 'Captured QA',
+        linkedAt: new Date(),
+      });
+
+      // Act
+      await service.unlinkQuery(mockTenantId, mockUserId, mockMid, 'sq-1', {
+        deleteLocal: false,
+        deleteRemote: true,
+      });
+
+      // Assert — delete was called with the pre-unlink objectId
+      expect(queryDefinitionService.delete).toHaveBeenCalledWith(
+        mockTenantId,
+        mockUserId,
+        mockMid,
+        'qa-obj-captured',
+      );
+    });
   });
 });
