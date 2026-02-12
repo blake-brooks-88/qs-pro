@@ -421,7 +421,7 @@ describe("UnlinkModal", () => {
       expect(listItems).toHaveLength(3);
 
       const highRiskDots = document.querySelectorAll(".bg-amber-500");
-      expect(highRiskDots.length).toBeGreaterThanOrEqual(2);
+      expect(highRiskDots).toHaveLength(2);
     });
 
     it("shows acknowledgment checkbox", async () => {
