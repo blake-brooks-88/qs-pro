@@ -185,7 +185,9 @@ vi.mock("../UnlinkModal", () => ({
       <div data-testid="mock-unlink-modal" role="dialog">
         <span>Unlink Query Activity</span>
         <button
-          onClick={() => onUnlinkComplete({ deleteLocal: false, deleteRemote: false })}
+          onClick={() =>
+            onUnlinkComplete({ deleteLocal: false, deleteRemote: false })
+          }
           data-testid="unlink-confirm-btn"
         >
           Confirm Unlink
@@ -433,9 +435,7 @@ describe("EditorWorkspace - Unlink Integration", () => {
       await user.click(button);
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("mock-unlink-modal"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("mock-unlink-modal")).toBeInTheDocument();
       });
     });
 
@@ -457,9 +457,7 @@ describe("EditorWorkspace - Unlink Integration", () => {
       await user.click(button);
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("mock-unlink-modal"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("mock-unlink-modal")).toBeInTheDocument();
       });
 
       // Click confirm in mock modal (triggers onUnlinkComplete with deleteLocal: false)
