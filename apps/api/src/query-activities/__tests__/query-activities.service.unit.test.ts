@@ -767,7 +767,7 @@ describe('QueryActivitiesService', () => {
       );
     });
 
-    it('captures linkedQaObjectId before unlinking so remote deletion uses pre-unlink value', async () => {
+    it('captures linkedQaCustomerKey before unlinking so remote deletion uses pre-unlink value', async () => {
       // Arrange — simulate unlinkFromQA clearing the link columns
       vi.mocked(savedQueriesService.findById).mockResolvedValueOnce({
         id: 'sq-1',
