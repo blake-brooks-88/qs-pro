@@ -507,7 +507,14 @@ export class QueryDefinitionService {
     );
 
     const result = response.Body?.DeleteResponse?.Results;
-    if (result?.StatusCode && result.StatusCode !== "OK") {
+    if (!result?.StatusCode) {
+      throw mceSoapFailure(
+        "DeleteQueryDefinition",
+        "NoResponse",
+        "Delete response did not contain a StatusCode",
+      );
+    }
+    if (result.StatusCode !== "OK") {
       throw mceSoapFailure(
         "DeleteQueryDefinition",
         result.StatusCode,

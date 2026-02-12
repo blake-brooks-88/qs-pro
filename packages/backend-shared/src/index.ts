@@ -41,6 +41,7 @@ export {
   buildRowsetRequest,
 } from "./mce/rest/request-bodies";
 export {
+  buildGetAutomationDetailRequest,
   buildGetAutomationsRequest,
   buildUpdateQueryTextRequest,
 } from "./mce/rest/request-bodies/query-update";

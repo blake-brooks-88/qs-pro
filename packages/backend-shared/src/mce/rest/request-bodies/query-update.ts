@@ -56,6 +56,30 @@ export function buildGetAutomationsRequest(
 
   return {
     method: "GET",
-    url: `/automation/v1/automations?$page=${page}&$pagesize=${pageSize}`,
+    // Community examples use both `page`/`pageSize` and `$page`/`$pageSize`.
+    // Sending both makes pagination more resilient across tenants/versions.
+    url: `/automation/v1/automations?page=${page}&pageSize=${pageSize}&$page=${page}&$pageSize=${pageSize}`,
+  };
+}
+
+export interface GetAutomationDetailRequest {
+  method: "GET";
+  url: string;
+}
+
+export function buildGetAutomationDetailRequest(
+  automationId: string,
+): GetAutomationDetailRequest {
+  if (!automationId || automationId.trim() === "") {
+    throw new AppError(ErrorCode.MCE_BAD_REQUEST, undefined, {
+      field: "automationId",
+      reason: "must not be empty",
+    });
+  }
+
+  const encodedId = encodeURIComponent(automationId);
+  return {
+    method: "GET",
+    url: `/automation/v1/automations/${encodedId}`,
   };
 }

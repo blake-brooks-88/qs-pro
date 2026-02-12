@@ -88,14 +88,18 @@ describe("buildGetAutomationsRequest", () => {
     const result = buildGetAutomationsRequest(1, 200);
 
     expect(result.method).toBe("GET");
-    expect(result.url).toBe("/automation/v1/automations?$page=1&$pagesize=200");
+    expect(result.url).toBe(
+      "/automation/v1/automations?page=1&pageSize=200&$page=1&$pageSize=200",
+    );
   });
 
   it("handles different page/pageSize values correctly", () => {
     const result = buildGetAutomationsRequest(3, 50);
 
     expect(result.method).toBe("GET");
-    expect(result.url).toBe("/automation/v1/automations?$page=3&$pagesize=50");
+    expect(result.url).toBe(
+      "/automation/v1/automations?page=3&pageSize=50&$page=3&$pageSize=50",
+    );
   });
 
   it("throws AppError (MCE_BAD_REQUEST) when page is less than 1", () => {
