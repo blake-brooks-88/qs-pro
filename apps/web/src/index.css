@@ -158,6 +158,26 @@
 .animate-badge-pulse-enterprise {
   animation: badge-pulse-enterprise 2s ease-in-out infinite;
 }
+
+/* Published version green pulse */
+@keyframes publish-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 148, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(0, 255, 148, 0);
+  }
+}
+
+.animate-publish-pulse {
+  animation: publish-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-publish-pulse {
+    animation: none;
+  }
+}
 }
 
 /* Monaco Editor Semantic Decorations - must override Monaco's inline token styles */
