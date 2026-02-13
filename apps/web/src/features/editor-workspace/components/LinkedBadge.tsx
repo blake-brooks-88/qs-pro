@@ -40,22 +40,19 @@ export function LinkedBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 text-emerald-500 text-xs font-medium max-w-48",
+        "inline-flex items-center gap-1.5 text-emerald-500 text-xs font-medium max-w-64",
         className,
       )}
     >
-      <LinkMinimalistic size={iconSize} />
-      <span className="truncate">
+      <LinkMinimalistic size={iconSize} className="shrink-0" />
+      <span className="min-w-0 truncate">
         {qaName ? `Linked to ${qaName}` : "Linked"}
-        {qaName &&
-        typeof automationCount === "number" &&
-        automationCount > 0 ? (
-          <span className="text-muted-foreground font-normal">
-            {" "}
-            &middot; {formatCountSuffix(automationCount)}
-          </span>
-        ) : null}
       </span>
+      {qaName && typeof automationCount === "number" && automationCount > 0 ? (
+        <span className="shrink-0 whitespace-nowrap text-muted-foreground font-normal">
+          &middot; {formatCountSuffix(automationCount)}
+        </span>
+      ) : null}
     </span>
   );
 }
