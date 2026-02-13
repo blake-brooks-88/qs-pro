@@ -29,6 +29,10 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 
 import { registerSqlCompletionProvider } from "./monaco/register-sql-completion-provider";
+import {
+  registerCursorPositionListener,
+  registerSqlEditorKeybindings,
+} from "./monaco/register-sql-editor-keybindings";
 import { registerSqlInlineCompletionsProvider } from "./monaco/register-sql-inline-completions-provider";
 
 const MAX_ERROR_TOKEN_LENGTH = 80;
@@ -480,51 +484,22 @@ export function MonacoQueryEditor({
         autoBracketRef.current = false;
       });
 
-      // Use refs to always get latest callbacks (avoids stale closure issues)
-      editorInstance.addCommand(
-        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
-        () => {
-          onSaveRef.current?.();
-        },
-      );
-
-      if (onSaveAs) {
-        editorInstance.addCommand(
-          monacoInstance.KeyMod.CtrlCmd |
-            monacoInstance.KeyMod.Shift |
-            monacoInstance.KeyCode.KeyS,
-          () => {
-            onSaveAsRef.current?.();
-          },
-        );
-      }
-
-      if (onRunRequest) {
-        editorInstance.addCommand(
-          monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter,
-          () => {
-            onRunRequest();
-          },
-        );
-      }
-
-      editorInstance.addCommand(
-        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Slash,
-        () => {
-          void editorInstance.getAction("editor.action.commentLine")?.run();
-        },
-      );
+      registerSqlEditorKeybindings({
+        editor: editorInstance,
+        monaco: monacoInstance,
+        getOnSave: () => onSaveRef.current,
+        getOnSaveAs: () => onSaveAsRef.current,
+        enableSaveAs: Boolean(onSaveAs),
+        onRunRequest,
+      });
 
       cursorPositionDisposableRef.current?.dispose();
-      cursorPositionDisposableRef.current =
-        editorInstance.onDidChangeCursorPosition((event) => {
-          const model = editorInstance.getModel();
-          if (!model) {
-            return;
-          }
-          const offset = model.getOffsetAt(event.position);
+      cursorPositionDisposableRef.current = registerCursorPositionListener({
+        editor: editorInstance,
+        onCursorPositionChange: (offset) => {
           onCursorPositionChangeRef.current?.(offset);
-        });
+        },
+      });
     },
     [
       diagnostics,
