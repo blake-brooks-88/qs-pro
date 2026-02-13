@@ -17,4 +17,5 @@ export interface QueryPublishEventsRepository {
   findLatestBySavedQueryId(
     savedQueryId: string,
   ): Promise<QueryPublishEvent | null>;
+  findBySavedQueryId(savedQueryId: string): Promise<QueryPublishEvent[]>;
 }

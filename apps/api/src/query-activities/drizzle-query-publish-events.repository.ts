@@ -54,4 +54,12 @@ export class DrizzleQueryPublishEventsRepository implements QueryPublishEventsRe
       .limit(1);
     return results[0] ?? null;
   }
+
+  async findBySavedQueryId(savedQueryId: string): Promise<QueryPublishEvent[]> {
+    return this.getDb()
+      .select()
+      .from(queryPublishEvents)
+      .where(eq(queryPublishEvents.savedQueryId, savedQueryId))
+      .orderBy(desc(queryPublishEvents.createdAt));
+  }
 }

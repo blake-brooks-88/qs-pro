@@ -106,6 +106,8 @@ export type {
   AutomationInfo,
   BlastRadiusResponse,
   DriftCheckResponse,
+  PublishEventListItem,
+  PublishEventsListResponse,
   PublishQueryRequest,
   PublishQueryResponse,
 } from "./query-publish.js";
@@ -113,6 +115,8 @@ export {
   AutomationInfoSchema,
   BlastRadiusResponseSchema,
   DriftCheckResponseSchema,
+  PublishEventListItemSchema,
+  PublishEventsListResponseSchema,
   PublishQueryRequestSchema,
   PublishQueryResponseSchema,
 } from "./query-publish.js";
