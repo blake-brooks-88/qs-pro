@@ -28,6 +28,11 @@ import { toMonacoMarkers } from "@/features/editor-workspace/utils/sql-diagnosti
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 
+import {
+  registerSqlAutoBracketInsertOnFromJoin,
+  registerSqlSuggestRetriggerOnDot,
+  registerSqlTabExpandFromJoin,
+} from "./monaco/register-sql-auto-bracket-behavior";
 import { registerSqlCompletionProvider } from "./monaco/register-sql-completion-provider";
 import {
   registerCursorPositionListener,
@@ -72,6 +77,7 @@ export function MonacoQueryEditor({
   const autoBracketDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const inlineCompletionDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const suggestRetriggerDisposableRef = useRef<Monaco.IDisposable | null>(null);
+  const tabExpandDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const cursorPositionDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const autoBracketRef = useRef(false);
   const onCursorPositionChangeRef = useRef(onCursorPositionChange);
@@ -327,166 +333,23 @@ export function MonacoQueryEditor({
       });
 
       autoBracketDisposableRef.current?.dispose();
-      autoBracketDisposableRef.current = editorInstance.onDidChangeModelContent(
-        (event) => {
-          if (autoBracketRef.current) {
-            return;
-          }
-          const model = editorInstance.getModel();
-          if (!model) {
-            return;
-          }
-
-          const latestChange = event.changes[event.changes.length - 1];
-          if (!latestChange) {
-            return;
-          }
-          if (!latestChange.text) {
-            return;
-          }
-
-          const changeEnd = latestChange.rangeOffset + latestChange.text.length;
-          const prefixStart = Math.max(0, changeEnd - 7);
-          const prefix = model
-            .getValue()
-            .slice(prefixStart, changeEnd)
-            .toLowerCase();
-          const shouldInsert = /\b(from|join)\s$/.test(prefix);
-
-          if (!shouldInsert) {
-            return;
-          }
-
-          const position = model.getPositionAt(changeEnd);
-          const nextChar = model.getValueInRange({
-            startLineNumber: position.lineNumber,
-            startColumn: position.column,
-            endLineNumber: position.lineNumber,
-            endColumn: position.column + 1,
-          });
-
-          if (nextChar.startsWith("[")) {
-            return;
-          }
-
-          autoBracketRef.current = true;
-          editorInstance.trigger("keyboard", "type", { text: "[" });
-          autoBracketRef.current = false;
+      autoBracketDisposableRef.current = registerSqlAutoBracketInsertOnFromJoin(
+        {
+          editor: editorInstance,
+          autoBracketRef,
         },
       );
 
       suggestRetriggerDisposableRef.current?.dispose();
-      suggestRetriggerDisposableRef.current =
-        editorInstance.onDidChangeModelContent((event) => {
-          const model = editorInstance.getModel();
-          if (!model) {
-            return;
-          }
+      suggestRetriggerDisposableRef.current = registerSqlSuggestRetriggerOnDot({
+        editor: editorInstance,
+      });
 
-          const latestChange = event.changes[event.changes.length - 1];
-          if (!latestChange) {
-            return;
-          }
-
-          const insertedText = latestChange.text;
-          if (insertedText?.length !== 1) {
-            return;
-          }
-          if (!/[a-zA-Z0-9_]/.test(insertedText)) {
-            return;
-          }
-
-          const changeEnd = latestChange.rangeOffset + insertedText.length;
-          if (changeEnd < 2) {
-            return;
-          }
-
-          const charBeforeInsert = model.getValue().charAt(changeEnd - 2);
-          if (charBeforeInsert !== ".") {
-            return;
-          }
-
-          editorInstance.trigger(
-            "retrigger",
-            "editor.action.triggerSuggest",
-            {},
-          );
-        });
-
-      editorInstance.onKeyDown((event) => {
-        if (event.keyCode !== monacoInstance.KeyCode.Tab) {
-          return;
-        }
-        if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
-          return;
-        }
-
-        const model = editorInstance.getModel();
-        const position = editorInstance.getPosition();
-        if (!model || !position) {
-          return;
-        }
-
-        const offset = model.getOffsetAt(position);
-        const wordInfo = model.getWordUntilPosition(position);
-        const currentWord = wordInfo.word ?? "";
-        const charBefore = model.getValueInRange({
-          startLineNumber: position.lineNumber,
-          startColumn: Math.max(1, position.column - 1),
-          endLineNumber: position.lineNumber,
-          endColumn: position.column,
-        });
-
-        if (/\s/.test(charBefore)) {
-          return;
-        }
-
-        const fromJoinMatch = currentWord.match(
-          /^(?:f|fr|fro|from|j|jo|joi|join)$/i,
-        );
-        const isFromOrJoinPrefix =
-          wordInfo.endColumn === position.column && fromJoinMatch !== null;
-        if (!isFromOrJoinPrefix) {
-          return;
-        }
-
-        const expandedKeyword = /^f/i.test(currentWord) ? "FROM" : "JOIN";
-
-        const sqlContext = getSqlCursorContext(model.getValue(), offset);
-        if (sqlContext.hasFromJoinTable) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        autoBracketRef.current = true;
-        const replacement = `${expandedKeyword} `;
-        editorInstance.executeEdits("auto-bracket-tab", [
-          {
-            range: {
-              startLineNumber: position.lineNumber,
-              startColumn: wordInfo.startColumn,
-              endLineNumber: position.lineNumber,
-              endColumn: wordInfo.endColumn,
-            },
-            text: replacement,
-          },
-        ]);
-        editorInstance.setPosition({
-          lineNumber: position.lineNumber,
-          column: wordInfo.startColumn + replacement.length,
-        });
-
-        const insertOpenBracket = () => {
-          editorInstance.trigger("keyboard", "type", { text: "[" });
-        };
-        if (typeof requestAnimationFrame === "function") {
-          requestAnimationFrame(insertOpenBracket);
-        } else {
-          setTimeout(insertOpenBracket, 0);
-        }
-
-        autoBracketRef.current = false;
+      tabExpandDisposableRef.current?.dispose();
+      tabExpandDisposableRef.current = registerSqlTabExpandFromJoin({
+        editor: editorInstance,
+        monaco: monacoInstance,
+        autoBracketRef,
       });
 
       registerSqlEditorKeybindings({
@@ -524,11 +387,13 @@ export function MonacoQueryEditor({
       autoBracketDisposableRef.current?.dispose();
       inlineCompletionDisposableRef.current?.dispose();
       suggestRetriggerDisposableRef.current?.dispose();
+      tabExpandDisposableRef.current?.dispose();
       cursorPositionDisposableRef.current?.dispose();
       completionDisposableRef.current = null;
       autoBracketDisposableRef.current = null;
       inlineCompletionDisposableRef.current = null;
       suggestRetriggerDisposableRef.current = null;
+      tabExpandDisposableRef.current = null;
       cursorPositionDisposableRef.current = null;
     };
   }, []);
