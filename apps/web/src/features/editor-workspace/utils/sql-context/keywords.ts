@@ -1,0 +1,18 @@
+export const SQL_KEYWORDS = new Set([
+  "select",
+  "from",
+  "join",
+  "where",
+  "group",
+  "order",
+  "having",
+  "on",
+  "inner",
+  "left",
+  "right",
+  "full",
+  "cross",
+  "union",
+  "limit",
+  "as",
+]);
