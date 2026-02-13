@@ -6,10 +6,18 @@ export function registerSqlEditorKeybindings(options: {
   getOnSave: () => (() => void) | undefined;
   getOnSaveAs: () => (() => void) | undefined;
   enableSaveAs: boolean;
-  onRunRequest?: () => void;
+  enableRunRequest: boolean;
+  getOnRunRequest: () => (() => void) | undefined;
 }) {
-  const { editor, monaco, getOnSave, getOnSaveAs, enableSaveAs, onRunRequest } =
-    options;
+  const {
+    editor,
+    monaco,
+    getOnSave,
+    getOnSaveAs,
+    enableSaveAs,
+    enableRunRequest,
+    getOnRunRequest,
+  } = options;
 
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
     getOnSave()?.();
@@ -24,10 +32,16 @@ export function registerSqlEditorKeybindings(options: {
     );
   }
 
-  if (onRunRequest) {
+  if (enableRunRequest) {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      onRunRequest();
+      getOnRunRequest()?.();
     });
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.NumpadEnter,
+      () => {
+        getOnRunRequest()?.();
+      },
+    );
   }
 
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash, () => {

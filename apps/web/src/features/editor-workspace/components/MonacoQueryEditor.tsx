@@ -78,6 +78,7 @@ export function MonacoQueryEditor({
   const diagnosticsRef = useRef(diagnostics);
   const onSaveRef = useRef(onSave);
   const onSaveAsRef = useRef(onSaveAs);
+  const onRunRequestRef = useRef(onRunRequest);
   const queryClient = useQueryClient();
 
   const debouncedValue = useDebouncedValue(value, 150);
@@ -227,6 +228,10 @@ export function MonacoQueryEditor({
   useEffect(() => {
     onSaveAsRef.current = onSaveAs;
   }, [onSaveAs]);
+
+  useEffect(() => {
+    onRunRequestRef.current = onRunRequest;
+  }, [onRunRequest]);
 
   const handleEditorMount: OnMount = useCallback(
     (editorInstance, monacoInstance) => {
@@ -490,7 +495,8 @@ export function MonacoQueryEditor({
         getOnSave: () => onSaveRef.current,
         getOnSaveAs: () => onSaveAsRef.current,
         enableSaveAs: Boolean(onSaveAs),
-        onRunRequest,
+        enableRunRequest: Boolean(onRunRequest),
+        getOnRunRequest: () => onRunRequestRef.current,
       });
 
       cursorPositionDisposableRef.current?.dispose();
