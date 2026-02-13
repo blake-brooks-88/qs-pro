@@ -110,5 +110,20 @@ describe("LinkedBadge", () => {
 
       expect(screen.getByTitle("Linked to My QA")).toBeInTheDocument();
     });
+
+    it("md variant renders count suffix outside truncated region", () => {
+      const { container } = render(
+        <LinkedBadge size="md" qaName="My QA" automationCount={3} />,
+      );
+
+      const outerSpan = container.firstElementChild;
+      expect(outerSpan).toBeInTheDocument();
+      const truncateSpan = outerSpan?.querySelector(".truncate");
+      expect(truncateSpan).toBeInTheDocument();
+      expect(truncateSpan?.textContent).toBe("Linked to My QA");
+      expect(
+        truncateSpan?.querySelector(".text-muted-foreground"),
+      ).not.toBeInTheDocument();
+    });
   });
 });
