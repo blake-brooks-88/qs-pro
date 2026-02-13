@@ -207,4 +207,47 @@ describe("PublishConfirmationDialog", () => {
 
     expect(screen.getByText(/My Query Activity/)).toBeInTheDocument();
   });
+
+  describe("blast radius error state", () => {
+    it("shows error message when blastRadiusError is true", () => {
+      render(
+        <PublishConfirmationDialog
+          {...createDefaultProps()}
+          blastRadiusError
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          "Unable to load automation data. Proceed with caution.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("does NOT show 'No automations' when blastRadiusError is true", () => {
+      render(
+        <PublishConfirmationDialog
+          {...createDefaultProps()}
+          blastRadiusError
+        />,
+      );
+
+      expect(
+        screen.queryByText("No automations use this Query Activity."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("publish button remains enabled during error state", () => {
+      render(
+        <PublishConfirmationDialog
+          {...createDefaultProps()}
+          blastRadiusError
+        />,
+      );
+
+      expect(
+        screen.getByRole("button", { name: /publish/i }),
+      ).not.toBeDisabled();
+    });
+  });
 });
