@@ -18,16 +18,13 @@ import {
   getEditorOptions,
   MONACO_THEME_NAME,
 } from "@/features/editor-workspace/utils/monaco-options";
-import {
-  extractSelectFieldRanges,
-  extractTableReferences,
-  getSharedFolderIds,
-} from "@/features/editor-workspace/utils/sql-context";
+import { getSharedFolderIds } from "@/features/editor-workspace/utils/sql-context";
 import type { SqlDiagnostic } from "@/features/editor-workspace/utils/sql-diagnostics";
-import { toMonacoMarkers } from "@/features/editor-workspace/utils/sql-diagnostics";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 
+import { applySqlDecorations } from "./monaco/apply-sql-decorations";
+import { applySqlMarkers } from "./monaco/apply-sql-markers";
 import {
   registerSqlAutoBracketInsertOnFromJoin,
   registerSqlSuggestRetriggerOnDot,
@@ -248,14 +245,11 @@ export function MonacoQueryEditor({
 
       applyMonacoTheme(monacoInstance);
 
-      const model = editorInstance.getModel();
-      if (model) {
-        monacoInstance.editor.setModelMarkers(
-          model,
-          "sql-lint",
-          toMonacoMarkers(diagnostics, model.getValue(), monacoInstance),
-        );
-      }
+      applySqlMarkers({
+        editor: editorInstance,
+        monaco: monacoInstance,
+        diagnostics,
+      });
 
       completionDisposableRef.current?.dispose();
       completionDisposableRef.current = registerSqlCompletionProvider({
@@ -404,16 +398,7 @@ export function MonacoQueryEditor({
     if (!editor || !monaco) {
       return;
     }
-    const model = editor.getModel();
-    if (!model) {
-      return;
-    }
-
-    monaco.editor.setModelMarkers(
-      model,
-      "sql-lint",
-      toMonacoMarkers(diagnostics, model.getValue(), monaco),
-    );
+    applySqlMarkers({ editor, monaco, diagnostics });
   }, [diagnostics, value]);
 
   useEffect(() => {
@@ -427,74 +412,13 @@ export function MonacoQueryEditor({
     if (!model) {
       return;
     }
-
-    const references = extractTableReferences(model.getValue()).filter(
-      (reference) => !reference.isSubquery,
-    );
-
-    const tableDecorations = references.map((reference) => {
-      const start = model.getPositionAt(reference.startIndex);
-      const end = model.getPositionAt(reference.endIndex);
-      return {
-        range: new monaco.Range(
-          start.lineNumber,
-          start.column,
-          end.lineNumber,
-          end.column,
-        ),
-        options: {
-          inlineClassName: "monaco-de-name",
-        },
-      };
+    decorationRef.current = applySqlDecorations({
+      editor,
+      monaco,
+      diagnostics,
+      currentDecorationIds: decorationRef.current,
+      maxErrorTokenLength: MAX_ERROR_TOKEN_LENGTH,
     });
-
-    const fieldRanges = extractSelectFieldRanges(model.getValue());
-    const fieldDecorations = fieldRanges.map((range) => {
-      const start = model.getPositionAt(range.startIndex);
-      const end = model.getPositionAt(range.endIndex);
-      return {
-        range: new monaco.Range(
-          start.lineNumber,
-          start.column,
-          end.lineNumber,
-          end.column,
-        ),
-        options: {
-          inlineClassName:
-            range.type === "field" ? "monaco-field-name" : "monaco-field-alias",
-        },
-      };
-    });
-
-    const errorTokenDecorations = diagnostics
-      .filter((diagnostic) => diagnostic.severity === "error")
-      .filter(
-        (diagnostic) =>
-          diagnostic.endIndex - diagnostic.startIndex <= MAX_ERROR_TOKEN_LENGTH,
-      )
-      .map((diagnostic) => {
-        const start = model.getPositionAt(diagnostic.startIndex);
-        const end = model.getPositionAt(
-          Math.max(diagnostic.endIndex, diagnostic.startIndex + 1),
-        );
-        return {
-          range: new monaco.Range(
-            start.lineNumber,
-            start.column,
-            end.lineNumber,
-            end.column,
-          ),
-          options: {
-            inlineClassName: "monaco-error-token",
-          },
-        };
-      });
-
-    decorationRef.current = editor.deltaDecorations(decorationRef.current, [
-      ...tableDecorations,
-      ...fieldDecorations,
-      ...errorTokenDecorations,
-    ]);
   }, [debouncedValue, diagnostics]);
 
   return (
