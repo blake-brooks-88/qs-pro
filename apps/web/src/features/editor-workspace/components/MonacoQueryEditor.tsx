@@ -14,7 +14,6 @@ import type {
   DataExtensionField,
   Folder,
 } from "@/features/editor-workspace/types";
-import { getContextualKeywords } from "@/features/editor-workspace/utils/autocomplete-keyword";
 import { getInlineCompletionReplacementEndOffset } from "@/features/editor-workspace/utils/inline-completion-range";
 import type { InlineSuggestionContext } from "@/features/editor-workspace/utils/inline-suggestions";
 import { evaluateInlineSuggestions } from "@/features/editor-workspace/utils/inline-suggestions";
@@ -42,43 +41,11 @@ import { toMonacoMarkers } from "@/features/editor-workspace/utils/sql-diagnosti
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 
-const SQL_KEYWORDS = [
-  "SELECT",
-  "FROM",
-  "WHERE",
-  "JOIN",
-  "INNER",
-  "LEFT",
-  "RIGHT",
-  "FULL",
-  "OUTER",
-  "CROSS",
-  "ON",
-  "UNION",
-  "UNION ALL",
-  "GROUP BY",
-  "ORDER BY",
-  "HAVING",
-  "DISTINCT",
-  "TOP",
-  "ASC",
-  "DESC",
-  "AS",
-  "AND",
-  "OR",
-  "NOT",
-  "IN",
-  "EXISTS",
-  "IS",
-  "NULL",
-  "BETWEEN",
-  "LIKE",
-  "CASE",
-  "WHEN",
-  "THEN",
-  "ELSE",
-  "END",
-];
+import {
+  buildAsteriskExpansion,
+  type TableInScopeForExpansion,
+} from "./monaco/build-asterisk-expansion";
+import { buildSqlKeywordCompletions } from "./monaco/build-sql-keyword-completions";
 
 const MAX_DE_SUGGESTIONS = 50;
 const MAX_DE_COUNT_FETCH = 10;
@@ -325,10 +292,36 @@ export function MonacoQueryEditor({
               /\bSELECT\s+.*,\s*\*$/i.test(textBefore);
 
             if (isExplicitTrigger && isOnAsterisk) {
-              const tablesWithoutAliases = sqlContext.tablesInScope.filter(
-                (t) => !t.alias,
-              );
-              if (tablesWithoutAliases.length > 1) {
+              const result = await buildAsteriskExpansion({
+                textBeforeCursor: textBefore,
+                cursorIndex,
+                tablesInScope: sqlContext.tablesInScope.map(
+                  (table): TableInScopeForExpansion => ({
+                    name: table.name,
+                    alias: table.alias,
+                    isSubquery: table.isSubquery,
+                    outputFields: table.outputFields,
+                  }),
+                ),
+                getFieldsForTable: async (table) => {
+                  if (table.isSubquery) {
+                    return table.outputFields.map((name) => ({
+                      name,
+                      type: "Text" as const,
+                      isPrimaryKey: false,
+                      isNullable: true,
+                    }));
+                  }
+                  if (!tenantIdRef.current) {
+                    return [];
+                  }
+                  const dataExtension = resolveDataExtension(table.name);
+                  const customerKey = dataExtension?.customerKey ?? table.name;
+                  return fetchFields(customerKey);
+                },
+              });
+
+              if (result.type === "issue") {
                 const wordInfo = model.getWordUntilPosition(position);
                 const wordRange = new monacoInstance.Range(
                   position.lineNumber,
@@ -340,11 +333,10 @@ export function MonacoQueryEditor({
                 return {
                   suggestions: [
                     {
-                      label:
-                        "⚠️ Cannot expand: multiple tables without aliases",
+                      label: result.message,
                       kind: monacoInstance.languages.CompletionItemKind.Issue,
                       insertText: "*",
-                      detail: "Add table aliases to disambiguate columns",
+                      detail: result.detail,
                       sortText: "0000",
                       range: wordRange,
                     },
@@ -352,68 +344,33 @@ export function MonacoQueryEditor({
                 };
               }
 
-              const columnList: string[] = [];
+              if (result.type === "expand") {
+                const startPos = model.getPositionAt(
+                  result.replaceOffsets.startOffset,
+                );
+                const endPos = model.getPositionAt(
+                  result.replaceOffsets.endOffset,
+                );
+                const replaceRange = new monacoInstance.Range(
+                  startPos.lineNumber,
+                  startPos.column,
+                  endPos.lineNumber,
+                  endPos.column,
+                );
 
-              for (const table of sqlContext.tablesInScope) {
-                let fields: DataExtensionField[] = [];
-
-                if (table.isSubquery) {
-                  fields = table.outputFields.map((name) => ({
-                    name,
-                    type: "Text" as const,
-                    isPrimaryKey: false,
-                    isNullable: true,
-                  }));
-                } else if (tenantIdRef.current) {
-                  const dataExtension = resolveDataExtension(table.name);
-                  const customerKey = dataExtension?.customerKey ?? table.name;
-                  fields = await fetchFields(customerKey);
-                }
-
-                const prefix = table.alias ?? "";
-
-                for (const field of fields) {
-                  const fieldName = field.name.includes(" ")
-                    ? `[${field.name}]`
-                    : field.name;
-
-                  const fullName = prefix
-                    ? `${prefix}.${fieldName}`
-                    : fieldName;
-
-                  columnList.push(fullName);
-                }
-              }
-
-              if (columnList.length > 0) {
-                const expandedColumns = columnList.join(",\n  ");
-
-                const asteriskMatch = textBefore.match(/\*$/);
-                if (asteriskMatch) {
-                  const asteriskOffset = textBefore.length - 1;
-                  const asteriskPos = model.getPositionAt(asteriskOffset);
-                  const replaceRange = new monacoInstance.Range(
-                    asteriskPos.lineNumber,
-                    asteriskPos.column,
-                    position.lineNumber,
-                    position.column,
-                  );
-
-                  return {
-                    suggestions: [
-                      {
-                        label: `Expand to ${columnList.length} columns`,
-                        kind: monacoInstance.languages.CompletionItemKind
-                          .Snippet,
-                        insertText: expandedColumns,
-                        detail: "Expand * to full column list",
-                        documentation: expandedColumns,
-                        range: replaceRange,
-                        sortText: "0000",
-                      },
-                    ],
-                  };
-                }
+                return {
+                  suggestions: [
+                    {
+                      label: `Expand to ${result.columnCount} columns`,
+                      kind: monacoInstance.languages.CompletionItemKind.Snippet,
+                      insertText: result.expandedColumns,
+                      detail: "Expand * to full column list",
+                      documentation: result.expandedColumns,
+                      range: replaceRange,
+                      sortText: "0000",
+                    },
+                  ],
+                };
               }
             }
 
@@ -447,27 +404,19 @@ export function MonacoQueryEditor({
               position.column,
             );
 
-            const contextualKeywords = new Set(
-              getContextualKeywords(sqlContext.lastKeyword),
-            );
-
-            const keywordsWithBrackets = new Set(["FROM", "JOIN"]);
-            const keywordSuggestions = SQL_KEYWORDS.map((keyword) => {
-              const needsBrackets = keywordsWithBrackets.has(keyword);
-              return {
-                label: keyword,
-                insertText: needsBrackets ? `${keyword} [$0]` : keyword,
-                insertTextRules: needsBrackets
-                  ? monacoInstance.languages.CompletionItemInsertTextRule
-                      .InsertAsSnippet
-                  : undefined,
-                kind: monacoInstance.languages.CompletionItemKind.Keyword,
-                sortText: contextualKeywords.has(keyword)
-                  ? `0-${keyword}`
-                  : `1-${keyword}`,
-                range: wordRange,
-              };
-            });
+            const keywordSuggestions = buildSqlKeywordCompletions(
+              sqlContext.lastKeyword,
+            ).map((completion) => ({
+              label: completion.label,
+              insertText: completion.insertText,
+              insertTextRules: completion.insertAsSnippet
+                ? monacoInstance.languages.CompletionItemInsertTextRule
+                    .InsertAsSnippet
+                : undefined,
+              kind: monacoInstance.languages.CompletionItemKind.Keyword,
+              sortText: completion.sortText,
+              range: wordRange,
+            }));
 
             if (sqlContext.aliasBeforeDot) {
               const lineContent = model.getLineContent(position.lineNumber);
