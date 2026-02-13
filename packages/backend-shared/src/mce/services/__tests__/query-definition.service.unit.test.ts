@@ -1236,17 +1236,19 @@ describe("QueryDefinitionService", () => {
       );
     });
 
-    it("succeeds when StatusCode is missing (no Results)", async () => {
+    it("throws when StatusCode is missing (no Results)", async () => {
       mockSoapRequest.mockResolvedValue({
         Body: {
           DeleteResponse: {},
         },
       });
 
-      await expect(service.delete(T, U, M, "obj-del")).resolves.toBeUndefined();
+      await expect(service.delete(T, U, M, "obj-del")).rejects.toThrow(
+        AppError,
+      );
     });
 
-    it("succeeds when Results is present but StatusCode is undefined", async () => {
+    it("throws when Results is present but StatusCode is undefined", async () => {
       mockSoapRequest.mockResolvedValue({
         Body: {
           DeleteResponse: {
@@ -1255,7 +1257,9 @@ describe("QueryDefinitionService", () => {
         },
       });
 
-      await expect(service.delete(T, U, M, "obj-del")).resolves.toBeUndefined();
+      await expect(service.delete(T, U, M, "obj-del")).rejects.toThrow(
+        AppError,
+      );
     });
   });
 });

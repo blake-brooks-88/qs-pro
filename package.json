@@ -3,10 +3,11 @@
   "private": true,
   "scripts": {
     "predev": "pnpm -r --filter \"./packages/**\" build",
-    "dev": "concurrently \"pnpm run api:dev\" \"pnpm run web:dev\" \"pnpm run worker:dev\"",
+    "dev": "concurrently \"pnpm run api:dev:fast\" \"pnpm run web:dev\" \"pnpm run worker:dev\"",
     "worker:dev": "lsof -i :3001 -t | xargs kill -9 2>/dev/null || true && pnpm --filter worker start:dev",
     "dev:preview": "pnpm run web:dev:preview",
-    "api:dev": "lsof -i :3000 -t | xargs kill -9 2>/dev/null || true && pnpm --filter api start:dev",
+    "api:dev": "pnpm -r --filter \"./packages/**\" build && pnpm run api:dev:fast",
+    "api:dev:fast": "lsof -i :3000 -t | xargs kill -9 2>/dev/null || true && pnpm --filter api start:dev",
     "web:dev": "pnpm --filter @qpp/web dev",
     "web:dev:preview": "pnpm --filter @qpp/web dev:preview",
     "tunnel:dev": "concurrently \"pnpm dev\" \"cloudflared tunnel run queryplusplus-dev\"",

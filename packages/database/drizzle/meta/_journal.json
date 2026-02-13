@@ -169,6 +169,13 @@
       "when": 1770837410943,
       "tag": "0023_rls_broadened_with_check",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1770865578809,
+      "tag": "0024_shell_query_runs_fk_set_null",
+      "breakpoints": true
     }
   ]
 }

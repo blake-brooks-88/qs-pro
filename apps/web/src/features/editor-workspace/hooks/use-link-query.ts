@@ -32,7 +32,13 @@ export function useUnlinkQuery() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (savedQueryId: string) => unlinkQuery(savedQueryId),
+    mutationFn: ({
+      savedQueryId,
+      options,
+    }: {
+      savedQueryId: string;
+      options?: { deleteLocal?: boolean; deleteRemote?: boolean };
+    }) => unlinkQuery(savedQueryId, options),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: SAVED_QUERIES_KEY });
       void queryClient.invalidateQueries({

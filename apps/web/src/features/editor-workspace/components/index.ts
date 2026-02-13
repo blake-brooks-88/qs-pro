@@ -9,5 +9,6 @@ export * from "./PublishConfirmationDialog";
 export * from "./QueryActivityModal";
 export * from "./ResultsPane";
 export * from "./SaveQueryModal";
+export * from "./UnlinkModal";
 export * from "./VersionHistoryPanel";
 export * from "./WorkspaceSidebar";

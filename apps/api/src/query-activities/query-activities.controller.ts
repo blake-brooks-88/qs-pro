@@ -14,6 +14,7 @@ import {
   CreateQueryActivitySchema,
   LinkQueryRequestSchema,
   PublishQueryRequestSchema,
+  UnlinkRequestSchema,
 } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
@@ -100,14 +101,21 @@ export class QueryActivitiesController {
   async unlinkQuery(
     @CurrentUser() user: UserSession,
     @Param('savedQueryId') savedQueryId: string,
+    @Body() body: unknown,
   ) {
     await this.requireDeployFeature(user.tenantId);
+
+    const parsed = UnlinkRequestSchema.safeParse(body ?? {});
+    const options = parsed.success
+      ? parsed.data
+      : { deleteLocal: false, deleteRemote: false };
 
     return this.queryActivitiesService.unlinkQuery(
       user.tenantId,
       user.userId,
       user.mid,
       savedQueryId,
+      options,
     );
   }
 

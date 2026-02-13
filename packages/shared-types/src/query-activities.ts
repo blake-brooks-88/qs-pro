@@ -73,7 +73,15 @@ export const LinkQueryResponseSchema = z.object({
   sqlUpdated: z.boolean(),
 });
 
+export const UnlinkRequestSchema = z
+  .object({
+    deleteLocal: z.boolean().default(false),
+    deleteRemote: z.boolean().default(false),
+  })
+  .default({ deleteLocal: false, deleteRemote: false });
+
 export type QAListItem = z.infer<typeof QAListItemSchema>;
 export type QADetail = z.infer<typeof QADetailSchema>;
 export type LinkQueryRequest = z.infer<typeof LinkQueryRequestSchema>;
 export type LinkQueryResponse = z.infer<typeof LinkQueryResponseSchema>;
+export type UnlinkRequest = z.infer<typeof UnlinkRequestSchema>;

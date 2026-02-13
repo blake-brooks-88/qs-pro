@@ -14,6 +14,11 @@
  * - Feature gating (free tier -> 403)
  * - Not-linked error (404)
  * - Handles pagination (multiple pages)
+ *
+ * Mock fidelity:
+ * - List endpoint (GET /automation/v1/automations?page=...) returns items WITHOUT steps
+ * - Detail endpoint (GET /automation/v1/automations/{id}) returns full automation WITH steps
+ * - This matches the real MCE REST API behavior
  */
 import {
   FastifyAdapter,
@@ -57,6 +62,90 @@ const TEST_TSSD = 'test-blast-int';
 const TEST_MID = 'mid-blast-int';
 const TEST_QA_OBJECT_ID = 'qa-obj-blast-test';
 
+const AUTOMATION_STATUS_LABELS: Record<number, string> = {
+  0: 'BuildError',
+  1: 'Building',
+  2: 'Ready',
+  3: 'Running',
+  4: 'Paused',
+  5: 'Stopped',
+  6: 'Scheduled',
+  7: 'Awaiting Trigger',
+  8: 'InactiveTrigger',
+};
+
+interface AutomationDef {
+  id: string;
+  name: string;
+  description?: string;
+  status: number;
+  qaObjectId: string;
+}
+
+function buildListResponse(
+  automations: AutomationDef[],
+  opts?: { totalResults?: number },
+) {
+  return {
+    items: automations.map((a) => ({
+      id: a.id,
+      name: a.name,
+      description: a.description,
+      statusId: a.status,
+      status: AUTOMATION_STATUS_LABELS[a.status] ?? 'Unknown',
+    })),
+    count: opts?.totalResults ?? automations.length,
+  };
+}
+
+function buildDetailResponse(a: AutomationDef) {
+  return {
+    id: a.id,
+    name: a.name,
+    description: a.description,
+    statusId: a.status,
+    status: AUTOMATION_STATUS_LABELS[a.status] ?? 'Unknown',
+    steps: [
+      {
+        stepNumber: 1,
+        activities: [
+          {
+            id: `act-${a.id}`,
+            name: `Activity for ${a.name}`,
+            objectTypeId: 300,
+            activityObjectId: a.qaObjectId,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function setupMceMock(
+  mock: ReturnType<typeof vi.fn>,
+  automations: AutomationDef[],
+  opts?: { totalResults?: number },
+) {
+  const detailMap = new Map(
+    automations.map((a) => [a.id, buildDetailResponse(a)]),
+  );
+  const listResponse = buildListResponse(automations, opts);
+
+  mock.mockImplementation(
+    (_t: string, _u: string, _m: string, config: { url: string }) => {
+      if (config.url.includes('/automation/v1/automations?')) {
+        return Promise.resolve(listResponse);
+      }
+      const id = config.url.split('/').pop() ?? '';
+      const detail = detailMap.get(id);
+      if (detail) {
+        return Promise.resolve(detail);
+      }
+      return Promise.resolve({ id, name: '', status: 0, steps: [] });
+    },
+  );
+}
+
 describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () => {
   let app: NestFastifyApplication;
   let sqlClient: Sql;
@@ -68,9 +157,7 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
   const createdSavedQueryIds: string[] = [];
 
   const mockMceBridge = {
-    request: vi
-      .fn()
-      .mockResolvedValue({ items: [], page: 1, pageSize: 200, count: 0 }),
+    request: vi.fn().mockResolvedValue({ items: [], count: 0 }),
   };
 
   const mockQDService = {
@@ -140,42 +227,6 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
     );
 
     return result;
-  }
-
-  function buildAutomationResponse(
-    automations: Array<{
-      id: string;
-      name: string;
-      description?: string;
-      statusId: number;
-      qaObjectId: string;
-    }>,
-    opts?: { page?: number; pageSize?: number; count?: number },
-  ) {
-    return {
-      items: automations.map((a) => ({
-        id: a.id,
-        name: a.name,
-        description: a.description,
-        statusId: a.statusId,
-        steps: [
-          {
-            stepNumber: 1,
-            activities: [
-              {
-                id: `act-${a.id}`,
-                name: `Activity for ${a.name}`,
-                objectTypeId: 300,
-                activityObjectId: a.qaObjectId,
-              },
-            ],
-          },
-        ],
-      })),
-      page: opts?.page ?? 1,
-      pageSize: opts?.pageSize ?? 200,
-      count: opts?.count ?? automations.length,
-    };
   }
 
   beforeAll(async () => {
@@ -292,8 +343,6 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
     vi.clearAllMocks();
     mockMceBridge.request.mockResolvedValue({
       items: [],
-      page: 1,
-      pageSize: 200,
       count: 0,
     });
   });
@@ -302,24 +351,23 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
     it('returns automations containing the linked QA', async () => {
       const query = await createLinkedSavedQuery('Blast Query');
 
-      mockMceBridge.request.mockResolvedValue(
-        buildAutomationResponse([
-          {
-            id: 'auto-1',
-            name: 'Daily Extract',
-            description: 'Runs daily at 8am',
-            statusId: 3,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-          {
-            id: 'auto-2',
-            name: 'Weekly Report',
-            description: 'Weekly rollup',
-            statusId: 4,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-        ]),
-      );
+      const automations: AutomationDef[] = [
+        {
+          id: 'auto-1',
+          name: 'Daily Extract',
+          description: 'Runs daily at 8am',
+          status: 3,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+        {
+          id: 'auto-2',
+          name: 'Weekly Report',
+          description: 'Weekly rollup',
+          status: 4,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+      ];
+      setupMceMock(mockMceBridge.request, automations);
 
       const res = await request(app.getHttpServer()).get(
         `/query-activities/blast-radius/${query.id}`,
@@ -346,16 +394,15 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
     it('returns empty list when no automations contain the QA', async () => {
       const query = await createLinkedSavedQuery('No Automations Query');
 
-      mockMceBridge.request.mockResolvedValue(
-        buildAutomationResponse([
-          {
-            id: 'auto-other',
-            name: 'Other Automation',
-            statusId: 2,
-            qaObjectId: 'some-other-qa-obj',
-          },
-        ]),
-      );
+      const automations: AutomationDef[] = [
+        {
+          id: 'auto-other',
+          name: 'Other Automation',
+          status: 2,
+          qaObjectId: 'some-other-qa-obj',
+        },
+      ];
+      setupMceMock(mockMceBridge.request, automations);
 
       const res = await request(app.getHttpServer()).get(
         `/query-activities/blast-radius/${query.id}`,
@@ -371,46 +418,45 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
     it('correctly identifies high-risk automations (Running, Scheduled, Awaiting Trigger)', async () => {
       const query = await createLinkedSavedQuery('Risk Detection Query');
 
-      mockMceBridge.request.mockResolvedValue(
-        buildAutomationResponse([
-          {
-            id: 'auto-running',
-            name: 'Running Auto',
-            statusId: 3,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-          {
-            id: 'auto-scheduled',
-            name: 'Scheduled Auto',
-            statusId: 6,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-          {
-            id: 'auto-awaiting',
-            name: 'Awaiting Auto',
-            statusId: 7,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-          {
-            id: 'auto-ready',
-            name: 'Ready Auto',
-            statusId: 2,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-          {
-            id: 'auto-paused',
-            name: 'Paused Auto',
-            statusId: 4,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-          {
-            id: 'auto-stopped',
-            name: 'Stopped Auto',
-            statusId: 5,
-            qaObjectId: TEST_QA_OBJECT_ID,
-          },
-        ]),
-      );
+      const automations: AutomationDef[] = [
+        {
+          id: 'auto-running',
+          name: 'Running Auto',
+          status: 3,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+        {
+          id: 'auto-scheduled',
+          name: 'Scheduled Auto',
+          status: 6,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+        {
+          id: 'auto-awaiting',
+          name: 'Awaiting Auto',
+          status: 7,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+        {
+          id: 'auto-ready',
+          name: 'Ready Auto',
+          status: 2,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+        {
+          id: 'auto-paused',
+          name: 'Paused Auto',
+          status: 4,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+        {
+          id: 'auto-stopped',
+          name: 'Stopped Auto',
+          status: 5,
+          qaObjectId: TEST_QA_OBJECT_ID,
+        },
+      ];
+      setupMceMock(mockMceBridge.request, automations);
 
       const res = await request(app.getHttpServer()).get(
         `/query-activities/blast-radius/${query.id}`,
@@ -478,38 +524,44 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
     it('handles multiple pages of automations', async () => {
       const query = await createLinkedSavedQuery('Paginated Query');
 
-      let callCount = 0;
-      mockMceBridge.request.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
+      const page1Auto: AutomationDef = {
+        id: 'auto-p1',
+        name: 'Page 1 Auto',
+        status: 3,
+        qaObjectId: TEST_QA_OBJECT_ID,
+      };
+      const page2Auto: AutomationDef = {
+        id: 'auto-p2',
+        name: 'Page 2 Auto',
+        status: 2,
+        qaObjectId: TEST_QA_OBJECT_ID,
+      };
+
+      const detailMap = new Map([
+        ['auto-p1', buildDetailResponse(page1Auto)],
+        ['auto-p2', buildDetailResponse(page2Auto)],
+      ]);
+
+      let listCallCount = 0;
+      mockMceBridge.request.mockImplementation(
+        (_t: string, _u: string, _m: string, config: { url: string }) => {
+          if (config.url.includes('/automation/v1/automations?')) {
+            listCallCount++;
+            if (listCallCount === 1) {
+              return Promise.resolve(
+                buildListResponse([page1Auto], { totalResults: 250 }),
+              );
+            }
+            return Promise.resolve(
+              buildListResponse([page2Auto], { totalResults: 250 }),
+            );
+          }
+          const id = config.url.split('/').pop() ?? '';
           return Promise.resolve(
-            buildAutomationResponse(
-              [
-                {
-                  id: 'auto-p1',
-                  name: 'Page 1 Auto',
-                  statusId: 3,
-                  qaObjectId: TEST_QA_OBJECT_ID,
-                },
-              ],
-              { page: 1, pageSize: 200, count: 250 },
-            ),
+            detailMap.get(id) ?? { id, name: '', status: 0, steps: [] },
           );
-        }
-        return Promise.resolve(
-          buildAutomationResponse(
-            [
-              {
-                id: 'auto-p2',
-                name: 'Page 2 Auto',
-                statusId: 2,
-                qaObjectId: TEST_QA_OBJECT_ID,
-              },
-            ],
-            { page: 2, pageSize: 200, count: 250 },
-          ),
-        );
-      });
+        },
+      );
 
       const res = await request(app.getHttpServer()).get(
         `/query-activities/blast-radius/${query.id}`,
@@ -517,7 +569,6 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
 
       expect(res.status).toBe(200);
       expect(res.body.automations).toHaveLength(2);
-      expect(mockMceBridge.request).toHaveBeenCalledTimes(2);
 
       const names = res.body.automations.map((a: { name: string }) => a.name);
       expect(names).toContain('Page 1 Auto');

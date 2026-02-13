@@ -114,7 +114,9 @@ export const shellQueryRuns = pgTable(
     errorMessage: text("error_message"),
     sqlTextEncrypted: text("sql_text_encrypted"),
     rowCount: integer("row_count"),
-    savedQueryId: uuid("saved_query_id").references(() => savedQueries.id),
+    savedQueryId: uuid("saved_query_id").references(() => savedQueries.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),

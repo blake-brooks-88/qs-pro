@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AppError, ErrorCode } from "../../../common/errors";
 import {
+  buildGetAutomationDetailRequest,
   buildGetAutomationsRequest,
   buildUpdateQueryTextRequest,
 } from "./query-update";
@@ -88,14 +89,18 @@ describe("buildGetAutomationsRequest", () => {
     const result = buildGetAutomationsRequest(1, 200);
 
     expect(result.method).toBe("GET");
-    expect(result.url).toBe("/automation/v1/automations?$page=1&$pagesize=200");
+    expect(result.url).toBe(
+      "/automation/v1/automations?page=1&pageSize=200&$page=1&$pageSize=200",
+    );
   });
 
   it("handles different page/pageSize values correctly", () => {
     const result = buildGetAutomationsRequest(3, 50);
 
     expect(result.method).toBe("GET");
-    expect(result.url).toBe("/automation/v1/automations?$page=3&$pagesize=50");
+    expect(result.url).toBe(
+      "/automation/v1/automations?page=3&pageSize=50&$page=3&$pageSize=50",
+    );
   });
 
   it("throws AppError (MCE_BAD_REQUEST) when page is less than 1", () => {
@@ -110,5 +115,39 @@ describe("buildGetAutomationsRequest", () => {
 
     expect(error.code).toBe(ErrorCode.MCE_BAD_REQUEST);
     expect(error.context?.field).toBe("pageSize");
+  });
+});
+
+describe("buildGetAutomationDetailRequest", () => {
+  it("returns correct method and URL for valid automationId", () => {
+    const result = buildGetAutomationDetailRequest("auto-123");
+
+    expect(result.method).toBe("GET");
+    expect(result.url).toBe("/automation/v1/automations/auto-123");
+  });
+
+  it("encodes special characters in automationId", () => {
+    const automationId = "id/with spaces&special=chars";
+    const result = buildGetAutomationDetailRequest(automationId);
+
+    expect(result.url).toBe(
+      `/automation/v1/automations/${encodeURIComponent(automationId)}`,
+    );
+    expect(result.url).not.toContain(" ");
+    expect(result.url).not.toContain("&special");
+  });
+
+  it("throws AppError (MCE_BAD_REQUEST) when automationId is empty string", () => {
+    const error = catchAppError(() => buildGetAutomationDetailRequest(""));
+
+    expect(error.code).toBe(ErrorCode.MCE_BAD_REQUEST);
+    expect(error.context?.field).toBe("automationId");
+  });
+
+  it("throws AppError (MCE_BAD_REQUEST) when automationId is whitespace-only", () => {
+    const error = catchAppError(() => buildGetAutomationDetailRequest("   "));
+
+    expect(error.code).toBe(ErrorCode.MCE_BAD_REQUEST);
+    expect(error.context?.field).toBe("automationId");
   });
 });

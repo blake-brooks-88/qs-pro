@@ -11,6 +11,7 @@ import {
   Export,
   History,
   Import,
+  LinkBrokenMinimalistic,
   LinkMinimalistic,
   Rocket,
 } from "@solar-icons/react";
@@ -97,6 +98,7 @@ import { ResultsPane } from "./ResultsPane";
 import { RunButtonDropdown } from "./RunButtonDropdown";
 import { SaveQueryModal } from "./SaveQueryModal";
 import { TargetDataExtensionModal } from "./TargetDataExtensionModal";
+import { UnlinkModal } from "./UnlinkModal";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 
@@ -156,6 +158,14 @@ export function EditorWorkspace({
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showDriftDialog, setShowDriftDialog] = useState(false);
   const [publishVersionId, setPublishVersionId] = useState<string | null>(null);
+
+  // Unlink flow state
+  const [unlinkTarget, setUnlinkTarget] = useState<{
+    savedQueryId: string;
+    savedQueryName: string;
+    linkedQaName: string;
+    linkedQaCustomerKey: string;
+  } | null>(null);
 
   // Version History state
   const versionHistoryIsOpen = useVersionHistoryStore((s) => s.isOpen);
@@ -740,6 +750,60 @@ export function EditorWorkspace({
     setShowPublishConfirm(true);
   }, []);
 
+  const handleOpenUnlinkModal = useCallback(
+    (queryId: string) => {
+      const tab = storeFindTabByQueryId(queryId);
+      const query = savedQueries?.find((q) => q.id === queryId);
+      const name = tab?.name ?? query?.name ?? "Query";
+      const qaName =
+        tab?.linkedQaName ?? query?.linkedQaName ?? "Query Activity";
+      const qaKey =
+        tab?.linkedQaCustomerKey ?? query?.linkedQaCustomerKey ?? "";
+
+      if (!qaKey) {
+        return;
+      }
+
+      setUnlinkTarget({
+        savedQueryId: queryId,
+        savedQueryName: name,
+        linkedQaName: qaName,
+        linkedQaCustomerKey: qaKey,
+      });
+    },
+    [storeFindTabByQueryId, savedQueries],
+  );
+
+  const handleUnlinkComplete = useCallback(
+    (options: { deleteLocal: boolean; deleteRemote: boolean }) => {
+      if (!unlinkTarget) {
+        return;
+      }
+
+      const tab = storeFindTabByQueryId(unlinkTarget.savedQueryId);
+      if (tab) {
+        if (options.deleteLocal) {
+          storeCloseTab(tab.id);
+          onTabClose?.(tab.id);
+        } else {
+          storeUpdateTabLinkState(tab.id, {
+            linkedQaCustomerKey: null,
+            linkedQaName: null,
+          });
+        }
+      }
+
+      setUnlinkTarget(null);
+    },
+    [
+      unlinkTarget,
+      storeFindTabByQueryId,
+      storeCloseTab,
+      storeUpdateTabLinkState,
+      onTabClose,
+    ],
+  );
+
   const handleCloseTab = useCallback(
     (id: string) => {
       storeCloseTab(id);
@@ -1099,6 +1163,9 @@ export function EditorWorkspace({
                 onLinkQuery={
                   isDeployFeatureEnabled ? handleOpenLinkModal : undefined
                 }
+                onUnlinkQuery={
+                  isDeployFeatureEnabled ? handleOpenUnlinkModal : undefined
+                }
               />
             ) : null}
 
@@ -1231,6 +1298,18 @@ export function EditorWorkspace({
                                         </Tooltip.Content>
                                       </Tooltip.Portal>
                                     </Tooltip.Root>
+                                    <ToolbarButton
+                                      icon={
+                                        <LinkBrokenMinimalistic size={18} />
+                                      }
+                                      label="Unlink from Query Activity"
+                                      onClick={() => {
+                                        const qId = safeActiveTab.queryId;
+                                        if (qId) {
+                                          handleOpenUnlinkModal(qId);
+                                        }
+                                      }}
+                                    />
                                   </>
                                 ) : (
                                   <ToolbarButton
@@ -1477,6 +1556,18 @@ export function EditorWorkspace({
           automations={blastRadius.data?.automations ?? []}
           isLoadingBlastRadius={blastRadius.isLoading}
         />
+
+        {unlinkTarget ? (
+          <UnlinkModal
+            open
+            onClose={() => setUnlinkTarget(null)}
+            savedQueryId={unlinkTarget.savedQueryId}
+            savedQueryName={unlinkTarget.savedQueryName}
+            linkedQaName={unlinkTarget.linkedQaName}
+            linkedQaCustomerKey={unlinkTarget.linkedQaCustomerKey}
+            onUnlinkComplete={handleUnlinkComplete}
+          />
+        ) : null}
 
         <DriftDetectionDialog
           isOpen={showDriftDialog}
