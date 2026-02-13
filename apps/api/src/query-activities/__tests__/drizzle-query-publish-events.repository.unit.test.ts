@@ -176,4 +176,47 @@ describe('DrizzleQueryPublishEventsRepository', () => {
       expect(result).toEqual(mockEvent);
     });
   });
+
+  describe('findBySavedQueryId()', () => {
+    it('returns all events ordered by createdAt desc', async () => {
+      // Arrange
+      const olderEvent = {
+        ...mockEvent,
+        id: 'pe-2',
+        createdAt: new Date('2026-02-09T12:00:00Z'),
+      };
+      resolveData = [mockEvent, olderEvent];
+
+      // Act
+      const result = await repository.findBySavedQueryId('sq-1');
+
+      // Assert
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual(mockEvent);
+      expect(result[1]).toEqual(olderEvent);
+    });
+
+    it('returns empty array when no events exist', async () => {
+      // Arrange
+      resolveData = [];
+
+      // Act
+      const result = await repository.findBySavedQueryId('sq-1');
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('returns single-element array when one event exists', async () => {
+      // Arrange
+      resolveData = [mockEvent];
+
+      // Act
+      const result = await repository.findBySavedQueryId('sq-1');
+
+      // Assert
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(mockEvent);
+    });
+  });
 });
