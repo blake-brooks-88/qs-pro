@@ -139,6 +139,10 @@ export function UnlinkModal({
       return false;
     }
 
+    if (blastRadius.isError) {
+      return confirmInput === linkedQaName;
+    }
+
     if (safetyTier === 1) {
       return true;
     }
@@ -154,6 +158,7 @@ export function UnlinkModal({
     unlinkMutation.isPending,
     showsBlastRadius,
     blastRadius.isLoading,
+    blastRadius.isError,
     safetyTier,
     confirmInput,
     linkedQaName,
@@ -273,6 +278,35 @@ export function UnlinkModal({
                   <span className="h-3 w-3 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin" />
                   Loading automations...
                 </div>
+              ) : blastRadius.isError ? (
+                <>
+                  <p className="text-xs text-amber-500 font-medium py-1">
+                    Unable to check automations. Type the Query Activity name to
+                    confirm.
+                  </p>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="unlink-confirm-input"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Type the Query Activity name (
+                      <span className="font-bold text-foreground">
+                        {linkedQaName}
+                      </span>
+                      ) to confirm deletion
+                    </label>
+                    <input
+                      id="unlink-confirm-input"
+                      type="text"
+                      value={confirmInput}
+                      onChange={(e) => setConfirmInput(e.target.value)}
+                      disabled={unlinkMutation.isPending}
+                      autoComplete="off"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                      placeholder={linkedQaName}
+                    />
+                  </div>
+                </>
               ) : (
                 <>
                   {safetyTier === 1 ? (

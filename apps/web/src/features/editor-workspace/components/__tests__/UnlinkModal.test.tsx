@@ -525,6 +525,114 @@ describe("UnlinkModal", () => {
   });
 
   // =========================================================================
+  // Blast radius error state
+  // =========================================================================
+
+  describe("blast radius error - falls back to type-to-confirm", () => {
+    beforeEach(() => {
+      server.use(
+        http.get("/api/query-activities/blast-radius/:savedQueryId", () => {
+          return HttpResponse.json(
+            { message: "Internal Server Error" },
+            { status: 500 },
+          );
+        }),
+      );
+    });
+
+    it("shows warning message when blast radius fails", async () => {
+      const user = userEvent.setup();
+      render(<UnlinkModal {...createDefaultProps()} />, {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await selectOption(user, "Unlink \\+ delete AS Query Activity");
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            /Unable to check automations\. Type the Query Activity name to confirm\./,
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows type-to-confirm input on error", async () => {
+      const user = userEvent.setup();
+      render(<UnlinkModal {...createDefaultProps()} />, {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await selectOption(user, "Unlink \\+ delete AS Query Activity");
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Unable to check automations/),
+        ).toBeInTheDocument();
+      });
+
+      const confirmInput = screen.getByLabelText(
+        /Type the Query Activity name/,
+      );
+      expect(confirmInput).toBeInTheDocument();
+      expect(confirmInput).toHaveAttribute("placeholder", "Weekly Report QA");
+    });
+
+    it("confirm disabled until exact QA name typed", async () => {
+      const user = userEvent.setup();
+      render(<UnlinkModal {...createDefaultProps()} />, {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await selectOption(user, "Unlink \\+ delete AS Query Activity");
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Unable to check automations/),
+        ).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByRole("button", {
+        name: /Unlink & Delete/,
+      });
+      expect(confirmButton).toBeDisabled();
+
+      const confirmInput = screen.getByLabelText(
+        /Type the Query Activity name/,
+      );
+      await user.type(confirmInput, "Weekly Report QA");
+
+      expect(confirmButton).not.toBeDisabled();
+    });
+
+    it("typing wrong name keeps confirm disabled", async () => {
+      const user = userEvent.setup();
+      render(<UnlinkModal {...createDefaultProps()} />, {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await selectOption(user, "Unlink \\+ delete AS Query Activity");
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Unable to check automations/),
+        ).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByRole("button", {
+        name: /Unlink & Delete/,
+      });
+      const confirmInput = screen.getByLabelText(
+        /Type the Query Activity name/,
+      );
+
+      await user.type(confirmInput, "wrong name");
+
+      expect(confirmButton).toBeDisabled();
+    });
+  });
+
+  // =========================================================================
   // Interactions
   // =========================================================================
 
