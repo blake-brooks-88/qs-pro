@@ -310,6 +310,7 @@ export function EditorWorkspace({
   const blastRadius = useBlastRadius(
     showPublishConfirm ? activeTabLinkedSavedQueryId : undefined,
   );
+  const toolbarBlastRadius = useBlastRadius(activeTabLinkedSavedQueryId);
   const { data: versionsData } = useQueryVersions(activeTabLinkedSavedQueryId);
 
   const latestVersionId = useMemo(() => {
@@ -1273,6 +1274,10 @@ export function EditorWorkspace({
                                     <LinkedBadge
                                       size="md"
                                       qaName={safeActiveTab.linkedQaName}
+                                      automationCount={
+                                        toolbarBlastRadius.data?.totalCount ??
+                                        null
+                                      }
                                     />
                                     <Tooltip.Root>
                                       <Tooltip.Trigger asChild>
@@ -1555,6 +1560,7 @@ export function EditorWorkspace({
           versionSql={safeActiveTab.content}
           automations={blastRadius.data?.automations ?? []}
           isLoadingBlastRadius={blastRadius.isLoading}
+          blastRadiusError={blastRadius.isError}
         />
 
         {unlinkTarget ? (
