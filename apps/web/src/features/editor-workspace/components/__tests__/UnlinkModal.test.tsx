@@ -551,7 +551,7 @@ describe("UnlinkModal", () => {
       await waitFor(() => {
         expect(
           screen.getByText(
-            /Unable to check automations\. Type the Query Activity name to confirm\./,
+            /Unable to verify automation usage\. Name confirmation required as a safety precaution\./,
           ),
         ).toBeInTheDocument();
       });
@@ -567,7 +567,7 @@ describe("UnlinkModal", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Unable to check automations/),
+          screen.getByText(/Unable to verify automation usage/),
         ).toBeInTheDocument();
       });
 
@@ -588,7 +588,7 @@ describe("UnlinkModal", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Unable to check automations/),
+          screen.getByText(/Unable to verify automation usage/),
         ).toBeInTheDocument();
       });
 
@@ -615,7 +615,7 @@ describe("UnlinkModal", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Unable to check automations/),
+          screen.getByText(/Unable to verify automation usage/),
         ).toBeInTheDocument();
       });
 

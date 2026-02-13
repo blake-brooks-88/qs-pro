@@ -106,6 +106,11 @@ export function UnlinkModal({
     [automations],
   );
 
+  const effectiveSafetyTier = useMemo(
+    () => (showsBlastRadius && blastRadius.isError ? 2 : safetyTier),
+    [showsBlastRadius, blastRadius.isError, safetyTier],
+  );
+
   const highRiskCount = useMemo(
     () => automations.filter((a) => a.isHighRisk).length,
     [automations],
@@ -139,17 +144,13 @@ export function UnlinkModal({
       return false;
     }
 
-    if (blastRadius.isError) {
-      return confirmInput === linkedQaName;
-    }
-
-    if (safetyTier === 1) {
+    if (effectiveSafetyTier === 1) {
       return true;
     }
 
     const nameMatches = confirmInput === linkedQaName;
 
-    if (safetyTier === 2) {
+    if (effectiveSafetyTier === 2) {
       return nameMatches;
     }
 
@@ -158,8 +159,7 @@ export function UnlinkModal({
     unlinkMutation.isPending,
     showsBlastRadius,
     blastRadius.isLoading,
-    blastRadius.isError,
-    safetyTier,
+    effectiveSafetyTier,
     confirmInput,
     linkedQaName,
     acknowledged,
@@ -280,10 +280,10 @@ export function UnlinkModal({
                 </div>
               ) : blastRadius.isError ? (
                 <>
-                  <p className="text-xs text-amber-500 font-medium py-1">
-                    Unable to check automations. Type the Query Activity name to
-                    confirm.
-                  </p>
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    Unable to verify automation usage. Name confirmation
+                    required as a safety precaution.
+                  </div>
                   <div className="space-y-1.5">
                     <label
                       htmlFor="unlink-confirm-input"
@@ -309,7 +309,7 @@ export function UnlinkModal({
                 </>
               ) : (
                 <>
-                  {safetyTier === 1 ? (
+                  {effectiveSafetyTier === 1 ? (
                     <p className="text-xs text-muted-foreground py-1">
                       This Query Activity is not used by any automations.
                     </p>
@@ -371,7 +371,7 @@ export function UnlinkModal({
                       </div>
 
                       {/* Tier 3: Acknowledgment checkbox */}
-                      {safetyTier === 3 ? (
+                      {effectiveSafetyTier === 3 ? (
                         <label
                           htmlFor="unlink-acknowledge-checkbox"
                           className="flex items-start gap-2 cursor-pointer"
