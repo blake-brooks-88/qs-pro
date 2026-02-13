@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { publishQuery } from "@/services/query-activities";
 
+import { publishEventsKeys } from "./use-publish-events";
 import { queryActivityKeys } from "./use-query-activities-list";
 import { versionHistoryKeys } from "./use-query-versions";
 
@@ -25,6 +26,9 @@ export function usePublishQuery() {
       });
       void queryClient.invalidateQueries({
         queryKey: versionHistoryKeys.list(savedQueryId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: publishEventsKeys.list(savedQueryId),
       });
     },
   });

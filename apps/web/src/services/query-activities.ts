@@ -3,6 +3,7 @@ import type {
   CreateQueryActivityDto,
   DriftCheckResponse,
   LinkQueryResponse,
+  PublishEventsListResponse,
   PublishQueryResponse,
   QADetail,
   QAListItem,
@@ -73,6 +74,15 @@ export async function checkDrift(
 ): Promise<DriftCheckResponse> {
   const response = await api.get<DriftCheckResponse>(
     `/query-activities/drift/${savedQueryId}`,
+  );
+  return response.data;
+}
+
+export async function fetchPublishEvents(
+  savedQueryId: string,
+): Promise<PublishEventsListResponse> {
+  const response = await api.get<PublishEventsListResponse>(
+    `/saved-queries/${savedQueryId}/versions/publish-events`,
   );
   return response.data;
 }

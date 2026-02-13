@@ -91,6 +91,10 @@ export const handlers = [
     return HttpResponse.json({ versions: [], total: 0 });
   }),
 
+  http.get("/api/saved-queries/:id/versions/publish-events", () => {
+    return HttpResponse.json({ events: [], total: 0 });
+  }),
+
   http.get("/api/saved-queries/:id/versions/:versionId", ({ params }) => {
     return HttpResponse.json({
       id: params.versionId,
