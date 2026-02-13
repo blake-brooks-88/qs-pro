@@ -174,6 +174,34 @@ describe("usePublishQuery", () => {
     );
   });
 
+  it("invalidates publish events cache for the specific savedQueryId on success", async () => {
+    server.use(
+      http.post("/api/query-activities/publish/:savedQueryId", () => {
+        return HttpResponse.json(mockPublishResponse);
+      }),
+    );
+
+    const queryClient = createQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => usePublishQuery(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    result.current.mutate({
+      savedQueryId: "sq-123",
+      versionId: "ver-1",
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ["publishEvents", "list", "sq-123"],
+      }),
+    );
+  });
+
   it("sets error state on 403 (feature not enabled)", async () => {
     server.use(
       http.post("/api/query-activities/publish/:savedQueryId", () => {
