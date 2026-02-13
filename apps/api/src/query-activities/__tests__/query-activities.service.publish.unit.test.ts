@@ -788,5 +788,226 @@ describe('QueryActivitiesService (publish)', () => {
 
       expect(result.automations).toHaveLength(0);
     });
+
+    describe('edge cases', () => {
+      function mockListAndDetail(
+        listResponse: unknown,
+        detailResponse?: unknown,
+      ) {
+        vi.mocked(mceBridgeService.request).mockImplementation(((
+          _t: string,
+          _u: string,
+          _m: string,
+          config: { url: string },
+        ) => {
+          if (config.url.includes('/automation/v1/automations?')) {
+            return Promise.resolve(listResponse);
+          }
+          return Promise.resolve(
+            detailResponse ?? { id: '', name: '', status: 0, steps: [] },
+          );
+        }) as any);
+      }
+
+      it('returns empty automations when response.items is null', async () => {
+        mockListAndDetail({ items: null, page: 1, pageSize: 200, count: 0 });
+
+        const result = await service.getBlastRadius(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+        );
+
+        expect(result.automations).toHaveLength(0);
+        expect(result.totalCount).toBe(0);
+      });
+
+      it('returns empty automations when response.items is undefined', async () => {
+        mockListAndDetail({ page: 1, pageSize: 200, count: 0 });
+
+        const result = await service.getBlastRadius(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+        );
+
+        expect(result.automations).toHaveLength(0);
+        expect(result.totalCount).toBe(0);
+      });
+
+      it('defaults undefined statusId to 0 (BuildError)', async () => {
+        mockListAndDetail(
+          {
+            items: [{ id: 'auto-no-status', name: 'No Status' }],
+            count: 1,
+          },
+          {
+            id: 'auto-no-status',
+            name: 'No Status',
+            steps: [
+              {
+                stepNumber: 1,
+                activities: [
+                  {
+                    id: 'act-1',
+                    name: 'Activity 1',
+                    objectTypeId: 300,
+                    activityObjectId: 'qa-obj-100',
+                  },
+                ],
+              },
+            ],
+          },
+        );
+
+        const result = await service.getBlastRadius(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+        );
+
+        expect(result.automations).toHaveLength(1);
+        expect(result.automations[0]?.status).toBe('BuildError');
+        expect(result.automations[0]?.isHighRisk).toBe(false);
+      });
+
+      it('maps unknown statusId (999) to "Unknown"', async () => {
+        mockListAndDetail(
+          {
+            items: [{ id: 'auto-999', name: 'Unknown Status', statusId: 999 }],
+            count: 1,
+          },
+          {
+            id: 'auto-999',
+            name: 'Unknown Status',
+            steps: [
+              {
+                stepNumber: 1,
+                activities: [
+                  {
+                    id: 'act-1',
+                    name: 'Activity 1',
+                    objectTypeId: 300,
+                    activityObjectId: 'qa-obj-100',
+                  },
+                ],
+              },
+            ],
+          },
+        );
+
+        const result = await service.getBlastRadius(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+        );
+
+        expect(result.automations).toHaveLength(1);
+        expect(result.automations[0]?.status).toBe('Unknown');
+        expect(result.automations[0]?.isHighRisk).toBe(false);
+      });
+
+      it('stops pagination when response.count is undefined', async () => {
+        mockListAndDetail(
+          {
+            items: [{ id: 'auto-1', name: 'Match', statusId: 2 }],
+            page: 1,
+            pageSize: 200,
+          },
+          {
+            id: 'auto-1',
+            name: 'Match',
+            steps: [
+              {
+                stepNumber: 1,
+                activities: [
+                  {
+                    id: 'act-1',
+                    name: 'Activity 1',
+                    objectTypeId: 300,
+                    activityObjectId: 'qa-obj-100',
+                  },
+                ],
+              },
+            ],
+          },
+        );
+
+        const result = await service.getBlastRadius(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+        );
+
+        expect(result.automations).toHaveLength(1);
+        const listCalls = vi
+          .mocked(mceBridgeService.request)
+          .mock.calls.filter((call) =>
+            String((call[3] as { url: string }).url).includes(
+              '/automation/v1/automations?',
+            ),
+          );
+        expect(listCalls).toHaveLength(1);
+      });
+
+      it('skips automation when steps is null', async () => {
+        mockListAndDetail(
+          {
+            items: [{ id: 'auto-null-steps', name: 'Null Steps', statusId: 2 }],
+            count: 1,
+          },
+          {
+            id: 'auto-null-steps',
+            name: 'Null Steps',
+            status: 2,
+            steps: null,
+          },
+        );
+
+        const result = await service.getBlastRadius(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+        );
+
+        expect(result.automations).toHaveLength(0);
+      });
+
+      it('skips step when activities is null', async () => {
+        mockListAndDetail(
+          {
+            items: [
+              {
+                id: 'auto-null-acts',
+                name: 'Null Activities',
+                statusId: 2,
+              },
+            ],
+            count: 1,
+          },
+          {
+            id: 'auto-null-acts',
+            name: 'Null Activities',
+            status: 2,
+            steps: [{ stepNumber: 1, activities: null }],
+          },
+        );
+
+        const result = await service.getBlastRadius(
+          mockTenantId,
+          mockUserId,
+          mockMid,
+          'sq-1',
+        );
+
+        expect(result.automations).toHaveLength(0);
+      });
+    });
   });
 });

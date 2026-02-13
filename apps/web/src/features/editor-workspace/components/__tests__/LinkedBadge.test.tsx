@@ -62,4 +62,68 @@ describe("LinkedBadge", () => {
       expect(badge?.className).toContain("font-medium");
     });
   });
+
+  describe("automation count", () => {
+    it("md variant shows automation count when provided", () => {
+      render(<LinkedBadge size="md" qaName="My QA" automationCount={3} />);
+
+      expect(screen.getByText("Linked to My QA")).toBeInTheDocument();
+      expect(screen.getByText(/3 automations/)).toBeInTheDocument();
+    });
+
+    it("md variant shows singular 'automation' for count of 1", () => {
+      render(<LinkedBadge size="md" qaName="My QA" automationCount={1} />);
+
+      expect(screen.getByText(/1 automation/)).toBeInTheDocument();
+      expect(screen.queryByText(/automations/)).not.toBeInTheDocument();
+    });
+
+    it("md variant omits count when automationCount is null", () => {
+      render(<LinkedBadge size="md" qaName="My QA" automationCount={null} />);
+
+      expect(screen.getByText("Linked to My QA")).toBeInTheDocument();
+      expect(screen.queryByText(/automation/)).not.toBeInTheDocument();
+    });
+
+    it("md variant omits count when automationCount is undefined", () => {
+      render(<LinkedBadge size="md" qaName="My QA" />);
+
+      expect(screen.queryByText(/automation/)).not.toBeInTheDocument();
+    });
+
+    it("md variant omits count when automationCount is 0", () => {
+      render(<LinkedBadge size="md" qaName="My QA" automationCount={0} />);
+
+      expect(screen.queryByText(/automation/)).not.toBeInTheDocument();
+    });
+
+    it("sm variant includes count in title tooltip when provided", () => {
+      render(<LinkedBadge size="sm" qaName="My QA" automationCount={5} />);
+
+      expect(
+        screen.getByTitle("Linked to My QA · 5 automations"),
+      ).toBeInTheDocument();
+    });
+
+    it("sm variant uses default title when count is null", () => {
+      render(<LinkedBadge size="sm" qaName="My QA" automationCount={null} />);
+
+      expect(screen.getByTitle("Linked to My QA")).toBeInTheDocument();
+    });
+
+    it("md variant renders count suffix outside truncated region", () => {
+      const { container } = render(
+        <LinkedBadge size="md" qaName="My QA" automationCount={3} />,
+      );
+
+      const outerSpan = container.firstElementChild;
+      expect(outerSpan).toBeInTheDocument();
+      const truncateSpan = outerSpan?.querySelector(".truncate");
+      expect(truncateSpan).toBeInTheDocument();
+      expect(truncateSpan?.textContent).toBe("Linked to My QA");
+      expect(
+        truncateSpan?.querySelector(".text-muted-foreground"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

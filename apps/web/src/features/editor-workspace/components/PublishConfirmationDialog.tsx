@@ -26,6 +26,7 @@ interface PublishConfirmationDialogProps {
   versionSql: string;
   automations: AutomationInfo[];
   isLoadingBlastRadius: boolean;
+  blastRadiusError?: boolean;
 }
 
 const HIGH_RISK_STATUSES = new Set([
@@ -51,6 +52,7 @@ export function PublishConfirmationDialog({
   versionSql,
   automations,
   isLoadingBlastRadius,
+  blastRadiusError,
 }: PublishConfirmationDialogProps) {
   const baseOptions = getEditorOptions();
 
@@ -139,6 +141,10 @@ export function PublishConfirmationDialog({
                 <span className="h-3 w-3 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin" />
                 Loading automations...
               </div>
+            ) : blastRadiusError ? (
+              <p className="text-xs text-destructive py-2">
+                Unable to load automation data. Proceed with caution.
+              </p>
             ) : automations.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">
                 No automations use this Query Activity.
