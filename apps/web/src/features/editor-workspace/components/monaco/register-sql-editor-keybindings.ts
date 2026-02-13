@@ -36,12 +36,6 @@ export function registerSqlEditorKeybindings(options: {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       getOnRunRequest()?.();
     });
-    editor.addCommand(
-      monaco.KeyMod.CtrlCmd | monaco.KeyCode.NumpadEnter,
-      () => {
-        getOnRunRequest()?.();
-      },
-    );
   }
 
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash, () => {
