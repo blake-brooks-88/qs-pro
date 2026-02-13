@@ -73,6 +73,14 @@ function createSavedQueriesRepoStub() {
   };
 }
 
+function createPublishEventsRepoStub() {
+  return {
+    create: vi.fn(),
+    findLatestBySavedQueryId: vi.fn().mockResolvedValue(null),
+    findBySavedQueryId: vi.fn().mockResolvedValue([]),
+  };
+}
+
 function createFeaturesServiceStub() {
   return {
     getTenantFeatures: vi.fn().mockResolvedValue({
@@ -85,6 +93,7 @@ describe('QueryVersionsService', () => {
   let service: QueryVersionsService;
   let versionsRepoStub: ReturnType<typeof createQueryVersionsRepoStub>;
   let savedQueriesRepoStub: ReturnType<typeof createSavedQueriesRepoStub>;
+  let publishEventsRepoStub: ReturnType<typeof createPublishEventsRepoStub>;
   let encryptionStub: ReturnType<typeof createEncryptionServiceStub>;
   let featuresStub: ReturnType<typeof createFeaturesServiceStub>;
 
@@ -93,6 +102,7 @@ describe('QueryVersionsService', () => {
 
     versionsRepoStub = createQueryVersionsRepoStub();
     savedQueriesRepoStub = createSavedQueriesRepoStub();
+    publishEventsRepoStub = createPublishEventsRepoStub();
     encryptionStub = createEncryptionServiceStub();
     featuresStub = createFeaturesServiceStub();
 
@@ -108,6 +118,10 @@ describe('QueryVersionsService', () => {
         {
           provide: 'SAVED_QUERIES_REPOSITORY',
           useValue: savedQueriesRepoStub,
+        },
+        {
+          provide: 'QUERY_PUBLISH_EVENT_REPOSITORY',
+          useValue: publishEventsRepoStub,
         },
         {
           provide: EncryptionService,
