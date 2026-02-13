@@ -13,9 +13,6 @@ import type {
   DataExtensionField,
   Folder,
 } from "@/features/editor-workspace/types";
-import { getInlineCompletionReplacementEndOffset } from "@/features/editor-workspace/utils/inline-completion-range";
-import type { InlineSuggestionContext } from "@/features/editor-workspace/utils/inline-suggestions";
-import { evaluateInlineSuggestions } from "@/features/editor-workspace/utils/inline-suggestions";
 import {
   applyMonacoTheme,
   getEditorOptions,
@@ -25,7 +22,6 @@ import {
   extractSelectFieldRanges,
   extractTableReferences,
   getSharedFolderIds,
-  getSqlCursorContext,
 } from "@/features/editor-workspace/utils/sql-context";
 import type { SqlDiagnostic } from "@/features/editor-workspace/utils/sql-diagnostics";
 import { toMonacoMarkers } from "@/features/editor-workspace/utils/sql-diagnostics";
@@ -33,6 +29,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 
 import { registerSqlCompletionProvider } from "./monaco/register-sql-completion-provider";
+import { registerSqlInlineCompletionsProvider } from "./monaco/register-sql-inline-completions-provider";
 
 const MAX_ERROR_TOKEN_LENGTH = 80;
 
@@ -259,76 +256,11 @@ export function MonacoQueryEditor({
 
       inlineCompletionDisposableRef.current?.dispose();
       inlineCompletionDisposableRef.current =
-        monacoInstance.languages.registerInlineCompletionsProvider("sql", {
-          provideInlineCompletions: async (model, position) => {
-            const text = model.getValue();
-            const cursorIndex = model.getOffsetAt(position);
-            const sqlContext = getSqlCursorContext(text, cursorIndex);
-
-            const ctx: InlineSuggestionContext = {
-              sql: text,
-              cursorIndex,
-              sqlContext,
-              tablesInScope: sqlContext.tablesInScope,
-              existingAliases: new Set(
-                sqlContext.tablesInScope
-                  .map((t) => t.alias?.toLowerCase())
-                  .filter((a): a is string => Boolean(a)),
-              ),
-              getFieldsForTable: async (table) => {
-                if (table.isSubquery) {
-                  return table.outputFields.map((name) => ({
-                    name,
-                    type: "Text" as const,
-                    isPrimaryKey: false,
-                    isNullable: true,
-                  }));
-                }
-                const dataExtension = resolveDataExtension(table.name);
-                const customerKey = dataExtension?.customerKey ?? table.name;
-                return fetchFields(customerKey);
-              },
-            };
-
-            const suggestion = await evaluateInlineSuggestions(ctx);
-
-            if (!suggestion) {
-              return { items: [] };
-            }
-
-            const buildInlineRangeForInsertText = (insertText: string) => {
-              const endOffset = getInlineCompletionReplacementEndOffset(
-                text,
-                cursorIndex,
-                insertText,
-              );
-              const endPosition = model.getPositionAt(endOffset);
-              return new monacoInstance.Range(
-                position.lineNumber,
-                position.column,
-                endPosition.lineNumber,
-                endPosition.column,
-              );
-            };
-
-            return {
-              items: [
-                {
-                  insertText: suggestion.text,
-                  range: buildInlineRangeForInsertText(suggestion.text),
-                },
-                ...(suggestion.alternatives ?? []).map((alt) => ({
-                  insertText: alt,
-                  range: buildInlineRangeForInsertText(alt),
-                })),
-              ],
-            };
-          },
-          freeInlineCompletions: () => {},
-          disposeInlineCompletions: () => {},
-        } as Parameters<
-          typeof monacoInstance.languages.registerInlineCompletionsProvider
-        >[1]);
+        registerSqlInlineCompletionsProvider({
+          monaco: monacoInstance,
+          resolveDataExtension,
+          fetchFields,
+        });
 
       monacoInstance.languages.setLanguageConfiguration("sql", {
         comments: {
