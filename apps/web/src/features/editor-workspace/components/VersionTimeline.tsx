@@ -1,4 +1,4 @@
-import type { VersionListItem } from "@qpp/shared-types";
+import type { PublishEventListItem, VersionListItem } from "@qpp/shared-types";
 import {
   type KeyboardEvent,
   useCallback,
@@ -14,6 +14,9 @@ interface VersionTimelineProps {
   selectedVersionId: string | null;
   onSelectVersion: (versionId: string) => void;
   onUpdateName: (versionId: string, name: string | null) => void;
+  currentPublishedVersionId?: string | null;
+  publishedVersionIds?: Set<string>;
+  publishEventsByVersionId?: Map<string, PublishEventListItem[]>;
 }
 
 function formatTimestamp(dateStr: string): string {
@@ -157,11 +160,67 @@ function InlineEditableName({
   );
 }
 
+interface PublishBadgeProps {
+  events: PublishEventListItem[];
+  isCurrent: boolean;
+}
+
+function PublishBadge({ events, isCurrent }: PublishBadgeProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const count = events.length;
+  const label = isCurrent
+    ? count > 1
+      ? `published ${String(count)}x`
+      : "published"
+    : count > 1
+      ? `published ${String(count)}x`
+      : "was published";
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsExpanded((prev) => !prev);
+        }}
+        className={cn(
+          "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+          isCurrent
+            ? "bg-success-500/10 text-success-600 dark:text-success-400"
+            : "bg-muted text-muted-foreground",
+        )}
+      >
+        {label}
+      </button>
+      {isExpanded && count > 0 ? (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-popover border border-border rounded-md shadow-lg p-2 min-w-40">
+          <div className="text-[10px] text-muted-foreground space-y-1">
+            {events.map((event) => (
+              <div key={event.id}>
+                {new Date(event.createdAt).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function VersionTimeline({
   versions,
   selectedVersionId,
   onSelectVersion,
   onUpdateName,
+  currentPublishedVersionId,
+  publishedVersionIds,
+  publishEventsByVersionId,
 }: VersionTimelineProps) {
   if (versions.length === 0) {
     return (
@@ -181,6 +240,11 @@ export function VersionTimeline({
         const isSelected = version.id === selectedVersionId;
         const delta = computeLineCountDelta(sorted, index);
         const isRestore = version.source === "restore";
+        const isCurrentPublished = version.id === currentPublishedVersionId;
+        const wasPreviouslyPublished =
+          !isCurrentPublished &&
+          (publishedVersionIds?.has(version.id) ?? false);
+        const versionPublishEvents = publishEventsByVersionId?.get(version.id);
 
         return (
           <div key={version.id} className="relative pl-8 pb-4 last:pb-0 group">
@@ -203,6 +267,18 @@ export function VersionTimeline({
                 )}
               />
             </div>
+
+            {isCurrentPublished ? (
+              <div
+                className="absolute left-4 top-4 w-2.5 h-2.5 rounded-full bg-success-500 animate-publish-pulse z-10"
+                aria-label="Currently published"
+              />
+            ) : wasPreviouslyPublished ? (
+              <div
+                className="absolute left-4 top-4 w-2.5 h-2.5 rounded-full bg-muted-foreground/50 z-10"
+                aria-label="Previously published"
+              />
+            ) : null}
 
             <button
               type="button"
@@ -242,6 +318,12 @@ export function VersionTimeline({
                     <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                       restored
                     </span>
+                  ) : null}
+                  {versionPublishEvents && versionPublishEvents.length > 0 ? (
+                    <PublishBadge
+                      events={versionPublishEvents}
+                      isCurrent={isCurrentPublished}
+                    />
                   ) : null}
                 </div>
               </div>
