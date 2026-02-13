@@ -35,15 +35,17 @@ async function fetchVersionDetail(
 }
 
 export function useQueryVersions(savedQueryId: string | undefined) {
+  const safeSavedQueryId =
+    typeof savedQueryId === "string" ? savedQueryId : undefined;
   return useQuery({
-    queryKey: versionHistoryKeys.list(savedQueryId ?? ""),
+    queryKey: versionHistoryKeys.list(safeSavedQueryId ?? ""),
     queryFn: () => {
-      if (!savedQueryId) {
+      if (!safeSavedQueryId) {
         throw new Error("savedQueryId is required");
       }
-      return fetchVersions(savedQueryId);
+      return fetchVersions(safeSavedQueryId);
     },
-    enabled: !!savedQueryId,
+    enabled: !!safeSavedQueryId,
     staleTime: 30_000,
   });
 }
@@ -52,15 +54,21 @@ export function useVersionDetail(
   savedQueryId: string | undefined,
   versionId: string | undefined,
 ) {
+  const safeSavedQueryId =
+    typeof savedQueryId === "string" ? savedQueryId : undefined;
+  const safeVersionId = typeof versionId === "string" ? versionId : undefined;
   return useQuery({
-    queryKey: versionHistoryKeys.detail(savedQueryId ?? "", versionId ?? ""),
+    queryKey: versionHistoryKeys.detail(
+      safeSavedQueryId ?? "",
+      safeVersionId ?? "",
+    ),
     queryFn: () => {
-      if (!savedQueryId || !versionId) {
+      if (!safeSavedQueryId || !safeVersionId) {
         throw new Error("savedQueryId and versionId are required");
       }
-      return fetchVersionDetail(savedQueryId, versionId);
+      return fetchVersionDetail(safeSavedQueryId, safeVersionId);
     },
-    enabled: !!savedQueryId && !!versionId,
+    enabled: !!safeSavedQueryId && !!safeVersionId,
     staleTime: Infinity,
   });
 }

@@ -147,6 +147,20 @@ describe("VersionHistoryPanel", () => {
     expect(screen.getByText("No versions available")).toBeInTheDocument();
   });
 
+  it("VersionHistoryPanel_InvalidVersionsPayload_DoesNotCrash", () => {
+    // Arrange — guard against unexpected API payload shapes
+    mockUseQueryVersions.mockReturnValue({
+      data: { versions: {} as unknown as VersionListItem[], total: 1 },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useQueryVersions>);
+
+    // Act
+    render(<VersionHistoryPanel {...defaultProps} />);
+
+    // Assert
+    expect(screen.getByText("No versions available")).toBeInTheDocument();
+  });
+
   it("VersionHistoryPanel_CloseButton_CallsOnClose", async () => {
     // Arrange
     const user = userEvent.setup();
