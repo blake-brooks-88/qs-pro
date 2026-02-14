@@ -83,6 +83,60 @@ describe("buildSqlCompletions", () => {
     expect(result).toEqual([]);
   });
 
+  it("returns no suggestions when cursor is inside a comment", async () => {
+    const { text, cursorIndex } = parseCursor(
+      "SELECT -- some co|mment\n* FROM [Customers]",
+    );
+
+    const result = await buildSqlCompletions({
+      text,
+      cursorIndex,
+      triggerCharacter: undefined,
+      isExplicitTrigger: true,
+      bracketRange: {
+        startOffset: cursorIndex,
+        endOffset: cursorIndex,
+        inBracket: false,
+        hasClosingBracket: false,
+      },
+      wordRange: getWordRange(text, cursorIndex),
+      resolveDataExtension,
+      fetchFields: async () => [],
+      getFieldsCount: async () => null,
+      hasTenant: () => true,
+      dataExtensions,
+      sharedFolderIds: new Set([sharedFolderId]),
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty results when underscore trigger fires but no system views loaded", async () => {
+    const { text, cursorIndex } = parseCursor("SELECT * FROM _|");
+
+    const result = await buildSqlCompletions({
+      text,
+      cursorIndex,
+      triggerCharacter: "_",
+      isExplicitTrigger: false,
+      bracketRange: {
+        startOffset: cursorIndex,
+        endOffset: cursorIndex,
+        inBracket: false,
+        hasClosingBracket: false,
+      },
+      wordRange: getWordRange(text, cursorIndex),
+      resolveDataExtension,
+      fetchFields: async () => [],
+      getFieldsCount: async () => null,
+      hasTenant: () => true,
+      dataExtensions,
+      sharedFolderIds: new Set([sharedFolderId]),
+    });
+
+    expect(result).toEqual([]);
+  });
+
   it("suggests fields for alias-before-dot and replaces only after the dot", async () => {
     const { text, cursorIndex } = parseCursor("SELECT a.| FROM [Customers] a");
 
@@ -124,6 +178,42 @@ describe("buildSqlCompletions", () => {
     expect(result.at(0)?.replaceOffsets.startOffset).toBe(dotOffset + 1);
     expect(result.at(0)?.replaceOffsets.endOffset).toBe(cursorIndex);
     expect(result.at(0)?.insertText).toBe("Email");
+  });
+
+  it("returns subquery output fields for alias-before-dot on a subquery table", async () => {
+    const { text, cursorIndex } = parseCursor(
+      "SELECT sq.| FROM (SELECT Name, Email FROM [Customers]) sq",
+    );
+
+    const fetchFields = vi.fn(async () => []);
+
+    const result = await buildSqlCompletions({
+      text,
+      cursorIndex,
+      triggerCharacter: ".",
+      isExplicitTrigger: false,
+      bracketRange: {
+        startOffset: cursorIndex,
+        endOffset: cursorIndex,
+        inBracket: false,
+        hasClosingBracket: false,
+      },
+      wordRange: getWordRange(text, cursorIndex),
+      resolveDataExtension,
+      fetchFields,
+      getFieldsCount: async () => null,
+      hasTenant: () => true,
+      dataExtensions,
+      sharedFolderIds: new Set([sharedFolderId]),
+    });
+
+    expect(fetchFields).not.toHaveBeenCalled();
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.every((item) => item.kind === "field")).toBe(true);
+
+    const fieldNames = result.map((item) => item.insertText);
+    expect(fieldNames).toContain("Name");
+    expect(fieldNames).toContain("Email");
   });
 
   it("suggests data extensions after FROM when inside brackets", async () => {
@@ -208,5 +298,42 @@ describe("buildSqlCompletions", () => {
     expect(result).toHaveLength(1);
     expect(result.at(0)?.kind).toBe("snippet");
     expect(result.at(0)?.insertText).toContain("c.Email");
+  });
+
+  it("returns issue completion when asterisk expansion finds ambiguous tables", async () => {
+    const { text, cursorIndex } = parseCursor(
+      "SELECT *| FROM [Customers] JOIN [SharedDE]",
+    );
+
+    const result = await buildSqlCompletions({
+      text,
+      cursorIndex,
+      triggerCharacter: undefined,
+      isExplicitTrigger: true,
+      bracketRange: {
+        startOffset: cursorIndex,
+        endOffset: cursorIndex,
+        inBracket: false,
+        hasClosingBracket: false,
+      },
+      wordRange: getWordRange(text, cursorIndex),
+      resolveDataExtension,
+      fetchFields: async () => [
+        {
+          name: "Email",
+          type: "EmailAddress",
+          isPrimaryKey: false,
+          isNullable: true,
+        },
+      ],
+      getFieldsCount: async () => null,
+      hasTenant: () => true,
+      dataExtensions,
+      sharedFolderIds: new Set([sharedFolderId]),
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result.at(0)?.kind).toBe("issue");
+    expect(result.at(0)?.insertText).toBe("*");
   });
 });

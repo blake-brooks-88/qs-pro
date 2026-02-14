@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueryExecutionStatus } from "@/features/editor-workspace/hooks/use-query-execution";
 import type { RunResultsResponse } from "@/features/editor-workspace/hooks/use-run-results";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
+import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
   DataExtension,
   ExecutionResult,
@@ -260,12 +261,47 @@ vi.mock("../ConfirmationDialog", () => ({
     ) : null,
 }));
 
-// Mock QueryTabBar to make tab counting reliable in tests
-// The real QueryTabBar reads from Zustand store which complicates testing
+vi.mock("../VersionHistoryPanel", () => ({
+  VersionHistoryPanel: ({
+    savedQueryId,
+    onClose,
+  }: {
+    savedQueryId: string;
+    onClose: () => void;
+  }) => (
+    <div data-testid="mock-version-history-panel" data-query-id={savedQueryId}>
+      <button onClick={onClose} data-testid="version-history-close">
+        Close
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock("../VersionHistoryWarningDialog", () => ({
+  VersionHistoryWarningDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="mock-version-history-warning">Warning</div> : null,
+}));
+
+// Mock QueryTabBar to expose onCloseWithConfirm for confirm-close testing
 vi.mock("../QueryTabBar", () => ({
-  QueryTabBar: () => (
+  QueryTabBar: ({
+    onCloseWithConfirm,
+  }: {
+    onCloseWithConfirm?: (tabId: string) => void;
+  }) => (
     <div data-testid="mock-query-tab-bar">
       <span>Query Tabs</span>
+      <button
+        data-testid="close-tab-with-confirm"
+        onClick={() => {
+          const tabs = useTabsStore.getState().tabs;
+          if (tabs[0]) {
+            onCloseWithConfirm?.(tabs[0].id);
+          }
+        }}
+      >
+        Close Tab
+      </button>
     </div>
   ),
 }));
@@ -478,6 +514,7 @@ describe("EditorWorkspace", () => {
     // Reset Zustand stores before each test
     useTabsStore.getState().reset();
     useActivityBarStore.setState({ activeView: "dataExtensions" });
+    useVersionHistoryStore.getState().closeVersionHistory();
   });
 
   // Tab lifecycle tests removed - these were mock-heavy and implementation-coupled.
@@ -778,6 +815,15 @@ describe("EditorWorkspace", () => {
       expect(sidebar).toHaveAttribute("data-active-view", "dataExtensions");
     });
 
+    it("hides sidebar when activeView is null", () => {
+      useActivityBarStore.setState({ activeView: null });
+
+      renderEditorWorkspace();
+
+      expect(screen.queryByTestId("mock-sidebar")).not.toBeInTheDocument();
+      expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
+    });
+
     it("renders history panel in main area when history view is active", () => {
       useActivityBarStore.setState({
         activeView: "history",
@@ -861,6 +907,114 @@ describe("EditorWorkspace", () => {
         );
       });
       expect(useActivityBarStore.getState().activeView).toBeNull();
+    });
+  });
+
+  describe("version history panel", () => {
+    it("renders VersionHistoryPanel when version history store is open", () => {
+      useVersionHistoryStore.getState().openVersionHistory("sq-1");
+
+      renderEditorWorkspace();
+
+      expect(
+        screen.getByTestId("mock-version-history-panel"),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("mock-version-history-panel")).toHaveAttribute(
+        "data-query-id",
+        "sq-1",
+      );
+      expect(screen.queryByTestId("mock-editor")).not.toBeInTheDocument();
+    });
+
+    it("hides editor toolbar and shows version history panel instead", () => {
+      useVersionHistoryStore.getState().openVersionHistory("sq-1");
+
+      renderEditorWorkspace();
+
+      expect(
+        screen.getByTestId("mock-version-history-panel"),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("run-button")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("confirm close tab", () => {
+    it("opens confirmation dialog and closes tab on confirm", async () => {
+      const user = userEvent.setup();
+      const onTabClose = vi.fn();
+
+      const initialTabs: QueryTab[] = [
+        {
+          id: "tab-1",
+          queryId: "q1",
+          name: "Dirty Query",
+          content: "SELECT 1",
+          isDirty: true,
+          isNew: false,
+        },
+      ];
+
+      renderEditorWorkspace({ initialTabs, onTabClose });
+
+      // Click the mock close-tab-with-confirm button
+      await user.click(screen.getByTestId("close-tab-with-confirm"));
+
+      // Confirmation dialog should appear
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("mock-confirmation-dialog"),
+        ).toBeInTheDocument();
+        expect(screen.getByTestId("confirmation-title")).toHaveTextContent(
+          "Unsaved Changes",
+        );
+      });
+
+      // Click confirm to close the tab
+      await user.click(screen.getByTestId("confirmation-confirm"));
+
+      // Dialog should close
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("mock-confirmation-dialog"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("cancels close tab when cancel is clicked in confirmation dialog", async () => {
+      const user = userEvent.setup();
+
+      const initialTabs: QueryTab[] = [
+        {
+          id: "tab-1",
+          queryId: "q1",
+          name: "Dirty Query",
+          content: "SELECT 1",
+          isDirty: true,
+          isNew: false,
+        },
+      ];
+
+      renderEditorWorkspace({ initialTabs });
+
+      // Click the mock close-tab-with-confirm button
+      await user.click(screen.getByTestId("close-tab-with-confirm"));
+
+      // Confirmation dialog should appear
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("mock-confirmation-dialog"),
+        ).toBeInTheDocument();
+      });
+
+      // Click cancel
+      await user.click(screen.getByTestId("confirmation-cancel"));
+
+      // Dialog should close
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("mock-confirmation-dialog"),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 

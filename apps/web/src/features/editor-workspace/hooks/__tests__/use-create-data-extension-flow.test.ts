@@ -1,24 +1,29 @@
 import { QueryClient } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
 import type { DataExtensionDraft } from "@/features/editor-workspace/types";
 
 import { useCreateDataExtensionFlow } from "../use-create-data-extension-flow";
 
-const { mockInferSchemaFromQuery, mockCreateMetadataFetcher, mockCreateDE } =
-  vi.hoisted(() => ({
-    mockInferSchemaFromQuery: vi.fn(),
-    mockCreateMetadataFetcher: vi.fn(),
-    mockCreateDE: vi.fn(),
-  }));
+const {
+  mockInferSchemaFromQuery,
+  mockCreateMetadataFetcher,
+  mockCreateDE,
+  mockToastError,
+} = vi.hoisted(() => ({
+  mockInferSchemaFromQuery: vi.fn(),
+  mockCreateMetadataFetcher: vi.fn(),
+  mockCreateDE: vi.fn(),
+  mockToastError: vi.fn(),
+}));
 
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     warning: vi.fn(),
-    error: vi.fn(),
+    error: (...args: unknown[]) => mockToastError(...args),
   },
 }));
 
@@ -37,6 +42,10 @@ vi.mock("../../utils/metadata-fetcher", () => ({
 }));
 
 describe("useCreateDataExtensionFlow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("opens modal and stores inferred fields on success", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -124,5 +133,75 @@ describe("useCreateDataExtensionFlow", () => {
     const queryKey = metadataQueryKeys.dataExtensions("t1", "e1");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey });
     expect(refetchSpy).toHaveBeenCalledWith({ queryKey, type: "all" });
+  });
+
+  it("schema inference failure: toast.error called, modal opens with empty fields", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    mockCreateMetadataFetcher.mockReturnValue({
+      getFieldsForTable: vi.fn().mockResolvedValue(null),
+    });
+    mockInferSchemaFromQuery.mockRejectedValue(new Error("parse error"));
+
+    const { result } = renderHook(() =>
+      useCreateDataExtensionFlow({
+        queryClient,
+        tenantId: "t1",
+        eid: "e1",
+        sqlText: "INVALID SQL",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleCreateDE();
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith(
+      "Could not infer schema from query",
+    );
+    expect(result.current.isDEModalOpen).toBe(true);
+    expect(result.current.inferredFields).toEqual([]);
+  });
+
+  it("optional customerKey included in DTO when provided", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    vi.spyOn(queryClient, "refetchQueries").mockResolvedValue();
+
+    mockCreateDE.mockResolvedValue({});
+
+    const { result } = renderHook(() =>
+      useCreateDataExtensionFlow({
+        queryClient,
+        tenantId: "t1",
+        eid: "e1",
+        sqlText: "SELECT 1",
+      }),
+    );
+
+    const draft: DataExtensionDraft = {
+      name: "MyDE",
+      customerKey: "custom-key-123",
+      folderId: "f1",
+      isSendable: false,
+      fields: [
+        {
+          name: "Email",
+          type: "EmailAddress",
+          isPrimaryKey: false,
+          isNullable: true,
+        },
+      ],
+    };
+
+    await result.current.handleSaveDataExtension(draft);
+
+    expect(mockCreateDE).toHaveBeenCalledTimes(1);
+    const dto = mockCreateDE.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(dto.customerKey).toBe("custom-key-123");
   });
 });
