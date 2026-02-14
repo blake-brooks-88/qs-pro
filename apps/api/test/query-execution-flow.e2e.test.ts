@@ -909,14 +909,12 @@ describe('Query Execution Flow (e2e)', () => {
     for (const ctx of runContexts.values()) {
       try {
         const reserved = await sqlClient.reserve();
-        await reserved`SELECT set_config('app.tenant_id', ${ctx.tenantId}, false)`;
-        await reserved`SELECT set_config('app.mid', ${ctx.mid}, false)`;
-        await reserved`SELECT set_config('app.user_id', ${ctx.userId}, false)`;
-        await reserved`DELETE FROM shell_query_runs WHERE user_id = ${ctx.userId}::uuid`;
-        await reserved`RESET app.tenant_id`;
-        await reserved`RESET app.mid`;
-        await reserved`RESET app.user_id`;
-        reserved.release();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${ctx.tenantId}, false), set_config('app.mid', ${ctx.mid}, false), set_config('app.user_id', ${ctx.userId}, false)`;
+          await reserved`DELETE FROM shell_query_runs WHERE user_id = ${ctx.userId}::uuid`;
+        } finally {
+          reserved.release();
+        }
       } catch {
         // Best effort - RLS may block if wrong context
       }
@@ -926,12 +924,12 @@ describe('Query Execution Flow (e2e)', () => {
     for (const setting of createdTenantSettings) {
       try {
         const reserved = await sqlClient.reserve();
-        await reserved`SELECT set_config('app.tenant_id', ${setting.tenantId}, false)`;
-        await reserved`SELECT set_config('app.mid', ${setting.mid}, false)`;
-        await reserved`DELETE FROM tenant_settings WHERE tenant_id = ${setting.tenantId}::uuid AND mid = ${setting.mid}`;
-        await reserved`RESET app.tenant_id`;
-        await reserved`RESET app.mid`;
-        reserved.release();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${setting.tenantId}, false), set_config('app.mid', ${setting.mid}, false)`;
+          await reserved`DELETE FROM tenant_settings WHERE tenant_id = ${setting.tenantId}::uuid AND mid = ${setting.mid}`;
+        } finally {
+          reserved.release();
+        }
       } catch {
         // Best effort
       }
@@ -941,12 +939,12 @@ describe('Query Execution Flow (e2e)', () => {
     for (const ctx of runContexts.values()) {
       try {
         const reserved = await sqlClient.reserve();
-        await reserved`SELECT set_config('app.tenant_id', ${ctx.tenantId}, false)`;
-        await reserved`SELECT set_config('app.mid', ${ctx.mid}, false)`;
-        await reserved`DELETE FROM credentials WHERE user_id = ${ctx.userId}::uuid`;
-        await reserved`RESET app.tenant_id`;
-        await reserved`RESET app.mid`;
-        reserved.release();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${ctx.tenantId}, false), set_config('app.mid', ${ctx.mid}, false)`;
+          await reserved`DELETE FROM credentials WHERE user_id = ${ctx.userId}::uuid`;
+        } finally {
+          reserved.release();
+        }
       } catch {
         // Best effort
       }

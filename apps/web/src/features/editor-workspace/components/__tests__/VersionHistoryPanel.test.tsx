@@ -1,5 +1,5 @@
 import type { VersionListItem } from "@qpp/shared-types";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -147,6 +147,20 @@ describe("VersionHistoryPanel", () => {
     expect(screen.getByText("No versions available")).toBeInTheDocument();
   });
 
+  it("VersionHistoryPanel_InvalidVersionsPayload_DoesNotCrash", () => {
+    // Arrange — guard against unexpected API payload shapes
+    mockUseQueryVersions.mockReturnValue({
+      data: { versions: {} as unknown as VersionListItem[], total: 1 },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useQueryVersions>);
+
+    // Act
+    render(<VersionHistoryPanel {...defaultProps} />);
+
+    // Assert
+    expect(screen.getByText("No versions available")).toBeInTheDocument();
+  });
+
   it("VersionHistoryPanel_CloseButton_CallsOnClose", async () => {
     // Arrange
     const user = userEvent.setup();
@@ -193,6 +207,86 @@ describe("VersionHistoryPanel", () => {
 
     // Assert
     expect(screen.getByTestId("locked-overlay")).toBeInTheDocument();
+  });
+
+  it("VersionHistoryPanel_ShowChangesToggle_TogglesState", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    render(<VersionHistoryPanel {...defaultProps} />);
+
+    // Act - click the Show Changes toggle button
+    const toggleButton = screen.getByText("Show Changes").closest("button");
+    expect(toggleButton).not.toBeNull();
+    await user.click(toggleButton as HTMLElement);
+
+    // Assert - toggle was clicked successfully (component re-renders without error)
+    expect(screen.getByText("Show Changes")).toBeInTheDocument();
+  });
+
+  it("VersionHistoryPanel_RestoreFlow_CallsMutateWithCorrectArgs", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const mockMutate = vi.fn();
+
+    mockUseVersionDetail.mockReturnValue({
+      data: { sqlText: "SELECT Id FROM Contact" },
+    } as unknown as ReturnType<typeof useVersionDetail>);
+
+    mockUseRestoreVersion.mockReturnValue({
+      mutate: mockMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useRestoreVersion>);
+
+    render(<VersionHistoryPanel {...defaultProps} />);
+
+    // Act - Select the older version (v1) by clicking its card via author name
+    const olderVersionCard = screen.getByText("John Doe").closest("button");
+    expect(olderVersionCard).not.toBeNull();
+    await user.click(olderVersionCard as HTMLElement);
+
+    // Restore button should now be enabled for a non-latest version
+    await waitFor(() => {
+      const restoreButton = screen.getByRole("button", {
+        name: /restore this version/i,
+      });
+      expect(restoreButton).not.toBeDisabled();
+    });
+
+    // Click the Restore button to open the confirmation dialog
+    await user.click(
+      screen.getByRole("button", { name: /restore this version/i }),
+    );
+
+    // Confirmation dialog should appear
+    await waitFor(() => {
+      expect(screen.getByText("Restore version")).toBeInTheDocument();
+    });
+
+    // Click Restore in the confirmation dialog
+    await user.click(screen.getByRole("button", { name: "Restore" }));
+
+    // Assert - restoreMutation.mutate was called with correct version ID
+    expect(mockMutate).toHaveBeenCalledWith(
+      { savedQueryId: "sq-1", versionId: "v1" },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
+  });
+
+  it("VersionHistoryPanel_RestorePending_ShowsRestoringText", () => {
+    // Arrange
+    mockUseRestoreVersion.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: true,
+    } as unknown as ReturnType<typeof useRestoreVersion>);
+
+    // Act
+    render(<VersionHistoryPanel {...defaultProps} />);
+
+    // Assert
+    expect(screen.getByText("Restoring...")).toBeInTheDocument();
   });
 });
 

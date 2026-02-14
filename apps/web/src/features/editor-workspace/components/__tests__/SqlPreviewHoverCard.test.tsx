@@ -1,7 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@radix-ui/react-hover-card", () => ({
+  Root: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Trigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Portal: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Content: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Arrow: () => null,
+}));
 
 import { SqlPreviewHoverCard } from "../SqlPreviewHoverCard";
 
