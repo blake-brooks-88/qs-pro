@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
+import { AuditInterceptor } from './audit.interceptor';
 import { AUDIT_LOG_REPOSITORY } from './audit.repository';
 import { AuditService } from './audit.service';
 import { DrizzleAuditLogRepository } from './drizzle-audit-log.repository';
@@ -13,6 +15,10 @@ import { DrizzleAuditLogRepository } from './drizzle-audit-log.repository';
       inject: ['DATABASE'],
     },
     AuditService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
   ],
   exports: [AuditService],
 })
