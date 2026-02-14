@@ -101,21 +101,19 @@ describe('RLS Tenant Isolation (e2e)', () => {
   afterAll(async () => {
     server.close();
 
-    // Clean up test data in reverse order using exact RLS context for each record
-    // This ensures we can delete RLS-protected records properly
+    // Clean up test data in reverse order using exact RLS context for each record.
+    // Every reserve() is wrapped in try/finally to guarantee release and prevent pool exhaustion.
 
     // 1. Delete shell_query_runs with exact context (tenant + mid + user required)
     for (const run of createdRuns) {
       try {
         const reserved = await sqlClient.reserve();
-        await reserved`SELECT set_config('app.tenant_id', ${run.tenantId}, false)`;
-        await reserved`SELECT set_config('app.mid', ${run.mid}, false)`;
-        await reserved`SELECT set_config('app.user_id', ${run.userId}, false)`;
-        await reserved`DELETE FROM shell_query_runs WHERE id = ${run.runId}::uuid`;
-        await reserved`RESET app.tenant_id`;
-        await reserved`RESET app.mid`;
-        await reserved`RESET app.user_id`;
-        reserved.release();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${run.tenantId}, false), set_config('app.mid', ${run.mid}, false), set_config('app.user_id', ${run.userId}, false)`;
+          await reserved`DELETE FROM shell_query_runs WHERE id = ${run.runId}::uuid`;
+        } finally {
+          reserved.release();
+        }
       } catch {
         // Best effort cleanup
       }
@@ -125,19 +123,19 @@ describe('RLS Tenant Isolation (e2e)', () => {
     for (const cred of createdCredentials) {
       try {
         const reserved = await sqlClient.reserve();
-        await reserved`SELECT set_config('app.tenant_id', ${cred.tenantId}, false)`;
-        await reserved`SELECT set_config('app.mid', ${cred.mid}, false)`;
-        await reserved`DELETE FROM credentials WHERE id = ${cred.credentialId}::uuid`;
-        await reserved`RESET app.tenant_id`;
-        await reserved`RESET app.mid`;
-        reserved.release();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${cred.tenantId}, false), set_config('app.mid', ${cred.mid}, false)`;
+          await reserved`DELETE FROM credentials WHERE id = ${cred.credentialId}::uuid`;
+        } finally {
+          reserved.release();
+        }
       } catch {
         // Best effort
       }
     }
 
-    // 3. Delete any remaining credentials created during auth flow (try all mid combinations)
-    // Credentials table has RLS on tenant + mid
+    // 3. Delete any remaining credentials created during auth flow.
+    // Use a single reserved connection per tenant+mid to avoid pool exhaustion.
     if (createdUserIds.length > 0 && createdTenantIds.length > 0) {
       const midsToTry = [
         'mid-a',
@@ -154,14 +152,12 @@ describe('RLS Tenant Isolation (e2e)', () => {
         for (const mid of midsToTry) {
           try {
             const reserved = await sqlClient.reserve();
-            await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
-            await reserved`SELECT set_config('app.mid', ${mid}, false)`;
-            for (const userId of createdUserIds) {
-              await reserved`DELETE FROM credentials WHERE user_id = ${userId}::uuid`;
+            try {
+              await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false), set_config('app.mid', ${mid}, false)`;
+              await reserved`DELETE FROM credentials WHERE user_id = ANY(${createdUserIds}::uuid[])`;
+            } finally {
+              reserved.release();
             }
-            await reserved`RESET app.tenant_id`;
-            await reserved`RESET app.mid`;
-            reserved.release();
           } catch {
             // Ignore - RLS may block if wrong context
           }
@@ -169,8 +165,8 @@ describe('RLS Tenant Isolation (e2e)', () => {
       }
     }
 
-    // 4. Delete any remaining shell_query_runs (try all context combinations)
-    // shell_query_runs has RLS on tenant + mid + user
+    // 4. Delete any remaining shell_query_runs.
+    // Use batch delete with ANY() to collapse the inner loop into a single query per tenant+mid.
     if (createdUserIds.length > 0 && createdTenantIds.length > 0) {
       const midsToTry = [
         'mid-a',
@@ -185,20 +181,17 @@ describe('RLS Tenant Isolation (e2e)', () => {
       ];
       for (const tenantId of createdTenantIds) {
         for (const mid of midsToTry) {
-          for (const userId of createdUserIds) {
+          try {
+            const reserved = await sqlClient.reserve();
             try {
-              const reserved = await sqlClient.reserve();
-              await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
-              await reserved`SELECT set_config('app.mid', ${mid}, false)`;
-              await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
-              await reserved`DELETE FROM shell_query_runs WHERE user_id = ${userId}::uuid`;
-              await reserved`RESET app.tenant_id`;
-              await reserved`RESET app.mid`;
-              await reserved`RESET app.user_id`;
+              const firstUserId = createdUserIds[0] ?? '';
+              await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false), set_config('app.mid', ${mid}, false), set_config('app.user_id', ${firstUserId}, false)`;
+              await reserved`DELETE FROM shell_query_runs WHERE user_id = ANY(${createdUserIds}::uuid[])`;
+            } finally {
               reserved.release();
-            } catch {
-              // Ignore - RLS may block if wrong context
             }
+          } catch {
+            // Ignore - RLS may block if wrong context
           }
         }
       }

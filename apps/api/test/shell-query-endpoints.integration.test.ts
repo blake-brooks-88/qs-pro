@@ -121,14 +121,12 @@ describe('Shell query endpoints (integration)', () => {
       for (const runId of createdRunIds) {
         try {
           const reserved = await sqlClient.reserve();
-          await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
-          await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
-          await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
-          await reserved`DELETE FROM shell_query_runs WHERE id = ${runId}::uuid`;
-          await reserved`RESET app.tenant_id`;
-          await reserved`RESET app.mid`;
-          await reserved`RESET app.user_id`;
-          reserved.release();
+          try {
+            await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false), set_config('app.mid', ${TEST_MID}, false), set_config('app.user_id', ${userId}, false)`;
+            await reserved`DELETE FROM shell_query_runs WHERE id = ${runId}::uuid`;
+          } finally {
+            reserved.release();
+          }
         } catch {
           // ignore
         }
