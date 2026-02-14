@@ -42,6 +42,20 @@ export { ErrorCode, ErrorMessages } from "./errors/index.js";
 // Testing utilities
 export { assertDefined } from "./testing/index.js";
 
+// Audit
+export type {
+  AuditEventType,
+  AuditLogItem,
+  AuditLogListResponse,
+  AuditLogQueryParams,
+} from "./audit.js";
+export {
+  AUDIT_EVENT_TYPES,
+  AuditLogItemSchema,
+  AuditLogListResponseSchema,
+  AuditLogQueryParamsSchema,
+} from "./audit.js";
+
 // Folders
 export type {
   CreateFolderDto,
