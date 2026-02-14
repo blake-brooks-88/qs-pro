@@ -126,6 +126,16 @@ export async function purgeTestData(): Promise<number> {
           SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
+        DELETE FROM query_publish_events
+        WHERE tenant_id IN (
+          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        )`;
+      await tx`
+        DELETE FROM query_versions
+        WHERE tenant_id IN (
+          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        )`;
+      await tx`
         DELETE FROM credentials
         WHERE tenant_id IN (
           SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
