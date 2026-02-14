@@ -18,6 +18,7 @@ import {
 } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
+import { Audited } from '../common/decorators/audited.decorator';
 import {
   CurrentUser,
   type UserSession,
@@ -34,6 +35,7 @@ export class SavedQueriesController {
 
   @Post()
   @UseGuards(CsrfGuard)
+  @Audited('saved_query.created')
   async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
     const result = CreateSavedQuerySchema.safeParse(body);
     if (!result.success) {
@@ -91,6 +93,7 @@ export class SavedQueriesController {
 
   @Patch(':id')
   @UseGuards(CsrfGuard)
+  @Audited('saved_query.updated', { targetIdParam: 'id' })
   async update(
     @CurrentUser() user: UserSession,
     @Param('id') id: string,
@@ -114,6 +117,7 @@ export class SavedQueriesController {
 
   @Delete(':id')
   @UseGuards(CsrfGuard)
+  @Audited('saved_query.deleted', { targetIdParam: 'id' })
   async delete(@CurrentUser() user: UserSession, @Param('id') id: string) {
     await this.savedQueriesService.delete(
       user.tenantId,
