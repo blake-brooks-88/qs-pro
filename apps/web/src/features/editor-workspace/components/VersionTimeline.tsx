@@ -178,21 +178,29 @@ function PublishBadge({ events, isCurrent }: PublishBadgeProps) {
 
   return (
     <div className="relative">
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         onClick={(e) => {
           e.stopPropagation();
           setIsExpanded((prev) => !prev);
         }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.stopPropagation();
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
         className={cn(
-          "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+          "text-[10px] font-medium px-1.5 py-0.5 rounded-full cursor-pointer",
           isCurrent
             ? "bg-success-500/10 text-success-600 dark:text-success-400"
             : "bg-muted text-muted-foreground",
         )}
       >
         {label}
-      </button>
+      </span>
       {isExpanded && count > 0 ? (
         <div className="absolute right-0 top-full mt-1 z-20 bg-popover border border-border rounded-md shadow-lg p-2 min-w-40">
           <div className="text-[10px] text-muted-foreground space-y-1">

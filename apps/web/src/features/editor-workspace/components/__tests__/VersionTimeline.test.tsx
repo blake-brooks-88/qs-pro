@@ -107,7 +107,11 @@ describe("VersionTimeline", () => {
           btn.tagName === "BUTTON" && btn.className.includes("rounded-lg"),
       );
     expect(cards).toHaveLength(1);
-    await user.click(cards[0]);
+    const [card] = cards;
+    if (!card) {
+      throw new Error("Expected card element");
+    }
+    await user.click(card);
 
     expect(onSelectVersion).toHaveBeenCalledWith("v-1");
   });
@@ -377,8 +381,11 @@ describe("VersionTimeline", () => {
             el.className.includes("cursor-text"),
         );
       expect(timestampButtons).toHaveLength(1);
-
-      await user.click(timestampButtons[0]);
+      const [timestampBtn] = timestampButtons;
+      if (!timestampBtn) {
+        throw new Error("Expected timestamp button");
+      }
+      await user.click(timestampBtn);
 
       const input = screen.getByRole("textbox", { name: "Version name" });
       expect(input).toBeInTheDocument();
