@@ -8,12 +8,14 @@ import { LockedOverlay } from "@/components/ui/locked-overlay";
 import { useFeature } from "@/hooks/use-feature";
 import { cn } from "@/lib/utils";
 
+import { usePublishEvents } from "../hooks/use-publish-events";
 import {
   useQueryVersions,
   useRestoreVersion,
   useUpdateVersionName,
   useVersionDetail,
 } from "../hooks/use-query-versions";
+import { computeVersionGap, derivePublishState } from "../utils/publish-utils";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { VersionDiffViewer } from "./VersionDiffViewer";
 import { VersionTimeline } from "./VersionTimeline";
@@ -75,6 +77,20 @@ export function VersionHistoryPanel({
     const rawVersions = versionData?.versions;
     return Array.isArray(rawVersions) ? rawVersions : [];
   }, [versionData]);
+
+  const { data: publishEventsData } = usePublishEvents(
+    hasAccess && isLinked ? savedQueryId : undefined,
+  );
+
+  const publishState = useMemo(
+    () => derivePublishState(publishEventsData?.events ?? []),
+    [publishEventsData?.events],
+  );
+
+  const versionGap = useMemo(
+    () => computeVersionGap(versions, publishState.currentPublishedVersionId),
+    [versions, publishState.currentPublishedVersionId],
+  );
 
   const effectiveSelectedId = useMemo(() => {
     if (selectedVersionId && versions.some((v) => v.id === selectedVersionId)) {
@@ -189,6 +205,11 @@ export function VersionHistoryPanel({
           <span className="text-[10px] text-muted-foreground whitespace-nowrap">
             Version History
           </span>
+          {versionGap > 0 ? (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-warning-500/10 text-warning-600 dark:text-warning-400 whitespace-nowrap">
+              {versionGap} {versionGap === 1 ? "version" : "versions"} ahead
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -285,6 +306,9 @@ export function VersionHistoryPanel({
               selectedVersionId={effectiveSelectedId}
               onSelectVersion={handleSelectVersion}
               onUpdateName={handleUpdateName}
+              currentPublishedVersionId={publishState.currentPublishedVersionId}
+              publishedVersionIds={publishState.publishedVersionIds}
+              publishEventsByVersionId={publishState.publishEventsByVersionId}
             />
           </div>
         </div>

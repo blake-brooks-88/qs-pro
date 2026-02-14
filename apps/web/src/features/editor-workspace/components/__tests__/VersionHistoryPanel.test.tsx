@@ -22,6 +22,10 @@ vi.mock("@/features/editor-workspace/hooks/use-query-versions", () => ({
   useUpdateVersionName: vi.fn(),
 }));
 
+vi.mock("@/features/editor-workspace/hooks/use-publish-events", () => ({
+  usePublishEvents: vi.fn().mockReturnValue({ data: undefined }),
+}));
+
 vi.mock("@/hooks/use-feature", () => ({
   useFeature: vi.fn(),
 }));
@@ -240,7 +244,9 @@ describe("VersionHistoryPanel", () => {
     render(<VersionHistoryPanel {...defaultProps} />);
 
     // Act - Select the older version (v1) by clicking its card via author name
-    const olderVersionCard = screen.getByText("John Doe").closest("button");
+    const olderVersionCard = screen
+      .getByText("John Doe")
+      .closest('[role="button"]');
     expect(olderVersionCard).not.toBeNull();
     await user.click(olderVersionCard as HTMLElement);
 
@@ -315,7 +321,7 @@ describe("VersionTimeline", () => {
     const { container } = render(<VersionTimeline {...defaultTimelineProps} />);
 
     // Assert — v2 (Feb 5, Jane Smith) should appear before v1 (Feb 1, John Doe)
-    const cards = container.querySelectorAll('button[type="button"]');
+    const cards = container.querySelectorAll('div[role="button"].rounded-lg');
     expect(cards).toHaveLength(2);
     expect(cards[0]).toHaveTextContent("Jane Smith");
     expect(cards[1]).toHaveTextContent("John Doe");
@@ -332,7 +338,7 @@ describe("VersionTimeline", () => {
       />,
     );
 
-    const cards = container.querySelectorAll('button[type="button"]');
+    const cards = container.querySelectorAll('div[role="button"].rounded-lg');
     const firstCard = cards[0];
     expect(firstCard).toBeDefined();
     await user.click(firstCard as HTMLElement);
@@ -345,11 +351,11 @@ describe("VersionTimeline", () => {
     // Arrange & Act
     const { container } = render(<VersionTimeline {...defaultTimelineProps} />);
 
-    // Assert
-    const cardButtons = container.querySelectorAll('button[type="button"]');
-    expect(cardButtons).toHaveLength(2);
-    for (const card of cardButtons) {
-      expect(card.querySelectorAll("button")).toHaveLength(0);
+    // Assert - cards are div[role="button"], not <button>, so inner interactive elements are valid HTML
+    const cards = container.querySelectorAll('[role="button"]');
+    expect(cards.length).toBeGreaterThanOrEqual(2);
+    for (const card of cards) {
+      expect(card.tagName).not.toBe("BUTTON");
     }
 
     const nameElement = screen.getByText("Feature complete");

@@ -73,6 +73,14 @@ function createSavedQueriesRepoStub() {
   };
 }
 
+function createPublishEventsRepoStub() {
+  return {
+    create: vi.fn(),
+    findLatestBySavedQueryId: vi.fn().mockResolvedValue(null),
+    findBySavedQueryId: vi.fn().mockResolvedValue([]),
+  };
+}
+
 function createFeaturesServiceStub() {
   return {
     getTenantFeatures: vi.fn().mockResolvedValue({
@@ -85,6 +93,7 @@ describe('QueryVersionsService', () => {
   let service: QueryVersionsService;
   let versionsRepoStub: ReturnType<typeof createQueryVersionsRepoStub>;
   let savedQueriesRepoStub: ReturnType<typeof createSavedQueriesRepoStub>;
+  let publishEventsRepoStub: ReturnType<typeof createPublishEventsRepoStub>;
   let encryptionStub: ReturnType<typeof createEncryptionServiceStub>;
   let featuresStub: ReturnType<typeof createFeaturesServiceStub>;
 
@@ -93,6 +102,7 @@ describe('QueryVersionsService', () => {
 
     versionsRepoStub = createQueryVersionsRepoStub();
     savedQueriesRepoStub = createSavedQueriesRepoStub();
+    publishEventsRepoStub = createPublishEventsRepoStub();
     encryptionStub = createEncryptionServiceStub();
     featuresStub = createFeaturesServiceStub();
 
@@ -108,6 +118,10 @@ describe('QueryVersionsService', () => {
         {
           provide: 'SAVED_QUERIES_REPOSITORY',
           useValue: savedQueriesRepoStub,
+        },
+        {
+          provide: 'QUERY_PUBLISH_EVENT_REPOSITORY',
+          useValue: publishEventsRepoStub,
         },
         {
           provide: EncryptionService,
@@ -375,6 +389,98 @@ describe('QueryVersionsService', () => {
     });
   });
 
+  describe('listPublishEvents()', () => {
+    it('returns events mapped to PublishEventListItem format', async () => {
+      // Arrange
+      const rawEvent = {
+        id: 'pe-1',
+        savedQueryId: SAVED_QUERY_ID,
+        versionId: VERSION_ID,
+        tenantId: TENANT_ID,
+        mid: MID,
+        userId: USER_ID,
+        linkedQaCustomerKey: 'qa-key-1',
+        publishedSqlHash: 'hash-abc',
+        createdAt: new Date('2026-02-10T12:00:00Z'),
+      };
+      publishEventsRepoStub.findBySavedQueryId.mockResolvedValue([rawEvent]);
+
+      // Act
+      const result = await service.listPublishEvents(
+        TENANT_ID,
+        MID,
+        USER_ID,
+        SAVED_QUERY_ID,
+      );
+
+      // Assert
+      expect(result.total).toBe(1);
+      expect(result.events).toHaveLength(1);
+      expect(result.events[0]).toEqual({
+        id: 'pe-1',
+        versionId: VERSION_ID,
+        savedQueryId: SAVED_QUERY_ID,
+        createdAt: '2026-02-10T12:00:00.000Z',
+      });
+    });
+
+    it('returns empty events when no publish events exist', async () => {
+      // Arrange
+      publishEventsRepoStub.findBySavedQueryId.mockResolvedValue([]);
+
+      // Act
+      const result = await service.listPublishEvents(
+        TENANT_ID,
+        MID,
+        USER_ID,
+        SAVED_QUERY_ID,
+      );
+
+      // Assert
+      expect(result.events).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('throws RESOURCE_NOT_FOUND when saved query does not exist', async () => {
+      // Arrange
+      savedQueriesRepoStub.findById.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.listPublishEvents(TENANT_ID, MID, USER_ID, SAVED_QUERY_ID),
+      ).rejects.toMatchObject({
+        code: ErrorCode.RESOURCE_NOT_FOUND,
+      });
+    });
+
+    it('throws FEATURE_NOT_ENABLED when versionHistory is disabled', async () => {
+      // Arrange
+      featuresStub.getTenantFeatures.mockResolvedValue({
+        features: { versionHistory: false, querySharing: true },
+      });
+
+      // Act & Assert
+      await expect(
+        service.listPublishEvents(TENANT_ID, MID, USER_ID, SAVED_QUERY_ID),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FEATURE_NOT_ENABLED,
+      });
+    });
+
+    it('passes savedQueryId to the repository', async () => {
+      // Arrange
+      publishEventsRepoStub.findBySavedQueryId.mockResolvedValue([]);
+
+      // Act
+      await service.listPublishEvents(TENANT_ID, MID, USER_ID, SAVED_QUERY_ID);
+
+      // Assert
+      expect(publishEventsRepoStub.findBySavedQueryId).toHaveBeenCalledWith(
+        SAVED_QUERY_ID,
+      );
+    });
+  });
+
   describe('feature gating', () => {
     beforeEach(() => {
       featuresStub.getTenantFeatures.mockResolvedValue({
@@ -424,6 +530,14 @@ describe('QueryVersionsService', () => {
             versionName: 'Test',
           },
         ),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FEATURE_NOT_ENABLED,
+      });
+    });
+
+    it('listPublishEvents throws FEATURE_NOT_ENABLED', async () => {
+      await expect(
+        service.listPublishEvents(TENANT_ID, MID, USER_ID, SAVED_QUERY_ID),
       ).rejects.toMatchObject({
         code: ErrorCode.FEATURE_NOT_ENABLED,
       });

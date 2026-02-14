@@ -21,6 +21,10 @@ vi.mock("@/features/editor-workspace/hooks/use-query-versions", () => ({
   useUpdateVersionName: vi.fn(),
 }));
 
+vi.mock("@/features/editor-workspace/hooks/use-publish-events", () => ({
+  usePublishEvents: vi.fn().mockReturnValue({ data: undefined }),
+}));
+
 vi.mock("@/hooks/use-feature", () => ({
   useFeature: vi.fn(),
 }));

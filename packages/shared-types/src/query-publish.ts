@@ -27,6 +27,24 @@ export const DriftCheckResponseSchema = z.object({
 });
 export type DriftCheckResponse = z.infer<typeof DriftCheckResponseSchema>;
 
+// --- Publish Events List ---
+
+export const PublishEventListItemSchema = z.object({
+  id: z.string().uuid(),
+  versionId: z.string().uuid(),
+  savedQueryId: z.string().uuid(),
+  createdAt: z.string().datetime(),
+});
+export type PublishEventListItem = z.infer<typeof PublishEventListItemSchema>;
+
+export const PublishEventsListResponseSchema = z.object({
+  events: z.array(PublishEventListItemSchema),
+  total: z.number().int(),
+});
+export type PublishEventsListResponse = z.infer<
+  typeof PublishEventsListResponseSchema
+>;
+
 // --- Blast Radius ---
 
 export const AutomationInfoSchema = z.object({

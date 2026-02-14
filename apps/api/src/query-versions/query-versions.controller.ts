@@ -36,6 +36,19 @@ export class QueryVersionsController {
     );
   }
 
+  @Get(':savedQueryId/versions/publish-events')
+  async listPublishEvents(
+    @CurrentUser() user: UserSession,
+    @Param('savedQueryId') savedQueryId: string,
+  ) {
+    return this.queryVersionsService.listPublishEvents(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      savedQueryId,
+    );
+  }
+
   @Get(':savedQueryId/versions/:versionId')
   async getVersionDetail(
     @CurrentUser() user: UserSession,

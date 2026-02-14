@@ -6,6 +6,8 @@ import {
   RlsContextService,
 } from '@qpp/backend-shared';
 import type {
+  PublishEventListItem,
+  PublishEventsListResponse,
   UpdateVersionNameDto,
   VersionDetail,
   VersionListItem,
@@ -13,6 +15,7 @@ import type {
 } from '@qpp/shared-types';
 
 import { FeaturesService } from '../features/features.service';
+import type { QueryPublishEventsRepository } from '../query-activities/query-publish-events.repository';
 import type {
   SavedQueriesRepository,
   UpdateSavedQueryParams,
@@ -26,6 +29,8 @@ export class QueryVersionsService {
     private readonly queryVersionsRepository: QueryVersionsRepository,
     @Inject('SAVED_QUERIES_REPOSITORY')
     private readonly savedQueriesRepository: SavedQueriesRepository,
+    @Inject('QUERY_PUBLISH_EVENT_REPOSITORY')
+    private readonly queryPublishEventsRepository: QueryPublishEventsRepository,
     private readonly encryptionService: EncryptionService,
     private readonly rlsContext: RlsContextService,
     private readonly featuresService: FeaturesService,
@@ -223,6 +228,38 @@ export class QueryVersionsService {
           createdAt: updated.createdAt.toISOString(),
           authorName: null,
         };
+      },
+    );
+  }
+
+  async listPublishEvents(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    savedQueryId: string,
+  ): Promise<PublishEventsListResponse> {
+    await this.assertFeatureEnabled(tenantId);
+
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        await this.assertSavedQueryAccessible(tenantId, userId, savedQueryId);
+
+        const rows =
+          await this.queryPublishEventsRepository.findBySavedQueryId(
+            savedQueryId,
+          );
+
+        const events: PublishEventListItem[] = rows.map((row) => ({
+          id: row.id,
+          versionId: row.versionId,
+          savedQueryId: row.savedQueryId,
+          createdAt: row.createdAt.toISOString(),
+        }));
+
+        return { events, total: events.length };
       },
     );
   }
