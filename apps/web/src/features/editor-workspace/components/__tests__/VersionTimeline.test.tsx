@@ -103,8 +103,7 @@ describe("VersionTimeline", () => {
     const cards = screen
       .getAllByRole("button")
       .filter(
-        (btn) =>
-          btn.tagName === "BUTTON" && btn.className.includes("rounded-lg"),
+        (btn) => btn.tagName === "DIV" && btn.className.includes("rounded-lg"),
       );
     expect(cards).toHaveLength(1);
     const [card] = cards;

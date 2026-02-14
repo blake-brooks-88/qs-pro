@@ -25,9 +25,6 @@ function makePublishEvent(
     id,
     versionId,
     savedQueryId: "sq-1",
-    userId: "user-1",
-    linkedQaCustomerKey: "qa-key-1",
-    publishedSqlHash: "hash-1",
     createdAt,
   };
 }

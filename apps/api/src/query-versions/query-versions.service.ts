@@ -256,9 +256,6 @@ export class QueryVersionsService {
           id: row.id,
           versionId: row.versionId,
           savedQueryId: row.savedQueryId,
-          userId: row.userId,
-          linkedQaCustomerKey: row.linkedQaCustomerKey,
-          publishedSqlHash: row.publishedSqlHash,
           createdAt: row.createdAt.toISOString(),
         }));
 

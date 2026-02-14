@@ -33,9 +33,6 @@ export const PublishEventListItemSchema = z.object({
   id: z.string().uuid(),
   versionId: z.string().uuid(),
   savedQueryId: z.string().uuid(),
-  userId: z.string().uuid(),
-  linkedQaCustomerKey: z.string(),
-  publishedSqlHash: z.string(),
   createdAt: z.string().datetime(),
 });
 export type PublishEventListItem = z.infer<typeof PublishEventListItemSchema>;

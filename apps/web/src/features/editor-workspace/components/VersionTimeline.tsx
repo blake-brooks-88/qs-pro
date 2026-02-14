@@ -288,9 +288,19 @@ export function VersionTimeline({
               />
             ) : null}
 
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectVersion(version.id)}
+              onKeyDown={(e) => {
+                if (
+                  e.currentTarget === e.target &&
+                  (e.key === "Enter" || e.key === " ")
+                ) {
+                  e.preventDefault();
+                  onSelectVersion(version.id);
+                }
+              }}
               className={cn(
                 "w-full text-left rounded-lg border p-3 transition-all cursor-pointer",
                 isSelected
@@ -299,21 +309,7 @@ export function VersionTimeline({
               )}
             >
               <div className="flex items-center justify-between gap-2">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  className="min-w-0 flex-1 min-h-5"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectVersion(version.id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      onSelectVersion(version.id);
-                    }
-                  }}
-                >
+                <div className="min-w-0 flex-1 min-h-5">
                   <InlineEditableName
                     versionId={version.id}
                     currentName={version.versionName}
@@ -369,7 +365,7 @@ export function VersionTimeline({
                   </span>
                 ) : null}
               </div>
-            </button>
+            </div>
           </div>
         );
       })}

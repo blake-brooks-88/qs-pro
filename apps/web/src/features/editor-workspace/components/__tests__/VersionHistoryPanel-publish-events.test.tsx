@@ -74,9 +74,6 @@ function createPublishEvent(
 ): PublishEventListItem {
   return {
     savedQueryId: "sq-1",
-    userId: "user-1",
-    linkedQaCustomerKey: "qa-key-1",
-    publishedSqlHash: "abc123",
     createdAt: "2026-02-10T12:00:00.000Z",
     ...overrides,
   };

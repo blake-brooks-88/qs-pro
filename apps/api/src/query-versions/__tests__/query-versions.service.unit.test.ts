@@ -420,9 +420,6 @@ describe('QueryVersionsService', () => {
         id: 'pe-1',
         versionId: VERSION_ID,
         savedQueryId: SAVED_QUERY_ID,
-        userId: USER_ID,
-        linkedQaCustomerKey: 'qa-key-1',
-        publishedSqlHash: 'hash-abc',
         createdAt: '2026-02-10T12:00:00.000Z',
       });
     });
