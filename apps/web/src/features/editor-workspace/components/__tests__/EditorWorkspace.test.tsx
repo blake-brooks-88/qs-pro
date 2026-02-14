@@ -271,12 +271,12 @@ vi.mock("../QueryTabBar", () => ({
 }));
 
 // Mock schema-inferrer for "Create DE From Query" flow
-vi.mock("../utils/schema-inferrer", () => ({
+vi.mock("../../utils/schema-inferrer", () => ({
   inferSchemaFromQuery: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock metadata-fetcher for "Create DE From Query" flow
-vi.mock("../utils/metadata-fetcher", () => ({
+vi.mock("../../utils/metadata-fetcher", () => ({
   createMetadataFetcher: vi.fn().mockReturnValue({
     getFieldsForTable: vi.fn().mockResolvedValue(null),
   }),

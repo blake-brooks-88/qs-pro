@@ -1,8 +1,6 @@
-import type { CreateDataExtensionDto } from "@qpp/shared-types";
 import type { LinkQueryResponse } from "@qpp/shared-types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -11,23 +9,20 @@ import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
 import { useBeforeUnloadDirtyTabs } from "@/features/editor-workspace/hooks/use-before-unload-dirty-tabs";
 import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
-import { useCreateQueryActivity } from "@/features/editor-workspace/hooks/use-create-query-activity";
+import { useCreateDataExtensionFlow } from "@/features/editor-workspace/hooks/use-create-data-extension-flow";
 import { useDriftCheck } from "@/features/editor-workspace/hooks/use-drift-check";
 import { useLazyOpenSavedQuery } from "@/features/editor-workspace/hooks/use-lazy-open-saved-query";
-import { useLinkQuery } from "@/features/editor-workspace/hooks/use-link-query";
-import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
 import { usePublishFlow } from "@/features/editor-workspace/hooks/use-publish-flow";
 import { usePublishQuery } from "@/features/editor-workspace/hooks/use-publish-query";
-import {
-  queryActivityFoldersQueryKeys,
-  useQueryActivityFolders,
-} from "@/features/editor-workspace/hooks/use-query-activity-folders";
+import { useQueryActivityDeploymentFlow } from "@/features/editor-workspace/hooks/use-query-activity-deployment-flow";
+import { useQueryActivityFolders } from "@/features/editor-workspace/hooks/use-query-activity-folders";
 import { useQueryExecution } from "@/features/editor-workspace/hooks/use-query-execution";
 import {
   useQueryVersions,
   versionHistoryKeys,
 } from "@/features/editor-workspace/hooks/use-query-versions";
 import { useResultsPaneResize } from "@/features/editor-workspace/hooks/use-results-pane-resize";
+import { useRunRequestHandler } from "@/features/editor-workspace/hooks/use-run-request-handler";
 import { useSaveFlows } from "@/features/editor-workspace/hooks/use-save-flows";
 import { useUpdateSavedQuery } from "@/features/editor-workspace/hooks/use-saved-queries";
 import { useUnlinkFlow } from "@/features/editor-workspace/hooks/use-unlink-flow";
@@ -35,11 +30,8 @@ import { useVersionHistoryFlow } from "@/features/editor-workspace/hooks/use-ver
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
-  DataExtensionDraft,
-  DataExtensionField,
   EditorWorkspaceProps,
   ExecutionResult,
-  QueryActivityDraft,
   TargetUpdateType,
 } from "@/features/editor-workspace/types";
 import { adaptExecutionResult } from "@/features/editor-workspace/utils/execution-result-adapter";
@@ -57,7 +49,6 @@ import { useFeature } from "@/hooks/use-feature";
 import { useRunUsage } from "@/hooks/use-run-usage";
 import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { copyToClipboard } from "@/lib/clipboard";
-import { createDataExtension } from "@/services/metadata";
 import { useTabsStore } from "@/store/tabs-store";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
@@ -105,16 +96,10 @@ export function EditorWorkspace({
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const showHistoryForQuery = useActivityBarStore((s) => s.showHistoryForQuery);
 
-  const [isDEModalOpen, setIsDEModalOpen] = useState(false);
-  const [isQueryActivityModalOpen, setIsQueryActivityModalOpen] =
-    useState(false);
   const [isConfirmCloseOpen, setIsConfirmCloseOpen] = useState(false);
   const [tabToClose, setTabToClose] = useState<string | null>(null);
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
   const [isTargetDEModalOpen, setIsTargetDEModalOpen] = useState(false);
-  const [inferredFields, setInferredFields] = useState<DataExtensionField[]>(
-    [],
-  );
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -164,8 +149,6 @@ export function EditorWorkspace({
 
   // Query Activity hooks
   const { data: qaFolders = [] } = useQueryActivityFolders(eid);
-  const createQueryActivityMutation = useCreateQueryActivity();
-  const linkMutation = useLinkQuery();
   const publishMutation = usePublishQuery();
   const { enabled: isDeployFeatureEnabled } = useFeature("deployToAutomation");
 
@@ -448,127 +431,36 @@ export function EditorWorkspace({
     }
   }, [executionResult.status, openResultsPane]);
 
-  const handleCreateDE = async () => {
-    // Lazy load both inferrer and fetcher to avoid bundle impact
-    try {
-      const [{ inferSchemaFromQuery }, { createMetadataFetcher }] =
-        await Promise.all([
-          import("../utils/schema-inferrer"),
-          import("../utils/metadata-fetcher"),
-        ]);
-      const fetcher = createMetadataFetcher(queryClient, tenantId, eid);
-      const fields = await inferSchemaFromQuery(safeActiveTab.content, fetcher);
-      setInferredFields(fields);
-    } catch {
-      // Parsing failed - show empty modal
-      toast.error("Could not infer schema from query");
-      setInferredFields([]);
-    }
+  const {
+    isDEModalOpen,
+    inferredFields,
+    handleCreateDE,
+    closeDEModal,
+    handleSaveDataExtension,
+  } = useCreateDataExtensionFlow({
+    queryClient,
+    tenantId,
+    eid,
+    sqlText: safeActiveTab.content,
+    onCreateDE,
+  });
 
-    setIsDEModalOpen(true);
-    onCreateDE?.();
-  };
-
-  const handleSaveDataExtension = useCallback(
-    async (draft: DataExtensionDraft) => {
-      // Map DataExtensionDraft to CreateDataExtensionDto (strip client-side id from fields)
-      const dto: CreateDataExtensionDto = {
-        name: draft.name,
-        ...(draft.customerKey && { customerKey: draft.customerKey }),
-        folderId: draft.folderId,
-        isSendable: draft.isSendable,
-        subscriberKeyField: draft.subscriberKeyField,
-        retention: draft.retention,
-        fields: draft.fields.map(({ id: _id, ...field }) => field),
-      };
-
-      try {
-        await createDataExtension(dto);
-        toast.success(`Data Extension "${draft.name}" created`);
-        const queryKey = metadataQueryKeys.dataExtensions(tenantId, eid);
-        await queryClient.invalidateQueries({ queryKey });
-        await queryClient.refetchQueries({ queryKey, type: "all" });
-      } catch (error) {
-        toast.error("Failed to create Data Extension", {
-          description:
-            error instanceof Error ? error.message : "An error occurred",
-        });
-        throw error;
-      }
+  const {
+    isQueryActivityModalOpen,
+    openQueryActivityModal: handleOpenQueryActivityModal,
+    closeQueryActivityModal,
+    isPending: isCreateQueryActivityPending,
+    handleCreateQueryActivity,
+  } = useQueryActivityDeploymentFlow({
+    queryClient,
+    activeTabId,
+    activeTab: {
+      queryId: safeActiveTab.queryId,
+      name: safeActiveTab.name,
+      content: safeActiveTab.content,
     },
-    [queryClient, tenantId, eid],
-  );
-
-  const handleOpenQueryActivityModal = () => {
-    setIsQueryActivityModalOpen(true);
-  };
-
-  const handleCreateQueryActivity = useCallback(
-    async (draft: QueryActivityDraft) => {
-      try {
-        const result = await createQueryActivityMutation.mutateAsync({
-          name: draft.name,
-          customerKey: draft.externalKey,
-          description: draft.description,
-          categoryId: draft.categoryId,
-          targetDataExtensionCustomerKey: draft.targetDataExtensionCustomerKey,
-          queryText: draft.queryText,
-          targetUpdateType: draft.targetUpdateType,
-        });
-
-        // Invalidate Query Activity folders cache to refresh the sidebar
-        await queryClient.invalidateQueries({
-          queryKey: queryActivityFoldersQueryKeys.all,
-        });
-
-        // Auto-link if this is a saved query tab
-        const savedQueryId = safeActiveTab.queryId;
-        if (savedQueryId && result.customerKey) {
-          try {
-            const linkResponse = await linkMutation.mutateAsync({
-              savedQueryId,
-              qaCustomerKey: result.customerKey,
-            });
-            if (activeTabId) {
-              storeUpdateTabLinkState(activeTabId, {
-                linkedQaCustomerKey: linkResponse.linkedQaCustomerKey,
-                linkedQaName: linkResponse.linkedQaName,
-              });
-            }
-            toast.success(`Query Activity "${draft.name}" deployed and linked`);
-          } catch {
-            toast.success(`Query Activity "${draft.name}" deployed`, {
-              description: `Object ID: ${result.objectId}`,
-            });
-          }
-        } else {
-          toast.success(`Query Activity "${draft.name}" deployed`, {
-            description: `Object ID: ${result.objectId}`,
-          });
-        }
-        setIsQueryActivityModalOpen(false);
-      } catch (error) {
-        // Extract detailed error message from API response (RFC 9457 Problem Details format)
-        let description = "An error occurred";
-        if (axios.isAxiosError(error)) {
-          const detail = error.response?.data?.detail;
-          description = typeof detail === "string" ? detail : error.message;
-        } else if (error instanceof Error) {
-          description = error.message;
-        }
-        toast.error("Failed to deploy Query Activity", { description });
-        // Keep modal open on error - do not close or rethrow
-      }
-    },
-    [
-      createQueryActivityMutation,
-      queryClient,
-      safeActiveTab.queryId,
-      activeTabId,
-      linkMutation,
-      storeUpdateTabLinkState,
-    ],
-  );
+    storeUpdateTabLinkState,
+  });
 
   const handleOpenLinkModal = useCallback((queryId: string) => {
     setLinkTargetQueryId(queryId);
@@ -603,8 +495,8 @@ export function EditorWorkspace({
   const handleLinkCreateNew = useCallback(() => {
     setIsLinkModalOpen(false);
     setLinkTargetQueryId(null);
-    setIsQueryActivityModalOpen(true);
-  }, []);
+    handleOpenQueryActivityModal();
+  }, [handleOpenQueryActivityModal]);
 
   const handleCloseTab = useCallback(
     (id: string) => {
@@ -624,34 +516,19 @@ export function EditorWorkspace({
     [activeTabId, storeUpdateTabContent],
   );
 
-  const handleRunRequest = useCallback(() => {
-    if (isRunning) {
-      return;
-    }
-    if (hasBlockingDiagnostics) {
-      setIsRunBlockedOpen(true);
-      return;
-    }
-    if (isAtRunLimit) {
-      setIsUpgradeModalOpen(true);
-      return;
-    }
-    void execute(
-      safeActiveTab.content,
-      safeActiveTab.name,
-      undefined,
-      undefined,
-      safeActiveTab.queryId ?? undefined,
-    );
-  }, [
+  const handleRunRequest = useRunRequestHandler({
     isRunning,
     hasBlockingDiagnostics,
     isAtRunLimit,
+    activeTab: {
+      content: safeActiveTab.content,
+      name: safeActiveTab.name,
+      queryId: safeActiveTab.queryId,
+    },
     execute,
-    safeActiveTab.content,
-    safeActiveTab.name,
-    safeActiveTab.queryId,
-  ]);
+    onOpenRunBlockedDialog: () => setIsRunBlockedOpen(true),
+    onOpenUpgradeModal: () => setIsUpgradeModalOpen(true),
+  });
 
   const handleCancel = useCallback(() => {
     void cancel();
@@ -906,18 +783,15 @@ export function EditorWorkspace({
           queryClient={queryClient}
           dataExtensionModal={{
             isOpen: isDEModalOpen,
-            onClose: () => {
-              setIsDEModalOpen(false);
-              setInferredFields([]);
-            },
+            onClose: closeDEModal,
             initialFields: inferredFields,
             onSave: handleSaveDataExtension,
           }}
           queryActivityModal={{
             isOpen: isQueryActivityModalOpen,
             initialName: safeActiveTab.name,
-            isPending: createQueryActivityMutation.isPending,
-            onClose: () => setIsQueryActivityModalOpen(false),
+            isPending: isCreateQueryActivityPending,
+            onClose: closeQueryActivityModal,
             onSubmit: handleCreateQueryActivity,
             queryText: safeActiveTab.content,
           }}
