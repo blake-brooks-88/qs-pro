@@ -102,7 +102,15 @@ export async function configureApp(
         }
 
         void (async () => {
-          const reserved = await sqlClient.reserve();
+          const reserved = await Promise.race([
+            sqlClient.reserve(),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('RLS connection reserve timeout')),
+                5000,
+              ),
+            ),
+          ]);
           let released = false;
 
           const cleanup = async () => {
@@ -111,9 +119,7 @@ export async function configureApp(
             }
             released = true;
             try {
-              await reserved`RESET app.tenant_id`;
-              await reserved`RESET app.mid`;
-              await reserved`RESET app.user_id`;
+              await reserved`SELECT set_config('app.tenant_id', '', false), set_config('app.mid', '', false), set_config('app.user_id', '', false)`;
             } catch {
               // ignore
             }

@@ -47,14 +47,6 @@ export function LinkedBadge({
       <LinkMinimalistic size={iconSize} className="shrink-0" />
       <span className="min-w-0 truncate">
         {qaName ? `Linked to ${qaName}` : "Linked"}
-        {qaName &&
-        typeof automationCount === "number" &&
-        automationCount > 0 ? (
-          <span className="text-muted-foreground font-normal">
-            {" "}
-            &middot; {formatCountSuffix(automationCount)}
-          </span>
-        ) : null}
       </span>
       {qaName && typeof automationCount === "number" && automationCount > 0 ? (
         <span className="shrink-0 whitespace-nowrap text-muted-foreground font-normal">
