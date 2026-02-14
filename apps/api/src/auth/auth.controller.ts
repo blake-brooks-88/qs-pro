@@ -17,6 +17,7 @@ import { AuthService, SessionGuard } from '@qpp/backend-shared';
 import { randomBytes } from 'crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import { AuditService } from '../audit/audit.service';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -43,9 +44,11 @@ const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
+  // TODO(Phase 12): auth.session_expired — requires SessionGuard DI wiring in @qpp/backend-shared
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private auditService: AuditService,
   ) {}
 
   private clearAuthSession(session: SecureSession | undefined): void {
@@ -104,6 +107,17 @@ export class AuthController {
       req.session.set('userId', user.id);
       req.session.set('tenantId', tenant.id);
       req.session.set('mid', mid);
+
+      void this.auditService.log({
+        eventType: 'auth.login',
+        actorType: 'user',
+        actorId: user.id,
+        tenantId: tenant.id,
+        mid,
+        targetId: user.id,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       const accept = String(req.headers.accept ?? '');
       const requestedJson = accept.includes('application/json');
@@ -227,6 +241,18 @@ export class AuthController {
         session.set('userId', user.id);
         session.set('tenantId', tenant.id);
         session.set('mid', resolvedMid);
+
+        void this.auditService.log({
+          eventType: 'auth.login',
+          actorType: 'user',
+          actorId: user.id,
+          tenantId: tenant.id,
+          mid: resolvedMid,
+          targetId: user.id,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
         return { url: '/', statusCode: 302 };
       }
 
@@ -316,6 +342,17 @@ export class AuthController {
     req.session.set('tenantId', result.tenant.id);
     req.session.set('mid', result.mid);
 
+    void this.auditService.log({
+      eventType: 'auth.login',
+      actorType: 'user',
+      actorId: result.user.id,
+      tenantId: result.tenant.id,
+      mid: result.mid,
+      targetId: result.user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     this.logger.log(
       `OAuth callback completed durationMs=${Date.now() - callbackStartedAt}`,
     );
@@ -324,17 +361,53 @@ export class AuthController {
 
   @Get('refresh')
   @UseGuards(SessionGuard)
-  async refresh(@CurrentUser() userSession: UserSession) {
+  async refresh(
+    @CurrentUser() userSession: UserSession,
+    @Req() req: SessionRequest,
+  ) {
     await this.authService.refreshToken(
       userSession.tenantId,
       userSession.userId,
       userSession.mid,
     );
+
+    void this.auditService.log({
+      eventType: 'auth.oauth_refreshed',
+      actorType: 'user',
+      actorId: userSession.userId,
+      tenantId: userSession.tenantId,
+      mid: userSession.mid,
+      targetId: userSession.userId,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     return { ok: true };
   }
 
   @Get('logout')
   logout(@Req() req: SessionRequest) {
+    const tenantId = req.session?.get('tenantId');
+    const mid = req.session?.get('mid');
+    const userId = req.session?.get('userId');
+
+    if (
+      typeof tenantId === 'string' &&
+      typeof mid === 'string' &&
+      typeof userId === 'string'
+    ) {
+      void this.auditService.log({
+        eventType: 'auth.logout',
+        actorType: 'user',
+        actorId: userId,
+        tenantId,
+        mid,
+        targetId: userId,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+    }
+
     req.session?.delete();
     return { ok: true };
   }

@@ -13,6 +13,7 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { AuditService } from '../../audit/audit.service';
 import type { UserSession } from '../../common/decorators/current-user.decorator';
 import { AuthController } from '../auth.controller';
 
@@ -109,6 +110,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: ConfigService, useValue: configService },
+        { provide: AuditService, useValue: { log: vi.fn() } },
       ],
     })
       .overrideGuard(SessionGuard)
@@ -776,9 +778,10 @@ describe('AuthController', () => {
         tenantId: 'tenant-1',
         mid: 'mid-1',
       };
+      const request = createMockRequest({ session: createMockSession() });
 
       // Act
-      await controller.refresh(userSession);
+      await controller.refresh(userSession, request);
 
       // Assert
       expect(authService.refreshToken).toHaveBeenCalledWith(
@@ -796,9 +799,10 @@ describe('AuthController', () => {
       });
 
       const userSession: UserSession = createMockUserSession();
+      const request = createMockRequest({ session: createMockSession() });
 
       // Act
-      const result = await controller.refresh(userSession);
+      const result = await controller.refresh(userSession, request);
 
       // Assert
       expect(result).toEqual({ ok: true });
@@ -810,9 +814,10 @@ describe('AuthController', () => {
       authService.refreshToken.mockRejectedValue(error);
 
       const userSession: UserSession = createMockUserSession();
+      const request = createMockRequest({ session: createMockSession() });
 
       // Act & Assert
-      await expect(controller.refresh(userSession)).rejects.toThrow(
+      await expect(controller.refresh(userSession, request)).rejects.toThrow(
         'Refresh failed',
       );
     });

@@ -11,6 +11,7 @@ export class AuditRetentionSweeper {
     private readonly db: PostgresJsDatabase<Record<string, never>>,
   ) {}
 
+  // TODO(Phase 14): system.retention_purge audit event — requires admin context for RLS bypass
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async handleRetentionPurge(): Promise<void> {
     this.logger.log("Starting nightly audit retention purge...");
