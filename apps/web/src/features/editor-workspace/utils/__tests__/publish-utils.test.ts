@@ -231,6 +231,20 @@ describe("derivePublishState", () => {
     expect(state.publishEventsByVersionId.get("v1")).toHaveLength(1);
   });
 
+  it("sorts events by createdAt desc before deriving state", () => {
+    // Arrange - events in non-chronological order
+    const events = [
+      makePublishEvent("pe-2", "v1", "2026-02-05T12:00:00.000Z"),
+      makePublishEvent("pe-1", "v2", "2026-02-10T12:00:00.000Z"),
+    ];
+
+    // Act
+    const state = derivePublishState(events);
+
+    // Assert - most recent event's version is the current published
+    expect(state.currentPublishedVersionId).toBe("v2");
+  });
+
   it("handles single event", () => {
     // Arrange
     const events = [makePublishEvent("pe-1", "v1", "2026-02-10T12:00:00.000Z")];

@@ -157,18 +157,4 @@ describe("usePublishEvents", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
-
-  it("queryFn guard throws when savedQueryId is undefined", async () => {
-    const queryClient = createQueryClient();
-    const { result } = renderHook(() => usePublishEvents(undefined), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    const refetchResult = await result.current.refetch();
-
-    expect(refetchResult.isError).toBe(true);
-    expect(refetchResult.error?.message).toBe("savedQueryId is required");
-  });
 });

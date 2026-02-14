@@ -36,12 +36,16 @@ export function derivePublishState(
     };
   }
 
-  const currentPublishedVersionId = events[0]?.versionId ?? null;
+  const sorted = [...events].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  const currentPublishedVersionId = sorted[0]?.versionId ?? null;
 
   const publishedVersionIds = new Set<string>();
   const publishEventsByVersionId = new Map<string, PublishEventListItem[]>();
 
-  for (const event of events) {
+  for (const event of sorted) {
     publishedVersionIds.add(event.versionId);
     const existing = publishEventsByVersionId.get(event.versionId);
     if (existing) {

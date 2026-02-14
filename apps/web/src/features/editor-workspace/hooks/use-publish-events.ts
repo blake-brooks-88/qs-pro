@@ -11,13 +11,8 @@ export const publishEventsKeys = {
 
 export function usePublishEvents(savedQueryId: string | undefined) {
   return useQuery<PublishEventsListResponse>({
-    queryKey: publishEventsKeys.list(savedQueryId ?? ""),
-    queryFn: () => {
-      if (!savedQueryId) {
-        throw new Error("savedQueryId is required");
-      }
-      return fetchPublishEvents(savedQueryId);
-    },
+    queryKey: publishEventsKeys.list(savedQueryId ?? "disabled"),
+    queryFn: () => fetchPublishEvents(savedQueryId as string),
     enabled: !!savedQueryId,
     staleTime: 30_000,
   });
