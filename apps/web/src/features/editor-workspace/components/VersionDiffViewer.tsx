@@ -6,17 +6,21 @@ import {
 } from "@/features/editor-workspace/utils/monaco-options";
 
 interface VersionDiffViewerProps {
+  savedQueryId: string;
   currentSql: string;
   previousSql: string | null;
   showChanges: boolean;
 }
 
 export function VersionDiffViewer({
+  savedQueryId,
   currentSql,
   previousSql,
   showChanges,
 }: VersionDiffViewerProps) {
   const baseOptions = getEditorOptions();
+  const modifiedModelPath = `inmemory://version-history/${savedQueryId}/modified.sql`;
+  const originalModelPath = `inmemory://version-history/${savedQueryId}/original.sql`;
 
   if (!showChanges || previousSql === null) {
     return (
@@ -24,6 +28,8 @@ export function VersionDiffViewer({
         height="100%"
         defaultLanguage="sql"
         value={currentSql}
+        path={modifiedModelPath}
+        keepCurrentModel
         theme={MONACO_THEME_NAME}
         options={{
           ...baseOptions,
@@ -40,6 +46,10 @@ export function VersionDiffViewer({
       language="sql"
       original={previousSql}
       modified={currentSql}
+      originalModelPath={originalModelPath}
+      modifiedModelPath={modifiedModelPath}
+      keepCurrentOriginalModel
+      keepCurrentModifiedModel
       theme={MONACO_THEME_NAME}
       options={{
         ...baseOptions,

@@ -73,10 +73,10 @@ export function VersionHistoryPanel({
   const { data: versionData, isLoading: isLoadingVersions } = useQueryVersions(
     hasAccess ? savedQueryId : undefined,
   );
-  const versions = useMemo(
-    () => versionData?.versions ?? [],
-    [versionData?.versions],
-  );
+  const versions = useMemo<VersionListItem[]>(() => {
+    const rawVersions = versionData?.versions;
+    return Array.isArray(rawVersions) ? rawVersions : [];
+  }, [versionData]);
 
   const { data: publishEventsData } = usePublishEvents(
     hasAccess && isLinked ? savedQueryId : undefined,
@@ -286,6 +286,7 @@ export function VersionHistoryPanel({
             </div>
           ) : selectedDetail ? (
             <VersionDiffViewer
+              savedQueryId={savedQueryId}
               currentSql={selectedDetail.sqlText}
               previousSql={previousDetail?.sqlText ?? null}
               showChanges={showChanges}

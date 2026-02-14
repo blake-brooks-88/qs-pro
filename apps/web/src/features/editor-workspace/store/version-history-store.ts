@@ -16,13 +16,17 @@ export const useVersionHistoryStore = create<VersionHistoryState>((set) => ({
   savedQueryId: null,
   selectedVersionId: null,
   showChanges: true,
-  openVersionHistory: (savedQueryId) =>
+  openVersionHistory: (savedQueryId) => {
+    if (typeof savedQueryId !== "string") {
+      return;
+    }
     set({
       isOpen: true,
       savedQueryId,
       selectedVersionId: null,
       showChanges: true,
-    }),
+    });
+  },
   closeVersionHistory: () =>
     set({
       isOpen: false,

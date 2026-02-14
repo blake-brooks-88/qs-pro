@@ -1,75 +1,45 @@
-import type { CreateDataExtensionDto } from "@qpp/shared-types";
 import type { LinkQueryResponse } from "@qpp/shared-types";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import {
-  AltArrowUp,
-  ClockCircle,
-  Code,
-  Database,
-  Diskette,
-  Download,
-  Export,
-  History,
-  Import,
-  LinkBrokenMinimalistic,
-  LinkMinimalistic,
-  Rocket,
-} from "@solar-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
-import {
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ActivityBar } from "@/components/ActivityBar";
-import { FeatureGate } from "@/components/FeatureGate";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
+import { useBeforeUnloadDirtyTabs } from "@/features/editor-workspace/hooks/use-before-unload-dirty-tabs";
 import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
-import { useCreateQueryActivity } from "@/features/editor-workspace/hooks/use-create-query-activity";
+import { useCreateDataExtensionFlow } from "@/features/editor-workspace/hooks/use-create-data-extension-flow";
 import { useDriftCheck } from "@/features/editor-workspace/hooks/use-drift-check";
-import { useLinkQuery } from "@/features/editor-workspace/hooks/use-link-query";
-import { metadataQueryKeys } from "@/features/editor-workspace/hooks/use-metadata";
+import { useLazyOpenSavedQuery } from "@/features/editor-workspace/hooks/use-lazy-open-saved-query";
+import { usePublishFlow } from "@/features/editor-workspace/hooks/use-publish-flow";
 import { usePublishQuery } from "@/features/editor-workspace/hooks/use-publish-query";
-import {
-  queryActivityFoldersQueryKeys,
-  useQueryActivityFolders,
-} from "@/features/editor-workspace/hooks/use-query-activity-folders";
+import { useQueryActivityDeploymentFlow } from "@/features/editor-workspace/hooks/use-query-activity-deployment-flow";
+import { useQueryActivityFolders } from "@/features/editor-workspace/hooks/use-query-activity-folders";
 import { useQueryExecution } from "@/features/editor-workspace/hooks/use-query-execution";
 import {
   useQueryVersions,
   versionHistoryKeys,
 } from "@/features/editor-workspace/hooks/use-query-versions";
-import {
-  useSavedQuery,
-  useUpdateSavedQuery,
-} from "@/features/editor-workspace/hooks/use-saved-queries";
+import { useResultsPaneResize } from "@/features/editor-workspace/hooks/use-results-pane-resize";
+import { useRunRequestHandler } from "@/features/editor-workspace/hooks/use-run-request-handler";
+import { useSaveFlows } from "@/features/editor-workspace/hooks/use-save-flows";
+import { useUpdateSavedQuery } from "@/features/editor-workspace/hooks/use-saved-queries";
+import { useUnlinkFlow } from "@/features/editor-workspace/hooks/use-unlink-flow";
+import { useVersionHistoryFlow } from "@/features/editor-workspace/hooks/use-version-history-flow";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
-  DataExtensionDraft,
-  DataExtensionField,
   EditorWorkspaceProps,
   ExecutionResult,
-  QueryActivityDraft,
   TargetUpdateType,
 } from "@/features/editor-workspace/types";
-import { formatDiagnosticMessage } from "@/features/editor-workspace/utils/sql-diagnostics";
+import { adaptExecutionResult } from "@/features/editor-workspace/utils/execution-result-adapter";
+import {
+  getRunBlockMessage,
+  getRunLimitFlags,
+  getRunTooltipMessage,
+} from "@/features/editor-workspace/utils/run-gating";
 import {
   getFirstBlockingDiagnostic,
   hasBlockingDiagnostics as checkHasBlockingDiagnostics,
@@ -79,27 +49,17 @@ import { useFeature } from "@/hooks/use-feature";
 import { useRunUsage } from "@/hooks/use-run-usage";
 import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { copyToClipboard } from "@/lib/clipboard";
-import { cn } from "@/lib/utils";
-import { createDataExtension } from "@/services/metadata";
 import { useTabsStore } from "@/store/tabs-store";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
-import { DataExtensionModal } from "./DataExtensionModal";
-import { DriftDetectionDialog } from "./DriftDetectionDialog";
+import { EditorResultsPane } from "./EditorResultsPane";
+import { EditorToolbar } from "./EditorToolbar";
+import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
-import { ImportQueryModal } from "./ImportQueryModal";
-import { LinkedBadge } from "./LinkedBadge";
-import { LinkQueryModal } from "./LinkQueryModal";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
-import { PublishConfirmationDialog } from "./PublishConfirmationDialog";
-import { QueryActivityModal } from "./QueryActivityModal";
 import { QueryTabBar } from "./QueryTabBar";
-import { ResultsPane } from "./ResultsPane";
-import { RunButtonDropdown } from "./RunButtonDropdown";
-import { SaveQueryModal } from "./SaveQueryModal";
-import { TargetDataExtensionModal } from "./TargetDataExtensionModal";
-import { UnlinkModal } from "./UnlinkModal";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
+import { VersionHistoryWarningDialog } from "./VersionHistoryWarningDialog";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 
 export function EditorWorkspace({
@@ -136,17 +96,10 @@ export function EditorWorkspace({
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const showHistoryForQuery = useActivityBarStore((s) => s.showHistoryForQuery);
 
-  const [isDEModalOpen, setIsDEModalOpen] = useState(false);
-  const [isQueryActivityModalOpen, setIsQueryActivityModalOpen] =
-    useState(false);
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isConfirmCloseOpen, setIsConfirmCloseOpen] = useState(false);
   const [tabToClose, setTabToClose] = useState<string | null>(null);
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
   const [isTargetDEModalOpen, setIsTargetDEModalOpen] = useState(false);
-  const [inferredFields, setInferredFields] = useState<DataExtensionField[]>(
-    [],
-  );
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -155,17 +108,10 @@ export function EditorWorkspace({
   );
 
   // Publish flow state
-  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
-  const [showDriftDialog, setShowDriftDialog] = useState(false);
-  const [publishVersionId, setPublishVersionId] = useState<string | null>(null);
+  // (handled via usePublishFlow below)
 
   // Unlink flow state
-  const [unlinkTarget, setUnlinkTarget] = useState<{
-    savedQueryId: string;
-    savedQueryName: string;
-    linkedQaName: string;
-    linkedQaCustomerKey: string;
-  } | null>(null);
+  // (handled via useUnlinkFlow below)
 
   // Version History state
   const versionHistoryIsOpen = useVersionHistoryStore((s) => s.isOpen);
@@ -178,10 +124,6 @@ export function EditorWorkspace({
   const closeVersionHistory = useVersionHistoryStore(
     (s) => s.closeVersionHistory,
   );
-  const [isVersionHistoryWarningOpen, setIsVersionHistoryWarningOpen] =
-    useState(false);
-  const [pendingVersionHistoryQueryId, setPendingVersionHistoryQueryId] =
-    useState<string | null>(null);
 
   // TanStack Query client for metadata fetching
   const queryClient = useQueryClient();
@@ -189,16 +131,6 @@ export function EditorWorkspace({
   // Quota hooks
   const { tier } = useTier();
   const { data: usageData } = useRunUsage();
-
-  // State for lazy-loading query content when opening from sidebar
-  const [pendingQueryId, setPendingQueryId] = useState<string | null>(null);
-
-  // State for Save As mode
-  const [isSaveAsMode, setIsSaveAsMode] = useState(false);
-  const [saveAsInitialName, setSaveAsInitialName] = useState<string>("");
-
-  // Lazy fetch query content when opening from sidebar
-  const { data: pendingQuery } = useSavedQuery(pendingQueryId ?? undefined);
 
   const {
     execute,
@@ -217,8 +149,6 @@ export function EditorWorkspace({
 
   // Query Activity hooks
   const { data: qaFolders = [] } = useQueryActivityFolders(eid);
-  const createQueryActivityMutation = useCreateQueryActivity();
-  const linkMutation = useLinkQuery();
   const publishMutation = usePublishQuery();
   const { enabled: isDeployFeatureEnabled } = useFeature("deployToAutomation");
 
@@ -238,13 +168,18 @@ export function EditorWorkspace({
     (state) => state.updateTabLinkState,
   );
 
-  const [isResultsOpen, setIsResultsOpen] = useState(false);
-  const [resultsHeight, setResultsHeight] = useState(280);
-  const [isResizingResults, setIsResizingResults] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<number | undefined>(
     undefined,
   );
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const {
+    isResultsOpen,
+    resultsHeight,
+    isResizingResults,
+    openResultsPane,
+    toggleResultsPane,
+    handleResultsResizeStart,
+  } = useResultsPaneResize({ workspaceRef });
 
   // Track if store has been initialized
   const initializedRef = useRef(false);
@@ -298,6 +233,60 @@ export function EditorWorkspace({
     };
   }, [activeTab, tabs]);
 
+  const {
+    isSaveModalOpen,
+    saveModalInitialName,
+    openSaveModal,
+    closeSaveModal,
+    handleSave,
+    handleSaveAs,
+    handleSaveModalSuccess,
+  } = useSaveFlows({
+    activeTabId,
+    activeTab: safeActiveTab,
+    storeMarkTabSaved,
+    storeOpenQuery,
+    updateQuery,
+    queryClient,
+    versionHistoryKeys,
+    onSave,
+  });
+
+  const {
+    isWarningOpen: isVersionHistoryWarningOpen,
+    handleOpenVersionHistory,
+    handleVersionRestore,
+    handleWarningCancel: handleVersionHistoryWarningCancel,
+    handleContinueWithoutSaving: handleVersionHistoryContinueWithoutSaving,
+    handleSaveAndContinue: handleVersionHistorySaveAndContinue,
+  } = useVersionHistoryFlow({
+    activeTabId,
+    activeTab: safeActiveTab,
+    versionHistorySavedQueryId,
+    openVersionHistory,
+    closeVersionHistory,
+    storeFindTabByQueryId,
+    storeUpdateTabContent,
+    storeSetActiveTab,
+    storeMarkTabSaved,
+    updateQuery,
+    queryClient,
+    versionHistoryKeys,
+  });
+
+  const {
+    unlinkTarget,
+    openUnlinkModal: handleOpenUnlinkModal,
+    closeUnlinkModal,
+    handleUnlinkComplete,
+  } = useUnlinkFlow({
+    savedQueries,
+    storeFindTabByQueryId,
+    storeCloseTab,
+    storeUpdateTabLinkState,
+    onTabClose,
+  });
+
   // Publish-related: derive linked saved query ID for the active tab
   const activeTabLinkedSavedQueryId = useMemo(() => {
     if (safeActiveTab.queryId && safeActiveTab.linkedQaCustomerKey) {
@@ -307,10 +296,6 @@ export function EditorWorkspace({
   }, [safeActiveTab.queryId, safeActiveTab.linkedQaCustomerKey]);
 
   const driftCheck = useDriftCheck(activeTabLinkedSavedQueryId);
-  const blastRadius = useBlastRadius(
-    showPublishConfirm ? activeTabLinkedSavedQueryId : undefined,
-  );
-  const toolbarBlastRadius = useBlastRadius(activeTabLinkedSavedQueryId);
   const { data: versionsData } = useQueryVersions(activeTabLinkedSavedQueryId);
 
   const latestVersionId = useMemo(() => {
@@ -325,25 +310,32 @@ export function EditorWorkspace({
     return sorted[0]?.id ?? null;
   }, [versionsData?.versions]);
 
-  // Drift check on linked query open (once per tab)
-  const driftCheckedTabsRef = useRef<Set<string>>(new Set());
+  const {
+    showPublishConfirm,
+    showDriftDialog,
+    handlePublishClick,
+    handlePublishConfirm,
+    handleVersionPublish,
+    handleDriftKeepMine,
+    handleDriftAcceptTheirs,
+    closePublishConfirm,
+    closeDriftDialog,
+  } = usePublishFlow({
+    activeTabId,
+    activeTabLinkedSavedQueryId,
+    activeTab: safeActiveTab,
+    driftCheck,
+    updateQuery,
+    publishMutation,
+    latestVersionId,
+    storeUpdateTabContent,
+    storeMarkTabSaved,
+  });
 
-  useEffect(() => {
-    if (
-      !activeTabId ||
-      !activeTabLinkedSavedQueryId ||
-      driftCheckedTabsRef.current.has(activeTabId)
-    ) {
-      return;
-    }
-    driftCheckedTabsRef.current.add(activeTabId);
-    void driftCheck.refetch().then((result) => {
-      if (result.data?.hasDrift) {
-        setShowDriftDialog(true);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on tab/link change
-  }, [activeTabId, activeTabLinkedSavedQueryId]);
+  const blastRadius = useBlastRadius(
+    showPublishConfirm ? activeTabLinkedSavedQueryId : undefined,
+  );
+  const toolbarBlastRadius = useBlastRadius(activeTabLinkedSavedQueryId);
 
   // Use the new hook that merges sync (legacy/prereq) and async (AST worker) diagnostics
   const sqlDiagnostics = useSqlDiagnostics(safeActiveTab.content, {
@@ -365,41 +357,22 @@ export function EditorWorkspace({
     [sqlDiagnostics],
   );
 
-  const isAtRunLimit = useMemo(() => {
-    if (!usageData?.queryRuns.limit) {
-      return false;
-    }
-    return usageData.queryRuns.current >= usageData.queryRuns.limit;
-  }, [usageData]);
-
-  const isNearRunLimit = useMemo(() => {
-    if (!usageData?.queryRuns.limit) {
-      return false;
-    }
-    return (
-      usageData.queryRuns.current >=
-      usageData.queryRuns.limit * WARNING_THRESHOLD
-    );
-  }, [usageData]);
+  const { isAtRunLimit, isNearRunLimit } = useMemo(
+    () => getRunLimitFlags(usageData, WARNING_THRESHOLD),
+    [usageData],
+  );
 
   const runBlockMessage = useMemo(() => {
-    if (!blockingDiagnostic) {
-      return null;
-    }
-    return formatDiagnosticMessage(blockingDiagnostic, safeActiveTab.content);
+    return getRunBlockMessage(blockingDiagnostic, safeActiveTab.content);
   }, [safeActiveTab.content, blockingDiagnostic]);
 
   const runTooltipMessage = useMemo(() => {
-    if (isRunning) {
-      return "Query is currently running...";
-    }
-    if (isAtRunLimit) {
-      return "Monthly run limit reached. Click to upgrade.";
-    }
-    if (hasBlockingDiagnostics) {
-      return runBlockMessage ?? "Query is missing required SQL.";
-    }
-    return "Execute SQL (Ctrl+Enter)";
+    return getRunTooltipMessage({
+      isRunning,
+      isAtRunLimit,
+      hasBlockingDiagnostics,
+      runBlockMessage,
+    });
   }, [isRunning, isAtRunLimit, hasBlockingDiagnostics, runBlockMessage]);
 
   // Derive link target info for LinkQueryModal
@@ -415,35 +388,15 @@ export function EditorWorkspace({
   }, [linkTargetQueryId, storeFindTabByQueryId]);
 
   const executionResult: ExecutionResult = useMemo(() => {
-    const legacyStatus =
-      executionStatus === "ready"
-        ? "success"
-        : executionStatus === "failed" || executionStatus === "canceled"
-          ? "error"
-          : executionStatus === "idle"
-            ? "idle"
-            : "running";
-
-    const resultsData = results.data;
-
-    return {
-      ...externalExecutionResult,
-      status: legacyStatus,
+    return adaptExecutionResult({
+      externalExecutionResult,
       executionStatus,
-      runId: runId ?? undefined,
-      errorMessage:
-        executionErrorMessage ??
-        results.error?.message ??
-        externalExecutionResult.errorMessage,
-      columns: resultsData?.columns ?? externalExecutionResult.columns,
-      rows: (resultsData?.rows ?? externalExecutionResult.rows) as Record<
-        string,
-        string | number | boolean | null
-      >[],
-      totalRows: resultsData?.totalRows ?? externalExecutionResult.totalRows,
-      currentPage: resultsData?.page ?? currentPage,
-      pageSize: resultsData?.pageSize ?? externalExecutionResult.pageSize,
-    };
+      runId,
+      executionErrorMessage,
+      resultsData: results.data,
+      resultsError: results.error,
+      currentPage,
+    });
   }, [
     externalExecutionResult,
     executionStatus,
@@ -454,164 +407,60 @@ export function EditorWorkspace({
     currentPage,
   ]);
 
-  // Effect to open tab when pending query loads
-  useEffect(() => {
-    if (pendingQuery && pendingQueryId) {
+  const { requestOpenSavedQuery } = useLazyOpenSavedQuery({
+    onOpenSavedQuery: (query) => {
       storeOpenQuery(
-        pendingQuery.id,
-        pendingQuery.name,
-        pendingQuery.sqlText,
-        pendingQuery.linkedQaCustomerKey || pendingQuery.linkedQaName
+        query.id,
+        query.name,
+        query.sqlText,
+        query.linkedQaCustomerKey || query.linkedQaName
           ? {
-              linkedQaCustomerKey: pendingQuery.linkedQaCustomerKey,
-              linkedQaName: pendingQuery.linkedQaName,
+              linkedQaCustomerKey: query.linkedQaCustomerKey,
+              linkedQaName: query.linkedQaName,
             }
           : undefined,
       );
-      setPendingQueryId(null);
-    }
-  }, [pendingQuery, pendingQueryId, storeOpenQuery]);
+    },
+  });
 
-  // Dirty State & BeforeUnload
-  useEffect(() => {
-    const hasDirtyTabs = tabs.some((t) => t.isDirty);
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasDirtyTabs) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [tabs]);
+  useBeforeUnloadDirtyTabs(tabs);
 
   useEffect(() => {
     if (executionResult.status !== "idle") {
-      setIsResultsOpen(true);
+      openResultsPane();
     }
-  }, [executionResult.status]);
+  }, [executionResult.status, openResultsPane]);
 
-  const handleCreateDE = async () => {
-    // Lazy load both inferrer and fetcher to avoid bundle impact
-    try {
-      const [{ inferSchemaFromQuery }, { createMetadataFetcher }] =
-        await Promise.all([
-          import("../utils/schema-inferrer"),
-          import("../utils/metadata-fetcher"),
-        ]);
-      const fetcher = createMetadataFetcher(queryClient, tenantId, eid);
-      const fields = await inferSchemaFromQuery(safeActiveTab.content, fetcher);
-      setInferredFields(fields);
-    } catch {
-      // Parsing failed - show empty modal
-      toast.error("Could not infer schema from query");
-      setInferredFields([]);
-    }
+  const {
+    isDEModalOpen,
+    inferredFields,
+    handleCreateDE,
+    closeDEModal,
+    handleSaveDataExtension,
+  } = useCreateDataExtensionFlow({
+    queryClient,
+    tenantId,
+    eid,
+    sqlText: safeActiveTab.content,
+    onCreateDE,
+  });
 
-    setIsDEModalOpen(true);
-    onCreateDE?.();
-  };
-
-  const handleSaveDataExtension = useCallback(
-    async (draft: DataExtensionDraft) => {
-      // Map DataExtensionDraft to CreateDataExtensionDto (strip client-side id from fields)
-      const dto: CreateDataExtensionDto = {
-        name: draft.name,
-        ...(draft.customerKey && { customerKey: draft.customerKey }),
-        folderId: draft.folderId,
-        isSendable: draft.isSendable,
-        subscriberKeyField: draft.subscriberKeyField,
-        retention: draft.retention,
-        fields: draft.fields.map(({ id: _id, ...field }) => field),
-      };
-
-      try {
-        await createDataExtension(dto);
-        toast.success(`Data Extension "${draft.name}" created`);
-        const queryKey = metadataQueryKeys.dataExtensions(tenantId, eid);
-        await queryClient.invalidateQueries({ queryKey });
-        await queryClient.refetchQueries({ queryKey, type: "all" });
-      } catch (error) {
-        toast.error("Failed to create Data Extension", {
-          description:
-            error instanceof Error ? error.message : "An error occurred",
-        });
-        throw error;
-      }
+  const {
+    isQueryActivityModalOpen,
+    openQueryActivityModal: handleOpenQueryActivityModal,
+    closeQueryActivityModal,
+    isPending: isCreateQueryActivityPending,
+    handleCreateQueryActivity,
+  } = useQueryActivityDeploymentFlow({
+    queryClient,
+    activeTabId,
+    activeTab: {
+      queryId: safeActiveTab.queryId,
+      name: safeActiveTab.name,
+      content: safeActiveTab.content,
     },
-    [queryClient, tenantId, eid],
-  );
-
-  const handleOpenQueryActivityModal = () => {
-    setIsQueryActivityModalOpen(true);
-  };
-
-  const handleCreateQueryActivity = useCallback(
-    async (draft: QueryActivityDraft) => {
-      try {
-        const result = await createQueryActivityMutation.mutateAsync({
-          name: draft.name,
-          customerKey: draft.externalKey,
-          description: draft.description,
-          categoryId: draft.categoryId,
-          targetDataExtensionCustomerKey: draft.targetDataExtensionCustomerKey,
-          queryText: draft.queryText,
-          targetUpdateType: draft.targetUpdateType,
-        });
-
-        // Invalidate Query Activity folders cache to refresh the sidebar
-        await queryClient.invalidateQueries({
-          queryKey: queryActivityFoldersQueryKeys.all,
-        });
-
-        // Auto-link if this is a saved query tab
-        const savedQueryId = safeActiveTab.queryId;
-        if (savedQueryId && result.customerKey) {
-          try {
-            const linkResponse = await linkMutation.mutateAsync({
-              savedQueryId,
-              qaCustomerKey: result.customerKey,
-            });
-            if (activeTabId) {
-              storeUpdateTabLinkState(activeTabId, {
-                linkedQaCustomerKey: linkResponse.linkedQaCustomerKey,
-                linkedQaName: linkResponse.linkedQaName,
-              });
-            }
-            toast.success(`Query Activity "${draft.name}" deployed and linked`);
-          } catch {
-            toast.success(`Query Activity "${draft.name}" deployed`, {
-              description: `Object ID: ${result.objectId}`,
-            });
-          }
-        } else {
-          toast.success(`Query Activity "${draft.name}" deployed`, {
-            description: `Object ID: ${result.objectId}`,
-          });
-        }
-        setIsQueryActivityModalOpen(false);
-      } catch (error) {
-        // Extract detailed error message from API response (RFC 9457 Problem Details format)
-        let description = "An error occurred";
-        if (axios.isAxiosError(error)) {
-          const detail = error.response?.data?.detail;
-          description = typeof detail === "string" ? detail : error.message;
-        } else if (error instanceof Error) {
-          description = error.message;
-        }
-        toast.error("Failed to deploy Query Activity", { description });
-        // Keep modal open on error - do not close or rethrow
-      }
-    },
-    [
-      createQueryActivityMutation,
-      queryClient,
-      safeActiveTab.queryId,
-      activeTabId,
-      linkMutation,
-      storeUpdateTabLinkState,
-    ],
-  );
+    storeUpdateTabLinkState,
+  });
 
   const handleOpenLinkModal = useCallback((queryId: string) => {
     setLinkTargetQueryId(queryId);
@@ -646,164 +495,8 @@ export function EditorWorkspace({
   const handleLinkCreateNew = useCallback(() => {
     setIsLinkModalOpen(false);
     setLinkTargetQueryId(null);
-    setIsQueryActivityModalOpen(true);
-  }, []);
-
-  // Publish flow handlers
-  const handlePublishClick = useCallback(async () => {
-    if (!safeActiveTab.queryId || !safeActiveTab.linkedQaCustomerKey) {
-      return;
-    }
-
-    if (safeActiveTab.isNew) {
-      toast.warning("Save your query before publishing.");
-      return;
-    }
-    if (safeActiveTab.isDirty) {
-      toast.warning("Save your changes before publishing.");
-      return;
-    }
-
-    const result = await driftCheck.refetch();
-    if (result.data?.hasDrift) {
-      setShowDriftDialog(true);
-    } else {
-      setPublishVersionId(null);
-      setShowPublishConfirm(true);
-    }
-  }, [
-    safeActiveTab.queryId,
-    safeActiveTab.linkedQaCustomerKey,
-    safeActiveTab.isNew,
-    safeActiveTab.isDirty,
-    driftCheck,
-  ]);
-
-  const handleDriftKeepMine = useCallback(() => {
-    setShowDriftDialog(false);
-    setPublishVersionId(null);
-    setShowPublishConfirm(true);
-  }, []);
-
-  const handleDriftAcceptTheirs = useCallback(async () => {
-    if (!safeActiveTab.queryId || !driftCheck.data?.remoteSql) {
-      return;
-    }
-    try {
-      await updateQuery.mutateAsync({
-        id: safeActiveTab.queryId,
-        data: { sqlText: driftCheck.data.remoteSql },
-      });
-      if (activeTabId) {
-        storeUpdateTabContent(activeTabId, driftCheck.data.remoteSql);
-        storeMarkTabSaved(
-          activeTabId,
-          safeActiveTab.queryId,
-          safeActiveTab.name,
-        );
-      }
-      toast.success("Accepted Automation Studio version as new local version.");
-      setShowDriftDialog(false);
-    } catch {
-      toast.error("Failed to accept remote version.");
-    }
-  }, [
-    safeActiveTab.queryId,
-    safeActiveTab.name,
-    driftCheck.data?.remoteSql,
-    activeTabId,
-    updateQuery,
-    storeUpdateTabContent,
-    storeMarkTabSaved,
-  ]);
-
-  const handlePublishConfirm = useCallback(async () => {
-    if (!safeActiveTab.queryId) {
-      return;
-    }
-    const versionId = publishVersionId ?? latestVersionId;
-    if (!versionId) {
-      toast.error("No version available to publish.");
-      return;
-    }
-    try {
-      await publishMutation.mutateAsync({
-        savedQueryId: safeActiveTab.queryId,
-        versionId,
-      });
-      setShowPublishConfirm(false);
-      setPublishVersionId(null);
-      toast.success("Published to Automation Studio.");
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "An error occurred";
-      toast.error("Failed to publish", { description: message });
-    }
-  }, [
-    safeActiveTab.queryId,
-    publishVersionId,
-    latestVersionId,
-    publishMutation,
-  ]);
-
-  const handleVersionPublish = useCallback((versionId: string) => {
-    setPublishVersionId(versionId);
-    setShowPublishConfirm(true);
-  }, []);
-
-  const handleOpenUnlinkModal = useCallback(
-    (queryId: string) => {
-      const tab = storeFindTabByQueryId(queryId);
-      const query = savedQueries?.find((q) => q.id === queryId);
-      const name = tab?.name ?? query?.name ?? "Query";
-      const qaName =
-        tab?.linkedQaName ?? query?.linkedQaName ?? "Query Activity";
-      const qaKey =
-        tab?.linkedQaCustomerKey ?? query?.linkedQaCustomerKey ?? "";
-
-      if (!qaKey) {
-        return;
-      }
-
-      setUnlinkTarget({
-        savedQueryId: queryId,
-        savedQueryName: name,
-        linkedQaName: qaName,
-        linkedQaCustomerKey: qaKey,
-      });
-    },
-    [storeFindTabByQueryId, savedQueries],
-  );
-
-  const handleUnlinkComplete = useCallback(
-    (options: { deleteLocal: boolean; deleteRemote: boolean }) => {
-      if (!unlinkTarget) {
-        return;
-      }
-
-      const tab = storeFindTabByQueryId(unlinkTarget.savedQueryId);
-      if (tab) {
-        if (options.deleteLocal) {
-          storeCloseTab(tab.id);
-          onTabClose?.(tab.id);
-        } else {
-          storeUpdateTabLinkState(tab.id, {
-            linkedQaCustomerKey: null,
-            linkedQaName: null,
-          });
-        }
-      }
-
-      setUnlinkTarget(null);
-    },
-    [
-      unlinkTarget,
-      storeFindTabByQueryId,
-      storeCloseTab,
-      storeUpdateTabLinkState,
-      onTabClose,
-    ],
-  );
+    handleOpenQueryActivityModal();
+  }, [handleOpenQueryActivityModal]);
 
   const handleCloseTab = useCallback(
     (id: string) => {
@@ -823,100 +516,19 @@ export function EditorWorkspace({
     [activeTabId, storeUpdateTabContent],
   );
 
-  const handleSave = useCallback(async () => {
-    if (!safeActiveTab.queryId) {
-      setIsSaveModalOpen(true);
-    } else if (safeActiveTab.isDirty) {
-      // Auto-save existing query via API
-      try {
-        await updateQuery.mutateAsync({
-          id: safeActiveTab.queryId,
-          data: { sqlText: safeActiveTab.content },
-        });
-
-        // Mark tab as saved in Zustand store
-        if (activeTabId) {
-          storeMarkTabSaved(
-            activeTabId,
-            safeActiveTab.queryId,
-            safeActiveTab.name,
-          );
-        }
-
-        toast.success("Query saved");
-        onSave?.(safeActiveTab.id, safeActiveTab.content);
-
-        if (safeActiveTab.queryId) {
-          void queryClient.invalidateQueries({
-            queryKey: versionHistoryKeys.list(safeActiveTab.queryId),
-          });
-        }
-      } catch (error) {
-        toast.error("Failed to save query", {
-          description:
-            error instanceof Error ? error.message : "An error occurred",
-        });
-      }
-    }
-  }, [
-    safeActiveTab,
-    activeTabId,
-    storeMarkTabSaved,
-    updateQuery,
-    onSave,
-    queryClient,
-  ]);
-
-  const handleSaveAs = useCallback(() => {
-    const name = safeActiveTab?.name || "Untitled";
-    setSaveAsInitialName(`${name} (copy)`);
-    setIsSaveAsMode(true);
-    setIsSaveModalOpen(true);
-  }, [safeActiveTab?.name]);
-
-  const handleSaveAsSuccess = useCallback(
-    (queryId: string, name: string) => {
-      // Create new tab for the copy (Google Docs style - original tab stays open)
-      storeOpenQuery(queryId, name, safeActiveTab?.content ?? "");
-      setIsSaveModalOpen(false);
-      setIsSaveAsMode(false);
-      setSaveAsInitialName("");
-    },
-    [safeActiveTab?.content, storeOpenQuery],
-  );
-
-  const handleResultsToggle = () => {
-    setIsResultsOpen((prev) => !prev);
-  };
-
-  const handleRunRequest = useCallback(() => {
-    if (isRunning) {
-      return;
-    }
-    if (hasBlockingDiagnostics) {
-      setIsRunBlockedOpen(true);
-      return;
-    }
-    if (isAtRunLimit) {
-      setIsUpgradeModalOpen(true);
-      return;
-    }
-    void execute(
-      safeActiveTab.content,
-      safeActiveTab.name,
-      undefined,
-      undefined,
-      safeActiveTab.queryId ?? undefined,
-    );
-  }, [
+  const handleRunRequest = useRunRequestHandler({
     isRunning,
     hasBlockingDiagnostics,
     isAtRunLimit,
+    activeTab: {
+      content: safeActiveTab.content,
+      name: safeActiveTab.name,
+      queryId: safeActiveTab.queryId,
+    },
     execute,
-    safeActiveTab.content,
-    safeActiveTab.name,
-    safeActiveTab.queryId,
-  ]);
+    onOpenRunBlockedDialog: () => setIsRunBlockedOpen(true),
+    onOpenUpgradeModal: () => setIsUpgradeModalOpen(true),
+  });
 
   const handleCancel = useCallback(() => {
     void cancel();
@@ -966,102 +578,6 @@ export function EditorWorkspace({
     [showHistoryForQuery],
   );
 
-  const handleOpenVersionHistory = useCallback(
-    (queryId?: string) => {
-      const targetQueryId = queryId ?? safeActiveTab.queryId;
-      if (!targetQueryId) {
-        return;
-      }
-      if (safeActiveTab.isDirty && safeActiveTab.queryId === targetQueryId) {
-        setPendingVersionHistoryQueryId(targetQueryId);
-        setIsVersionHistoryWarningOpen(true);
-      } else {
-        openVersionHistory(targetQueryId);
-      }
-    },
-    [safeActiveTab.queryId, safeActiveTab.isDirty, openVersionHistory],
-  );
-
-  const handleVersionRestore = useCallback(
-    (sqlText: string) => {
-      if (!versionHistorySavedQueryId) {
-        return;
-      }
-      const targetTab = storeFindTabByQueryId(versionHistorySavedQueryId);
-      if (targetTab) {
-        storeUpdateTabContent(targetTab.id, sqlText);
-        storeSetActiveTab(targetTab.id);
-      }
-      closeVersionHistory();
-    },
-    [
-      versionHistorySavedQueryId,
-      storeFindTabByQueryId,
-      storeUpdateTabContent,
-      storeSetActiveTab,
-      closeVersionHistory,
-    ],
-  );
-
-  const handleVersionHistoryWarningCancel = useCallback(() => {
-    setIsVersionHistoryWarningOpen(false);
-    setPendingVersionHistoryQueryId(null);
-  }, []);
-
-  const handleVersionHistoryContinueWithoutSaving = useCallback(() => {
-    const queryId = pendingVersionHistoryQueryId;
-    setIsVersionHistoryWarningOpen(false);
-    setPendingVersionHistoryQueryId(null);
-    if (queryId) {
-      openVersionHistory(queryId);
-    }
-  }, [pendingVersionHistoryQueryId, openVersionHistory]);
-
-  const handleVersionHistorySaveAndContinue = useCallback(async () => {
-    const queryId = pendingVersionHistoryQueryId;
-    setIsVersionHistoryWarningOpen(false);
-    setPendingVersionHistoryQueryId(null);
-
-    if (safeActiveTab.queryId && safeActiveTab.isDirty) {
-      try {
-        await updateQuery.mutateAsync({
-          id: safeActiveTab.queryId,
-          data: { sqlText: safeActiveTab.content },
-        });
-        if (activeTabId) {
-          storeMarkTabSaved(
-            activeTabId,
-            safeActiveTab.queryId,
-            safeActiveTab.name,
-          );
-        }
-        toast.success("Query saved");
-
-        void queryClient.invalidateQueries({
-          queryKey: versionHistoryKeys.list(safeActiveTab.queryId),
-        });
-      } catch (error) {
-        toast.error("Failed to save query", {
-          description:
-            error instanceof Error ? error.message : "An error occurred",
-        });
-        return;
-      }
-    }
-
-    if (queryId) {
-      openVersionHistory(queryId);
-    }
-  }, [
-    pendingVersionHistoryQueryId,
-    safeActiveTab,
-    activeTabId,
-    updateQuery,
-    storeMarkTabSaved,
-    queryClient,
-    openVersionHistory,
-  ]);
-
   const handleRunToTarget = useCallback(() => {
     setIsTargetDEModalOpen(true);
   }, []);
@@ -1079,40 +595,6 @@ export function EditorWorkspace({
     },
     [execute, safeActiveTab.content, safeActiveTab.name, safeActiveTab.queryId],
   );
-
-  const handleResultsResizeStart = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (!workspaceRef.current) {
-      return;
-    }
-    event.preventDefault();
-    const startY = event.clientY;
-    const startHeight = resultsHeight;
-    const containerHeight = workspaceRef.current.clientHeight;
-    const minHeight = 160;
-    const maxHeight = Math.max(minHeight, Math.min(560, containerHeight - 120));
-
-    setIsResizingResults(true);
-
-    const handleMove = (moveEvent: globalThis.PointerEvent) => {
-      const delta = moveEvent.clientY - startY;
-      const nextHeight = Math.min(
-        maxHeight,
-        Math.max(minHeight, startHeight - delta),
-      );
-      setResultsHeight(nextHeight);
-    };
-
-    const handleUp = () => {
-      setIsResizingResults(false);
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
-    };
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp);
-  };
 
   const isIdle = executionResult.status === "idle";
   const shouldShowResultsPane = !isIdle || isResultsOpen;
@@ -1152,7 +634,7 @@ export function EditorWorkspace({
                     return;
                   }
                   // Trigger lazy fetch
-                  setPendingQueryId(id);
+                  requestOpenSavedQuery(id);
                   onSelectQuery?.(id);
                 }}
                 onSelectDE={onSelectDE}
@@ -1191,193 +673,31 @@ export function EditorWorkspace({
                 />
               ) : (
                 <>
-                  {/* Workspace Header / Toolbar */}
-                  <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 overflow-visible">
-                    <div className="flex items-center gap-4">
-                      <RunButtonDropdown
-                        onRun={handleRunRequest}
-                        onRunToTarget={handleRunToTarget}
-                        isRunning={isRunning}
-                        disabled={hasBlockingDiagnostics}
-                        tooltipMessage={runTooltipMessage}
-                      />
-
-                      <div className="h-4 w-px bg-border mx-1" />
-
-                      <div className="flex items-center gap-1 overflow-visible">
-                        <ToolbarButton
-                          icon={<Diskette size={18} />}
-                          label={
-                            safeActiveTab.isDirty
-                              ? "Save Changes*"
-                              : "Save Query"
-                          }
-                          onClick={handleSave}
-                          className={
-                            safeActiveTab.isDirty ? "text-primary" : ""
-                          }
-                        />
-                        <ToolbarButton
-                          icon={<Code size={18} />}
-                          label="Format SQL"
-                          onClick={onFormat}
-                        />
-                        <ToolbarButton
-                          icon={<Download size={18} />}
-                          label="Export Results"
-                        />
-                        <div className="h-4 w-px bg-border mx-1" />
-                        <FeatureGate
-                          feature="createDataExtension"
-                          variant="button"
-                        >
-                          <ToolbarButton
-                            icon={<Database size={18} />}
-                            label="Create Data Extension"
-                            onClick={handleCreateDE}
-                            className="text-primary hover:text-primary-foreground hover:bg-primary"
-                          />
-                        </FeatureGate>
-                        {isDeployFeatureEnabled ? (
-                          <>
-                            <div className="h-4 w-px bg-border mx-1" />
-                            <ToolbarButton
-                              icon={<Import size={18} />}
-                              label="Import from Automation Studio"
-                              onClick={() => setIsImportModalOpen(true)}
-                            />
-                          </>
-                        ) : null}
-                        {safeActiveTab.queryId ? (
-                          <>
-                            <div className="h-4 w-px bg-border mx-1" />
-                            <ToolbarButton
-                              icon={<ClockCircle size={18} />}
-                              label="View Run History"
-                              onClick={() => {
-                                const qId = safeActiveTab.queryId;
-                                if (qId) {
-                                  showHistoryForQuery(qId);
-                                }
-                              }}
-                            />
-                            <ToolbarButton
-                              icon={<History size={18} />}
-                              label="Version History"
-                              onClick={() => handleOpenVersionHistory()}
-                            />
-                            {isDeployFeatureEnabled ? (
-                              <>
-                                <div className="h-4 w-px bg-border mx-1" />
-                                {safeActiveTab.linkedQaCustomerKey ? (
-                                  <>
-                                    <LinkedBadge
-                                      size="md"
-                                      qaName={safeActiveTab.linkedQaName}
-                                      automationCount={
-                                        toolbarBlastRadius.data?.totalCount ??
-                                        null
-                                      }
-                                    />
-                                    <Tooltip.Root>
-                                      <Tooltip.Trigger asChild>
-                                        <button
-                                          onClick={() =>
-                                            void handlePublishClick()
-                                          }
-                                          disabled={publishMutation.isPending}
-                                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground rounded-md transition-all active:scale-95 disabled:opacity-50"
-                                        >
-                                          <Export size={16} />
-                                          Publish
-                                        </button>
-                                      </Tooltip.Trigger>
-                                      <Tooltip.Portal>
-                                        <Tooltip.Content
-                                          className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50 font-bold uppercase tracking-tight"
-                                          sideOffset={5}
-                                          collisionPadding={10}
-                                        >
-                                          Push SQL to linked Query Activity
-                                          <Tooltip.Arrow className="fill-foreground" />
-                                        </Tooltip.Content>
-                                      </Tooltip.Portal>
-                                    </Tooltip.Root>
-                                    <ToolbarButton
-                                      icon={
-                                        <LinkBrokenMinimalistic size={18} />
-                                      }
-                                      label="Unlink from Query Activity"
-                                      onClick={() => {
-                                        const qId = safeActiveTab.queryId;
-                                        if (qId) {
-                                          handleOpenUnlinkModal(qId);
-                                        }
-                                      }}
-                                    />
-                                  </>
-                                ) : (
-                                  <ToolbarButton
-                                    icon={<LinkMinimalistic size={18} />}
-                                    label="Link to Query Activity"
-                                    onClick={() => {
-                                      const qId = safeActiveTab.queryId;
-                                      if (qId) {
-                                        handleOpenLinkModal(qId);
-                                      }
-                                    }}
-                                  />
-                                )}
-                              </>
-                            ) : null}
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 overflow-visible">
-                      <div className="hidden sm:flex flex-col items-end mr-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                          Active Tab
-                        </span>
-                        <span className="text-[10px] font-bold text-primary flex items-center gap-1">
-                          {safeActiveTab.name}
-                          {safeActiveTab.isDirty ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                          ) : null}
-                        </span>
-                      </div>
-                      <FeatureGate
-                        feature="deployToAutomation"
-                        variant="button"
-                      >
-                        <Tooltip.Root>
-                          <Tooltip.Trigger asChild>
-                            <button
-                              onClick={handleOpenQueryActivityModal}
-                              className="flex items-center gap-2 border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground h-8 px-4 rounded-md text-xs font-bold transition-all group active:scale-95"
-                            >
-                              <Rocket
-                                size={16}
-                                weight="Bold"
-                                className="group-hover:animate-bounce"
-                              />
-                              Create in AS
-                            </button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Portal>
-                            <Tooltip.Content
-                              className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50"
-                              sideOffset={5}
-                            >
-                              Create permanent MCE Activity
-                              <Tooltip.Arrow className="fill-foreground" />
-                            </Tooltip.Content>
-                          </Tooltip.Portal>
-                        </Tooltip.Root>
-                      </FeatureGate>
-                    </div>
-                  </div>
+                  <EditorToolbar
+                    activeTab={safeActiveTab}
+                    runButton={{
+                      onRun: handleRunRequest,
+                      onRunToTarget: handleRunToTarget,
+                      isRunning,
+                      disabled: hasBlockingDiagnostics,
+                      tooltipMessage: runTooltipMessage,
+                    }}
+                    onSave={() => void handleSave()}
+                    onFormat={onFormat}
+                    onCreateDE={handleCreateDE}
+                    onOpenImport={() => setIsImportModalOpen(true)}
+                    isDeployFeatureEnabled={isDeployFeatureEnabled}
+                    onViewRunHistory={(queryId) => showHistoryForQuery(queryId)}
+                    onOpenVersionHistory={() => handleOpenVersionHistory()}
+                    onPublish={() => void handlePublishClick()}
+                    isPublishing={publishMutation.isPending}
+                    automationCount={
+                      toolbarBlastRadius.data?.totalCount ?? null
+                    }
+                    onUnlink={(queryId) => handleOpenUnlinkModal(queryId)}
+                    onLink={(queryId) => handleOpenLinkModal(queryId)}
+                    onCreateInAS={handleOpenQueryActivityModal}
+                  />
 
                   {/* Usage Warning Banner */}
                   {tier === "free" &&
@@ -1417,7 +737,7 @@ export function EditorWorkspace({
                         onSaveTab={(tabId) => {
                           const tab = tabs.find((t) => t.id === tabId);
                           if (tab?.isNew) {
-                            setIsSaveModalOpen(true);
+                            openSaveModal();
                           } else if (tab) {
                             // Mark as saved in store
                             if (tab.queryId) {
@@ -1433,55 +753,20 @@ export function EditorWorkspace({
                       />
                     </div>
 
-                    {/* Results Resizable Pane */}
-                    <div
-                      className={cn(
-                        "border-t border-border bg-background flex flex-col min-h-[32px]",
-                        isResizingResults
-                          ? "transition-none"
-                          : "transition-[height] duration-300 ease-out",
-                      )}
-                      style={{
-                        height: shouldShowResultsPane ? resultsHeight : 32,
+                    <EditorResultsPane
+                      shouldShowResultsPane={shouldShowResultsPane}
+                      resultsHeight={resultsHeight}
+                      isResizingResults={isResizingResults}
+                      onResizeStart={handleResultsResizeStart}
+                      onToggle={toggleResultsPane}
+                      result={executionResult}
+                      onPageChange={(page) => {
+                        setPage(page);
+                        onPageChange?.(page);
                       }}
-                    >
-                      {shouldShowResultsPane ? (
-                        <>
-                          <div
-                            onPointerDown={handleResultsResizeStart}
-                            className="h-2 cursor-row-resize bg-border/40 hover:bg-border transition-colors"
-                          >
-                            <div className="mx-auto mt-0.5 h-1 w-10 rounded-full bg-muted-foreground/30" />
-                          </div>
-                          <div className="flex-1 min-h-0">
-                            <ResultsPane
-                              result={executionResult}
-                              onPageChange={(page) => {
-                                setPage(page);
-                                onPageChange?.(page);
-                              }}
-                              onCancel={handleCancel}
-                              onViewInContactBuilder={() => {
-                                const subscriberKey =
-                                  executionResult.rows[0]?.SubscriberKey;
-                                if (typeof subscriberKey === "string") {
-                                  onViewInContactBuilder?.(subscriberKey);
-                                }
-                              }}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleResultsToggle}
-                          className="h-full w-full flex items-center justify-between px-4 bg-card/60 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <span>Run a query to see results</span>
-                          <AltArrowUp size={14} />
-                        </button>
-                      )}
-                    </div>
+                      onCancel={handleCancel}
+                      onViewInContactBuilder={onViewInContactBuilder}
+                    />
                   </div>
                 </>
               )}
@@ -1489,134 +774,91 @@ export function EditorWorkspace({
           </>
         )}
 
-        {/* Modals */}
-        <DataExtensionModal
-          isOpen={isDEModalOpen}
-          onClose={() => {
-            setIsDEModalOpen(false);
-            setInferredFields([]);
-          }}
-          onSave={handleSaveDataExtension}
-          initialFields={inferredFields}
-          folders={folders.filter((f) => f.type === "data-extension")}
-          dataExtensions={dataExtensions}
-        />
-
-        <QueryActivityModal
-          isOpen={isQueryActivityModalOpen}
+        <EditorWorkspaceModals
           tenantId={tenantId}
           eid={eid}
+          folders={folders}
+          qaFolders={qaFolders}
           dataExtensions={dataExtensions}
-          folders={qaFolders}
-          deFolders={folders}
           queryClient={queryClient}
-          queryText={safeActiveTab.content}
-          initialName={safeActiveTab.name}
-          isPending={createQueryActivityMutation.isPending}
-          onClose={() => setIsQueryActivityModalOpen(false)}
-          onSubmit={handleCreateQueryActivity}
-        />
-
-        {linkTargetInfo ? (
-          <LinkQueryModal
-            isOpen={isLinkModalOpen}
-            onClose={() => {
+          dataExtensionModal={{
+            isOpen: isDEModalOpen,
+            onClose: closeDEModal,
+            initialFields: inferredFields,
+            onSave: handleSaveDataExtension,
+          }}
+          queryActivityModal={{
+            isOpen: isQueryActivityModalOpen,
+            initialName: safeActiveTab.name,
+            isPending: isCreateQueryActivityPending,
+            onClose: closeQueryActivityModal,
+            onSubmit: handleCreateQueryActivity,
+            queryText: safeActiveTab.content,
+          }}
+          linkQueryModal={{
+            isOpen: isLinkModalOpen,
+            linkTargetInfo,
+            onClose: () => {
               setIsLinkModalOpen(false);
               setLinkTargetQueryId(null);
-            }}
-            savedQueryId={linkTargetInfo.id}
-            savedQueryName={linkTargetInfo.name}
-            currentSql={linkTargetInfo.sql}
-            onLinkComplete={handleLinkComplete}
-            onCreateNew={handleLinkCreateNew}
-          />
-        ) : null}
-
-        <ImportQueryModal
-          isOpen={isImportModalOpen}
-          onClose={() => setIsImportModalOpen(false)}
-          onImportSaved={(queryId, name, sqlText) => {
-            storeOpenQuery(queryId, name, sqlText);
-            setIsImportModalOpen(false);
+            },
+            onLinkComplete: handleLinkComplete,
+            onCreateNew: handleLinkCreateNew,
           }}
-          onOpenInEditor={(sqlText, qaName) => {
-            const tabId = storeCreateNewTab();
-            storeUpdateTabContent(tabId, sqlText);
-            setIsImportModalOpen(false);
-            toast.success(`Opened "${qaName}" in editor`);
+          importQueryModal={{
+            isOpen: isImportModalOpen,
+            onClose: () => setIsImportModalOpen(false),
+            onImportSaved: (queryId, name, sqlText) => {
+              storeOpenQuery(queryId, name, sqlText);
+              setIsImportModalOpen(false);
+            },
+            onOpenInEditor: (sqlText, qaName) => {
+              const tabId = storeCreateNewTab();
+              storeUpdateTabContent(tabId, sqlText);
+              setIsImportModalOpen(false);
+              toast.success(`Opened "${qaName}" in editor`);
+            },
           }}
-        />
-
-        <PublishConfirmationDialog
-          isOpen={showPublishConfirm}
-          onClose={() => {
-            setShowPublishConfirm(false);
-            setPublishVersionId(null);
+          publishDialog={{
+            isOpen: showPublishConfirm,
+            onClose: closePublishConfirm,
+            onConfirm: () => void handlePublishConfirm(),
+            isPending: publishMutation.isPending,
+            qaName: safeActiveTab.linkedQaName ?? "Query Activity",
+            currentAsSql: driftCheck.data?.remoteSql ?? null,
+            versionSql: safeActiveTab.content,
+            automations: blastRadius.data?.automations ?? [],
+            isLoadingBlastRadius: blastRadius.isLoading,
+            blastRadiusError: blastRadius.isError,
           }}
-          onConfirm={() => void handlePublishConfirm()}
-          isPending={publishMutation.isPending}
-          qaName={safeActiveTab.linkedQaName ?? "Query Activity"}
-          currentAsSql={driftCheck.data?.remoteSql ?? null}
-          versionSql={safeActiveTab.content}
-          automations={blastRadius.data?.automations ?? []}
-          isLoadingBlastRadius={blastRadius.isLoading}
-          blastRadiusError={blastRadius.isError}
-        />
-
-        {unlinkTarget ? (
-          <UnlinkModal
-            open
-            onClose={() => setUnlinkTarget(null)}
-            savedQueryId={unlinkTarget.savedQueryId}
-            savedQueryName={unlinkTarget.savedQueryName}
-            linkedQaName={unlinkTarget.linkedQaName}
-            linkedQaCustomerKey={unlinkTarget.linkedQaCustomerKey}
-            onUnlinkComplete={handleUnlinkComplete}
-          />
-        ) : null}
-
-        <DriftDetectionDialog
-          isOpen={showDriftDialog}
-          onClose={() => setShowDriftDialog(false)}
-          localSql={driftCheck.data?.localSql ?? safeActiveTab.content}
-          remoteSql={driftCheck.data?.remoteSql ?? ""}
-          qaName={safeActiveTab.linkedQaName ?? "Query Activity"}
-          onKeepMine={handleDriftKeepMine}
-          onAcceptTheirs={() => void handleDriftAcceptTheirs()}
-          isPending={updateQuery.isPending}
-        />
-
-        <TargetDataExtensionModal
-          isOpen={isTargetDEModalOpen}
-          tenantId={tenantId}
-          eid={eid}
-          dataExtensions={dataExtensions}
-          folders={folders}
-          queryClient={queryClient}
-          sqlText={safeActiveTab.content}
-          onClose={() => setIsTargetDEModalOpen(false)}
-          onSelect={handleSelectTargetDE}
-        />
-
-        <SaveQueryModal
-          isOpen={isSaveModalOpen}
-          content={safeActiveTab.content}
-          initialName={isSaveAsMode ? saveAsInitialName : safeActiveTab.name}
-          onClose={() => {
-            setIsSaveModalOpen(false);
-            setIsSaveAsMode(false);
-            setSaveAsInitialName("");
+          unlinkModal={{
+            target: unlinkTarget,
+            onClose: closeUnlinkModal,
+            onUnlinkComplete: handleUnlinkComplete,
           }}
-          onSaveSuccess={
-            isSaveAsMode
-              ? handleSaveAsSuccess
-              : (queryId, name) => {
-                  // Mark tab as saved in Zustand store
-                  if (activeTabId) {
-                    storeMarkTabSaved(activeTabId, queryId, name);
-                  }
-                }
-          }
+          driftDialog={{
+            isOpen: showDriftDialog,
+            onClose: closeDriftDialog,
+            localSql: driftCheck.data?.localSql ?? safeActiveTab.content,
+            remoteSql: driftCheck.data?.remoteSql ?? "",
+            qaName: safeActiveTab.linkedQaName ?? "Query Activity",
+            onKeepMine: handleDriftKeepMine,
+            onAcceptTheirs: () => void handleDriftAcceptTheirs(),
+            isPending: updateQuery.isPending ?? false,
+          }}
+          targetDataExtensionModal={{
+            isOpen: isTargetDEModalOpen,
+            onClose: () => setIsTargetDEModalOpen(false),
+            sqlText: safeActiveTab.content,
+            onSelect: handleSelectTargetDE,
+          }}
+          saveQueryModal={{
+            isOpen: isSaveModalOpen,
+            content: safeActiveTab.content,
+            initialName: saveModalInitialName,
+            onClose: closeSaveModal,
+            onSaveSuccess: handleSaveModalSuccess,
+          }}
         />
 
         <ConfirmationDialog
@@ -1652,90 +894,13 @@ export function EditorWorkspace({
           onClose={() => setIsUpgradeModalOpen(false)}
         />
 
-        {/* Unsaved changes warning before opening version history */}
-        <Dialog
+        <VersionHistoryWarningDialog
           open={isVersionHistoryWarningOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              handleVersionHistoryWarningCancel();
-            }
-          }}
-        >
-          <DialogContent className="max-w-md bg-card border-border p-6">
-            <div className="space-y-1">
-              <DialogTitle className="text-lg font-bold">
-                Unsaved Changes
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-                You have unsaved changes. Would you like to save before viewing
-                version history?
-              </DialogDescription>
-            </div>
-            <DialogFooter className="mt-6 gap-2">
-              <Button
-                variant="ghost"
-                onClick={handleVersionHistoryWarningCancel}
-                className="text-xs font-bold"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleVersionHistoryContinueWithoutSaving}
-                className="text-xs font-bold"
-              >
-                Continue Without Saving
-              </Button>
-              <Button
-                onClick={handleVersionHistorySaveAndContinue}
-                className="text-xs font-bold"
-              >
-                Save & Continue
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          onCancel={handleVersionHistoryWarningCancel}
+          onContinueWithoutSaving={handleVersionHistoryContinueWithoutSaving}
+          onSaveAndContinue={() => void handleVersionHistorySaveAndContinue()}
+        />
       </div>
     </Tooltip.Provider>
-  );
-}
-
-interface ToolbarButtonProps {
-  icon: ReactNode;
-  label: string;
-  onClick?: () => void;
-  className?: string;
-}
-
-function ToolbarButton({
-  icon,
-  label,
-  onClick,
-  className,
-}: ToolbarButtonProps) {
-  return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <button
-          onClick={onClick}
-          className={cn(
-            "p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all active:scale-95",
-            className,
-          )}
-        >
-          {icon}
-        </button>
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50 font-bold uppercase tracking-tight"
-          sideOffset={5}
-          collisionPadding={10}
-        >
-          {label}
-          <Tooltip.Arrow className="fill-foreground" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
   );
 }
