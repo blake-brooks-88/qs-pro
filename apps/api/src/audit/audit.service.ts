@@ -1,10 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RlsContextService } from '@qpp/backend-shared';
+import type { AuditLogQueryParams } from '@qpp/shared-types';
 
 import {
   AUDIT_LOG_REPOSITORY,
   type IAuditLogRepository,
 } from './audit.repository';
+import type { AuditLogRow } from './drizzle-audit-log.repository';
 
 export interface AuditLogEntry {
   eventType: string;
@@ -53,5 +55,15 @@ export class AuditService {
         error instanceof Error ? error.stack : String(error),
       );
     }
+  }
+
+  async findAll(
+    tenantId: string,
+    mid: string,
+    params: AuditLogQueryParams,
+  ): Promise<{ items: AuditLogRow[]; total: number }> {
+    return this.rlsContext.runWithTenantContext(tenantId, mid, () =>
+      this.auditLogRepo.findAll(params),
+    );
   }
 }

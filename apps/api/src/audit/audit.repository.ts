@@ -1,3 +1,7 @@
+import type { AuditLogQueryParams } from '@qpp/shared-types';
+
+import type { AuditLogRow } from './drizzle-audit-log.repository';
+
 export const AUDIT_LOG_REPOSITORY = 'AUDIT_LOG_REPOSITORY';
 
 export interface NewAuditLogEntry {
@@ -14,4 +18,7 @@ export interface NewAuditLogEntry {
 
 export interface IAuditLogRepository {
   insert(entry: NewAuditLogEntry): Promise<void>;
+  findAll(
+    params: AuditLogQueryParams,
+  ): Promise<{ items: AuditLogRow[]; total: number }>;
 }
