@@ -11,7 +11,6 @@ import {
   validateWorkerEnv,
 } from "@qpp/backend-shared";
 
-import { AuditRetentionModule } from "./audit/audit-retention.module";
 import { AdminAuthMiddleware } from "./common/middleware/admin-auth.middleware";
 import { HealthModule } from "./health/health.module";
 import { MetricsModule } from "./metrics/metrics.module";
@@ -44,7 +43,6 @@ import { ShellQueryModule } from "./shell-query/shell-query.module";
     MceModule,
     HealthModule,
     ShellQueryModule,
-    AuditRetentionModule,
     RedisModule,
     MetricsModule,
   ],
