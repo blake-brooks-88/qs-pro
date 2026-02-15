@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -247,12 +248,38 @@ function App() {
   }
 
   return (
-    <AppShell
-      brandingExtra={import.meta.env.DEV ? <DevTierSelector /> : undefined}
+    <Sentry.ErrorBoundary
+      fallback={({ error, resetError }) => (
+        <div className="flex items-center justify-center min-h-screen bg-destructive/5">
+          <div className="p-8 max-w-md text-center space-y-4 border border-destructive/20 rounded-lg bg-background shadow-xl">
+            <h2 className="text-xl font-bold text-destructive">
+              Something went wrong
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error
+                ? error.message
+                : "An unexpected error occurred"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              This error has been automatically reported.
+            </p>
+            <button
+              onClick={resetError}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground h-10 px-4 py-2 hover:bg-primary/90"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
     >
-      <EditorWorkspacePage />
-      <Toaster />
-    </AppShell>
+      <AppShell
+        brandingExtra={import.meta.env.DEV ? <DevTierSelector /> : undefined}
+      >
+        <EditorWorkspacePage />
+        <Toaster />
+      </AppShell>
+    </Sentry.ErrorBoundary>
   );
 }
 
