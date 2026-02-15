@@ -134,4 +134,29 @@ describe("ShellQuerySweeper – audit logging", () => {
       expect.stringContaining("Failed to log sweeper audit event"),
     );
   });
+
+  it("skips sweep when no credentials found and does not insert audit event", async () => {
+    db.where.mockReset();
+
+    const tenantSettingsResult: Record<string, unknown>[] & {
+      limit?: ReturnType<typeof vi.fn>;
+    } = [{ tenantId: "t1", mid: "m1", qppFolderId: 100 }];
+    tenantSettingsResult.limit = vi.fn().mockReturnValue(tenantSettingsResult);
+
+    const emptyCreds: Record<string, unknown>[] & {
+      limit?: ReturnType<typeof vi.fn>;
+    } = [];
+    emptyCreds.limit = vi.fn().mockReturnValue(emptyCreds);
+
+    db.where
+      .mockReturnValueOnce(tenantSettingsResult)
+      .mockReturnValueOnce(emptyCreds);
+
+    await sweeper.handleSweep();
+
+    expect(Logger.prototype.debug).toHaveBeenCalledWith(
+      expect.stringContaining("No credentials found"),
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+  });
 });

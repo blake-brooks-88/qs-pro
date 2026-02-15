@@ -273,7 +273,7 @@ export const queryPublishEvents = pgTable(
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").defaultRandom().notNull(),
   tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
+    .references(() => tenants.id, { onDelete: "cascade" })
     .notNull(),
   mid: varchar("mid").notNull(),
   eventType: varchar("event_type", { length: 100 }).notNull(),

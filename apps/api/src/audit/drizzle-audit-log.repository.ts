@@ -77,6 +77,10 @@ export class DrizzleAuditLogRepository implements IAuditLogRepository {
     }
 
     if (params.search) {
+      // Casts JSONB to text for substring matching. The existing GIN index
+      // (jsonb_path_ops) does not accelerate ILIKE; a pg_trgm index on
+      // metadata::text would help if this becomes a bottleneck. Acceptable
+      // for now because RLS scoping (tenant_id + mid) limits the scan set.
       conditions.push(
         sql`${auditLogs.metadata}::text ILIKE ${'%' + params.search + '%'}`,
       );

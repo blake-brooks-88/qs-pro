@@ -209,12 +209,14 @@ describe('QueryActivitiesService link integration', () => {
     if (testUserId2) {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId2}::uuid`;
     }
+    await sqlClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
     if (testTenantId) {
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
     if (testTenantId2) {
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId2}::uuid`;
     }
+    await sqlClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
 
     await app.close();
   }, 30000);

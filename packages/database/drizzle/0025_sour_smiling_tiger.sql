@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS "audit_logs" (
   "id" uuid DEFAULT gen_random_uuid() NOT NULL,
-  "tenant_id" uuid NOT NULL REFERENCES "tenants"("id"),
+  "tenant_id" uuid NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
   "mid" varchar NOT NULL,
   "event_type" varchar(100) NOT NULL,
   "actor_type" varchar(20) NOT NULL CHECK ("actor_type" IN ('user', 'system')),

@@ -11,6 +11,7 @@ import { CsrfGuard } from '../auth/csrf.guard';
 import { FeaturesModule } from '../features/features.module';
 import { UsageModule } from '../usage/usage.module';
 import { DrizzleShellQueryRunRepository } from './drizzle-shell-query-run.repository';
+import { RunExistsGuard } from './guards/run-exists.guard';
 import { ShellQueryController } from './shell-query.controller';
 import { ShellQueryService } from './shell-query.service';
 import { ShellQuerySseService } from './shell-query-sse.service';
@@ -30,6 +31,7 @@ import { ShellQuerySseService } from './shell-query-sse.service';
     ShellQueryService,
     ShellQuerySseService,
     CsrfGuard,
+    RunExistsGuard,
     {
       provide: 'TENANT_REPOSITORY',
       useFactory: (db: any) => new DrizzleTenantRepository(db),
