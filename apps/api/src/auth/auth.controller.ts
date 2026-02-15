@@ -4,7 +4,6 @@ import {
   Get,
   InternalServerErrorException,
   Logger,
-  Optional,
   Post,
   Query,
   Redirect,
@@ -49,7 +48,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
-    @Optional() private readonly auditService?: AuditService,
+    private readonly auditService: AuditService,
   ) {}
 
   private clearAuthSession(session: SecureSession | undefined): void {
@@ -109,7 +108,7 @@ export class AuthController {
       req.session.set('tenantId', tenant.id);
       req.session.set('mid', mid);
 
-      void this.auditService?.log({
+      void this.auditService.log({
         eventType: 'auth.login',
         actorType: 'user',
         actorId: user.id,
@@ -243,7 +242,7 @@ export class AuthController {
         session.set('tenantId', tenant.id);
         session.set('mid', resolvedMid);
 
-        void this.auditService?.log({
+        void this.auditService.log({
           eventType: 'auth.login',
           actorType: 'user',
           actorId: user.id,
@@ -343,7 +342,7 @@ export class AuthController {
     req.session.set('tenantId', result.tenant.id);
     req.session.set('mid', result.mid);
 
-    void this.auditService?.log({
+    void this.auditService.log({
       eventType: 'auth.login',
       actorType: 'user',
       actorId: result.user.id,
@@ -372,7 +371,7 @@ export class AuthController {
       userSession.mid,
     );
 
-    void this.auditService?.log({
+    void this.auditService.log({
       eventType: 'auth.oauth_refreshed',
       actorType: 'user',
       actorId: userSession.userId,
@@ -397,7 +396,7 @@ export class AuthController {
       typeof mid === 'string' &&
       typeof userId === 'string'
     ) {
-      void this.auditService?.log({
+      void this.auditService.log({
         eventType: 'auth.logout',
         actorType: 'user',
         actorId: userId,
