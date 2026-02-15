@@ -5,8 +5,10 @@ import {
   QueryDefinitionService,
   RlsContextService,
 } from "@qpp/backend-shared";
+import type { AuditEventType } from "@qpp/shared-types";
 import {
   and,
+  auditLogs,
   credentials,
   eq,
   isNotNull,
@@ -17,6 +19,7 @@ import {
 @Injectable()
 export class ShellQuerySweeper {
   private readonly logger = new Logger(ShellQuerySweeper.name);
+  private readonly sweeperEventType: AuditEventType = "system.sweeper_run";
 
   constructor(
     private readonly queryDefinitionService: QueryDefinitionService,
@@ -82,7 +85,24 @@ export class ShellQuerySweeper {
         return;
       }
 
-      await this.performSweep(tenantId, firstCred.userId, mid, folderId);
+      const { attemptedCount, deletedCount, failedCount } =
+        await this.performSweep(tenantId, firstCred.userId, mid, folderId);
+
+      try {
+        await this.db.insert(auditLogs).values({
+          tenantId,
+          mid,
+          eventType: this.sweeperEventType,
+          actorType: "system",
+          actorId: null,
+          targetId: String(folderId),
+          metadata: { attemptedCount, deletedCount, failedCount, folderId },
+        });
+      } catch (e: unknown) {
+        this.logger.warn(
+          `Failed to log sweeper audit event: ${e instanceof Error ? e.message : "Unknown"}`,
+        );
+      }
     });
   }
 
@@ -91,7 +111,11 @@ export class ShellQuerySweeper {
     userId: string,
     mid: string,
     folderId: number,
-  ): Promise<void> {
+  ): Promise<{
+    attemptedCount: number;
+    deletedCount: number;
+    failedCount: number;
+  }> {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const queries = await this.queryDefinitionService.retrieveByFolder(
       tenantId,
@@ -101,10 +125,15 @@ export class ShellQuerySweeper {
       yesterday,
     );
 
+    let attemptedCount = 0;
+    let deletedCount = 0;
+    let failedCount = 0;
+
     for (const query of queries) {
       if (!query.objectId) {
         continue;
       }
+      attemptedCount++;
       try {
         await this.queryDefinitionService.delete(
           tenantId,
@@ -112,14 +141,14 @@ export class ShellQuerySweeper {
           mid,
           query.objectId,
         );
+        deletedCount++;
         this.logger.log(`Deleted QueryDefinition: ${query.customerKey}`);
       } catch (error: unknown) {
-        // Unrecoverable errors (auth/config) should propagate
         if (isUnrecoverable(error)) {
           throw error;
         }
 
-        // Asset may already be deleted or other transient error - log and continue
+        failedCount++;
         const message =
           error instanceof Error ? error.message : "Unknown error";
         this.logger.debug(
@@ -127,5 +156,7 @@ export class ShellQuerySweeper {
         );
       }
     }
+
+    return { attemptedCount, deletedCount, failedCount };
   }
 }

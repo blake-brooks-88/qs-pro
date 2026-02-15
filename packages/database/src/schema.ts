@@ -4,6 +4,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -24,6 +25,7 @@ export const tenants = pgTable("tenants", {
     .default("free")
     .notNull(),
   seatLimit: integer("seat_limit"), // null = unlimited
+  auditRetentionDays: integer("audit_retention_days").default(365),
   installedAt: timestamp("installed_at").defaultNow(),
 });
 
@@ -267,6 +269,25 @@ export const queryPublishEvents = pgTable(
   }),
 );
 
+// 12. Audit Logs (Append-only audit trail)
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id, { onDelete: "cascade" })
+    .notNull(),
+  mid: varchar("mid").notNull(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  actorType: varchar("actor_type", { length: 20 })
+    .$type<"user" | "system">()
+    .notNull(),
+  actorId: uuid("actor_id"),
+  targetId: varchar("target_id", { length: 255 }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: varchar("user_agent", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // --- Zod Validation Schemas ---
 export const selectTenantSchema = createSelectSchema(tenants);
 export const insertTenantSchema = createInsertSchema(tenants);
@@ -306,3 +327,6 @@ export const selectQueryPublishEventSchema =
   createSelectSchema(queryPublishEvents);
 export const insertQueryPublishEventSchema =
   createInsertSchema(queryPublishEvents);
+
+export const selectAuditLogSchema = createSelectSchema(auditLogs);
+export const insertAuditLogSchema = createInsertSchema(auditLogs);

@@ -1,9 +1,104 @@
 {
-  "id": "5aab277d-9fd8-497d-8588-9a7ce0aea0de",
-  "prevId": "9d2077d4-6c86-4d97-bcc8-4751d537ff5f",
+  "id": "e8d82c02-482d-4302-b91c-58b90b522589",
+  "prevId": "b0784b84-144b-434d-84ff-f98c07ef78fd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.audit_logs": {
+      "name": "audit_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mid": {
+          "name": "mid",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_type": {
+          "name": "actor_type",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "audit_logs_tenant_id_tenants_id_fk": {
+          "name": "audit_logs_tenant_id_tenants_id_fk",
+          "tableFrom": "audit_logs",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.credentials": {
       "name": "credentials",
       "schema": "",
@@ -241,6 +336,174 @@
             "parent_id"
           ],
           "tableTo": "folders",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.query_publish_events": {
+      "name": "query_publish_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "saved_query_id": {
+          "name": "saved_query_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_id": {
+          "name": "version_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mid": {
+          "name": "mid",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "linked_qa_customer_key": {
+          "name": "linked_qa_customer_key",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "published_sql_hash": {
+          "name": "published_sql_hash",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "query_publish_events_saved_query_id_idx": {
+          "name": "query_publish_events_saved_query_id_idx",
+          "columns": [
+            {
+              "expression": "saved_query_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "query_publish_events_version_id_idx": {
+          "name": "query_publish_events_version_id_idx",
+          "columns": [
+            {
+              "expression": "version_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "query_publish_events_tenant_id_idx": {
+          "name": "query_publish_events_tenant_id_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "query_publish_events_saved_query_id_saved_queries_id_fk": {
+          "name": "query_publish_events_saved_query_id_saved_queries_id_fk",
+          "tableFrom": "query_publish_events",
+          "columnsFrom": [
+            "saved_query_id"
+          ],
+          "tableTo": "saved_queries",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "query_publish_events_version_id_query_versions_id_fk": {
+          "name": "query_publish_events_version_id_query_versions_id_fk",
+          "tableFrom": "query_publish_events",
+          "columnsFrom": [
+            "version_id"
+          ],
+          "tableTo": "query_versions",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "query_publish_events_tenant_id_tenants_id_fk": {
+          "name": "query_publish_events_tenant_id_tenants_id_fk",
+          "tableFrom": "query_publish_events",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "query_publish_events_user_id_users_id_fk": {
+          "name": "query_publish_events_user_id_users_id_fk",
+          "tableFrom": "query_publish_events",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
@@ -1125,6 +1388,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "audit_retention_days": {
+          "name": "audit_retention_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 365
+        },
         "installed_at": {
           "name": "installed_at",
           "type": "timestamp",
@@ -1211,174 +1481,6 @@
           "nullsNotDistinct": false
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.query_publish_events": {
-      "name": "query_publish_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "saved_query_id": {
-          "name": "saved_query_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version_id": {
-          "name": "version_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mid": {
-          "name": "mid",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "linked_qa_customer_key": {
-          "name": "linked_qa_customer_key",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "published_sql_hash": {
-          "name": "published_sql_hash",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "query_publish_events_saved_query_id_idx": {
-          "name": "query_publish_events_saved_query_id_idx",
-          "columns": [
-            {
-              "expression": "saved_query_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "query_publish_events_version_id_idx": {
-          "name": "query_publish_events_version_id_idx",
-          "columns": [
-            {
-              "expression": "version_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "query_publish_events_tenant_id_idx": {
-          "name": "query_publish_events_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "query_publish_events_saved_query_id_saved_queries_id_fk": {
-          "name": "query_publish_events_saved_query_id_saved_queries_id_fk",
-          "tableFrom": "query_publish_events",
-          "columnsFrom": [
-            "saved_query_id"
-          ],
-          "tableTo": "saved_queries",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "query_publish_events_version_id_query_versions_id_fk": {
-          "name": "query_publish_events_version_id_query_versions_id_fk",
-          "tableFrom": "query_publish_events",
-          "columnsFrom": [
-            "version_id"
-          ],
-          "tableTo": "query_versions",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "query_publish_events_tenant_id_tenants_id_fk": {
-          "name": "query_publish_events_tenant_id_tenants_id_fk",
-          "tableFrom": "query_publish_events",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "query_publish_events_user_id_users_id_fk": {
-          "name": "query_publish_events_user_id_users_id_fk",
-          "tableFrom": "query_publish_events",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

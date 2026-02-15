@@ -32,6 +32,7 @@ describe('FeaturesService', () => {
               tssd: 'test-tssd',
               subscriptionTier: 'free',
               seatLimit: null,
+              auditRetentionDays: 365,
               installedAt: new Date(),
             }),
           },
@@ -55,6 +56,7 @@ describe('FeaturesService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'free',
       seatLimit: null,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     });
 
@@ -92,6 +94,7 @@ describe('FeaturesService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'pro',
       seatLimit: 10,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     });
 
@@ -130,6 +133,7 @@ describe('FeaturesService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'free',
       seatLimit: null,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     });
 
@@ -178,6 +182,7 @@ describe('FeaturesService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'pro',
       seatLimit: 10,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     });
 
@@ -227,6 +232,7 @@ describe('FeaturesService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'enterprise',
       seatLimit: 50,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     });
 
@@ -264,6 +270,7 @@ describe('FeaturesService', () => {
       tssd: 'test-tssd',
       subscriptionTier: '' as never,
       seatLimit: null,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     });
 

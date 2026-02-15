@@ -287,9 +287,25 @@ describe('Shell query endpoints (integration)', () => {
   });
 
   it('returns RESOURCE_NOT_FOUND for unknown SSE run events', async () => {
+    // Ensure this runId does not exist, otherwise Nest will attempt to start an
+    // SSE stream (which isn't supported by Fastify inject in this test harness).
+    const unknownRunId = crypto.randomUUID();
+    const reserved = await sqlClient.reserve();
+    try {
+      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+      await reserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+      await reserved`SELECT set_config('app.user_id', ${userId}, false)`;
+      await reserved`DELETE FROM shell_query_runs WHERE id = ${unknownRunId}::uuid`;
+      await reserved`RESET app.tenant_id`;
+      await reserved`RESET app.mid`;
+      await reserved`RESET app.user_id`;
+    } finally {
+      reserved.release();
+    }
+
     const res = await app.inject({
       method: 'GET',
-      url: `/runs/${crypto.randomUUID()}/events`,
+      url: `/runs/${unknownRunId}/events`,
       headers: { cookie },
     });
 
