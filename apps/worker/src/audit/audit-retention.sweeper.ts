@@ -25,8 +25,7 @@ export class AuditRetentionSweeper implements OnModuleInit {
         sql`SELECT MAX(COALESCE(${tenants.auditRetentionDays}, 365)) as max_retention FROM ${tenants}`,
       );
 
-      const maxRetention =
-        Number(retentionRows[0]?.["max_retention"]) || 365;
+      const maxRetention = Number(retentionRows[0]?.["max_retention"]) || 365;
 
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - maxRetention);
@@ -64,22 +63,16 @@ export class AuditRetentionSweeper implements OnModuleInit {
 
         try {
           await this.db.execute(
-            sql.raw(
-              `ALTER TABLE "audit_logs" DETACH PARTITION "${relname}"`,
-            ),
+            sql.raw(`ALTER TABLE "audit_logs" DETACH PARTITION "${relname}"`),
           );
-          await this.db.execute(
-            sql.raw(`DROP TABLE "${relname}"`),
-          );
+          await this.db.execute(sql.raw(`DROP TABLE "${relname}"`));
 
           this.logger.log(`Dropped expired partition: ${relname}`);
           droppedCount++;
         } catch (error: unknown) {
           const message =
             error instanceof Error ? error.message : "Unknown error";
-          this.logger.error(
-            `Failed to drop partition ${relname}: ${message}`,
-          );
+          this.logger.error(`Failed to drop partition ${relname}: ${message}`);
         }
       }
 
@@ -87,8 +80,7 @@ export class AuditRetentionSweeper implements OnModuleInit {
         `Audit retention purge completed. Dropped ${droppedCount} partition(s).`,
       );
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
       this.logger.error(`Audit retention purge failed: ${message}`);
     }
   }
@@ -112,9 +104,7 @@ export class AuditRetentionSweeper implements OnModuleInit {
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
-        this.logger.error(
-          `Failed to create partition ${name}: ${message}`,
-        );
+        this.logger.error(`Failed to create partition ${name}: ${message}`);
       }
     }
 

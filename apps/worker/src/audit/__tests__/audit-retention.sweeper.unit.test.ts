@@ -4,10 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuditRetentionSweeper } from "../audit-retention.sweeper";
 
 vi.mock("@qpp/database", () => ({
-  sql: Object.assign(
-    (..._args: unknown[]) => "TAGGED_SQL",
-    { raw: (str: string) => `RAW:${str}` },
-  ),
+  sql: Object.assign((..._args: unknown[]) => "TAGGED_SQL", {
+    raw: (str: string) => `RAW:${str}`,
+  }),
   tenants: { auditRetentionDays: "audit_retention_days_col" },
 }));
 
@@ -36,7 +35,9 @@ describe("AuditRetentionSweeper", () => {
   describe("onModuleInit", () => {
     it("calls handlePartitionCreation on startup", async () => {
       // Arrange
-      const spy = vi.spyOn(sweeper, "handlePartitionCreation").mockResolvedValue();
+      const spy = vi
+        .spyOn(sweeper, "handlePartitionCreation")
+        .mockResolvedValue();
 
       // Act
       await sweeper.onModuleInit();
@@ -164,7 +165,9 @@ describe("AuditRetentionSweeper", () => {
       );
 
       expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Dropped expired partition: audit_logs_y2024m12"),
+        expect.stringContaining(
+          "Dropped expired partition: audit_logs_y2024m12",
+        ),
       );
 
       expect(logSpy).toHaveBeenCalledWith(
@@ -212,7 +215,9 @@ describe("AuditRetentionSweeper", () => {
 
       // Assert
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Audit retention purge failed: connection refused"),
+        expect.stringContaining(
+          "Audit retention purge failed: connection refused",
+        ),
       );
     });
   });
@@ -309,7 +314,9 @@ describe("AuditRetentionSweeper", () => {
 
       // Assert — first partition fails, remaining two succeed
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to create partition audit_logs_y2026m02"),
+        expect.stringContaining(
+          "Failed to create partition audit_logs_y2026m02",
+        ),
       );
 
       expect(logSpy).toHaveBeenCalledWith(
@@ -330,7 +337,14 @@ describe("AuditRetentionSweeper", () => {
       const from = new Date("2026-02-14T12:00:00Z");
 
       // Act
-      const result = (sweeper as unknown as { getNextMonths: (from: Date, count: number) => Array<{ name: string; start: string; end: string }> }).getNextMonths(from, 3);
+      const result = (
+        sweeper as unknown as {
+          getNextMonths: (
+            from: Date,
+            count: number,
+          ) => Array<{ name: string; start: string; end: string }>;
+        }
+      ).getNextMonths(from, 3);
 
       // Assert
       expect(result).toEqual([
@@ -345,7 +359,14 @@ describe("AuditRetentionSweeper", () => {
       const from = new Date("2026-11-01T12:00:00Z");
 
       // Act
-      const result = (sweeper as unknown as { getNextMonths: (from: Date, count: number) => Array<{ name: string; start: string; end: string }> }).getNextMonths(from, 3);
+      const result = (
+        sweeper as unknown as {
+          getNextMonths: (
+            from: Date,
+            count: number,
+          ) => Array<{ name: string; start: string; end: string }>;
+        }
+      ).getNextMonths(from, 3);
 
       // Assert
       expect(result).toEqual([
@@ -360,7 +381,14 @@ describe("AuditRetentionSweeper", () => {
       const from = new Date("2026-01-15T12:00:00Z");
 
       // Act
-      const result = (sweeper as unknown as { getNextMonths: (from: Date, count: number) => Array<{ name: string; start: string; end: string }> }).getNextMonths(from, 1);
+      const result = (
+        sweeper as unknown as {
+          getNextMonths: (
+            from: Date,
+            count: number,
+          ) => Array<{ name: string; start: string; end: string }>;
+        }
+      ).getNextMonths(from, 1);
 
       // Assert
       expect(result).toEqual([

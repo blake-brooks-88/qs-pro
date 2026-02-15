@@ -109,7 +109,11 @@ export class ShellQuerySweeper {
     userId: string,
     mid: string,
     folderId: number,
-  ): Promise<{ attemptedCount: number; deletedCount: number; failedCount: number }> {
+  ): Promise<{
+    attemptedCount: number;
+    deletedCount: number;
+    failedCount: number;
+  }> {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const queries = await this.queryDefinitionService.retrieveByFolder(
       tenantId,

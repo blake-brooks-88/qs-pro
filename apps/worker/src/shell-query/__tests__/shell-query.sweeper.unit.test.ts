@@ -38,9 +38,7 @@ function setupDefaultDbResults(db: DbMock): void {
   const tenantSettingsResult: Record<string, unknown>[] & {
     limit?: ReturnType<typeof vi.fn>;
   } = [{ tenantId: "t1", mid: "m1", qppFolderId: 100 }];
-  tenantSettingsResult.limit = vi
-    .fn()
-    .mockReturnValue(tenantSettingsResult);
+  tenantSettingsResult.limit = vi.fn().mockReturnValue(tenantSettingsResult);
 
   const credentialsResult: Record<string, unknown>[] & {
     limit?: ReturnType<typeof vi.fn>;
