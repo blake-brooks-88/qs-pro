@@ -1,5 +1,4 @@
--- Partitioned audit_logs table + tenant retention config
--- (Drizzle cannot express PARTITION BY RANGE; custom DDL required)
+-- Audit logs table + tenant retention config
 
 CREATE TABLE IF NOT EXISTS "audit_logs" (
   "id" uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -13,13 +12,10 @@ CREATE TABLE IF NOT EXISTS "audit_logs" (
   "ip_address" varchar(45),
   "user_agent" varchar(500),
   "created_at" timestamp DEFAULT now() NOT NULL,
-  PRIMARY KEY ("id", "created_at")
-) PARTITION BY RANGE ("created_at");
+  PRIMARY KEY ("id")
+);
 
--- Default partition catches data outside defined ranges
-CREATE TABLE IF NOT EXISTS audit_logs_default PARTITION OF audit_logs DEFAULT;
-
--- Indexes (auto-propagate to all partitions)
+-- Indexes
 CREATE INDEX IF NOT EXISTS "audit_logs_tenant_mid_created_idx"
   ON "audit_logs" USING btree ("tenant_id", "mid", "created_at" DESC);
 CREATE INDEX IF NOT EXISTS "audit_logs_tenant_mid_event_type_idx"

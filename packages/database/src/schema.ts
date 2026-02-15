@@ -269,9 +269,9 @@ export const queryPublishEvents = pgTable(
   }),
 );
 
-// 12. Audit Logs (Partitioned, append-only audit trail)
+// 12. Audit Logs (Append-only audit trail)
 export const auditLogs = pgTable("audit_logs", {
-  id: uuid("id").defaultRandom().notNull(),
+  id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id")
     .references(() => tenants.id, { onDelete: "cascade" })
     .notNull(),
