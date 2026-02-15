@@ -104,13 +104,7 @@ describe('Features Remaining Gaps (integration)', () => {
             [tenant.id],
           );
         }
-        await client.unsafe(
-          'ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete',
-        );
         await client.unsafe('DELETE FROM tenants WHERE eid = $1', [eid]);
-        await client.unsafe(
-          'ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete',
-        );
       } catch {
         // Ignore cleanup errors
       }

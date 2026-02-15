@@ -235,9 +235,6 @@ describe('Auth endpoints (integration)', () => {
       }
     }
 
-    await client.unsafe(
-      'ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete',
-    );
     for (const eid of createdTenantEids) {
       try {
         await client.unsafe('DELETE FROM tenants WHERE eid = $1', [eid]);
@@ -245,9 +242,6 @@ describe('Auth endpoints (integration)', () => {
         // ignore cleanup errors
       }
     }
-    await client.unsafe(
-      'ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete',
-    );
 
     await client.end();
     await app.close();

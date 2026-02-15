@@ -390,9 +390,7 @@ describe('Shell Query Cancellation (integration)', () => {
       // Ignore cleanup errors
     }
     await sqlClient`DELETE FROM users WHERE id = ${TEST_USER_ID}::uuid`;
-    await sqlClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
     await sqlClient`DELETE FROM tenants WHERE id = ${TEST_TENANT_ID}::uuid`;
-    await sqlClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
 
     await module.close();
   }, 30000);

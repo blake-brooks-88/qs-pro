@@ -92,9 +92,7 @@ describe('FeaturesController (integration)', () => {
           reserved.release();
         }
 
-        await sqlClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
         await sqlClient`DELETE FROM tenants WHERE id = ${tenantId}::uuid`;
-        await sqlClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
       } catch {
         // Best-effort cleanup
       }

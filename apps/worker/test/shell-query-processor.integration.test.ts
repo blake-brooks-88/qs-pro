@@ -572,13 +572,11 @@ describe('ShellQueryProcessor (integration)', () => {
     }
 
     // 4. Delete tenants
-    await sqlClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
     try {
       await sqlClient`DELETE FROM tenants WHERE id = ${TEST_TENANT_ID}::uuid`;
     } catch {
       // Best effort cleanup
     }
-    await sqlClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
 
     await module.close();
   }, 30000);

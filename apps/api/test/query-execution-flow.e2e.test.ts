@@ -496,14 +496,12 @@ async function cleanupTestPollution(): Promise<void> {
     `;
 
     // Delete test tenants (no RLS)
-    await tempSql`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
     await tempSql`
       DELETE FROM tenants
       WHERE eid LIKE 'eid-query-flow%'
         OR eid LIKE 'eid-rate-limit%'
         OR eid LIKE 'eid-mce-%'
     `;
-    await tempSql`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
   } finally {
     await tempSql.end();
   }
@@ -957,9 +955,7 @@ describe('Query Execution Flow (e2e)', () => {
       await sqlClient`DELETE FROM users WHERE id = ANY(${createdUserIds}::uuid[])`;
     }
     if (createdTenantIds.length > 0) {
-      await sqlClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
       await sqlClient`DELETE FROM tenants WHERE id = ANY(${createdTenantIds}::uuid[])`;
-      await sqlClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
     }
 
     await app.close();

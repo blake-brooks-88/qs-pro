@@ -175,9 +175,7 @@ describe('SavedQueriesService (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
-      await sqlClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
-      await sqlClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
     }
 
     await app.close();

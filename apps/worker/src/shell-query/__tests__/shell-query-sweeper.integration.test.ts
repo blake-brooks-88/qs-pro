@@ -313,9 +313,7 @@ describe("ShellQuerySweeper (integration)", () => {
     // tenant_settings and users/tenants don't have RLS
     await sqlClient`DELETE FROM tenant_settings WHERE tenant_id = ${TEST_TENANT_ID_1}::uuid OR tenant_id = ${TEST_TENANT_ID_2}::uuid`;
     await sqlClient`DELETE FROM users WHERE id = ${TEST_USER_ID_1}::uuid OR id = ${TEST_USER_ID_2}::uuid`;
-    await sqlClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
     await sqlClient`DELETE FROM tenants WHERE id = ${TEST_TENANT_ID_1}::uuid OR id = ${TEST_TENANT_ID_2}::uuid`;
-    await sqlClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
 
     await module.close();
   }, 30000);
