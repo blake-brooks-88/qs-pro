@@ -26,6 +26,7 @@
     "typecheck": "pnpm -r typecheck",
     "db:generate": "pnpm --filter @qpp/database db:generate",
     "db:migrate": "pnpm --filter @qpp/database db:migrate",
+    "db:audit-retention": "pnpm --filter @qpp/database db:audit-retention",
     "prepare": "husky"
   },
   "lint-staged": {
