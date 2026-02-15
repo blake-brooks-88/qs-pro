@@ -69,7 +69,11 @@ export class DrizzleAuditLogRepository implements IAuditLogRepository {
     }
 
     if (params.dateTo) {
-      conditions.push(lte(auditLogs.createdAt, new Date(params.dateTo)));
+      const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(params.dateTo);
+      const endDate = isDateOnly
+        ? new Date(params.dateTo + 'T23:59:59.999Z')
+        : new Date(params.dateTo);
+      conditions.push(lte(auditLogs.createdAt, endDate));
     }
 
     if (params.search) {
