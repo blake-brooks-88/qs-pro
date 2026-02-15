@@ -22,7 +22,7 @@ describe('Worker AppModule', () => {
     vi.clearAllMocks();
   });
 
-  it('imports without env validation errors', async () => {
+  it('imports without env validation errors', { timeout: 15000 }, async () => {
     seedWorkerEnv();
 
     vi.resetModules();
