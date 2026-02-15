@@ -1,3 +1,5 @@
+import './instrument';
+
 import formBody from '@fastify/formbody';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';

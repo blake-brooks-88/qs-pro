@@ -1,29 +1,13 @@
-import {
-  ArgumentsHost,
-  Catch,
-  ExceptionFilter,
-  HttpException,
-  Logger,
-} from '@nestjs/common';
+import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
+import { Catch, HttpException, Logger } from '@nestjs/common';
 import {
   AppError,
   appErrorToProblemDetails,
   type ProblemDetails,
   safeContext,
 } from '@qpp/backend-shared';
+import { SentryExceptionCaptured } from '@sentry/nestjs';
 import { FastifyReply, FastifyRequest } from 'fastify';
-
-// Mock Sentry for now - when real SDK is added, configure beforeSend
-// to scrub sensitive fields (e.g., request headers, axios config)
-const Sentry = {
-  captureException: (
-    exception: unknown,
-    hint?: { extra?: Record<string, unknown> },
-  ) => {
-    void exception;
-    void hint;
-  },
-};
 
 function getStackTrace(error: unknown): string | undefined {
   if (error instanceof Error) {
@@ -36,6 +20,7 @@ function getStackTrace(error: unknown): string | undefined {
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
+  @SentryExceptionCaptured()
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<FastifyReply>();
@@ -62,7 +47,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         `[${problemDetails.status}] ${path}`,
         getStackTrace(exception),
       );
-      Sentry.captureException(exception, { extra: redactedContext });
     } else {
       this.logger.warn(
         `[${problemDetails.status}] ${path} - ${problemDetails.detail}`,

@@ -3,6 +3,7 @@ import { BullBoardModule } from "@bull-board/nestjs";
 import { BullModule } from "@nestjs/bullmq";
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { SentryModule } from "@sentry/nestjs/setup";
 import {
   AuthModule,
   DatabaseModule,
@@ -19,6 +20,7 @@ import { ShellQueryModule } from "./shell-query/shell-query.module";
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateWorkerEnv,

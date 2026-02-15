@@ -8,6 +8,7 @@ import {
   LoggerModule,
   validateApiEnv,
 } from '@qpp/backend-shared';
+import { SentryModule } from '@sentry/nestjs/setup';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateApiEnv,
