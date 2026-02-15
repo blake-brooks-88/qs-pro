@@ -179,8 +179,8 @@ describe('AuditController', () => {
       const result = await controller.findAll(mockUser, {});
 
       // Assert
-      const item = result.items[0];
-      expect(item).toEqual({
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toEqual({
         id: mockAuditLogRow.id,
         tenantId: mockAuditLogRow.tenantId,
         mid: mockAuditLogRow.mid,
@@ -193,7 +193,7 @@ describe('AuditController', () => {
         userAgent: null,
         createdAt: '2026-02-14T12:00:00.000Z',
       });
-      expect(typeof item.createdAt).toBe('string');
+      expect(typeof result.items[0]?.createdAt).toBe('string');
     });
 
     it('passes custom query params through to the service', async () => {
