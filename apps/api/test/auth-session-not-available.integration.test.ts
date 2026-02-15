@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '@qpp/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { AuditService } from '../src/audit/audit.service';
 import { AuthController } from '../src/auth/auth.controller';
 import { configureApp } from '../src/configure-app';
 
@@ -19,6 +20,7 @@ describe('AuthController session infrastructure errors (integration)', () => {
       providers: [
         { provide: AuthService, useValue: { handleJwtLogin: vi.fn() } },
         { provide: ConfigService, useValue: { get: vi.fn() } },
+        { provide: AuditService, useValue: { log: vi.fn() } },
       ],
     }).compile();
 
@@ -34,7 +36,7 @@ describe('AuthController session infrastructure errors (integration)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('POST /auth/login returns 500 when session is not available', async () => {

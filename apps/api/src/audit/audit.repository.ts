@@ -1,4 +1,4 @@
-import type { AuditLogQueryParams } from '@qpp/shared-types';
+import type { AuditEventType, AuditLogQueryParams } from '@qpp/shared-types';
 
 import type { AuditLogRow } from './drizzle-audit-log.repository';
 
@@ -7,7 +7,7 @@ export const AUDIT_LOG_REPOSITORY = 'AUDIT_LOG_REPOSITORY';
 export interface NewAuditLogEntry {
   tenantId: string;
   mid: string;
-  eventType: string;
+  eventType: AuditEventType;
   actorType: 'user' | 'system';
   actorId: string | null;
   targetId: string | null;

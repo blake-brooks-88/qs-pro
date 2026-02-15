@@ -5,6 +5,7 @@ import {
   QueryDefinitionService,
   RlsContextService,
 } from "@qpp/backend-shared";
+import type { AuditEventType } from "@qpp/shared-types";
 import {
   and,
   auditLogs,
@@ -18,6 +19,7 @@ import {
 @Injectable()
 export class ShellQuerySweeper {
   private readonly logger = new Logger(ShellQuerySweeper.name);
+  private readonly sweeperEventType: AuditEventType = "system.sweeper_run";
 
   constructor(
     private readonly queryDefinitionService: QueryDefinitionService,
@@ -90,7 +92,7 @@ export class ShellQuerySweeper {
         await this.db.insert(auditLogs).values({
           tenantId,
           mid,
-          eventType: "system.sweeper_run",
+          eventType: this.sweeperEventType,
           actorType: "system",
           actorId: null,
           targetId: String(folderId),

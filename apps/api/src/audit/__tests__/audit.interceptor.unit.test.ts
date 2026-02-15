@@ -77,7 +77,7 @@ describe('AuditInterceptor', () => {
   describe('when user context is missing', () => {
     it('passes through when request.user is undefined', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.created' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.created' });
       const { context } = createMockExecutionContext({ user: undefined });
       const next = createMockCallHandler({ ok: true });
 
@@ -92,7 +92,7 @@ describe('AuditInterceptor', () => {
 
     it('passes through when user has no tenantId', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.created' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.created' });
       const { context } = createMockExecutionContext({
         user: { userId: 'user-1', tenantId: undefined, mid: 'mid-1' },
       });
@@ -109,7 +109,7 @@ describe('AuditInterceptor', () => {
 
     it('passes through when user has no mid', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.created' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.created' });
       const { context } = createMockExecutionContext({
         user: { userId: 'user-1', tenantId: 'tenant-1', mid: undefined },
       });
@@ -134,7 +134,7 @@ describe('AuditInterceptor', () => {
 
     it('calls auditService.log with correct fields after successful handler execution', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.created' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.created' });
       const { context } = createMockExecutionContext({
         user: defaultUser,
         ip: '192.168.1.1',
@@ -151,7 +151,7 @@ describe('AuditInterceptor', () => {
       // Assert
       expect(auditService.log).toHaveBeenCalledOnce();
       expect(auditService.log).toHaveBeenCalledWith({
-        eventType: 'query.created',
+        eventType: 'saved_query.created',
         actorType: 'user',
         actorId: 'user-42',
         tenantId: 'tenant-1',
@@ -165,7 +165,7 @@ describe('AuditInterceptor', () => {
 
     it('sets actorId to null when userId is undefined', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.deleted' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.deleted' });
       const { context } = createMockExecutionContext({
         user: { userId: undefined, tenantId: 'tenant-1', mid: 'mid-1' },
         ip: '10.0.0.1',
@@ -198,7 +198,7 @@ describe('AuditInterceptor', () => {
     it('extracts targetId from request.params when targetIdParam is specified', async () => {
       // Arrange
       reflector.get.mockReturnValue({
-        eventType: 'query.updated',
+        eventType: 'saved_query.updated',
         targetIdParam: 'queryId',
       });
       const { context } = createMockExecutionContext({
@@ -223,7 +223,7 @@ describe('AuditInterceptor', () => {
 
     it('falls back to responseData.id when targetIdParam is not specified', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.created' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.created' });
       const { context } = createMockExecutionContext({
         user: defaultUser,
         ip: '127.0.0.1',
@@ -247,7 +247,7 @@ describe('AuditInterceptor', () => {
     it('falls back to responseData.id when targetIdParam is specified but param is missing', async () => {
       // Arrange
       reflector.get.mockReturnValue({
-        eventType: 'query.updated',
+        eventType: 'saved_query.updated',
         targetIdParam: 'queryId',
       });
       const { context } = createMockExecutionContext({
@@ -272,7 +272,7 @@ describe('AuditInterceptor', () => {
 
     it('returns null targetId when neither param nor responseData.id is available', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'settings.updated' });
+      reflector.get.mockReturnValue({ eventType: 'folder.updated' });
       const { context } = createMockExecutionContext({
         user: defaultUser,
         ip: '127.0.0.1',
@@ -295,7 +295,7 @@ describe('AuditInterceptor', () => {
 
     it('returns null targetId when responseData.id is not a string', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'settings.updated' });
+      reflector.get.mockReturnValue({ eventType: 'folder.updated' });
       const { context } = createMockExecutionContext({
         user: defaultUser,
         ip: '127.0.0.1',
@@ -327,7 +327,7 @@ describe('AuditInterceptor', () => {
     it('builds metadata from request.body for specified metadataFields', async () => {
       // Arrange
       reflector.get.mockReturnValue({
-        eventType: 'query.created',
+        eventType: 'saved_query.created',
         metadataFields: ['name', 'description'],
       });
       const { context } = createMockExecutionContext({
@@ -353,7 +353,7 @@ describe('AuditInterceptor', () => {
 
     it('returns undefined metadata when no metadataFields are specified', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.deleted' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.deleted' });
       const { context } = createMockExecutionContext({
         user: defaultUser,
         ip: '127.0.0.1',
@@ -378,7 +378,7 @@ describe('AuditInterceptor', () => {
     it('returns undefined metadata when metadataFields is an empty array', async () => {
       // Arrange
       reflector.get.mockReturnValue({
-        eventType: 'query.deleted',
+        eventType: 'saved_query.deleted',
         metadataFields: [],
       });
       const { context } = createMockExecutionContext({
@@ -405,7 +405,7 @@ describe('AuditInterceptor', () => {
     it('returns undefined metadata when specified body fields do not exist on request', async () => {
       // Arrange
       reflector.get.mockReturnValue({
-        eventType: 'query.created',
+        eventType: 'saved_query.created',
         metadataFields: ['nonExistentField', 'anotherMissing'],
       });
       const { context } = createMockExecutionContext({
@@ -432,7 +432,7 @@ describe('AuditInterceptor', () => {
     it('includes only matching fields when some metadataFields are missing from body', async () => {
       // Arrange
       reflector.get.mockReturnValue({
-        eventType: 'query.created',
+        eventType: 'saved_query.created',
         metadataFields: ['name', 'missing'],
       });
       const { context } = createMockExecutionContext({
@@ -460,7 +460,7 @@ describe('AuditInterceptor', () => {
   describe('response passthrough', () => {
     it('returns the original response data unmodified', async () => {
       // Arrange
-      reflector.get.mockReturnValue({ eventType: 'query.created' });
+      reflector.get.mockReturnValue({ eventType: 'saved_query.created' });
       const { context } = createMockExecutionContext({
         user: { userId: 'u-1', tenantId: 't-1', mid: 'm-1' },
         ip: '127.0.0.1',

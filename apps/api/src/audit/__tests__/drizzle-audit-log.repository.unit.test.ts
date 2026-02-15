@@ -16,7 +16,7 @@ function createMockEntry(
   return {
     tenantId: 'tenant-1',
     mid: '12345',
-    eventType: 'query.created',
+    eventType: 'saved_query.created',
     actorType: 'user',
     actorId: 'user-1',
     targetId: 'target-1',
@@ -32,7 +32,7 @@ function createMockRow(overrides: Record<string, unknown> = {}) {
     id: 'row-1',
     tenantId: 'tenant-1',
     mid: '12345',
-    eventType: 'query.created',
+    eventType: 'saved_query.created',
     actorType: 'user',
     actorId: 'user-1',
     targetId: 'target-1',
@@ -121,7 +121,7 @@ describe('DrizzleAuditLogRepository', () => {
       expect(mock.valuesFn).toHaveBeenCalledWith({
         tenantId: 'tenant-1',
         mid: '12345',
-        eventType: 'query.created',
+        eventType: 'saved_query.created',
         actorType: 'user',
         actorId: 'user-1',
         targetId: 'target-1',
@@ -189,7 +189,10 @@ describe('DrizzleAuditLogRepository', () => {
       mock.setItems([]);
       mock.setCount(0);
 
-      await repo.findAll({ ...defaultParams, eventType: 'query.created' });
+      await repo.findAll({
+        ...defaultParams,
+        eventType: 'saved_query.created',
+      });
 
       // Verify select was called (items + count = 2 calls)
       expect(mock.selectFn).toHaveBeenCalledTimes(2);
@@ -199,7 +202,7 @@ describe('DrizzleAuditLogRepository', () => {
       mock.setItems([]);
       mock.setCount(0);
 
-      await repo.findAll({ ...defaultParams, eventType: 'query.*' });
+      await repo.findAll({ ...defaultParams, eventType: 'saved_query.*' });
 
       expect(mock.selectFn).toHaveBeenCalledTimes(2);
     });

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RlsContextService } from '@qpp/backend-shared';
-import type { AuditLogQueryParams } from '@qpp/shared-types';
+import type { AuditEventType, AuditLogQueryParams } from '@qpp/shared-types';
 
 import {
   AUDIT_LOG_REPOSITORY,
@@ -9,7 +9,7 @@ import {
 import type { AuditLogRow } from './drizzle-audit-log.repository';
 
 export interface AuditLogEntry {
-  eventType: string;
+  eventType: AuditEventType;
   actorType: 'user' | 'system';
   actorId: string | null;
   tenantId: string;

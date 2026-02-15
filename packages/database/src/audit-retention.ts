@@ -15,6 +15,16 @@ async function main(): Promise<void> {
   const sql = postgres(url, { max: 1 });
 
   try {
+    const bypass = await sql<Array<{ rolbypassrls: boolean | null }>>`
+      SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user
+    `;
+    if (!bypass[0]?.rolbypassrls) {
+      console.error(
+        "Audit retention purge requires a role with BYPASSRLS (set DATABASE_URL_MIGRATIONS)",
+      );
+      process.exit(1);
+    }
+
     await sql`SELECT set_config('app.audit_retention_purge', 'on', false)`;
 
     let totalDeleted = 0;
@@ -27,6 +37,7 @@ async function main(): Promise<void> {
           FROM audit_logs a
           JOIN tenants t ON t.id = a.tenant_id
           WHERE a.created_at < now() - make_interval(days => COALESCE(t.audit_retention_days, 365))
+          ORDER BY a.created_at ASC
           LIMIT ${BATCH_SIZE}
         )
         DELETE FROM audit_logs
