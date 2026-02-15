@@ -1,15 +1,19 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { type PostgresJsDatabase, sql, tenants } from "@qpp/database";
 
 @Injectable()
-export class AuditRetentionSweeper {
+export class AuditRetentionSweeper implements OnModuleInit {
   private readonly logger = new Logger(AuditRetentionSweeper.name);
 
   constructor(
     @Inject("DATABASE")
     private readonly db: PostgresJsDatabase<Record<string, never>>,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.handlePartitionCreation();
+  }
 
   // TODO(Phase 14): system.retention_purge audit event — requires admin context for RLS bypass
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
@@ -61,11 +65,11 @@ export class AuditRetentionSweeper {
         try {
           await this.db.execute(
             sql.raw(
-              `ALTER TABLE audit_logs DETACH PARTITION ${relname}`,
+              `ALTER TABLE "audit_logs" DETACH PARTITION "${relname}"`,
             ),
           );
           await this.db.execute(
-            sql.raw(`DROP TABLE ${relname}`),
+            sql.raw(`DROP TABLE "${relname}"`),
           );
 
           this.logger.log(`Dropped expired partition: ${relname}`);
@@ -94,13 +98,13 @@ export class AuditRetentionSweeper {
     this.logger.log("Starting monthly audit partition pre-creation...");
 
     const now = new Date();
-    const monthsToCreate = this.getNextMonths(now, 2);
+    const monthsToCreate = this.getNextMonths(now, 3);
 
     for (const { name, start, end } of monthsToCreate) {
       try {
         await this.db.execute(
           sql.raw(
-            `CREATE TABLE IF NOT EXISTS ${name} PARTITION OF audit_logs FOR VALUES FROM ('${start}') TO ('${end}')`,
+            `CREATE TABLE IF NOT EXISTS "${name}" PARTITION OF "audit_logs" FOR VALUES FROM ('${start}') TO ('${end}')`,
           ),
         );
 
@@ -126,20 +130,17 @@ export class AuditRetentionSweeper {
     let month = from.getMonth() + 1;
 
     for (let i = 0; i < count; i++) {
-      month++;
-      if (month > 12) {
-        month = 1;
-        year++;
-      }
-
-      const nextYear = month === 12 ? year + 1 : year;
       const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
 
       const name = `audit_logs_y${year}m${String(month).padStart(2, "0")}`;
       const start = `${year}-${String(month).padStart(2, "0")}-01`;
       const end = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
 
       results.push({ name, start, end });
+
+      month = nextMonth;
+      year = nextYear;
     }
 
     return results;
