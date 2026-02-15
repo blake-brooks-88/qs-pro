@@ -34,6 +34,7 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'pro',
       seatLimit: 10,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     };
 
@@ -53,6 +54,7 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'pro',
       seatLimit: 10,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     };
 
@@ -75,6 +77,7 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'pro',
       seatLimit: 10,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     };
 
@@ -97,6 +100,7 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       subscriptionTier: 'enterprise',
       seatLimit: null,
+      auditRetentionDays: 365,
       installedAt: new Date(),
     };
 

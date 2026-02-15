@@ -170,10 +170,12 @@ export async function purgeTestData(): Promise<number> {
         WHERE tenant_id IN (
           SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
+      await tx`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
       await tx`
         DELETE FROM tenants
         WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
       `;
+      await tx`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
     });
 
     return count;

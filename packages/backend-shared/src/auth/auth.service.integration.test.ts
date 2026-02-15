@@ -193,7 +193,9 @@ describe("AuthService Integration", () => {
     // Clean up any leftover test data from previous runs
     await superuserClient`DELETE FROM credentials WHERE mid LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM users WHERE sf_user_id LIKE 'auth-integ-%'`;
+    await superuserClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
     await superuserClient`DELETE FROM tenants WHERE eid LIKE 'auth-integ-%'`;
+    await superuserClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
 
     // Create db proxy that uses context-aware db when available (mimics DatabaseModule)
     dbProxy = createDbProxy(db);
@@ -260,7 +262,9 @@ describe("AuthService Integration", () => {
     // Clean up test data (qs_migrate user bypasses RLS)
     await superuserClient`DELETE FROM credentials WHERE mid LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM users WHERE sf_user_id LIKE 'auth-integ-%'`;
+    await superuserClient`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
     await superuserClient`DELETE FROM tenants WHERE eid LIKE 'auth-integ-%'`;
+    await superuserClient`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
 
     // Close connections
     server.close();

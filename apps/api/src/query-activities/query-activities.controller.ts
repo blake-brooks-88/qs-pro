@@ -18,6 +18,7 @@ import {
 } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
+import { Audited } from '../common/decorators/audited.decorator';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
@@ -45,6 +46,7 @@ export class QueryActivitiesController {
 
   @Post()
   @UseGuards(CsrfGuard)
+  @Audited('query_activity.created')
   async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
     await this.requireDeployFeature(user.tenantId);
 
@@ -74,6 +76,7 @@ export class QueryActivitiesController {
 
   @Post('link/:savedQueryId')
   @UseGuards(CsrfGuard)
+  @Audited('query_activity.linked', { targetIdParam: 'savedQueryId' })
   async linkQuery(
     @CurrentUser() user: UserSession,
     @Param('savedQueryId') savedQueryId: string,
@@ -98,6 +101,7 @@ export class QueryActivitiesController {
 
   @Delete('link/:savedQueryId')
   @UseGuards(CsrfGuard)
+  @Audited('query_activity.unlinked', { targetIdParam: 'savedQueryId' })
   async unlinkQuery(
     @CurrentUser() user: UserSession,
     @Param('savedQueryId') savedQueryId: string,
@@ -121,6 +125,7 @@ export class QueryActivitiesController {
 
   @Post('publish/:savedQueryId')
   @UseGuards(CsrfGuard)
+  @Audited('query_activity.published', { targetIdParam: 'savedQueryId' })
   async publishQuery(
     @CurrentUser() user: UserSession,
     @Param('savedQueryId') savedQueryId: string,

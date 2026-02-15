@@ -12,6 +12,7 @@ import { SessionGuard } from '@qpp/backend-shared';
 import { UpdateVersionNameSchema } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
+import { Audited } from '../common/decorators/audited.decorator';
 import {
   CurrentUser,
   type UserSession,
@@ -66,6 +67,7 @@ export class QueryVersionsController {
 
   @Post(':savedQueryId/versions/:versionId/restore')
   @UseGuards(CsrfGuard)
+  @Audited('version.restored', { targetIdParam: 'versionId' })
   async restore(
     @CurrentUser() user: UserSession,
     @Param('savedQueryId') savedQueryId: string,
@@ -82,6 +84,7 @@ export class QueryVersionsController {
 
   @Patch(':savedQueryId/versions/:versionId')
   @UseGuards(CsrfGuard)
+  @Audited('version.renamed', { targetIdParam: 'versionId' })
   async updateName(
     @CurrentUser() user: UserSession,
     @Param('savedQueryId') savedQueryId: string,

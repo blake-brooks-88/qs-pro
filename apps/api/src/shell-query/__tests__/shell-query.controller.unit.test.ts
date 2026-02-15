@@ -12,13 +12,14 @@ import {
   createTenantRepoStub,
   resetFactories,
 } from '@qpp/test-utils';
-import { EMPTY, of } from 'rxjs';
+import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CsrfGuard } from '../../auth/csrf.guard';
 import type { UserSession } from '../../common/decorators/current-user.decorator';
 import { FeaturesService } from '../../features/features.service';
 import { UsageService } from '../../usage/usage.service';
+import { RunExistsGuard } from '../guards/run-exists.guard';
 import { ShellQueryController } from '../shell-query.controller';
 import { ShellQueryService } from '../shell-query.service';
 import { ShellQuerySseService } from '../shell-query-sse.service';
@@ -98,6 +99,8 @@ describe('ShellQueryController', () => {
       .overrideGuard(SessionGuard)
       .useValue({ canActivate: vi.fn().mockReturnValue(true) })
       .overrideGuard(CsrfGuard)
+      .useValue({ canActivate: vi.fn().mockReturnValue(true) })
+      .overrideGuard(RunExistsGuard)
       .useValue({ canActivate: vi.fn().mockReturnValue(true) })
       .compile();
 
@@ -243,49 +246,11 @@ describe('ShellQueryController', () => {
   });
 
   describe('SSE /:runId/events (streamEvents)', () => {
-    it('throws RESOURCE_NOT_FOUND when run does not exist', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-      const runId = 'non-existent';
-      shellQueryService.getRun.mockResolvedValue(null);
-
-      // Act & Assert
-      await expect(controller.streamEvents(runId, user)).rejects.toMatchObject({
-        code: ErrorCode.RESOURCE_NOT_FOUND,
-      });
-    });
-
-    it('calls service getRun for ownership check', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-      const runId = 'run-123';
-      shellQueryService.getRun.mockResolvedValue({
-        id: runId,
-        status: 'queued',
-      });
-      shellQuerySseService.streamRunEvents.mockReturnValue(EMPTY);
-
-      // Act
-      await controller.streamEvents(runId, user);
-
-      // Assert
-      expect(shellQueryService.getRun).toHaveBeenCalledWith(
-        runId,
-        user.tenantId,
-        user.mid,
-        user.userId,
-      );
-    });
-
     it('returns observable from SSE service', async () => {
       // Arrange
       const user = createMockUserSession() as UserSession;
       const runId = 'run-123';
       const mockObservable = of({ data: { status: 'queued' } } as MessageEvent);
-      shellQueryService.getRun.mockResolvedValue({
-        id: runId,
-        status: 'queued',
-      });
       shellQuerySseService.streamRunEvents.mockReturnValue(mockObservable);
 
       // Act

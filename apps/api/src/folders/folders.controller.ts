@@ -18,6 +18,7 @@ import {
 } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
+import { Audited } from '../common/decorators/audited.decorator';
 import {
   CurrentUser,
   type UserSession,
@@ -31,6 +32,7 @@ export class FoldersController {
 
   @Post()
   @UseGuards(CsrfGuard)
+  @Audited('folder.created')
   async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
     const result = CreateFolderSchema.safeParse(body);
     if (!result.success) {
@@ -70,6 +72,7 @@ export class FoldersController {
 
   @Patch(':id')
   @UseGuards(CsrfGuard)
+  @Audited('folder.updated', { targetIdParam: 'id', metadataFields: ['name'] })
   async update(
     @CurrentUser() user: UserSession,
     @Param('id') id: string,
@@ -93,6 +96,7 @@ export class FoldersController {
 
   @Delete(':id')
   @UseGuards(CsrfGuard)
+  @Audited('folder.deleted', { targetIdParam: 'id' })
   async delete(@CurrentUser() user: UserSession, @Param('id') id: string) {
     await this.foldersService.delete(user.tenantId, user.mid, user.userId, id);
     return { success: true };

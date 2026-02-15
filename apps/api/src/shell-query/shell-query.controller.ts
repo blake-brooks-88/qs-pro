@@ -24,6 +24,7 @@ import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FeaturesService } from '../features/features.service';
 import { FREE_TIER_RUN_LIMIT, UsageService } from '../usage/usage.service';
+import { RunExistsGuard } from './guards/run-exists.guard';
 import { ShellQueryService } from './shell-query.service';
 import { ShellQuerySseService } from './shell-query-sse.service';
 
@@ -215,24 +216,11 @@ export class ShellQueryController {
   }
 
   @Sse(':runId/events')
+  @UseGuards(RunExistsGuard)
   async streamEvents(
     @Param('runId') runId: string,
     @CurrentUser() user: UserSession,
   ): Promise<Observable<MessageEvent>> {
-    // 1. Verify ownership
-    const run = await this.shellQueryService.getRun(
-      runId,
-      user.tenantId,
-      user.mid,
-      user.userId,
-    );
-    if (!run) {
-      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-        operation: 'streamEvents',
-        runId,
-      });
-    }
-
     return this.shellQuerySse.streamRunEvents(runId, user.userId);
   }
 

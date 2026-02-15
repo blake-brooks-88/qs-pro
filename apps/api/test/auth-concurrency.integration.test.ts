@@ -166,9 +166,11 @@ describe('Auth Concurrency (integration)', () => {
         await client`DELETE FROM users WHERE id = ${userId}::uuid`;
       }
 
+      await client`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_delete`;
       for (const eid of createdTenantEids) {
         await client`DELETE FROM tenants WHERE eid = ${eid}`;
       }
+      await client`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
     } catch (cleanupError) {
       // Log but don't fail tests - cleanup errors shouldn't mask test results
       console.warn('Test cleanup warning:', cleanupError);

@@ -115,8 +115,42 @@ describe("HistoryQueryParamsSchema", () => {
     expect(() => HistoryQueryParamsSchema.parse({ pageSize: 200 })).toThrow();
   });
 
-  it("should reject pageSize below 10", () => {
-    expect(() => HistoryQueryParamsSchema.parse({ pageSize: 5 })).toThrow();
+  it("should reject pageSize below 1", () => {
+    expect(() => HistoryQueryParamsSchema.parse({ pageSize: 0 })).toThrow();
+  });
+
+  it("should accept small pageSize values", () => {
+    const result = HistoryQueryParamsSchema.parse({ pageSize: 1 });
+    expect(result.pageSize).toBe(1);
+    const result5 = HistoryQueryParamsSchema.parse({ pageSize: 5 });
+    expect(result5.pageSize).toBe(5);
+  });
+
+  it("should accept full ISO datetime for dateFrom/dateTo", () => {
+    const result = HistoryQueryParamsSchema.parse({
+      dateFrom: "2026-02-14T00:00:00Z",
+      dateTo: "2026-02-14T23:59:59Z",
+    });
+    expect(result.dateFrom).toBe("2026-02-14T00:00:00Z");
+    expect(result.dateTo).toBe("2026-02-14T23:59:59Z");
+  });
+
+  it("should accept date-only strings for dateFrom/dateTo", () => {
+    const result = HistoryQueryParamsSchema.parse({
+      dateFrom: "2026-02-14",
+      dateTo: "2026-02-15",
+    });
+    expect(result.dateFrom).toBe("2026-02-14");
+    expect(result.dateTo).toBe("2026-02-15");
+  });
+
+  it("should reject invalid date strings", () => {
+    expect(() =>
+      HistoryQueryParamsSchema.parse({ dateFrom: "not-a-date" }),
+    ).toThrow();
+    expect(() =>
+      HistoryQueryParamsSchema.parse({ dateFrom: "02/14/2026" }),
+    ).toThrow();
   });
 
   it("should reject invalid sortBy", () => {

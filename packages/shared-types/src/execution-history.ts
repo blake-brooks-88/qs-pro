@@ -32,10 +32,10 @@ export type HistoryListResponse = z.infer<typeof HistoryListResponseSchema>;
 
 export const HistoryQueryParamsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(10).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
   status: z.string().optional(),
-  dateFrom: z.string().datetime().optional(),
-  dateTo: z.string().datetime().optional(),
+  dateFrom: z.string().datetime().or(z.string().date()).optional(),
+  dateTo: z.string().datetime().or(z.string().date()).optional(),
   queryId: z.string().uuid().optional(),
   search: z.string().max(200).optional(),
   sortBy: z
