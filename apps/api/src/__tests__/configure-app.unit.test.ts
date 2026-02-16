@@ -112,7 +112,9 @@ describe('configureApp', () => {
       await configureApp(mockApp);
 
       // Assert
-      expect(mockApp.setGlobalPrefix).toHaveBeenCalledWith('api');
+      expect(mockApp.setGlobalPrefix).toHaveBeenCalledWith('api', {
+        exclude: ['livez', 'readyz', 'metrics'],
+      });
       expect(mockApp.setGlobalPrefix).toHaveBeenCalledTimes(1);
     });
 
