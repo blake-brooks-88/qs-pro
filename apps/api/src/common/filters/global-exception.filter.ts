@@ -103,15 +103,22 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const response = exception.getResponse();
     const is5xx = status >= 500;
 
-    // Extract detail message
     let detail: string;
+    let violations: string[] | undefined;
+
     if (typeof response === 'string') {
       detail = response;
     } else {
-      const msg = (response as Record<string, unknown>).message;
-      detail = Array.isArray(msg)
-        ? msg.join(', ')
-        : ((msg as string) ?? exception.message);
+      const responseObj = response as Record<string, unknown>;
+      if (Array.isArray(responseObj.violations)) {
+        violations = responseObj.violations as string[];
+        detail = 'Validation failed';
+      } else {
+        const msg = responseObj.message;
+        detail = Array.isArray(msg)
+          ? msg.join(', ')
+          : ((msg as string) ?? exception.message);
+      }
     }
 
     return {
@@ -120,6 +127,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       status,
       detail: is5xx ? 'An unexpected error occurred' : detail,
       instance: path,
+      ...(violations ? { violations } : {}),
     };
   }
 

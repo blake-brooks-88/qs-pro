@@ -32,6 +32,13 @@ class TestController {
     throw new BadRequestException('Invalid input');
   }
 
+  @Get('bad-request-violations')
+  throwBadRequestWithViolations() {
+    throw new BadRequestException({
+      violations: ['name: Required', 'age: Expected number, received string'],
+    });
+  }
+
   @Get('not-found')
   throwNotFound() {
     throw new NotFoundException('Resource not found');
@@ -147,6 +154,40 @@ describe('GlobalExceptionFilter', () => {
         detail: 'Resource not found',
         instance: '/test/not-found',
       });
+    });
+
+    it('returns RFC 9457 with violations array for BadRequestException with violations', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/test/bad-request-violations',
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.headers['content-type']).toContain(
+        'application/problem+json',
+      );
+
+      const body = response.json();
+      expect(body).toMatchObject({
+        type: 'urn:qpp:error:http-400',
+        title: 'Bad Request',
+        status: 400,
+        detail: 'Validation failed',
+        instance: '/test/bad-request-violations',
+        violations: ['name: Required', 'age: Expected number, received string'],
+      });
+    });
+
+    it('omits violations field when BadRequestException has no violations', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/test/bad-request',
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = response.json();
+      expect(body.detail).toBe('Invalid input');
+      expect(body).not.toHaveProperty('violations');
     });
 
     it('returns 401 for UnauthorizedException', async () => {
