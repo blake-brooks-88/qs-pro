@@ -9,9 +9,7 @@ export const ALLOWED_MCE_HOST_PATTERNS: RegExp[] = [
   /^[a-z0-9-]+\.auth\.marketingcloudapis\.com$/,
 ];
 
-export function isHostAllowed(url: string, extraHosts: string[]): boolean {
-  const hostname = new URL(url).hostname.toLowerCase();
-
+export function isHostAllowed(hostname: string, extraHosts: string[]): boolean {
   if (ALLOWED_MCE_HOST_PATTERNS.some((pattern) => pattern.test(hostname))) {
     return true;
   }
@@ -25,15 +23,15 @@ export function validateOutboundHost(
   policy: "log" | "block",
   logger: Logger,
 ): void {
-  if (isHostAllowed(url, extraHosts)) {
-    return;
-  }
-
   let hostname: string;
   try {
-    hostname = new URL(url).hostname;
+    hostname = new URL(url).hostname.toLowerCase();
   } catch {
     hostname = "unknown";
+  }
+
+  if (hostname !== "unknown" && isHostAllowed(hostname, extraHosts)) {
+    return;
   }
 
   if (policy === "log") {

@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
+import { z } from 'zod';
 
 import { ShellQueryService } from '../shell-query.service';
 
@@ -15,6 +16,14 @@ export class RunExistsGuard implements CanActivate {
       tenantId: string;
       mid: string;
     };
+
+    const parsed = z.string().uuid().safeParse(runId);
+    if (!parsed.success) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+        operation: 'streamEvents',
+        runId,
+      });
+    }
 
     const run = await this.shellQueryService.getRun(
       runId,
