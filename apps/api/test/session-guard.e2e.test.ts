@@ -167,9 +167,9 @@ describe('Session Guard (e2e)', () => {
   });
 
   describe('Public Endpoints Access', () => {
-    it('should allow GET /health without session', async () => {
+    it('should allow GET /livez without session', async () => {
       const response = await request(app.getHttpServer())
-        .get('/health')
+        .get('/livez')
         .expect(200);
 
       expect(response.body.status).toBe('ok');

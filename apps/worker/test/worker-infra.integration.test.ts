@@ -30,16 +30,16 @@ describe('Worker Infrastructure', () => {
     expect(app).toBeDefined();
   });
 
-  it('should have /health endpoint', async () => {
+  it('should have /readyz endpoint', async () => {
     const fastify = app.getHttpAdapter().getInstance();
-    const res = await fastify.inject({ method: 'GET', url: '/health' });
+    const res = await fastify.inject({ method: 'GET', url: '/readyz' });
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.status).toBe('ok');
-    // We expect redis to be 'up' or 'down' depending on env, but the field should exist
-    expect(body).toHaveProperty('redis');
-    expect(body).toHaveProperty('db');
+    expect(body.details).toHaveProperty('postgres');
+    expect(body.details).toHaveProperty('redis');
+    expect(body.details).toHaveProperty('bullmq');
   });
 
   it('should have shell-query queue registered', () => {

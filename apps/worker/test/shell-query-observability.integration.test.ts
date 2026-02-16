@@ -130,7 +130,7 @@ describe('Shell Query Observability (integration)', () => {
   describe('Health endpoint', () => {
     it('returns 200 OK for health check', async () => {
       const fastify = app.getHttpAdapter().getInstance();
-      const res = await fastify.inject({ method: 'GET', url: '/health' });
+      const res = await fastify.inject({ method: 'GET', url: '/livez' });
 
       expect(res.statusCode).toBe(200);
     });

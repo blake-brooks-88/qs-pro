@@ -247,7 +247,7 @@ describe('CSRF Guard (e2e)', () => {
       // HEAD is a safe method - no CSRF required
       // Most endpoints don't explicitly support HEAD, but the guard should pass
       // Use a simple endpoint that exists
-      await agent.head('/health').expect(200);
+      await agent.head('/livez').expect(200);
     });
 
     it('should allow OPTIONS requests without CSRF token', async () => {
