@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 10 Observability & Monitoring IN PROGRESS. Plans 01+03+04 complete: Sentry error tracking across all three apps, API MetricsModule with Prometheus endpoint, BullMQ trace propagation via bullmq-otel, 4 operational runbooks. Plan 02 partially executed (API health endpoints done, Worker health refactoring + pino-loki pending).
+**Current focus:** Phase 10 Observability & Monitoring COMPLETE. All 4 plans finished: Sentry error tracking (API/Worker/Web), health endpoints (/livez + /readyz for API and Worker via @nestjs/terminus), MetricsModule with Prometheus endpoint, BullMQ trace propagation, pino-loki log shipping, 4 operational runbooks.
 
 ## Current Milestone
 
 **Milestone:** v1.0 Launch (Full Phase 1)
 **Status:** In Progress
-**Progress:** [██████████] 97%
+**Progress:** [██████████] 98%
 
 ## Phase Status
 
@@ -40,7 +40,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 8.5 | Blast Radius (INSERTED) | ✓ Complete | 4/4 | 100% |
 | 8.6 | Version + Publish Integration (INSERTED) | ✓ Complete | 5/5 | 100% |
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
-| 10 | Observability & Monitoring | ► In Progress | 3/4 | 75% |
+| 10 | Observability & Monitoring | ✓ Complete | 4/4 | 100% |
 | 11 | API Hardening | ○ Pending | 0/0 | 0% |
 | 12 | Security Baseline | ○ Pending | 0/0 | 0% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
@@ -308,6 +308,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-15 | Conditional Sentry Vite plugin via process.env check | Plugin only activates when SENTRY_AUTH_TOKEN present; .filter(Boolean) removes null from plugins array |
 | 2026-02-15 | Source maps deleted after Sentry upload | filesToDeleteAfterUpload prevents serving .js.map files to end users (source code protection) |
 | 2026-02-15 | SENTRY_AUTH_TOKEN/ORG/PROJECT_WEB not VITE_ prefixed | Build-time env vars consumed by Vite plugin (Node.js context), not client-side runtime |
+| 2026-02-16 | HealthIndicatorService (v11 pattern) over deprecated HealthIndicator | terminus v11 deprecates base class; new check(key)/up()/down() API is cleaner and forward-compatible |
+| 2026-02-16 | Worker Postgres health uses SQL_CLIENT (raw postgres) | Worker lacks drizzle-orm as direct dependency; raw postgres tagged template avoids vitest resolution issues |
+| 2026-02-16 | pino-loki transport activated via LOKI_HOST env var | Dev experience unchanged (pino-pretty); only enables Loki transport when explicitly configured in production |
 | 2026-02-16 | BullMQ telemetry supported via @nestjs/bullmq | BullRootModuleOptions extends Bull.QueueOptions which includes telemetry?: Telemetry; BullMQOtel wired directly |
 | 2026-02-16 | @Global() MetricsModule with injectable provider tokens | QPP_QUERIES_EXECUTED, QPP_MCE_API_CALLS, QPP_QUERY_DURATION available for @Inject() across API |
 | 2026-02-16 | Runbooks force-added past /docs/ gitignore | Operational runbooks are hand-crafted, not auto-generated; git add -f appropriate |
@@ -336,8 +339,18 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 10 Plan 04 COMPLETE — API MetricsModule, BullMQ trace propagation, 4 operational runbooks
-**Next step:** Phase 10 Plan 02 Task 2 (Worker health refactoring + pino-loki)
+**Last action:** Phase 10 Plan 02 COMPLETE — Worker health refactoring + pino-loki log shipping
+**Next step:** Phase 10 COMPLETE. Next: Phase 11 API Hardening
+
+**Phase 10 Plan 02 COMPLETE (2026-02-16):**
+
+- Kubernetes-ready /livez and /readyz health endpoints for API and Worker via @nestjs/terminus
+- API: PostgresHealthIndicator (SELECT 1, 500ms timeout), RedisHealthIndicator (PING, 500ms timeout)
+- Worker: PostgresHealthIndicator (SQL_CLIENT), RedisHealthIndicator (BullMQ queue client), BullMQHealthIndicator (client status)
+- Old /health endpoint removed from API AppController, AppService simplified
+- pino-loki multi-transport for Grafana Loki log shipping (activated via LOKI_HOST env var)
+- AUTO_LOGGING_EXCLUDED_PATHS filters /health, /livez, /readyz, /metrics from access logs
+- All 244 worker + 321 backend-shared + 386 API tests pass
 
 **Phase 10 Plan 04 COMPLETE (2026-02-16):**
 
@@ -942,8 +955,8 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-16T00:35:30.633Z
-**Stopped at:** Completed 10-04-PLAN.md
+**Last session:** 2026-02-16T00:40:23.039Z
+**Stopped at:** Completed 10-02-PLAN.md
 **Resume file:** None
 
 ## Blockers
@@ -966,4 +979,4 @@ None currently.
 
 ---
 *State initialized: 2026-01-20*
-*Last updated: 2026-02-15 — Phase 10 Plan 03 COMPLETE (Frontend Sentry error tracking with ErrorBoundary and source map upload)*
+*Last updated: 2026-02-16 — Phase 10 COMPLETE (All 4 plans: Sentry, health endpoints, metrics, runbooks, pino-loki)*
