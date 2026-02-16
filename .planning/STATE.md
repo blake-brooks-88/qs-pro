@@ -40,7 +40,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 8.5 | Blast Radius (INSERTED) | ✓ Complete | 4/4 | 100% |
 | 8.6 | Version + Publish Integration (INSERTED) | ✓ Complete | 5/5 | 100% |
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
-| 10 | Observability & Monitoring | ✓ Complete | 4/4 | 100% |
+| 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
 | 11 | API Hardening | ○ Pending | 0/0 | 0% |
 | 12 | Security Baseline | ○ Pending | 0/0 | 0% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
@@ -339,8 +339,16 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 10 Plan 02 COMPLETE — Worker health refactoring + pino-loki log shipping
-**Next step:** Phase 10 COMPLETE. Next: Phase 11 API Hardening
+**Last action:** Phase 10 Plan 05 COMPLETE — Observability endpoint routing fix (gap closure)
+**Next step:** Phase 10 fully COMPLETE (including gap closure). Next: Phase 11 API Hardening
+
+**Phase 10 Plan 05 COMPLETE (2026-02-16):**
+
+- Gap closure: excluded /livez, /readyz, /metrics from global /api prefix
+- setGlobalPrefix('api', { exclude: ['livez', 'readyz', 'metrics'] }) in configure-app.ts
+- Observability endpoints now accessible at root level for Kubernetes probes and Prometheus scraping
+- Updated configure-app unit test assertion for new call signature
+- All 386 API + 244 Worker + 321 backend-shared tests pass
 
 **Phase 10 Plan 02 COMPLETE (2026-02-16):**
 
@@ -955,9 +963,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-16T00:40:23.039Z
-**Stopped at:** Completed 10-02-PLAN.md
-**Resume file:** None
+**Last session:** 2026-02-16T01:29:46.701Z
+**Stopped at:** Phase 11 context gathered
+**Resume file:** .planning/phases/11-api-hardening/11-CONTEXT.md
 
 ## Blockers
 
@@ -979,4 +987,4 @@ None currently.
 
 ---
 *State initialized: 2026-01-20*
-*Last updated: 2026-02-16 — Phase 10 COMPLETE (All 4 plans: Sentry, health endpoints, metrics, runbooks, pino-loki)*
+*Last updated: 2026-02-16 — Phase 10 COMPLETE (5 plans: Sentry, health endpoints, web Sentry, metrics/runbooks, routing fix)*
