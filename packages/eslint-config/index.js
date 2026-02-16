@@ -46,6 +46,16 @@ module.exports = tseslint.config(
       // ═══════════════════════════════════════════════════════════════
       "eqeqeq": ["error", "always"],
       "curly": ["error", "all"],
+      "no-empty": ["error", { allowEmptyCatch: false }],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='catch'] > :matches(ArrowFunctionExpression, FunctionExpression)[body.type='BlockStatement'][body.body.length=0]",
+          message:
+            "Do not swallow promise rejections with an empty .catch(() => {}) handler. Log/report, rethrow, or explicitly justify with an eslint-disable.",
+        },
+      ],
       "no-throw-literal": "error",
       "prefer-template": "warn",
       "no-else-return": "warn",
@@ -63,6 +73,23 @@ module.exports = tseslint.config(
       // ═══════════════════════════════════════════════════════════════
       "security/detect-object-injection": "warn",
       "prettier/prettier": "error",
+    },
+  },
+  // ═══════════════════════════════════════════════════════════════════
+  // TEST-LIKE FILES (guardrail exceptions)
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    files: [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/*.integration.test.*",
+      "**/*.e2e.test.*",
+      "**/__tests__/**",
+      "**/test/**",
+    ],
+    rules: {
+      "no-empty": "off",
+      "no-restricted-syntax": "off",
     },
   },
   // ═══════════════════════════════════════════════════════════════════

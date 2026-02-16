@@ -71,6 +71,7 @@ export function EditorWorkspaceModals(props: {
     automations: AutomationInfo[];
     isLoadingBlastRadius: boolean;
     blastRadiusError: boolean;
+    blastRadiusPartial: boolean;
   };
 
   unlinkModal: {
@@ -182,6 +183,7 @@ export function EditorWorkspaceModals(props: {
         automations={publishDialog.automations}
         isLoadingBlastRadius={publishDialog.isLoadingBlastRadius}
         blastRadiusError={publishDialog.blastRadiusError}
+        blastRadiusPartial={publishDialog.blastRadiusPartial}
       />
 
       {unlinkModal.target ? (

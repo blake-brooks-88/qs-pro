@@ -373,6 +373,12 @@ export function containsSelectStar(sqlText: string): boolean {
 }
 
 export function extractTableNames(sqlText: string): string[] {
+  return tryExtractTableNames(sqlText) ?? [];
+}
+
+// Strict variant for safety-critical checks. Returning null forces callers to
+// handle "unknown" rather than accidentally assuming "no tables referenced".
+export function tryExtractTableNames(sqlText: string): string[] | null {
   try {
     const ast = parser.astify(sqlText, { database: DIALECT }) as unknown as
       | AstStatement
@@ -388,7 +394,7 @@ export function extractTableNames(sqlText: string): string[] {
 
     return [...new Set(tables)];
   } catch {
-    return [];
+    return null;
   }
 }
 

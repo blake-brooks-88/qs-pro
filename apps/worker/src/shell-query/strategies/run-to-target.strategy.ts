@@ -19,9 +19,9 @@ import { MceQueryValidator } from "../mce-query-validator";
 import {
   containsSelectStar,
   expandSelectStar,
-  extractTableNames,
   type FieldDefinition,
   type MetadataFetcher,
+  tryExtractTableNames,
 } from "../query-analyzer";
 import { buildQueryCustomerKey } from "../query-definition.utils";
 import { inferSchema } from "../schema-inferrer";
@@ -158,7 +158,16 @@ export class RunToTargetFlow implements IFlowStrategy {
       !targetUpdateType || targetUpdateType === "Overwrite";
 
     if (isOverwriteMode) {
-      const referencedTables = extractTableNames(expandedSql);
+      const referencedTables = tryExtractTableNames(expandedSql);
+      if (!referencedTables) {
+        // Monitoring: If this triggers, node-sql-parser is failing on valid MCE
+        // SQL. Consider expanding parser support or adding a safer fallback.
+        throw new AppError(ErrorCode.MCE_BAD_REQUEST, undefined, {
+          statusMessage:
+            "Cannot safely verify overwrite behavior because the query could not be parsed. " +
+            'Use "Append" or "Update" data action, or simplify the FROM/JOIN clauses.',
+        });
+      }
       const normalizedTargetNames = new Set([
         normalizeMceIdentifier(targetDe.customerKey),
         normalizeMceIdentifier(targetDe.name),

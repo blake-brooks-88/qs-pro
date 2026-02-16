@@ -120,7 +120,16 @@ export function createMetadataFetcher(
           type: f.type,
           length: f.length,
         }));
-      } catch {
+      } catch (fetchError) {
+        // Monitoring: if this is frequent, consider surfacing a user-visible
+        // warning or adding retries/backoff for metadata fetches.
+        if (import.meta.env.DEV) {
+          console.warn(
+            "[metadata-fetcher] Failed to fetch fields for",
+            customerKey,
+            fetchError,
+          );
+        }
         return null;
       }
     },

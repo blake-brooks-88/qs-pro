@@ -134,6 +134,8 @@ export function useQueryExecution(
   const [currentPage, setCurrentPage] = useState(1);
   const eventSourceRef = useRef<EventSource | null>(null);
   const hasShownErrorRef = useRef(false);
+  const malformedMessageCountRef = useRef(0);
+  const hasShownMalformedRef = useRef(false);
 
   const resultsQuery = useRunResults({
     runId,
@@ -168,6 +170,8 @@ export function useQueryExecution(
     (targetRunId: string) => {
       closeEventSource();
       hasShownErrorRef.current = false;
+      malformedMessageCountRef.current = 0;
+      hasShownMalformedRef.current = false;
 
       const eventSource = new EventSource(`/api/runs/${targetRunId}/events`, {
         withCredentials: true,
@@ -183,8 +187,27 @@ export function useQueryExecution(
           } else {
             setStatus(data.status);
           }
-        } catch {
-          // Ignore malformed messages
+        } catch (parseError) {
+          // Monitoring: malformed SSE payloads indicate a server/client contract
+          // mismatch or a proxy injecting non-JSON content. Warn a few times,
+          // then prompt the user to refresh.
+          malformedMessageCountRef.current += 1;
+          if (malformedMessageCountRef.current <= 3) {
+            console.warn(
+              "[runs:sse] Ignoring malformed message",
+              malformedMessageCountRef.current,
+              parseError,
+            );
+          }
+          if (
+            malformedMessageCountRef.current >= 3 &&
+            !hasShownMalformedRef.current
+          ) {
+            hasShownMalformedRef.current = true;
+            toast.error(
+              "Live updates look corrupted. Refresh to check status.",
+            );
+          }
         }
       };
 
@@ -322,8 +345,13 @@ export function useQueryExecution(
     try {
       await api.post(`/runs/${runId}/cancel`);
       handleTerminalState("canceled");
-    } catch {
-      // Silently handle cancel failures
+    } catch (cancelError) {
+      // Monitoring: if this is common, it may indicate auth/session expiry or
+      // backend instability. Don't fail silently since cancel is user-initiated.
+      toast.error("Cancel failed. Refresh to verify the query status.");
+      if (import.meta.env.DEV) {
+        console.warn("[runs] Cancel failed", cancelError);
+      }
     }
   }, [runId, handleTerminalState]);
 

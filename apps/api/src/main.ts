@@ -113,7 +113,16 @@ async function bootstrap() {
         const qs = new URLSearchParams({ code, state }).toString();
         void reply.redirect(`/api/auth/callback?${qs}`, 302);
         return done();
-      } catch {
+      } catch (redirectError) {
+        // Monitoring: if this starts firing in production it may indicate invalid
+        // inbound URLs (proxy) or an unexpected auth callback shape. Keep this
+        // debug-only to avoid log spam.
+        if (process.env.NODE_ENV !== 'production') {
+          req.log.debug(
+            { err: redirectError },
+            'OAuth redirect helper failed; continuing request',
+          );
+        }
         done();
       }
     });

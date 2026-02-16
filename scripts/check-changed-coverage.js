@@ -82,6 +82,7 @@ function pickDefaultBase(cwd) {
       return ref;
     } catch {
       // ignore
+      continue;
     }
   }
   return undefined;

@@ -133,8 +133,13 @@ export function useSqlDiagnostics({
         // Initialize worker
         const initRequest: WorkerRequest = { type: "init" };
         workerRef.current.postMessage(initRequest);
-      } catch {
+      } catch (workerError) {
         // Worker creation failed - fall back to sync-only
+        // Monitoring: if this happens in production, bundling/CSP issues may be
+        // preventing Worker initialization.
+        if (import.meta.env.DEV) {
+          console.warn("[sql-lint.worker] Worker creation failed", workerError);
+        }
         return null;
       }
     }
