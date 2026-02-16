@@ -361,7 +361,7 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
       await setTenantTier('free');
 
       const res = await request(app.getHttpServer())
-        .post('/query-activities/publish/fake-id')
+        .post('/query-activities/publish/00000000-0000-4000-8000-000000000000')
         .send({ versionId: '00000000-0000-0000-0000-000000000001' });
 
       expect(res.status).toBe(403);
@@ -372,7 +372,7 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
   describe('validation errors', () => {
     it('returns 400 when body is missing versionId', async () => {
       const res = await request(app.getHttpServer())
-        .post('/query-activities/publish/fake-id')
+        .post('/query-activities/publish/00000000-0000-4000-8000-000000000000')
         .send({});
 
       expect(res.status).toBe(400);
@@ -380,7 +380,7 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
 
     it('returns 400 when versionId is not a valid UUID', async () => {
       const res = await request(app.getHttpServer())
-        .post('/query-activities/publish/fake-id')
+        .post('/query-activities/publish/00000000-0000-4000-8000-000000000000')
         .send({ versionId: 'not-a-uuid' });
 
       expect(res.status).toBe(400);
@@ -389,7 +389,7 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
 
   describe('not found errors', () => {
     it('returns 404 when savedQueryId does not exist', async () => {
-      const fakeId = '00000000-0000-0000-0000-000000000099';
+      const fakeId = '00000000-0000-4000-8000-000000000099';
 
       const res = await request(app.getHttpServer())
         .post(`/query-activities/publish/${fakeId}`)
@@ -465,7 +465,7 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
       mockSessionUser.userId = '';
 
       const res = await request(app.getHttpServer())
-        .post('/query-activities/publish/fake-id')
+        .post('/query-activities/publish/00000000-0000-4000-8000-000000000000')
         .send({ versionId: '00000000-0000-0000-0000-000000000001' });
 
       expect(res.status).toBe(403);

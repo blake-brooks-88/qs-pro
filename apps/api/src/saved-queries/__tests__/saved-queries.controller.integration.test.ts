@@ -331,7 +331,7 @@ describe('SavedQueriesController (HTTP integration)', () => {
     });
 
     it('should return error for nonexistent ID', async () => {
-      const fakeId = '00000000-0000-0000-0000-000000000000';
+      const fakeId = '00000000-0000-4000-8000-000000000000';
 
       const res = await request(app.getHttpServer())
         .get(`/api/saved-queries/${fakeId}`)

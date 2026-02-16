@@ -429,7 +429,7 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
 
     // Act
     const res = await request(app.getHttpServer()).delete(
-      '/query-activities/link/fake-id',
+      '/query-activities/link/00000000-0000-4000-8000-000000000000',
     );
 
     // Assert

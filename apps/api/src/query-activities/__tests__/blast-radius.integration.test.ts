@@ -493,7 +493,7 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
       await setTenantTier('free');
 
       const res = await request(app.getHttpServer()).get(
-        '/query-activities/blast-radius/fake-id',
+        '/query-activities/blast-radius/00000000-0000-4000-8000-000000000000',
       );
 
       expect(res.status).toBe(403);
