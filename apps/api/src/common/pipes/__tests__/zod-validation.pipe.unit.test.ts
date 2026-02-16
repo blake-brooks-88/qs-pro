@@ -9,20 +9,18 @@ const TestSchema = z.object({
   age: z.number(),
 });
 
-const metadata = { type: 'body' as const, metatype: Object, data: '' };
-
 describe('ZodValidationPipe', () => {
   const pipe = new ZodValidationPipe(TestSchema);
 
   it('returns parsed data for valid input', () => {
     const input = { name: 'Alice', age: 30 };
-    const result = pipe.transform(input, metadata);
+    const result = pipe.transform(input);
     expect(result).toEqual({ name: 'Alice', age: 30 });
   });
 
   it('returns result.data, stripping unknown fields', () => {
     const input = { name: 'Alice', age: 30, extra: true };
-    const result = pipe.transform(input, metadata);
+    const result = pipe.transform(input);
     expect(result).toEqual({ name: 'Alice', age: 30 });
     expect(result).not.toHaveProperty('extra');
   });
@@ -30,14 +28,14 @@ describe('ZodValidationPipe', () => {
   it('throws BadRequestException for invalid input', () => {
     const input = { name: 123, age: 'not-a-number' };
 
-    expect(() => pipe.transform(input, metadata)).toThrow(BadRequestException);
+    expect(() => pipe.transform(input)).toThrow(BadRequestException);
   });
 
   it('includes violations array in the thrown exception response', () => {
     const input = { name: 123, age: 'not-a-number' };
 
     try {
-      pipe.transform(input, metadata);
+      pipe.transform(input);
       expect.unreachable('should have thrown');
     } catch (error) {
       const exception = error as BadRequestException;
@@ -56,7 +54,7 @@ describe('ZodValidationPipe', () => {
     const nestedPipe = new ZodValidationPipe(NestedSchema);
 
     try {
-      nestedPipe.transform({ user: {} }, metadata);
+      nestedPipe.transform({ user: {} });
       expect.unreachable('should have thrown');
     } catch (error) {
       const exception = error as BadRequestException;
@@ -71,7 +69,7 @@ describe('ZodValidationPipe', () => {
     const stringPipe = new ZodValidationPipe(StringSchema);
 
     try {
-      stringPipe.transform(123, metadata);
+      stringPipe.transform(123);
       expect.unreachable('should have thrown');
     } catch (error) {
       const exception = error as BadRequestException;
@@ -86,7 +84,7 @@ describe('ZodValidationPipe', () => {
     const input = {};
 
     try {
-      pipe.transform(input, metadata);
+      pipe.transform(input);
       expect.unreachable('should have thrown');
     } catch (error) {
       const exception = error as BadRequestException;
@@ -100,7 +98,7 @@ describe('ZodValidationPipe', () => {
 
   it('thrown error is an instance of BadRequestException', () => {
     try {
-      pipe.transform({}, metadata);
+      pipe.transform({});
       expect.unreachable('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(BadRequestException);

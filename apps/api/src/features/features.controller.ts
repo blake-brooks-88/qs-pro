@@ -1,19 +1,16 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Patch,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { SessionGuard } from '@qpp/backend-shared';
 import type { TenantFeaturesResponse } from '@qpp/shared-types';
 import { SubscriptionTierSchema } from '@qpp/shared-types';
+import { z } from 'zod';
 
 import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from './features.service';
+
+const UpdateTierBodySchema = z.object({ tier: SubscriptionTierSchema });
 
 @Controller('features')
 @UseGuards(SessionGuard)
@@ -31,14 +28,9 @@ export class FeaturesController {
   @UseGuards(CsrfGuard)
   async updateTier(
     @CurrentUser() user: UserSession,
-    @Body() body: unknown,
+    @Body(new ZodValidationPipe(UpdateTierBodySchema))
+    body: z.infer<typeof UpdateTierBodySchema>,
   ): Promise<TenantFeaturesResponse> {
-    const result = SubscriptionTierSchema.safeParse(
-      (body as Record<string, unknown>)?.tier,
-    );
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-    return this.featuresService.updateTier(user.tenantId, result.data);
+    return this.featuresService.updateTier(user.tenantId, body.tier);
   }
 }

@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -71,8 +70,13 @@ describe('AuditController', () => {
         total: 2,
       });
 
-      // Act
-      const result = await controller.findAll(mockUser, {});
+      // Act — pipe applies defaults before reaching the method
+      const result = await controller.findAll(mockUser, {
+        page: 1,
+        pageSize: 25,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+      });
 
       // Assert
       expect(result).toEqual({
@@ -115,22 +119,18 @@ describe('AuditController', () => {
       featuresService = createMockFeaturesService(false);
       controller = new AuditController(auditService, featuresService);
 
-      // Act & Assert
-      await expect(controller.findAll(mockUser, {})).rejects.toMatchObject({
+      // Act & Assert — pipe applies defaults before reaching the method
+      const params = {
+        page: 1,
+        pageSize: 25,
+        sortBy: 'createdAt' as const,
+        sortDir: 'desc' as const,
+      };
+      await expect(controller.findAll(mockUser, params)).rejects.toMatchObject({
         code: ErrorCode.FEATURE_NOT_ENABLED,
       });
-      await expect(controller.findAll(mockUser, {})).rejects.toBeInstanceOf(
+      await expect(controller.findAll(mockUser, params)).rejects.toBeInstanceOf(
         AppError,
-      );
-    });
-
-    it('throws BadRequestException for invalid query params', async () => {
-      // Arrange — page = -1 violates .min(1)
-      const invalidQuery = { page: '-1' };
-
-      // Act & Assert
-      await expect(controller.findAll(mockUser, invalidQuery)).rejects.toThrow(
-        BadRequestException,
       );
     });
 
@@ -141,8 +141,13 @@ describe('AuditController', () => {
         total: 0,
       });
 
-      // Act
-      const result = await controller.findAll(mockUser, {});
+      // Act — pipe applies schema defaults before reaching the method
+      const result = await controller.findAll(mockUser, {
+        page: 1,
+        pageSize: 25,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+      });
 
       // Assert — service receives parsed defaults
       expect(auditService.findAll).toHaveBeenCalledWith(
@@ -175,8 +180,13 @@ describe('AuditController', () => {
         total: 1,
       });
 
-      // Act
-      const result = await controller.findAll(mockUser, {});
+      // Act — pipe applies defaults before reaching the method
+      const result = await controller.findAll(mockUser, {
+        page: 1,
+        pageSize: 25,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+      });
 
       // Assert
       expect(result.items).toHaveLength(1);
@@ -203,16 +213,17 @@ describe('AuditController', () => {
         total: 0,
       });
 
-      const query = {
-        page: '2',
-        pageSize: '10',
+      // Pipe parses and coerces query strings before reaching the method
+      const params = {
+        page: 2,
+        pageSize: 10,
         eventType: 'saved_query.created',
-        sortBy: 'eventType',
-        sortDir: 'asc',
+        sortBy: 'eventType' as const,
+        sortDir: 'asc' as const,
       };
 
       // Act
-      await controller.findAll(mockUser, query);
+      await controller.findAll(mockUser, params);
 
       // Assert
       expect(auditService.findAll).toHaveBeenCalledWith(
@@ -226,29 +237,6 @@ describe('AuditController', () => {
           sortDir: 'asc',
         }),
       );
-    });
-
-    it('throws BadRequestException when pageSize exceeds maximum', async () => {
-      // Arrange — pageSize max is 100
-      const invalidQuery = { pageSize: '101' };
-
-      // Act & Assert
-      await expect(controller.findAll(mockUser, invalidQuery)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('checks features before validating query params', async () => {
-      // Arrange — feature disabled AND invalid params
-      featuresService = createMockFeaturesService(false);
-      controller = new AuditController(auditService, featuresService);
-
-      const invalidQuery = { page: '-1' };
-
-      // Act & Assert — should throw AppError (feature check), not BadRequestException (validation)
-      await expect(
-        controller.findAll(mockUser, invalidQuery),
-      ).rejects.toBeInstanceOf(AppError);
     });
   });
 });

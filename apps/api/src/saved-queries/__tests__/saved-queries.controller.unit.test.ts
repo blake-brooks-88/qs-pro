@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { SessionGuard } from '@qpp/backend-shared';
 import { createMockUserSession, resetFactories } from '@qpp/test-utils';
@@ -85,12 +84,6 @@ describe('SavedQueriesController', () => {
         linkedQaName: null,
         linkedAt: null,
       });
-    });
-
-    it('throws BadRequestException when body fails validation', async () => {
-      await expect(controller.create(mockUser, {})).rejects.toThrow(
-        BadRequestException,
-      );
     });
   });
 
@@ -217,14 +210,6 @@ describe('SavedQueriesController', () => {
         { name: 'Renamed' },
       );
       expect(result.name).toBe('Renamed');
-    });
-
-    it('throws BadRequestException when body fails validation', async () => {
-      await expect(
-        controller.update(mockUser, '550e8400-e29b-41d4-a716-446655440000', {
-          name: '',
-        }),
-      ).rejects.toThrow(BadRequestException);
     });
   });
 

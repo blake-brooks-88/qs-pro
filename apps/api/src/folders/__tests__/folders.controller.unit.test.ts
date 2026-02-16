@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { SessionGuard } from '@qpp/backend-shared';
 import { createMockUserSession, resetFactories } from '@qpp/test-utils';
@@ -73,12 +72,6 @@ describe('FoldersController', () => {
         createdAt: '2026-02-14T12:00:00.000Z',
         updatedAt: '2026-02-14T12:00:00.000Z',
       });
-    });
-
-    it('throws BadRequestException when body fails validation', async () => {
-      await expect(controller.create(mockUser, {})).rejects.toThrow(
-        BadRequestException,
-      );
     });
   });
 
@@ -157,14 +150,6 @@ describe('FoldersController', () => {
         { name: 'Updated' },
       );
       expect(result.name).toBe('Updated');
-    });
-
-    it('throws BadRequestException when body fails validation', async () => {
-      await expect(
-        controller.update(mockUser, '550e8400-e29b-41d4-a716-446655440000', {
-          name: '',
-        }),
-      ).rejects.toThrow(BadRequestException);
     });
   });
 

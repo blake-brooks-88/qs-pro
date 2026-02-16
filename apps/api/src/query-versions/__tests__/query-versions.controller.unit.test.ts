@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { SessionGuard } from '@qpp/backend-shared';
 import { createMockUserSession, resetFactories } from '@qpp/test-utils';
@@ -166,20 +165,6 @@ describe('QueryVersionsController', () => {
         { versionName: null },
       );
       expect(result).toEqual(expected);
-    });
-
-    it('throws BadRequestException when body is empty', async () => {
-      await expect(
-        controller.updateName(mockUser, 'sq-1', 'v-1', {}),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws BadRequestException when versionName exceeds 255 chars', async () => {
-      await expect(
-        controller.updateName(mockUser, 'sq-1', 'v-1', {
-          versionName: 'x'.repeat(256),
-        }),
-      ).rejects.toThrow(BadRequestException);
     });
   });
 });

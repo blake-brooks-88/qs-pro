@@ -1,10 +1,10 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UseGuards,
@@ -23,6 +23,7 @@ import {
   CurrentUser,
   type UserSession,
 } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FoldersService } from './folders.service';
 
 @Controller('folders')
@@ -33,13 +34,10 @@ export class FoldersController {
   @Post()
   @UseGuards(CsrfGuard)
   @Audited('folder.created')
-  async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
-    const result = CreateFolderSchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-    const dto: CreateFolderDto = result.data;
-
+  async create(
+    @CurrentUser() user: UserSession,
+    @Body(new ZodValidationPipe(CreateFolderSchema)) dto: CreateFolderDto,
+  ) {
     const folder = await this.foldersService.create(
       user.tenantId,
       user.mid,
@@ -60,7 +58,10 @@ export class FoldersController {
   }
 
   @Get(':id')
-  async findById(@CurrentUser() user: UserSession, @Param('id') id: string) {
+  async findById(
+    @CurrentUser() user: UserSession,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
     const folder = await this.foldersService.findById(
       user.tenantId,
       user.mid,
@@ -75,15 +76,9 @@ export class FoldersController {
   @Audited('folder.updated', { targetIdParam: 'id', metadataFields: ['name'] })
   async update(
     @CurrentUser() user: UserSession,
-    @Param('id') id: string,
-    @Body() body: unknown,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body(new ZodValidationPipe(UpdateFolderSchema)) dto: UpdateFolderDto,
   ) {
-    const result = UpdateFolderSchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-    const dto: UpdateFolderDto = result.data;
-
     const folder = await this.foldersService.update(
       user.tenantId,
       user.mid,
@@ -97,7 +92,10 @@ export class FoldersController {
   @Delete(':id')
   @UseGuards(CsrfGuard)
   @Audited('folder.deleted', { targetIdParam: 'id' })
-  async delete(@CurrentUser() user: UserSession, @Param('id') id: string) {
+  async delete(
+    @CurrentUser() user: UserSession,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
     await this.foldersService.delete(user.tenantId, user.mid, user.userId, id);
     return { success: true };
   }

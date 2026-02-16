@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import { createMockUserSession, resetFactories } from '@qpp/test-utils';
@@ -97,12 +96,6 @@ describe('QueryActivitiesController', () => {
       );
       expect(result).toEqual({ ok: true });
     });
-
-    it('throws BadRequestException when body fails validation', async () => {
-      await expect(controller.create(mockUser, {})).rejects.toThrow(
-        BadRequestException,
-      );
-    });
   });
 
   describe('GET findAll()', () => {
@@ -140,12 +133,6 @@ describe('QueryActivitiesController', () => {
         'keep-local',
       );
       expect(result).toEqual({ linkedQaCustomerKey: 'qa-1' });
-    });
-
-    it('throws BadRequestException when body fails validation', async () => {
-      await expect(controller.linkQuery(mockUser, 'sq-1', {})).rejects.toThrow(
-        BadRequestException,
-      );
     });
   });
 

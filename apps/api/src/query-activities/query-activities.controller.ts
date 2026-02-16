@@ -1,15 +1,20 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import type {
+  CreateQueryActivityDto,
+  LinkQueryRequest,
+  PublishQueryRequest,
+} from '@qpp/shared-types';
 import {
   CreateQueryActivitySchema,
   LinkQueryRequestSchema,
@@ -22,6 +27,7 @@ import { Audited } from '../common/decorators/audited.decorator';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from '../features/features.service';
 import { QueryActivitiesService } from './query-activities.service';
 
@@ -47,19 +53,18 @@ export class QueryActivitiesController {
   @Post()
   @UseGuards(CsrfGuard)
   @Audited('query_activity.created')
-  async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
+  async create(
+    @CurrentUser() user: UserSession,
+    @Body(new ZodValidationPipe(CreateQueryActivitySchema))
+    dto: CreateQueryActivityDto,
+  ) {
     await this.requireDeployFeature(user.tenantId);
-
-    const result = CreateQueryActivitySchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
 
     return this.queryActivitiesService.create(
       user.tenantId,
       user.userId,
       user.mid,
-      result.data,
+      dto,
     );
   }
 
@@ -79,23 +84,20 @@ export class QueryActivitiesController {
   @Audited('query_activity.linked', { targetIdParam: 'savedQueryId' })
   async linkQuery(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
-    @Body() body: unknown,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
+    @Body(new ZodValidationPipe(LinkQueryRequestSchema))
+    dto: LinkQueryRequest,
   ) {
     await this.requireDeployFeature(user.tenantId);
-
-    const result = LinkQueryRequestSchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
 
     return this.queryActivitiesService.linkQuery(
       user.tenantId,
       user.userId,
       user.mid,
       savedQueryId,
-      result.data.qaCustomerKey,
-      result.data.conflictResolution,
+      dto.qaCustomerKey,
+      dto.conflictResolution,
     );
   }
 
@@ -104,7 +106,8 @@ export class QueryActivitiesController {
   @Audited('query_activity.unlinked', { targetIdParam: 'savedQueryId' })
   async unlinkQuery(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
     @Body() body: unknown,
   ) {
     await this.requireDeployFeature(user.tenantId);
@@ -128,29 +131,27 @@ export class QueryActivitiesController {
   @Audited('query_activity.published', { targetIdParam: 'savedQueryId' })
   async publishQuery(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
-    @Body() body: unknown,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
+    @Body(new ZodValidationPipe(PublishQueryRequestSchema))
+    dto: PublishQueryRequest,
   ) {
     await this.requireDeployFeature(user.tenantId);
-
-    const result = PublishQueryRequestSchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
 
     return this.queryActivitiesService.publish(
       user.tenantId,
       user.userId,
       user.mid,
       savedQueryId,
-      result.data.versionId,
+      dto.versionId,
     );
   }
 
   @Get('drift/:savedQueryId')
   async checkDrift(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
   ) {
     await this.requireDeployFeature(user.tenantId);
 
@@ -165,7 +166,8 @@ export class QueryActivitiesController {
   @Get('blast-radius/:savedQueryId')
   async getBlastRadius(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
   ) {
     await this.requireDeployFeature(user.tenantId);
 

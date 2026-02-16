@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import { createMockUserSession, resetFactories } from '@qpp/test-utils';
@@ -132,23 +131,6 @@ describe('QueryActivitiesController (publish)', () => {
       ).rejects.toMatchObject({
         code: ErrorCode.FEATURE_NOT_ENABLED,
       });
-    });
-
-    it('throws BadRequestException when body fails Zod validation (missing versionId)', async () => {
-      enableDeploy(featuresService);
-
-      await expect(
-        controller.publishQuery(mockUser, 'sq-1', {}),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws BadRequestException when versionId is not a UUID', async () => {
-      enableDeploy(featuresService);
-      const body = { versionId: 'not-a-uuid' };
-
-      await expect(
-        controller.publishQuery(mockUser, 'sq-1', body),
-      ).rejects.toThrow(BadRequestException);
     });
 
     it('returns the service response on success', async () => {
