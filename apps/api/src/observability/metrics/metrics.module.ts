@@ -66,6 +66,8 @@ function getOrCreateHistogram(
 })
 export class MetricsModule implements OnModuleInit {
   onModuleInit() {
-    collectDefaultMetrics({ prefix: 'qpp_' });
+    if (!register.getSingleMetric('qpp_process_cpu_user_seconds_total')) {
+      collectDefaultMetrics({ prefix: 'qpp_' });
+    }
   }
 }
