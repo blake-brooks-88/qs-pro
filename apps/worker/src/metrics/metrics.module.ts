@@ -1,7 +1,35 @@
 import { Global, Module } from "@nestjs/common";
-import { Counter, Gauge, Histogram } from "prom-client";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 
 import { MetricsController } from "./metrics.controller";
+
+function getOrCreateCounter(
+  name: string,
+  help: string,
+  labelNames: string[] = [],
+): Counter {
+  return (
+    (register.getSingleMetric(name) as Counter) ??
+    new Counter({ name, help, labelNames })
+  );
+}
+
+function getOrCreateHistogram(
+  name: string,
+  help: string,
+  buckets: number[],
+): Histogram {
+  return (
+    (register.getSingleMetric(name) as Histogram) ??
+    new Histogram({ name, help, buckets })
+  );
+}
+
+function getOrCreateGauge(name: string, help: string): Gauge {
+  return (
+    (register.getSingleMetric(name) as Gauge) ?? new Gauge({ name, help })
+  );
+}
 
 @Global()
 @Module({
@@ -10,37 +38,37 @@ import { MetricsController } from "./metrics.controller";
     {
       provide: "METRICS_JOBS_TOTAL",
       useFactory: () =>
-        new Counter({
-          name: "shell_query_jobs_total",
-          help: "Total number of shell query jobs",
-          labelNames: ["status"],
-        }),
+        getOrCreateCounter(
+          "shell_query_jobs_total",
+          "Total number of shell query jobs",
+          ["status"],
+        ),
     },
     {
       provide: "METRICS_DURATION",
       useFactory: () =>
-        new Histogram({
-          name: "shell_query_duration_seconds",
-          help: "Duration of shell query jobs in seconds",
-          buckets: [1, 5, 10, 30, 60, 300, 600, 1800],
-        }),
+        getOrCreateHistogram(
+          "shell_query_duration_seconds",
+          "Duration of shell query jobs in seconds",
+          [1, 5, 10, 30, 60, 300, 600, 1800],
+        ),
     },
     {
       provide: "METRICS_FAILURES_TOTAL",
       useFactory: () =>
-        new Counter({
-          name: "shell_query_failures_total",
-          help: "Total number of failed shell query jobs",
-          labelNames: ["error_type"],
-        }),
+        getOrCreateCounter(
+          "shell_query_failures_total",
+          "Total number of failed shell query jobs",
+          ["error_type"],
+        ),
     },
     {
       provide: "METRICS_ACTIVE_JOBS",
       useFactory: () =>
-        new Gauge({
-          name: "shell_query_active_jobs",
-          help: "Number of active shell query jobs",
-        }),
+        getOrCreateGauge(
+          "shell_query_active_jobs",
+          "Number of active shell query jobs",
+        ),
     },
   ],
   exports: [
