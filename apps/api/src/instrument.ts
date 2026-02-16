@@ -1,21 +1,23 @@
 import * as Sentry from '@sentry/nestjs';
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
+  dsn: process.env.SENTRY_DSN_API ?? process.env.SENTRY_DSN,
   environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV,
   release: process.env.APP_VERSION || 'dev',
   tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
   beforeSend(event) {
     if (event.request?.headers) {
-      const sensitiveHeaders = [
+      const sensitiveHeaders = new Set([
         'authorization',
         'cookie',
         'x-admin-key',
         'x-csrf-token',
         'x-xsrf-token',
-      ];
-      for (const header of sensitiveHeaders) {
-        delete event.request.headers[header];
+      ]);
+      for (const key of Object.keys(event.request.headers)) {
+        if (sensitiveHeaders.has(key.toLowerCase())) {
+          delete event.request.headers[key];
+        }
       }
     }
 

@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
+import { Injectable } from "@nestjs/common";
 import {
   type HealthIndicatorResult,
   HealthIndicatorService,

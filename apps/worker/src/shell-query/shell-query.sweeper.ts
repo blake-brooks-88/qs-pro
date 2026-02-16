@@ -5,7 +5,6 @@ import {
   QueryDefinitionService,
   RlsContextService,
 } from "@qpp/backend-shared";
-import type { AuditEventType } from "@qpp/shared-types";
 import {
   and,
   auditLogs,
@@ -15,6 +14,7 @@ import {
   type PostgresJsDatabase,
   tenantSettings,
 } from "@qpp/database";
+import type { AuditEventType } from "@qpp/shared-types";
 
 @Injectable()
 export class ShellQuerySweeper {

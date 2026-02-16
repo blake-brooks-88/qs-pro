@@ -7,6 +7,7 @@ import {
 } from 'prom-client';
 
 import { MetricsController } from './metrics.controller';
+import { MetricsGuard } from './metrics.guard';
 
 function getOrCreateCounter(
   name: string,
@@ -34,6 +35,7 @@ function getOrCreateHistogram(
 @Module({
   controllers: [MetricsController],
   providers: [
+    MetricsGuard,
     {
       provide: 'QPP_QUERIES_EXECUTED',
       useFactory: () =>

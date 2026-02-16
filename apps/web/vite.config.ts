@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     build: {
-      sourcemap: true,
+      sourcemap: !!process.env.SENTRY_AUTH_TOKEN,
     },
 
     plugins: [

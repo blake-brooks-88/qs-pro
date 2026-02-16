@@ -1,7 +1,9 @@
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { MetricsController } from '../metrics.controller';
+import { MetricsGuard } from '../metrics.guard';
 
 vi.mock('prom-client', () => ({
   register: {
@@ -31,6 +33,10 @@ describe('MetricsController', () => {
   async function createTestModule(): Promise<TestingModule> {
     return Test.createTestingModule({
       controllers: [MetricsController],
+      providers: [
+        MetricsGuard,
+        { provide: ConfigService, useValue: { get: () => undefined } },
+      ],
     }).compile();
   }
 

@@ -10,20 +10,22 @@ function createMockIndicator(key: string, status: "up" | "down" = "up") {
 
 function createMockHealthCheckService() {
   return {
-    check: vi.fn().mockImplementation(async (indicators: Array<() => Promise<unknown>>) => {
-      const details: Record<string, unknown> = {};
-      for (const indicator of indicators) {
-        const result = await indicator();
-        Object.assign(details, result);
-      }
-      const allUp = Object.values(details).every(
-        (v) => (v as { status: string }).status === "up",
-      );
-      return {
-        status: allUp ? "ok" : "error",
-        details,
-      };
-    }),
+    check: vi
+      .fn()
+      .mockImplementation(async (indicators: Array<() => Promise<unknown>>) => {
+        const details: Record<string, unknown> = {};
+        for (const indicator of indicators) {
+          const result = await indicator();
+          Object.assign(details, result);
+        }
+        const allUp = Object.values(details).every(
+          (v) => (v as { status: string }).status === "up",
+        );
+        return {
+          status: allUp ? "ok" : "error",
+          details,
+        };
+      }),
   };
 }
 

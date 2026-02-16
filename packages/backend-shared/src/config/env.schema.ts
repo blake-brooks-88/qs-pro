@@ -90,6 +90,7 @@ export const observabilitySchema = z.object({
   LOKI_HOST: z.string().url().optional(),
   LOKI_USERNAME: z.string().optional(),
   LOKI_PASSWORD: z.string().optional(),
+  METRICS_API_KEY: z.string().min(1).optional(),
 });
 
 // =============================================================================

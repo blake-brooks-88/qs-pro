@@ -26,9 +26,7 @@ function getOrCreateHistogram(
 }
 
 function getOrCreateGauge(name: string, help: string): Gauge {
-  return (
-    (register.getSingleMetric(name) as Gauge) ?? new Gauge({ name, help })
-  );
+  return (register.getSingleMetric(name) as Gauge) ?? new Gauge({ name, help });
 }
 
 @Global()

@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
+import { Injectable } from "@nestjs/common";
 import {
   type HealthIndicatorResult,
   HealthIndicatorService,
@@ -29,10 +29,7 @@ export class RedisHealthIndicator {
       const response = await Promise.race([
         client.ping(),
         new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Redis ping timeout")),
-            500,
-          ),
+          setTimeout(() => reject(new Error("Redis ping timeout")), 500),
         ),
       ]);
 
