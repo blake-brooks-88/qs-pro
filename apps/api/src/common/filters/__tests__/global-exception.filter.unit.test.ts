@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  HttpException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -57,6 +58,14 @@ class TestController {
   @Get('plain-unknown')
   throwPlainObject() {
     throw new (class CustomError extends Error {})();
+  }
+
+  @Get('too-many-requests')
+  throwTooManyRequests() {
+    throw new HttpException(
+      { statusCode: 429, message: 'ThrottlerException: Too Many Requests' },
+      429,
+    );
   }
 }
 
@@ -190,6 +199,24 @@ describe('GlobalExceptionFilter', () => {
       expect(body).not.toHaveProperty('violations');
     });
 
+    it('returns RFC 9457-compatible 429 for rate limit exceeded', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/test/too-many-requests',
+      });
+
+      expect(response.statusCode).toBe(429);
+      expect(response.headers['content-type']).toContain(
+        'application/problem+json',
+      );
+      expect(response.json()).toMatchObject({
+        type: 'urn:qpp:error:http-429',
+        title: 'Too Many Requests',
+        status: 429,
+        instance: '/test/too-many-requests',
+      });
+    });
+
     it('returns 401 for UnauthorizedException', async () => {
       const response = await app.inject({
         method: 'GET',
@@ -316,6 +343,7 @@ describe('GlobalExceptionFilter', () => {
         { endpoint: '/test/not-found', expectedStatus: 404 },
         { endpoint: '/test/unauthorized', expectedStatus: 401 },
         { endpoint: '/test/unknown-error', expectedStatus: 500 },
+        { endpoint: '/test/too-many-requests', expectedStatus: 429 },
       ];
 
       for (const { endpoint, expectedStatus } of testCases) {

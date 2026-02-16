@@ -13,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SkipThrottle } from '@nestjs/throttler';
 import { AuthService, SessionGuard } from '@qpp/backend-shared';
 import { randomBytes } from 'crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -40,6 +41,7 @@ interface OAuthStatePayload {
 
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
+@SkipThrottle()
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
