@@ -144,6 +144,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       [408, 'Request Timeout'],
       [409, 'Conflict'],
       [410, 'Gone'],
+      [413, 'Payload Too Large'],
       [422, 'Unprocessable Entity'],
       [429, 'Too Many Requests'],
       [500, 'Internal Server Error'],

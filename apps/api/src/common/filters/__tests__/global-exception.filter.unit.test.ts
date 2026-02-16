@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   HttpException,
   NotFoundException,
+  PayloadTooLargeException,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -48,6 +50,21 @@ class TestController {
   @Get('unauthorized')
   throwUnauthorized() {
     throw new UnauthorizedException('Authentication required');
+  }
+
+  @Get('forbidden')
+  throwForbidden() {
+    throw new ForbiddenException('Insufficient permissions');
+  }
+
+  @Get('payload-too-large')
+  throwPayloadTooLarge() {
+    throw new PayloadTooLargeException('Request body exceeds 1MB limit');
+  }
+
+  @Get('malformed-json')
+  throwMalformedJson() {
+    throw new BadRequestException('Unexpected token } in JSON at position 42');
   }
 
   @Get('unknown-error')
@@ -232,6 +249,63 @@ describe('GlobalExceptionFilter', () => {
         instance: '/test/unauthorized',
       });
     });
+
+    it('returns 403 for ForbiddenException', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/test/forbidden',
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.headers['content-type']).toContain(
+        'application/problem+json',
+      );
+      expect(response.json()).toMatchObject({
+        type: 'urn:qpp:error:http-403',
+        title: 'Forbidden',
+        status: 403,
+        detail: 'Insufficient permissions',
+        instance: '/test/forbidden',
+      });
+    });
+
+    it('returns 413 for PayloadTooLargeException', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/test/payload-too-large',
+      });
+
+      expect(response.statusCode).toBe(413);
+      expect(response.headers['content-type']).toContain(
+        'application/problem+json',
+      );
+      expect(response.json()).toMatchObject({
+        type: 'urn:qpp:error:http-413',
+        title: 'Payload Too Large',
+        status: 413,
+        detail: 'Request body exceeds 1MB limit',
+        instance: '/test/payload-too-large',
+      });
+    });
+
+    it('returns RFC 9457 for malformed JSON parse error', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/test/malformed-json',
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.headers['content-type']).toContain(
+        'application/problem+json',
+      );
+      expect(response.json()).toMatchObject({
+        type: 'urn:qpp:error:http-400',
+        title: 'Bad Request',
+        status: 400,
+        instance: '/test/malformed-json',
+      });
+      expect(response.json().detail).toContain('Unexpected token');
+    });
   });
 
   describe('Unknown error handling', () => {
@@ -342,6 +416,8 @@ describe('GlobalExceptionFilter', () => {
         { endpoint: '/test/bad-request', expectedStatus: 400 },
         { endpoint: '/test/not-found', expectedStatus: 404 },
         { endpoint: '/test/unauthorized', expectedStatus: 401 },
+        { endpoint: '/test/forbidden', expectedStatus: 403 },
+        { endpoint: '/test/payload-too-large', expectedStatus: 413 },
         { endpoint: '/test/unknown-error', expectedStatus: 500 },
         { endpoint: '/test/too-many-requests', expectedStatus: 429 },
       ];
