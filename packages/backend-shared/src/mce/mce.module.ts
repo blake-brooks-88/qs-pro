@@ -1,5 +1,6 @@
 import { CacheModule } from "@nestjs/cache-manager";
 import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 
 import { AuthModule } from "../auth/auth.module";
 import { AuthService } from "../auth/auth.service";
@@ -14,7 +15,7 @@ import { QueryDefinitionService } from "./services/query-definition.service";
 import { RestDataService } from "./services/rest-data.service";
 
 @Module({
-  imports: [AuthModule, CacheModule.register()],
+  imports: [AuthModule, CacheModule.register(), ConfigModule],
   providers: [
     MceHttpClient,
     MceBridgeService,

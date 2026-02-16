@@ -1,9 +1,11 @@
 import { Controller, Get, Res, UseGuards } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { FastifyReply } from 'fastify';
 import { register } from 'prom-client';
 
 import { MetricsGuard } from './metrics.guard';
 
+@SkipThrottle()
 @Controller('metrics')
 @UseGuards(MetricsGuard)
 export class MetricsController {

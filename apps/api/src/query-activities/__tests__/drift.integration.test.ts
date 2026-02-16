@@ -310,7 +310,7 @@ describe('GET /query-activities/drift/:savedQueryId (integration)', () => {
       await setTenantTier('free');
 
       const res = await request(app.getHttpServer()).get(
-        '/query-activities/drift/fake-id',
+        '/query-activities/drift/00000000-0000-4000-8000-000000000000',
       );
 
       expect(res.status).toBe(403);

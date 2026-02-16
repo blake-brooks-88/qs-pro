@@ -1265,7 +1265,7 @@ describe('Query Execution Flow (e2e)', () => {
       const { agent, csrfToken } = await createAuthenticatedAgent();
 
       const res = await agent
-        .get('/runs/00000000-0000-0000-0000-000000000000')
+        .get('/runs/00000000-0000-4000-8000-000000000000')
         .set('x-csrf-token', csrfToken);
 
       expect(res.status).toBe(404);

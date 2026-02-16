@@ -1,3 +1,4 @@
+import { ConfigService } from "@nestjs/config";
 import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,11 +8,26 @@ import { MceHttpClient } from "./mce-http-client";
 
 vi.mock("axios");
 
+function createMockConfigService(
+  overrides: Record<string, string> = {},
+): ConfigService {
+  return {
+    get: vi.fn((key: string, fallback?: string) => {
+      if (key in overrides) {
+        return overrides[key];
+      }
+      return fallback;
+    }),
+  } as unknown as ConfigService;
+}
+
 describe("MceHttpClient", () => {
   let client: MceHttpClient;
+  let configService: ConfigService;
 
   beforeEach(() => {
-    client = new MceHttpClient();
+    configService = createMockConfigService();
+    client = new MceHttpClient(configService);
     vi.clearAllMocks();
   });
 
@@ -181,6 +197,119 @@ describe("MceHttpClient", () => {
 
       expect(axios.request).toHaveBeenCalledWith(
         expect.objectContaining({ timeout: 120_000 }),
+      );
+    });
+  });
+
+  describe("outbound host policy", () => {
+    it("allows MCE REST host", async () => {
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({
+        url: "https://mc1234.rest.marketingcloudapis.com/data/v1/async",
+      });
+
+      expect(axios.request).toHaveBeenCalled();
+    });
+
+    it("allows MCE SOAP host", async () => {
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({
+        url: "https://mc1234.soap.marketingcloudapis.com/Service.asmx",
+      });
+
+      expect(axios.request).toHaveBeenCalled();
+    });
+
+    it("allows MCE Auth host", async () => {
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({
+        url: "https://mc1234.auth.marketingcloudapis.com/v2/token",
+      });
+
+      expect(axios.request).toHaveBeenCalled();
+    });
+
+    it("logs warning for non-MCE host with policy=log", async () => {
+      configService = createMockConfigService({
+        OUTBOUND_HOST_POLICY: "log",
+      });
+      client = new MceHttpClient(configService);
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({ url: "https://evil.example.com/data" });
+
+      expect(axios.request).toHaveBeenCalled();
+    });
+
+    it("throws AppError for non-MCE host with policy=block", async () => {
+      configService = createMockConfigService({
+        OUTBOUND_HOST_POLICY: "block",
+      });
+      client = new MceHttpClient(configService);
+
+      await expect(
+        client.request({ url: "https://evil.example.com/data" }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.MCE_BAD_REQUEST,
+      });
+
+      expect(axios.request).not.toHaveBeenCalled();
+    });
+
+    it("resolves full URL from baseURL + url", async () => {
+      configService = createMockConfigService({
+        OUTBOUND_HOST_POLICY: "block",
+      });
+      client = new MceHttpClient(configService);
+
+      await expect(
+        client.request({
+          baseURL: "https://evil.example.com",
+          url: "/data",
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.MCE_BAD_REQUEST,
+      });
+    });
+
+    it("allows extra hosts from SENTRY_DSN", async () => {
+      configService = createMockConfigService({
+        SENTRY_DSN: "https://key@sentry.example.com/123",
+      });
+      client = new MceHttpClient(configService);
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({ url: "https://sentry.example.com/api/store" });
+
+      expect(axios.request).toHaveBeenCalled();
+    });
+
+    it("allows extra hosts from LOKI_HOST", async () => {
+      configService = createMockConfigService({
+        LOKI_HOST: "https://loki.example.com",
+      });
+      client = new MceHttpClient(configService);
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({
+        url: "https://loki.example.com/loki/api/v1/push",
+      });
+
+      expect(axios.request).toHaveBeenCalled();
+    });
+  });
+
+  describe("maxContentLength", () => {
+    it("sets maxContentLength to 50 MB on all requests", async () => {
+      vi.mocked(axios.request).mockResolvedValue({ data: {} });
+
+      await client.request({ url: "/test" });
+
+      expect(axios.request).toHaveBeenCalledWith(
+        expect.objectContaining({ maxContentLength: 52428800 }),
       );
     });
   });

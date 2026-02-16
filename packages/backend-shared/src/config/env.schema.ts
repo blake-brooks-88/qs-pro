@@ -21,6 +21,7 @@ export const infrastructureSchema = z.object({
   LOG_LEVEL: z
     .enum(["trace", "debug", "info", "warn", "error", "fatal"])
     .optional(),
+  OUTBOUND_HOST_POLICY: z.enum(["log", "block"]).default("log"),
 });
 
 /**

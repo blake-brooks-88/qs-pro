@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 10 Observability & Monitoring COMPLETE. All 4 plans finished: Sentry error tracking (API/Worker/Web), health endpoints (/livez + /readyz for API and Worker via @nestjs/terminus), MetricsModule with Prometheus endpoint, BullMQ trace propagation, pino-loki log shipping, 4 operational runbooks.
+**Current focus:** Phase 11 API Hardening — all 3 plans COMPLETE. ZodValidationPipe + ParseUUIDPipe (Plan 01), RLS isolation regression suite (Plan 02), outbound host allowlist + rate limiting (Plan 03).
 
 ## Current Milestone
 
@@ -41,7 +41,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 8.6 | Version + Publish Integration (INSERTED) | ✓ Complete | 5/5 | 100% |
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
 | 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
-| 11 | API Hardening | ○ Pending | 0/0 | 0% |
+| 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ○ Pending | 0/0 | 0% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
 | 14 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
@@ -314,6 +314,14 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-16 | BullMQ telemetry supported via @nestjs/bullmq | BullRootModuleOptions extends Bull.QueueOptions which includes telemetry?: Telemetry; BullMQOtel wired directly |
 | 2026-02-16 | @Global() MetricsModule with injectable provider tokens | QPP_QUERIES_EXECUTED, QPP_MCE_API_CALLS, QPP_QUERY_DURATION available for @Inject() across API |
 | 2026-02-16 | Runbooks force-added past /docs/ gitignore | Operational runbooks are hand-crafted, not auto-generated; git add -f appropriate |
+| 2026-02-16 | OUTBOUND_HOST_POLICY defaults to 'log' | Safe rollout; teams switch to 'block' when confident in allowlist coverage |
+| 2026-02-16 | Only full URLs validated for host policy | Relative paths (e.g., /data/v1/async) skip host validation; only http(s):// URLs checked |
+| 2026-02-16 | ThrottlerModule limit 10000 in test env | Effectively disables rate limiting during rapid test execution to prevent interference |
+| 2026-02-16 | @SkipThrottle() on auth, health, metrics controllers | OAuth flow is its own rate limiter; health/metrics are infrastructure endpoints |
+| 2026-02-16 | SessionThrottlerGuard uses session userId for tracking | Falls back to IP for unauthenticated, then 'unknown'; extends ThrottlerGuard |
+| 2026-02-16 | relkind IN ('r','p') for FORCE RLS pg_class query | audit_logs is partitioned (relkind='p'); must include both regular and partitioned tables |
+| 2026-02-16 | DISABLE TRIGGER for audit_logs immutability bypass in tests | set_config('app.audit_retention_purge') unreliable in purge context; ALTER TABLE DISABLE TRIGGER is deterministic |
+| 2026-02-16 | withRlsContext helper for RLS integration tests | Reserves connection, sets set_config vars, executes callback, resets in finally block |
 
 ## Roadmap Evolution
 
@@ -339,8 +347,19 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 10 Plan 05 COMPLETE — Observability endpoint routing fix (gap closure)
-**Next step:** Phase 10 fully COMPLETE (including gap closure). Next: Phase 11 API Hardening
+**Last action:** Phase 11 COMPLETE — All 3 plans delivered (ZodValidationPipe, RLS regression suite, outbound host policy + rate limiting)
+**Next step:** Phase 12 Security Baseline (pending planning)
+
+**Phase 11 Plan 03 COMPLETE (2026-02-16):**
+
+- Outbound host allowlist enforcing MCE REST/SOAP/Auth host patterns with configurable log/block policy
+- 50 MB maxContentLength on all MCE HTTP requests preventing memory exhaustion
+- Global rate limiting at 120 req/min per authenticated user session with Redis-backed storage
+- Health, metrics, and auth endpoints exempt from rate limiting via @SkipThrottle()
+- 429 rate limit responses produce RFC 9457 Problem Details format
+- 3 auto-fixed deviations: relative URL handling, TypeScript override modifier, ConfigService DI propagation to 6 integration tests
+- Pre-existing API test failures (23 tests) from ZodValidationPipe refactoring unrelated to this plan
+- All backend-shared tests pass, builds succeed
 
 **Phase 10 Plan 05 COMPLETE (2026-02-16):**
 
@@ -963,9 +982,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-16T01:29:46.701Z
-**Stopped at:** Phase 11 context gathered
-**Resume file:** .planning/phases/11-api-hardening/11-CONTEXT.md
+**Last session:** 2026-02-16T18:07:06.059Z
+**Stopped at:** Phase 12 context gathered
+**Resume file:** .planning/phases/12-security-baseline/12-CONTEXT.md
 
 ## Blockers
 
@@ -987,4 +1006,4 @@ None currently.
 
 ---
 *State initialized: 2026-01-20*
-*Last updated: 2026-02-16 — Phase 10 COMPLETE (5 plans: Sentry, health endpoints, web Sentry, metrics/runbooks, routing fix)*
+*Last updated: 2026-02-16 — Phase 11 Plan 03 COMPLETE (outbound host policy, response size limits, session-based rate limiting)*

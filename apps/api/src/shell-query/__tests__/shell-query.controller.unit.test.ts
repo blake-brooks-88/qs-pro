@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
@@ -108,28 +107,6 @@ describe('ShellQueryController', () => {
   });
 
   describe('POST /runs (createRun)', () => {
-    it('rejects request with empty sqlText', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-      const body = { sqlText: '' };
-
-      // Act & Assert
-      await expect(controller.createRun(user, body)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('rejects request with sqlText over 100k characters', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-      const body = { sqlText: 'A'.repeat(100_001) };
-
-      // Act & Assert
-      await expect(controller.createRun(user, body)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
     it('returns 500 when tenant not found', async () => {
       // Arrange
       const user = createMockUserSession() as UserSession;
@@ -266,40 +243,7 @@ describe('ShellQueryController', () => {
   });
 
   describe('GET /:runId/results (getResults)', () => {
-    it('rejects non-numeric page parameter', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-      const runId = 'run-123';
-
-      // Act & Assert
-      await expect(controller.getResults(runId, 'abc', user)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('rejects page less than 1', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-      const runId = 'run-123';
-
-      // Act & Assert
-      await expect(controller.getResults(runId, '0', user)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('rejects page greater than 50', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-      const runId = 'run-123';
-
-      // Act & Assert
-      await expect(controller.getResults(runId, '51', user)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('delegates to service with parsed page number', async () => {
+    it('delegates to service with page number', async () => {
       // Arrange
       const user = createMockUserSession() as UserSession;
       const runId = 'run-123';
@@ -312,8 +256,8 @@ describe('ShellQueryController', () => {
       };
       shellQueryService.getResults.mockResolvedValue(mockResults);
 
-      // Act
-      const result = await controller.getResults(runId, '5', user);
+      // Act — pipe parses query into { page: number } before reaching the method
+      const result = await controller.getResults(runId, { page: 5 }, user);
 
       // Assert
       expect(shellQueryService.getResults).toHaveBeenCalledWith(
@@ -350,20 +294,17 @@ describe('ShellQueryController', () => {
         },
       });
 
-      // Act & Assert
-      await expect(controller.getHistory(user, {})).rejects.toMatchObject({
+      // Act & Assert — pipe applies defaults, so pass parsed params
+      await expect(
+        controller.getHistory(user, {
+          page: 1,
+          pageSize: 25,
+          sortBy: 'createdAt',
+          sortDir: 'desc',
+        }),
+      ).rejects.toMatchObject({
         code: ErrorCode.FEATURE_NOT_ENABLED,
       });
-    });
-
-    it('throws BadRequestException on invalid query params', async () => {
-      // Arrange
-      const user = createMockUserSession() as UserSession;
-
-      // Act & Assert
-      await expect(
-        controller.getHistory(user, { page: 'not-a-number' }),
-      ).rejects.toThrow(BadRequestException);
     });
 
     it('delegates to service listHistory with parsed params', async () => {
@@ -372,10 +313,12 @@ describe('ShellQueryController', () => {
       const mockResult = { items: [], total: 0, page: 1, pageSize: 25 };
       shellQueryService.listHistory.mockResolvedValue(mockResult);
 
-      // Act
+      // Act — pipe parses query strings into typed params before reaching the method
       const result = await controller.getHistory(user, {
-        page: '2',
-        pageSize: '10',
+        page: 2,
+        pageSize: 10,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
       });
 
       // Assert

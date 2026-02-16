@@ -52,7 +52,7 @@ describe('RunExistsGuard', () => {
 
   it('returns true when run exists', async () => {
     // Arrange
-    const runId = 'run-123';
+    const runId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
     shellQueryService.getRun.mockResolvedValue({ id: runId, status: 'queued' });
     const context = createMockExecutionContext(runId, user);
 
@@ -71,7 +71,7 @@ describe('RunExistsGuard', () => {
 
   it('throws RESOURCE_NOT_FOUND when run does not exist', async () => {
     // Arrange
-    const runId = 'non-existent';
+    const runId = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e';
     shellQueryService.getRun.mockResolvedValue(null);
     const context = createMockExecutionContext(runId, user);
 
@@ -79,5 +79,29 @@ describe('RunExistsGuard', () => {
     await expect(guard.canActivate(context)).rejects.toMatchObject({
       code: ErrorCode.RESOURCE_NOT_FOUND,
     });
+  });
+
+  it('throws VALIDATION_ERROR when runId is not a valid UUID', async () => {
+    // Arrange
+    const runId = 'not-a-uuid';
+    const context = createMockExecutionContext(runId, user);
+
+    // Act & Assert
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      code: ErrorCode.VALIDATION_ERROR,
+    });
+    expect(shellQueryService.getRun).not.toHaveBeenCalled();
+  });
+
+  it('throws VALIDATION_ERROR when runId is a UUID but not v4', async () => {
+    // Arrange (v1 UUID)
+    const runId = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+    const context = createMockExecutionContext(runId, user);
+
+    // Act & Assert
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      code: ErrorCode.VALIDATION_ERROR,
+    });
+    expect(shellQueryService.getRun).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -9,12 +8,14 @@ import {
   InternalServerErrorException,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Sse,
   UseGuards,
 } from '@nestjs/common';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import type { HistoryQueryParams } from '@qpp/shared-types';
 import { HistoryQueryParamsSchema } from '@qpp/shared-types';
 import type { Observable } from 'rxjs';
 import { z } from 'zod';
@@ -22,6 +23,7 @@ import { z } from 'zod';
 import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from '../features/features.service';
 import { FREE_TIER_RUN_LIMIT, UsageService } from '../usage/usage.service';
 import { RunExistsGuard } from './guards/run-exists.guard';
@@ -55,6 +57,12 @@ const createRunSchema = z.object({
     .optional(),
 });
 
+type CreateRunDto = z.infer<typeof createRunSchema>;
+
+const getResultsPageSchema = z.object({
+  page: z.coerce.number().int().min(1).max(50).default(1),
+});
+
 type TenantRepository = {
   findById(tenantId: string): Promise<{ eid: string } | null>;
 };
@@ -72,12 +80,10 @@ export class ShellQueryController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createRun(@CurrentUser() user: UserSession, @Body() body: unknown) {
-    const result = createRunSchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-
+  async createRun(
+    @CurrentUser() user: UserSession,
+    @Body(new ZodValidationPipe(createRunSchema)) dto: CreateRunDto,
+  ) {
     const {
       sqlText,
       snippetName,
@@ -85,7 +91,7 @@ export class ShellQueryController {
       targetUpdateType,
       savedQueryId,
       tableMetadata,
-    } = result.data;
+    } = dto;
 
     const { tier, features: tenantFeatures } =
       await this.featuresService.getTenantFeatures(user.tenantId);
@@ -149,7 +155,11 @@ export class ShellQueryController {
   }
 
   @Get('history')
-  async getHistory(@CurrentUser() user: UserSession, @Query() query: unknown) {
+  async getHistory(
+    @CurrentUser() user: UserSession,
+    @Query(new ZodValidationPipe(HistoryQueryParamsSchema))
+    params: HistoryQueryParams,
+  ) {
     const { features: tenantFeatures } =
       await this.featuresService.getTenantFeatures(user.tenantId);
 
@@ -160,22 +170,17 @@ export class ShellQueryController {
       });
     }
 
-    const result = HistoryQueryParamsSchema.safeParse(query);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-
     return this.shellQueryService.listHistory(
       user.tenantId,
       user.mid,
       user.userId,
-      result.data,
+      params,
     );
   }
 
   @Get(':runId/sql')
   async getRunSqlText(
-    @Param('runId') runId: string,
+    @Param('runId', new ParseUUIDPipe({ version: '4' })) runId: string,
     @CurrentUser() user: UserSession,
   ) {
     const { features: tenantFeatures } =
@@ -204,7 +209,7 @@ export class ShellQueryController {
 
   @Get(':runId')
   async getRunStatus(
-    @Param('runId') runId: string,
+    @Param('runId', new ParseUUIDPipe({ version: '4' })) runId: string,
     @CurrentUser() user: UserSession,
   ) {
     return this.shellQueryService.getRunStatus(
@@ -218,7 +223,7 @@ export class ShellQueryController {
   @Sse(':runId/events')
   @UseGuards(RunExistsGuard)
   async streamEvents(
-    @Param('runId') runId: string,
+    @Param('runId', new ParseUUIDPipe({ version: '4' })) runId: string,
     @CurrentUser() user: UserSession,
   ): Promise<Observable<MessageEvent>> {
     return this.shellQuerySse.streamRunEvents(runId, user.userId);
@@ -226,31 +231,24 @@ export class ShellQueryController {
 
   @Get(':runId/results')
   async getResults(
-    @Param('runId') runId: string,
-    @Query('page') page: string = '1',
+    @Param('runId', new ParseUUIDPipe({ version: '4' })) runId: string,
+    @Query(new ZodValidationPipe(getResultsPageSchema))
+    query: { page: number },
     @CurrentUser() user: UserSession,
   ) {
-    const pageNum = parseInt(page, 10);
-    if (isNaN(pageNum) || pageNum < 1) {
-      throw new BadRequestException('Invalid page number');
-    }
-    if (pageNum > 50) {
-      throw new BadRequestException('Page number exceeds maximum of 50');
-    }
-
     return this.shellQueryService.getResults(
       runId,
       user.tenantId,
       user.userId,
       user.mid,
-      pageNum,
+      query.page,
     );
   }
 
   @Post(':runId/cancel')
   @HttpCode(HttpStatus.OK)
   async cancelRun(
-    @Param('runId') runId: string,
+    @Param('runId', new ParseUUIDPipe({ version: '4' })) runId: string,
     @CurrentUser() user: UserSession,
   ) {
     return this.shellQueryService.cancelRun(

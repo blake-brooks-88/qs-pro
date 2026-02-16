@@ -243,7 +243,7 @@ describe('QueryActivitiesController (integration)', () => {
       await setTenantTier('free');
 
       const res = await request(app.getHttpServer())
-        .post('/query-activities/link/fake-id')
+        .post('/query-activities/link/00000000-0000-4000-8000-000000000000')
         .send({ qaCustomerKey: 'qa-key-1' });
 
       expect(res.status).toBe(403);
@@ -254,7 +254,7 @@ describe('QueryActivitiesController (integration)', () => {
       await setTenantTier('free');
 
       const res = await request(app.getHttpServer()).delete(
-        '/query-activities/link/fake-id',
+        '/query-activities/link/00000000-0000-4000-8000-000000000000',
       );
 
       expect(res.status).toBe(403);
@@ -462,7 +462,7 @@ describe('QueryActivitiesController (integration)', () => {
       await setTenantTier('pro');
 
       const res = await request(app.getHttpServer())
-        .post('/query-activities/link/fake-id')
+        .post('/query-activities/link/00000000-0000-4000-8000-000000000000')
         .send({});
 
       expect(res.status).toBe(400);

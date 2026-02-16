@@ -1,3 +1,4 @@
+import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -233,6 +234,13 @@ describe("QueryDefinitionService (integration)", () => {
         MceBridgeService,
         MceHttpClient,
         { provide: MCE_AUTH_PROVIDER, useValue: stubAuthProvider },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string, fallback?: string) =>
+              key === "OUTBOUND_HOST_POLICY" ? "log" : fallback,
+          },
+        },
       ],
     }).compile();
 

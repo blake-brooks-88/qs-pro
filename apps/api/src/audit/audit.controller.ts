@@ -1,17 +1,13 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import type { AuditLogQueryParams } from '@qpp/shared-types';
 import { AuditLogQueryParamsSchema } from '@qpp/shared-types';
 
 import {
   CurrentUser,
   type UserSession,
 } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from '../features/features.service';
 import { AuditService } from './audit.service';
 import type { AuditLogRow } from './drizzle-audit-log.repository';
@@ -25,7 +21,11 @@ export class AuditController {
   ) {}
 
   @Get()
-  async findAll(@CurrentUser() user: UserSession, @Query() query: unknown) {
+  async findAll(
+    @CurrentUser() user: UserSession,
+    @Query(new ZodValidationPipe(AuditLogQueryParamsSchema))
+    params: AuditLogQueryParams,
+  ) {
     const { features } = await this.featuresService.getTenantFeatures(
       user.tenantId,
     );
@@ -37,12 +37,6 @@ export class AuditController {
       });
     }
 
-    const result = AuditLogQueryParamsSchema.safeParse(query);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-
-    const params = result.data;
     const { items, total } = await this.auditService.findAll(
       user.tenantId,
       user.mid,

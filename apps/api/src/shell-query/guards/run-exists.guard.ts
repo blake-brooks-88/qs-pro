@@ -1,7 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
+import { z } from 'zod';
 
 import { ShellQueryService } from '../shell-query.service';
+
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class RunExistsGuard implements CanActivate {
@@ -15,6 +19,14 @@ export class RunExistsGuard implements CanActivate {
       tenantId: string;
       mid: string;
     };
+
+    const parsed = z.string().regex(UUID_V4_REGEX).safeParse(runId);
+    if (!parsed.success) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+        operation: 'streamEvents',
+        runId,
+      });
+    }
 
     const run = await this.shellQueryService.getRun(
       runId,

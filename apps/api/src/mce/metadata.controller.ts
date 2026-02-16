@@ -11,12 +11,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { MetadataService, SessionGuard } from '@qpp/backend-shared';
+import type { CreateDataExtensionDto } from '@qpp/shared-types';
 import { CreateDataExtensionSchema } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller('metadata')
 @UseGuards(SessionGuard)
@@ -81,13 +83,9 @@ export class MetadataController {
   @UseGuards(CsrfGuard)
   async createDataExtension(
     @CurrentUser() user: UserSession,
-    @Body() body: unknown,
+    @Body(new ZodValidationPipe(CreateDataExtensionSchema))
+    dto: CreateDataExtensionDto,
   ) {
-    const result = CreateDataExtensionSchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-
     const {
       folderId,
       subscriberKeyField,
@@ -95,7 +93,7 @@ export class MetadataController {
       retention,
       customerKey,
       ...rest
-    } = result.data;
+    } = dto;
 
     const categoryId = Number.parseInt(folderId, 10);
 

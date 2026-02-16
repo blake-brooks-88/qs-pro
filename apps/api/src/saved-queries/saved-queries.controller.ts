@@ -1,10 +1,10 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UseGuards,
@@ -23,6 +23,7 @@ import {
   CurrentUser,
   type UserSession,
 } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
   type DecryptedSavedQuery,
   SavedQueriesService,
@@ -36,13 +37,11 @@ export class SavedQueriesController {
   @Post()
   @UseGuards(CsrfGuard)
   @Audited('saved_query.created')
-  async create(@CurrentUser() user: UserSession, @Body() body: unknown) {
-    const result = CreateSavedQuerySchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-    const dto: CreateSavedQueryDto = result.data;
-
+  async create(
+    @CurrentUser() user: UserSession,
+    @Body(new ZodValidationPipe(CreateSavedQuerySchema))
+    dto: CreateSavedQueryDto,
+  ) {
     const query = await this.savedQueriesService.create(
       user.tenantId,
       user.mid,
@@ -81,7 +80,10 @@ export class SavedQueriesController {
   }
 
   @Get(':id')
-  async findById(@CurrentUser() user: UserSession, @Param('id') id: string) {
+  async findById(
+    @CurrentUser() user: UserSession,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
     const query = await this.savedQueriesService.findById(
       user.tenantId,
       user.mid,
@@ -96,15 +98,10 @@ export class SavedQueriesController {
   @Audited('saved_query.updated', { targetIdParam: 'id' })
   async update(
     @CurrentUser() user: UserSession,
-    @Param('id') id: string,
-    @Body() body: unknown,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body(new ZodValidationPipe(UpdateSavedQuerySchema))
+    dto: UpdateSavedQueryDto,
   ) {
-    const result = UpdateSavedQuerySchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
-    const dto: UpdateSavedQueryDto = result.data;
-
     const query = await this.savedQueriesService.update(
       user.tenantId,
       user.mid,
@@ -118,7 +115,10 @@ export class SavedQueriesController {
   @Delete(':id')
   @UseGuards(CsrfGuard)
   @Audited('saved_query.deleted', { targetIdParam: 'id' })
-  async delete(@CurrentUser() user: UserSession, @Param('id') id: string) {
+  async delete(
+    @CurrentUser() user: UserSession,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
     await this.savedQueriesService.delete(
       user.tenantId,
       user.mid,

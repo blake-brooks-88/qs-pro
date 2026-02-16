@@ -1,14 +1,15 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { SessionGuard } from '@qpp/backend-shared';
+import type { UpdateVersionNameDto } from '@qpp/shared-types';
 import { UpdateVersionNameSchema } from '@qpp/shared-types';
 
 import { CsrfGuard } from '../auth/csrf.guard';
@@ -17,6 +18,7 @@ import {
   CurrentUser,
   type UserSession,
 } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { QueryVersionsService } from './query-versions.service';
 
 @Controller('saved-queries')
@@ -27,7 +29,8 @@ export class QueryVersionsController {
   @Get(':savedQueryId/versions')
   async listVersions(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
   ) {
     return this.queryVersionsService.listVersions(
       user.tenantId,
@@ -40,7 +43,8 @@ export class QueryVersionsController {
   @Get(':savedQueryId/versions/publish-events')
   async listPublishEvents(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
   ) {
     return this.queryVersionsService.listPublishEvents(
       user.tenantId,
@@ -53,8 +57,10 @@ export class QueryVersionsController {
   @Get(':savedQueryId/versions/:versionId')
   async getVersionDetail(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
-    @Param('versionId') versionId: string,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
+    @Param('versionId', new ParseUUIDPipe({ version: '4' }))
+    versionId: string,
   ) {
     return this.queryVersionsService.getVersionDetail(
       user.tenantId,
@@ -70,8 +76,10 @@ export class QueryVersionsController {
   @Audited('version.restored', { targetIdParam: 'versionId' })
   async restore(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
-    @Param('versionId') versionId: string,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
+    @Param('versionId', new ParseUUIDPipe({ version: '4' }))
+    versionId: string,
   ) {
     return this.queryVersionsService.restore(
       user.tenantId,
@@ -87,21 +95,20 @@ export class QueryVersionsController {
   @Audited('version.renamed', { targetIdParam: 'versionId' })
   async updateName(
     @CurrentUser() user: UserSession,
-    @Param('savedQueryId') savedQueryId: string,
-    @Param('versionId') versionId: string,
-    @Body() body: unknown,
+    @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
+    savedQueryId: string,
+    @Param('versionId', new ParseUUIDPipe({ version: '4' }))
+    versionId: string,
+    @Body(new ZodValidationPipe(UpdateVersionNameSchema))
+    dto: UpdateVersionNameDto,
   ) {
-    const result = UpdateVersionNameSchema.safeParse(body);
-    if (!result.success) {
-      throw new BadRequestException(result.error.errors);
-    }
     return this.queryVersionsService.updateName(
       user.tenantId,
       user.mid,
       user.userId,
       savedQueryId,
       versionId,
-      result.data,
+      dto,
     );
   }
 }
