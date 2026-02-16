@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 10 Observability & Monitoring IN PROGRESS. Plans 01+03 complete: Sentry error tracking across all three apps (API, Worker, Web). Browser ErrorBoundary + source map upload. Mock Sentry stub replaced with real @SentryExceptionCaptured decorator. All Phase 10 npm deps installed.
+**Current focus:** Phase 10 Observability & Monitoring IN PROGRESS. Plans 01+03+04 complete: Sentry error tracking across all three apps, API MetricsModule with Prometheus endpoint, BullMQ trace propagation via bullmq-otel, 4 operational runbooks. Plan 02 partially executed (API health endpoints done, Worker health refactoring + pino-loki pending).
 
 ## Current Milestone
 
@@ -40,7 +40,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 8.5 | Blast Radius (INSERTED) | ✓ Complete | 4/4 | 100% |
 | 8.6 | Version + Publish Integration (INSERTED) | ✓ Complete | 5/5 | 100% |
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
-| 10 | Observability & Monitoring | ► In Progress | 2/4 | 50% |
+| 10 | Observability & Monitoring | ► In Progress | 3/4 | 75% |
 | 11 | API Hardening | ○ Pending | 0/0 | 0% |
 | 12 | Security Baseline | ○ Pending | 0/0 | 0% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
@@ -308,6 +308,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-15 | Conditional Sentry Vite plugin via process.env check | Plugin only activates when SENTRY_AUTH_TOKEN present; .filter(Boolean) removes null from plugins array |
 | 2026-02-15 | Source maps deleted after Sentry upload | filesToDeleteAfterUpload prevents serving .js.map files to end users (source code protection) |
 | 2026-02-15 | SENTRY_AUTH_TOKEN/ORG/PROJECT_WEB not VITE_ prefixed | Build-time env vars consumed by Vite plugin (Node.js context), not client-side runtime |
+| 2026-02-16 | BullMQ telemetry supported via @nestjs/bullmq | BullRootModuleOptions extends Bull.QueueOptions which includes telemetry?: Telemetry; BullMQOtel wired directly |
+| 2026-02-16 | @Global() MetricsModule with injectable provider tokens | QPP_QUERIES_EXECUTED, QPP_MCE_API_CALLS, QPP_QUERY_DURATION available for @Inject() across API |
+| 2026-02-16 | Runbooks force-added past /docs/ gitignore | Operational runbooks are hand-crafted, not auto-generated; git add -f appropriate |
 
 ## Roadmap Evolution
 
@@ -333,8 +336,18 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 10 Plan 03 COMPLETE — Frontend Sentry error tracking with ErrorBoundary and source map upload
-**Next step:** Phase 10 Plan 02 or 04 (health checks + metrics, or Grafana Loki)
+**Last action:** Phase 10 Plan 04 COMPLETE — API MetricsModule, BullMQ trace propagation, 4 operational runbooks
+**Next step:** Phase 10 Plan 02 Task 2 (Worker health refactoring + pino-loki)
+
+**Phase 10 Plan 04 COMPLETE (2026-02-16):**
+
+- API MetricsModule with /metrics Prometheus endpoint and 3 business metric providers
+- Business metrics: qpp_queries_executed_total, qpp_mce_api_calls_total, qpp_query_duration_seconds
+- Default Node.js metrics via collectDefaultMetrics with qpp_ prefix
+- BullMQ trace propagation confirmed working via bullmq-otel telemetry option
+- 4 operational runbooks: MCE timeouts, queue backlog, DB pool exhaustion, Redis connectivity
+- Pre-existing issue: backend-shared build failure (Plan 02 committed test for code not yet created)
+- All 386 API + 246 Worker + 2146 Web tests pass
 
 **Phase 10 Plan 03 COMPLETE (2026-02-15):**
 
@@ -929,8 +942,8 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-16T00:05:59.640Z
-**Stopped at:** Completed 10-03-PLAN.md
+**Last session:** 2026-02-16T00:35:30.633Z
+**Stopped at:** Completed 10-04-PLAN.md
 **Resume file:** None
 
 ## Blockers
