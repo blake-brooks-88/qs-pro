@@ -7,6 +7,7 @@ import {
   getReservedSqlFromContext,
   runWithDbContext,
 } from "./db-context";
+import { triggerFailClosedExit } from "./fail-closed-exit";
 
 @Injectable()
 export class RlsContextService {
@@ -124,8 +125,8 @@ export class RlsContextService {
       }
       if (rollbackFailed && process.env.NODE_ENV === "production") {
         // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
-        // Process crash will destroy the pool and all its connections.
-        setImmediate(() => process.exit(1));
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
       } else {
         reserved.release();
       }
@@ -201,8 +202,8 @@ export class RlsContextService {
       }
       if (rollbackFailed && process.env.NODE_ENV === "production") {
         // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
-        // Process crash will destroy the pool and all its connections.
-        setImmediate(() => process.exit(1));
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
       } else {
         reserved.release();
       }
@@ -275,8 +276,8 @@ export class RlsContextService {
       }
       if (rollbackFailed && process.env.NODE_ENV === "production") {
         // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
-        // Process crash will destroy the pool and all its connections.
-        setImmediate(() => process.exit(1));
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
       } else {
         reserved.release();
       }

@@ -3,6 +3,7 @@ import { createDatabaseFromClient, createSqlClient } from "@qpp/database";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { getDbFromContext, runWithDbContext } from "./db-context";
+import { triggerFailClosedExit } from "./fail-closed-exit";
 
 type SecureSession = {
   get(key: string): unknown;
@@ -110,8 +111,8 @@ export class RlsContextMiddleware implements NestMiddleware {
       }
       if (cleanupUnsafe && process.env.NODE_ENV === "production") {
         // SECURITY: Do NOT release — connection may carry stale tenant context.
-        // Process crash will destroy the pool and all its connections.
-        setImmediate(() => process.exit(1));
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
       } else {
         await reserved.release();
       }

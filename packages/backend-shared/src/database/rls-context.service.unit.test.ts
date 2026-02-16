@@ -73,6 +73,7 @@ describe("RlsContextService", () => {
 
   const mockSqlClient = {
     reserve: vi.fn(),
+    end: vi.fn().mockResolvedValue(undefined),
     options: {},
     parameters: {},
   };

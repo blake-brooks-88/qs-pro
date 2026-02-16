@@ -1,6 +1,10 @@
 import secureSession from '@fastify/secure-session';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { getDbFromContext, runWithDbContext } from '@qpp/backend-shared';
+import {
+  getDbFromContext,
+  runWithDbContext,
+  triggerFailClosedExit,
+} from '@qpp/backend-shared';
 import { createDatabaseFromClient } from '@qpp/database';
 import type { Sql } from 'postgres';
 
@@ -144,8 +148,8 @@ export async function configureApp(
             }
             if (cleanupUnsafe && process.env.NODE_ENV === 'production') {
               // SECURITY: Do NOT release — connection may carry stale tenant context.
-              // Process crash will destroy the pool and all its connections.
-              setImmediate(() => process.exit(1));
+              // Fail closed: destroy pool connections and exit immediately.
+              triggerFailClosedExit(sqlClient);
             } else {
               reserved.release();
             }

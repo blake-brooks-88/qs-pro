@@ -19,6 +19,7 @@ export {
 } from "./common/errors";
 export * from "./database/database.module";
 export * from "./database/db-context";
+export * from "./database/fail-closed-exit";
 export * from "./database/rls-context.service";
 export {
   calculateRetryDelay,

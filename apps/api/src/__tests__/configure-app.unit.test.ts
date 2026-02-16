@@ -1,7 +1,10 @@
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { configureApp, type ConfigureAppOptions } from '../configure-app';
+import type { ConfigureAppOptions } from '../configure-app';
+
+type ConfigureAppFn = typeof import('../configure-app').configureApp;
+let configureApp: ConfigureAppFn;
 
 vi.mock('@fastify/secure-session', () => ({
   default: vi.fn(),
@@ -10,6 +13,21 @@ vi.mock('@fastify/secure-session', () => ({
 vi.mock('@qpp/backend-shared', () => ({
   getDbFromContext: vi.fn(),
   runWithDbContext: vi.fn(),
+  triggerFailClosedExit: vi.fn((sql: unknown) => {
+    if (
+      typeof sql === 'object' &&
+      sql !== null &&
+      'end' in sql &&
+      typeof (sql as { end?: unknown }).end === 'function'
+    ) {
+      void (
+        sql as {
+          end: (options?: { timeout?: number }) => Promise<void>;
+        }
+      ).end({ timeout: 0 });
+    }
+    process.exit(1);
+  }),
 }));
 
 vi.mock('@qpp/database', () => ({
@@ -95,7 +113,8 @@ function createMockApp() {
 describe('configureApp', () => {
   let mockApp: ReturnType<typeof createMockApp>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    configureApp ??= (await import('../configure-app')).configureApp;
     mockApp = createMockApp();
     vi.clearAllMocks();
   });
@@ -179,6 +198,7 @@ describe('configureApp', () => {
     let mockReserved: ReturnType<typeof createMockReserved>;
     let mockSqlClient: {
       reserve: ReturnType<typeof vi.fn>;
+      end: ReturnType<typeof vi.fn>;
       options: object;
       parameters: object;
     };
@@ -187,6 +207,7 @@ describe('configureApp', () => {
       mockReserved = createMockReserved();
       mockSqlClient = {
         reserve: vi.fn().mockResolvedValue(mockReserved),
+        end: vi.fn().mockResolvedValue(undefined),
         options: {},
         parameters: {},
       };
