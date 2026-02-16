@@ -35,6 +35,11 @@ export {
 export * from "./mce/mce-bridge.service";
 export { mceSoapFailure } from "./mce/mce-errors";
 export { MetadataService } from "./mce/metadata.service";
+export {
+  ALLOWED_MCE_HOST_PATTERNS,
+  isHostAllowed,
+  validateOutboundHost,
+} from "./mce/outbound-host-policy";
 export { buildQppResultsDataExtensionName } from "./mce/qpp-names";
 export {
   buildIsRunningRequest,

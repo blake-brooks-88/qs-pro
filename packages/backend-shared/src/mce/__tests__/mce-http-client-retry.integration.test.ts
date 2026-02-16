@@ -10,6 +10,7 @@
  * - Stateful handlers to track retry attempts
  * - Behavioral assertions via call counts and return values
  */
+import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -43,7 +44,16 @@ describe("MceHttpClient retry integration", () => {
     server.resetHandlers();
 
     module = await Test.createTestingModule({
-      providers: [MceHttpClient],
+      providers: [
+        MceHttpClient,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string, fallback?: string) =>
+              key === "OUTBOUND_HOST_POLICY" ? "log" : fallback,
+          },
+        },
+      ],
     }).compile();
 
     httpClient = module.get<MceHttpClient>(MceHttpClient);

@@ -20,6 +20,7 @@
  * - Timeout is forwarded to MceHttpClient
  * - Token invalidation is called before auth retry
  */
+import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import axios from "axios";
 import { http, HttpResponse } from "msw";
@@ -111,6 +112,13 @@ describe("MceBridgeService retry logic (integration)", () => {
       providers: [
         MceBridgeService,
         MceHttpClient,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string, fallback?: string) =>
+              key === "OUTBOUND_HOST_POLICY" ? "log" : fallback,
+          },
+        },
         {
           provide: MCE_AUTH_PROVIDER,
           useValue: createStubAuthProvider(authState),

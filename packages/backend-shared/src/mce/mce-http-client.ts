@@ -1,11 +1,14 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import axios, { AxiosRequestConfig } from "axios";
 
 import { AppError } from "../common/errors/app-error";
 import { ErrorCode } from "../common/errors/error-codes";
 import { MCE_TIMEOUTS } from "./http-timeout.config";
+import { validateOutboundHost } from "./outbound-host-policy";
 
 const MAX_STATUS_MESSAGE_LENGTH = 500;
+const MAX_CONTENT_LENGTH = 50 * 1024 * 1024; // 50 MB
 
 function truncate(value: string, maxLength: number): string {
   return value.length <= maxLength
@@ -30,6 +33,10 @@ function stripQueryString(url: string | undefined): string | undefined {
  */
 @Injectable()
 export class MceHttpClient {
+  private readonly logger = new Logger(MceHttpClient.name);
+
+  constructor(private readonly configService: ConfigService) {}
+
   /**
    * Execute HTTP request with timeout support.
    *
@@ -40,12 +47,55 @@ export class MceHttpClient {
     config: AxiosRequestConfig,
     timeout: number = MCE_TIMEOUTS.DEFAULT,
   ): Promise<T> {
+    const fullUrl = config.baseURL
+      ? `${config.baseURL}${config.url ?? ""}`
+      : config.url;
+
+    if (fullUrl && /^https?:\/\//i.test(fullUrl)) {
+      validateOutboundHost(
+        fullUrl,
+        this.getExtraHosts(),
+        this.getPolicy(),
+        this.logger,
+      );
+    }
+
     try {
-      const response = await axios.request<T>({ ...config, timeout });
+      const response = await axios.request<T>({
+        ...config,
+        timeout,
+        maxContentLength: MAX_CONTENT_LENGTH,
+      });
       return response.data;
     } catch (error) {
       throw this.translateError(error);
     }
+  }
+
+  private getPolicy(): "log" | "block" {
+    return (this.configService.get<string>("OUTBOUND_HOST_POLICY", "log") ??
+      "log") as "log" | "block";
+  }
+
+  private getExtraHosts(): string[] {
+    const hosts: string[] = [];
+    const sentryDsn = this.configService.get<string>("SENTRY_DSN");
+    if (sentryDsn) {
+      try {
+        hosts.push(new URL(sentryDsn).hostname);
+      } catch {
+        /* ignore invalid DSN */
+      }
+    }
+    const lokiHost = this.configService.get<string>("LOKI_HOST");
+    if (lokiHost) {
+      try {
+        hosts.push(new URL(lokiHost).hostname);
+      } catch {
+        /* ignore invalid host */
+      }
+    }
+    return hosts;
   }
 
   private translateError(error: unknown): AppError {
