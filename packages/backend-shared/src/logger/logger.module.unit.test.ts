@@ -1,8 +1,9 @@
 import type { IncomingMessage } from "http";
 import type { Options } from "pino-http";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  AUTO_LOGGING_EXCLUDED_PATHS,
   createPinoHttpOptions,
   REDACTED_FIELD_PATHS,
   REDACTED_HEADER_PATHS,
@@ -193,14 +194,155 @@ describe("Logger Security", () => {
       });
     });
 
-    it("uses JSON transport in production", () => {
+    it("uses no transport in production without LOKI_HOST", () => {
       const options = getPinoOptions("production", "text");
       expect(options.transport).toBeUndefined();
     });
 
-    it("uses JSON transport when format is json", () => {
+    it("uses no transport when format is json without LOKI_HOST", () => {
       const options = getPinoOptions("development", "json");
       expect(options.transport).toBeUndefined();
+    });
+  });
+
+  describe("Auto-Logging Exclusions", () => {
+    it("excludes /health from auto-logging", () => {
+      expect(AUTO_LOGGING_EXCLUDED_PATHS.has("/health")).toBe(true);
+    });
+
+    it("excludes /livez from auto-logging", () => {
+      expect(AUTO_LOGGING_EXCLUDED_PATHS.has("/livez")).toBe(true);
+    });
+
+    it("excludes /readyz from auto-logging", () => {
+      expect(AUTO_LOGGING_EXCLUDED_PATHS.has("/readyz")).toBe(true);
+    });
+
+    it("excludes /metrics from auto-logging", () => {
+      expect(AUTO_LOGGING_EXCLUDED_PATHS.has("/metrics")).toBe(true);
+    });
+
+    it("does not exclude regular API paths", () => {
+      expect(AUTO_LOGGING_EXCLUDED_PATHS.has("/api/users")).toBe(false);
+    });
+
+    it("ignore function uses the excluded paths set", () => {
+      const options = getPinoOptions("development", "text");
+      const autoLogging = options.autoLogging as {
+        ignore: (req: IncomingMessage) => boolean;
+      };
+
+      const healthReq = { url: "/livez" } as IncomingMessage;
+      const apiReq = { url: "/api/users" } as IncomingMessage;
+
+      expect(autoLogging.ignore(healthReq)).toBe(true);
+      expect(autoLogging.ignore(apiReq)).toBe(false);
+    });
+  });
+
+  describe("Pino-Loki Transport", () => {
+    const ORIGINAL_ENV = { ...process.env };
+
+    interface TransportTarget {
+      target: string;
+      options: Record<string, unknown>;
+      level?: string;
+    }
+
+    function getTransportTargets(options: Options): TransportTarget[] {
+      const transport = options.transport as
+        | { targets: TransportTarget[] }
+        | undefined;
+      expect(transport).toBeDefined();
+      return (transport as { targets: TransportTarget[] }).targets;
+    }
+
+    function lokiTarget(targets: TransportTarget[]): TransportTarget {
+      const target = targets[0];
+      expect(target).toBeDefined();
+      return target as TransportTarget;
+    }
+
+    function stdoutTarget(targets: TransportTarget[]): TransportTarget {
+      const target = targets[1];
+      expect(target).toBeDefined();
+      return target as TransportTarget;
+    }
+
+    afterEach(() => {
+      process.env = { ...ORIGINAL_ENV };
+    });
+
+    it("includes pino-loki target when LOKI_HOST is set", () => {
+      process.env.LOKI_HOST = "http://loki:3100";
+
+      const options = getPinoOptions("production", "json");
+      const targets = getTransportTargets(options);
+
+      expect(targets).toHaveLength(2);
+      expect(lokiTarget(targets).target).toBe("pino-loki");
+      expect(lokiTarget(targets).options.host).toBe("http://loki:3100");
+    });
+
+    it("includes stdout target alongside pino-loki", () => {
+      process.env.LOKI_HOST = "http://loki:3100";
+
+      const options = getPinoOptions("production", "json");
+      const targets = getTransportTargets(options);
+
+      expect(stdoutTarget(targets).target).toBe("pino/file");
+      expect(stdoutTarget(targets).options.destination).toBe(1);
+    });
+
+    it("includes basicAuth when LOKI_USERNAME and LOKI_PASSWORD are set", () => {
+      process.env.LOKI_HOST = "http://loki:3100";
+      process.env.LOKI_USERNAME = "admin";
+      process.env.LOKI_PASSWORD = "secret";
+
+      const options = getPinoOptions("production", "json");
+      const targets = getTransportTargets(options);
+
+      expect(lokiTarget(targets).options.basicAuth).toEqual({
+        username: "admin",
+        password: "secret",
+      });
+    });
+
+    it("omits basicAuth when LOKI_USERNAME is not set", () => {
+      process.env.LOKI_HOST = "http://loki:3100";
+      delete process.env.LOKI_USERNAME;
+      delete process.env.LOKI_PASSWORD;
+
+      const options = getPinoOptions("production", "json");
+      const targets = getTransportTargets(options);
+
+      expect(lokiTarget(targets).options.basicAuth).toBeUndefined();
+    });
+
+    it("uses SERVICE_NAME for loki labels", () => {
+      process.env.LOKI_HOST = "http://loki:3100";
+      process.env.SERVICE_NAME = "qpp-api";
+
+      const options = getPinoOptions("production", "json");
+      const targets = getTransportTargets(options);
+      const labels = lokiTarget(targets).options.labels as {
+        app: string;
+        env: string;
+      };
+
+      expect(labels.app).toBe("qpp-api");
+      expect(labels.env).toBe("production");
+    });
+
+    it("does not include pino-loki in development mode", () => {
+      process.env.LOKI_HOST = "http://loki:3100";
+
+      const options = getPinoOptions("development", "text");
+
+      expect(options.transport).toEqual({
+        target: "pino-pretty",
+        options: { colorize: true, translateTime: "SYS:standard" },
+      });
     });
   });
 });

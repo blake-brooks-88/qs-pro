@@ -1,134 +1,105 @@
-import { getQueueToken } from "@nestjs/bullmq";
-import { Test, TestingModule } from "@nestjs/testing";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { HealthController } from "../health.controller";
 
-interface MockRedisClient {
-  ping: ReturnType<typeof vi.fn>;
-}
-
-interface MockQueue {
-  client: Promise<MockRedisClient | null>;
-}
-
-function createMockRedisClient(
-  pingResponse: string | Promise<string> = "PONG",
-): MockRedisClient {
+function createMockIndicator(key: string, status: "up" | "down" = "up") {
   return {
-    ping: vi.fn().mockResolvedValue(pingResponse),
+    isHealthy: vi.fn().mockResolvedValue({ [key]: { status } }),
   };
 }
 
-function createMockQueue(client: MockRedisClient | null): MockQueue {
+function createMockHealthCheckService() {
   return {
-    client: Promise.resolve(client),
+    check: vi.fn().mockImplementation(async (indicators: Array<() => Promise<unknown>>) => {
+      const details: Record<string, unknown> = {};
+      for (const indicator of indicators) {
+        const result = await indicator();
+        Object.assign(details, result);
+      }
+      const allUp = Object.values(details).every(
+        (v) => (v as { status: string }).status === "up",
+      );
+      return {
+        status: allUp ? "ok" : "error",
+        details,
+      };
+    }),
   };
 }
 
 describe("HealthController", () => {
-  let controller: HealthController;
-  let mockQueue: MockQueue;
-  let mockSqlClient: object | null;
+  describe("livez()", () => {
+    it("returns ok status with empty checks", async () => {
+      const mockHealth = createMockHealthCheckService();
+      const controller = new HealthController(
+        mockHealth as never,
+        createMockIndicator("postgres") as never,
+        createMockIndicator("redis") as never,
+        createMockIndicator("bullmq") as never,
+      );
 
-  async function createTestModule(): Promise<TestingModule> {
-    return Test.createTestingModule({
-      controllers: [HealthController],
-      providers: [
-        { provide: getQueueToken("shell-query"), useValue: mockQueue },
-        { provide: "SQL_CLIENT", useValue: mockSqlClient },
-      ],
-    }).compile();
-  }
+      const result = await controller.livez();
 
-  beforeEach(() => {
-    mockQueue = createMockQueue(createMockRedisClient("PONG"));
-    mockSqlClient = {};
+      expect(result).toEqual({ status: "ok", details: {} });
+      expect(mockHealth.check).toHaveBeenCalledWith([]);
+    });
   });
 
-  describe("check()", () => {
-    it("returns redis status 'up' when Redis client responds with PONG", async () => {
-      // Arrange
-      const module = await createTestModule();
-      controller = module.get<HealthController>(HealthController);
+  describe("readyz()", () => {
+    it("calls all three health indicators", async () => {
+      const mockHealth = createMockHealthCheckService();
+      const mockPostgres = createMockIndicator("postgres");
+      const mockRedis = createMockIndicator("redis");
+      const mockBullmq = createMockIndicator("bullmq");
 
-      // Act
-      const result = await controller.check();
+      const controller = new HealthController(
+        mockHealth as never,
+        mockPostgres as never,
+        mockRedis as never,
+        mockBullmq as never,
+      );
 
-      // Assert
-      expect(result.redis).toBe("up");
+      const result = await controller.readyz();
+
+      expect(mockPostgres.isHealthy).toHaveBeenCalledWith("postgres");
+      expect(mockRedis.isHealthy).toHaveBeenCalledWith("redis");
+      expect(mockBullmq.isHealthy).toHaveBeenCalledWith("bullmq");
+      expect(result.status).toBe("ok");
     });
 
-    it("returns redis status 'down' when Redis ping times out", async () => {
-      // Arrange
-      const mockClient = createMockRedisClient();
-      mockClient.ping.mockResolvedValue("TIMEOUT");
-      mockQueue = createMockQueue(mockClient);
-      const module = await createTestModule();
-      controller = module.get<HealthController>(HealthController);
+    it("returns error status when any indicator is down", async () => {
+      const mockHealth = createMockHealthCheckService();
+      const mockPostgres = createMockIndicator("postgres");
+      const mockRedis = createMockIndicator("redis", "down");
+      const mockBullmq = createMockIndicator("bullmq");
 
-      // Act
-      const result = await controller.check();
+      const controller = new HealthController(
+        mockHealth as never,
+        mockPostgres as never,
+        mockRedis as never,
+        mockBullmq as never,
+      );
 
-      // Assert
-      expect(result.redis).toBe("down");
+      const result = await controller.readyz();
+
+      expect(result.status).toBe("error");
     });
 
-    it("returns redis status 'down' when queue client access times out", async () => {
-      // Arrange
-      mockQueue = createMockQueue(null);
-      const module = await createTestModule();
-      controller = module.get<HealthController>(HealthController);
+    it("includes all indicator details in response", async () => {
+      const mockHealth = createMockHealthCheckService();
+      const controller = new HealthController(
+        mockHealth as never,
+        createMockIndicator("postgres") as never,
+        createMockIndicator("redis") as never,
+        createMockIndicator("bullmq") as never,
+      );
 
-      // Act
-      const result = await controller.check();
+      const result = await controller.readyz();
 
-      // Assert
-      expect(result.redis).toBe("down");
-    });
-
-    it("returns db status 'up' when sqlClient is truthy", async () => {
-      // Arrange
-      mockSqlClient = { connected: true };
-      const module = await createTestModule();
-      controller = module.get<HealthController>(HealthController);
-
-      // Act
-      const result = await controller.check();
-
-      // Assert
-      expect(result.db).toBe("up");
-    });
-
-    it("returns db status 'down' when sqlClient is null", async () => {
-      // Arrange
-      mockSqlClient = null;
-      const module = await createTestModule();
-      controller = module.get<HealthController>(HealthController);
-
-      // Act
-      const result = await controller.check();
-
-      // Assert
-      expect(result.db).toBe("down");
-    });
-
-    it("returns response with expected health check shape", async () => {
-      // Arrange
-      const module = await createTestModule();
-      controller = module.get<HealthController>(HealthController);
-
-      // Act
-      const result = await controller.check();
-
-      // Assert
-      expect(result).toEqual({
-        status: "ok",
-        redis: "up",
-        db: "up",
-        timestamp: expect.stringMatching(
-          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
-        ),
+      expect(result.details).toEqual({
+        postgres: { status: "up" },
+        redis: { status: "up" },
+        bullmq: { status: "up" },
       });
     });
   });

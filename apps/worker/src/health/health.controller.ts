@@ -1,45 +1,32 @@
-import { InjectQueue } from "@nestjs/bullmq";
 import { Controller, Get } from "@nestjs/common";
-import { Inject } from "@nestjs/common";
-import { Queue } from "bullmq";
+import { HealthCheck, HealthCheckService } from "@nestjs/terminus";
 
-@Controller("health")
+import { BullMQHealthIndicator } from "./bullmq.health";
+import { PostgresHealthIndicator } from "./postgres.health";
+import { RedisHealthIndicator } from "./redis.health";
+
+@Controller()
 export class HealthController {
   constructor(
-    @InjectQueue("shell-query") private shellQueryQueue: Queue,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    @Inject("SQL_CLIENT") private sqlClient: any,
+    private readonly health: HealthCheckService,
+    private readonly postgres: PostgresHealthIndicator,
+    private readonly redis: RedisHealthIndicator,
+    private readonly bullmq: BullMQHealthIndicator,
   ) {}
 
-  @Get()
-  async check() {
-    let redis = "down";
-    try {
-      const client = await Promise.race([
-        this.shellQueryQueue.client,
-        new Promise<null>((resolve) => {
-          setTimeout(() => resolve(null), 500);
-        }),
-      ]);
+  @Get("livez")
+  @HealthCheck()
+  livez() {
+    return this.health.check([]);
+  }
 
-      if (client) {
-        const redisStatus = await Promise.race([
-          client.ping(),
-          new Promise<string>((resolve) => {
-            setTimeout(() => resolve("TIMEOUT"), 500);
-          }),
-        ]);
-        redis = redisStatus === "PONG" ? "up" : "down";
-      }
-    } catch {
-      redis = "down";
-    }
-
-    return {
-      status: "ok",
-      redis,
-      db: this.sqlClient ? "up" : "down",
-      timestamp: new Date().toISOString(),
-    };
+  @Get("readyz")
+  @HealthCheck()
+  readyz() {
+    return this.health.check([
+      () => this.postgres.isHealthy("postgres"),
+      () => this.redis.isHealthy("redis"),
+      () => this.bullmq.isHealthy("bullmq"),
+    ]);
   }
 }
