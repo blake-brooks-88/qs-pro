@@ -11,6 +11,7 @@ import {
   MceModule,
   validateWorkerEnv,
 } from "@qpp/backend-shared";
+import { BullMQOtel } from "bullmq-otel";
 
 import { AdminAuthMiddleware } from "./common/middleware/admin-auth.middleware";
 import { HealthModule } from "./health/health.module";
@@ -33,6 +34,7 @@ import { ShellQueryModule } from "./shell-query/shell-query.module";
         connection: {
           url: configService.get<string>("REDIS_URL", "redis://localhost:6379"),
         },
+        telemetry: new BullMQOtel("qpp-worker"),
       }),
       inject: [ConfigService],
     }),
