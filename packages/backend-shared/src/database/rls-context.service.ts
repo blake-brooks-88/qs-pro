@@ -122,11 +122,12 @@ export class RlsContextService {
           resetError instanceof Error ? resetError.message : String(resetError),
         );
       }
-      reserved.release();
       if (rollbackFailed && process.env.NODE_ENV === "production") {
-        // Monitoring: if rollback fails, the connection may be left "idle in transaction"
-        // or otherwise unsafe to return to the pool. Fail closed in production.
+        // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
+        // Process crash will destroy the pool and all its connections.
         setImmediate(() => process.exit(1));
+      } else {
+        reserved.release();
       }
     }
   }
@@ -198,10 +199,12 @@ export class RlsContextService {
           resetError instanceof Error ? resetError.message : String(resetError),
         );
       }
-      reserved.release();
       if (rollbackFailed && process.env.NODE_ENV === "production") {
-        // Monitoring: fail closed in production if rollback fails.
+        // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
+        // Process crash will destroy the pool and all its connections.
         setImmediate(() => process.exit(1));
+      } else {
+        reserved.release();
       }
     }
   }
@@ -270,10 +273,12 @@ export class RlsContextService {
           resetError instanceof Error ? resetError.message : String(resetError),
         );
       }
-      reserved.release();
       if (rollbackFailed && process.env.NODE_ENV === "production") {
-        // Monitoring: fail closed in production if rollback fails.
+        // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
+        // Process crash will destroy the pool and all its connections.
         setImmediate(() => process.exit(1));
+      } else {
+        reserved.release();
       }
     }
   }

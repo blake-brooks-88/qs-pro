@@ -108,11 +108,12 @@ export class RlsContextMiddleware implements NestMiddleware {
           );
         }
       }
-      await reserved.release();
-
       if (cleanupUnsafe && process.env.NODE_ENV === "production") {
-        // Monitoring: crash to avoid reusing a potentially tainted connection.
+        // SECURITY: Do NOT release — connection may carry stale tenant context.
+        // Process crash will destroy the pool and all its connections.
         setImmediate(() => process.exit(1));
+      } else {
+        await reserved.release();
       }
     };
 

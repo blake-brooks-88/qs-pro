@@ -142,12 +142,12 @@ export async function configureApp(
                 );
               }
             }
-            reserved.release();
-
             if (cleanupUnsafe && process.env.NODE_ENV === 'production') {
-              // Monitoring: if this ever happens in prod, treat it as a critical incident.
-              // We crash to avoid reusing a potentially tainted pooled connection.
+              // SECURITY: Do NOT release — connection may carry stale tenant context.
+              // Process crash will destroy the pool and all its connections.
               setImmediate(() => process.exit(1));
+            } else {
+              reserved.release();
             }
           };
 

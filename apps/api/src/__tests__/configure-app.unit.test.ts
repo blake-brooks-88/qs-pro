@@ -535,5 +535,171 @@ describe('configureApp', () => {
 
       expect(mockReserved.release).toHaveBeenCalled();
     });
+
+    it('releases connection when set_config clear fails but DISCARD ALL succeeds', async () => {
+      // Arrange
+      const releaseFn = vi.fn();
+      let setupDone = false;
+      const failingReserved = Object.assign(
+        function taggedTemplate(
+          strings: TemplateStringsArray,
+          ...values: unknown[]
+        ) {
+          let query = '';
+          for (let i = 0; i < strings.length; i++) {
+            query += strings[i];
+            if (i < values.length) {
+              query += String(values[i]);
+            }
+          }
+          // After setup, the first set_config with empty values is the cleanup
+          if (
+            setupDone &&
+            query.includes('set_config') &&
+            query.includes("''")
+          ) {
+            return Promise.reject(new Error('set_config clear failed'));
+          }
+          if (query.includes('set_config') && !query.includes("''")) {
+            setupDone = true;
+          }
+          return Promise.resolve([{ result: 1 }]);
+        },
+        { release: releaseFn },
+      );
+      mockSqlClient.reserve.mockResolvedValue(failingReserved);
+
+      const options: ConfigureAppOptions = { rls: true };
+      await configureApp(mockApp, options);
+
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
+      const done = vi.fn();
+      const onceHandlers: Record<string, () => void> = {};
+      const mockReplyRaw = {
+        once: vi.fn((event: string, handler: () => void) => {
+          onceHandlers[event] = handler;
+        }),
+      };
+      const mockReply = { raw: mockReplyRaw, log: { error: vi.fn() } };
+      const mockSession = {
+        get: vi.fn((key: string) => {
+          if (key === 'tenantId') {
+            return 'tenant-123';
+          }
+          if (key === 'mid') {
+            return 'mid-456';
+          }
+          return undefined;
+        }),
+      };
+
+      // Act
+      hook({ method: 'POST', session: mockSession }, mockReply, done);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      const finishHandler = onceHandlers['finish'];
+      if (!finishHandler) {
+        throw new Error('Expected finish cleanup handler to be registered');
+      }
+      finishHandler();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // Assert
+      expect(releaseFn).toHaveBeenCalled();
+    });
+
+    it('does not release and crashes when both set_config clear and DISCARD ALL fail in production', async () => {
+      // Arrange
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      const exitSpy = vi
+        .spyOn(process, 'exit')
+        .mockImplementation(() => undefined as never);
+
+      const releaseFn = vi.fn();
+      let setupDone = false;
+      const failingReserved = Object.assign(
+        function taggedTemplate(
+          strings: TemplateStringsArray,
+          ...values: unknown[]
+        ) {
+          let query = '';
+          for (let i = 0; i < strings.length; i++) {
+            query += strings[i];
+            if (i < values.length) {
+              query += String(values[i]);
+            }
+          }
+          // After setup, the first set_config with empty values is the cleanup
+          if (
+            setupDone &&
+            query.includes('set_config') &&
+            query.includes("''")
+          ) {
+            return Promise.reject(new Error('set_config clear failed'));
+          }
+          if (query.includes('DISCARD ALL')) {
+            return Promise.reject(new Error('DISCARD ALL failed'));
+          }
+          if (query.includes('set_config') && !query.includes("''")) {
+            setupDone = true;
+          }
+          return Promise.resolve([{ result: 1 }]);
+        },
+        { release: releaseFn },
+      );
+      mockSqlClient.reserve.mockResolvedValue(failingReserved);
+
+      const options: ConfigureAppOptions = { rls: true };
+      await configureApp(mockApp, options);
+
+      const hook = mockApp._hooks.onRequest.at(0);
+      if (!hook) {
+        throw new Error('Expected onRequest hook to be registered');
+      }
+      const done = vi.fn();
+      const onceHandlers: Record<string, () => void> = {};
+      const mockReplyRaw = {
+        once: vi.fn((event: string, handler: () => void) => {
+          onceHandlers[event] = handler;
+        }),
+      };
+      const mockReply = { raw: mockReplyRaw, log: { error: vi.fn() } };
+      const mockSession = {
+        get: vi.fn((key: string) => {
+          if (key === 'tenantId') {
+            return 'tenant-123';
+          }
+          if (key === 'mid') {
+            return 'mid-456';
+          }
+          return undefined;
+        }),
+      };
+
+      // Act
+      hook({ method: 'POST', session: mockSession }, mockReply, done);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      const finishHandler = onceHandlers['finish'];
+      if (!finishHandler) {
+        throw new Error('Expected finish cleanup handler to be registered');
+      }
+      finishHandler();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      // Flush setImmediate (process.exit is wrapped in setImmediate)
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Assert
+      expect(releaseFn).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      // Cleanup
+      process.env.NODE_ENV = originalNodeEnv;
+      exitSpy.mockRestore();
+    });
   });
 });
