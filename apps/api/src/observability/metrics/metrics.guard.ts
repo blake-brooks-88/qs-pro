@@ -7,7 +7,7 @@ export class MetricsGuard implements CanActivate {
   constructor(private readonly configService: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const apiKey = this.configService.get<string>('METRICS_API_KEY');
+    const apiKey = this.configService.get('METRICS_API_KEY', { infer: true });
     if (!apiKey) {
       return true;
     }
