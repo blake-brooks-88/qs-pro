@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 10 Observability & Monitoring IN PROGRESS. Plan 01 complete: Sentry error tracking + distributed tracing wired into API and Worker. Mock Sentry stub replaced with real @SentryExceptionCaptured decorator. All Phase 10 npm deps installed.
+**Current focus:** Phase 10 Observability & Monitoring IN PROGRESS. Plans 01+03 complete: Sentry error tracking across all three apps (API, Worker, Web). Browser ErrorBoundary + source map upload. Mock Sentry stub replaced with real @SentryExceptionCaptured decorator. All Phase 10 npm deps installed.
 
 ## Current Milestone
 
 **Milestone:** v1.0 Launch (Full Phase 1)
 **Status:** In Progress
-**Progress:** [██████████] 96%
+**Progress:** [██████████] 97%
 
 ## Phase Status
 
@@ -40,7 +40,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 8.5 | Blast Radius (INSERTED) | ✓ Complete | 4/4 | 100% |
 | 8.6 | Version + Publish Integration (INSERTED) | ✓ Complete | 5/5 | 100% |
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
-| 10 | Observability & Monitoring | ► In Progress | 1/4 | 25% |
+| 10 | Observability & Monitoring | ► In Progress | 2/4 | 50% |
 | 11 | API Hardening | ○ Pending | 0/0 | 0% |
 | 12 | Security Baseline | ○ Pending | 0/0 | 0% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
@@ -302,6 +302,12 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-15 | Separate import type for ArgumentsHost | isolatedModules + emitDecoratorMetadata requires explicit import type for types in decorated method signatures |
 | 2026-02-15 | All Phase 10 deps installed in Plan 01 | Subsequent plans focus on implementation; @nestjs/terminus, prom-client, pino-loki, @sentry/react ready |
 | 2026-02-15 | observabilitySchema with all-optional env vars | SENTRY_DSN, SENTRY_ENVIRONMENT, LOKI_HOST/USERNAME/PASSWORD all optional; dev environments work without config |
+| 2026-02-15 | Browser instrument.ts as first import in main.tsx | Sentry must initialize before any module imports for fetch/XHR auto-instrumentation |
+| 2026-02-15 | ErrorBoundary wraps only authenticated AppShell | Loading/error/unauth states are simple static content that won't crash; no need to wrap |
+| 2026-02-15 | 10% trace sampling in production, 100% in dev | Errors always captured at 100% (default sampleRate); traces throttled for performance |
+| 2026-02-15 | Conditional Sentry Vite plugin via process.env check | Plugin only activates when SENTRY_AUTH_TOKEN present; .filter(Boolean) removes null from plugins array |
+| 2026-02-15 | Source maps deleted after Sentry upload | filesToDeleteAfterUpload prevents serving .js.map files to end users (source code protection) |
+| 2026-02-15 | SENTRY_AUTH_TOKEN/ORG/PROJECT_WEB not VITE_ prefixed | Build-time env vars consumed by Vite plugin (Node.js context), not client-side runtime |
 
 ## Roadmap Evolution
 
@@ -327,8 +333,19 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 10 Plan 01 COMPLETE — Sentry error tracking + distributed tracing for API and Worker
-**Next step:** Phase 10 Plan 02 (health checks + metrics)
+**Last action:** Phase 10 Plan 03 COMPLETE — Frontend Sentry error tracking with ErrorBoundary and source map upload
+**Next step:** Phase 10 Plan 02 or 04 (health checks + metrics, or Grafana Loki)
+
+**Phase 10 Plan 03 COMPLETE (2026-02-15):**
+
+- Browser Sentry SDK initialized in instrument.ts with browserTracingIntegration
+- instrument.ts imported as first line in main.tsx for early fetch/XHR instrumentation
+- Sentry.ErrorBoundary wraps authenticated AppShell content with user-friendly fallback UI
+- sentryVitePlugin conditionally activates when SENTRY_AUTH_TOKEN present
+- build.sourcemap: true enables source map generation; filesToDeleteAfterUpload removes after upload
+- @sentry/react and @sentry/vite-plugin installed
+- Graceful no-op when VITE_SENTRY_DSN not set (dev environments)
+- All 2146 web tests pass, all packages typecheck clean, build succeeds
 
 **Phase 10 Plan 01 COMPLETE (2026-02-15):**
 
@@ -912,8 +929,8 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-15T23:54:42.036Z
-**Stopped at:** Completed 10-01-PLAN.md
+**Last session:** 2026-02-16T00:05:59.640Z
+**Stopped at:** Completed 10-03-PLAN.md
 **Resume file:** None
 
 ## Blockers
@@ -936,4 +953,4 @@ None currently.
 
 ---
 *State initialized: 2026-01-20*
-*Last updated: 2026-02-15 — Phase 10 Plan 01 COMPLETE (Sentry error tracking + distributed tracing for API and Worker)*
+*Last updated: 2026-02-15 — Phase 10 Plan 03 COMPLETE (Frontend Sentry error tracking with ErrorBoundary and source map upload)*
