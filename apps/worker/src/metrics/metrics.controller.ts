@@ -1,8 +1,11 @@
-import { Controller, Get, Res } from "@nestjs/common";
+import { Controller, Get, Res, UseGuards } from "@nestjs/common";
 import { FastifyReply } from "fastify";
 import { register } from "prom-client";
 
+import { MetricsGuard } from "./metrics.guard";
+
 @Controller("metrics")
+@UseGuards(MetricsGuard)
 export class MetricsController {
   @Get()
   async getMetrics(@Res() res: FastifyReply) {

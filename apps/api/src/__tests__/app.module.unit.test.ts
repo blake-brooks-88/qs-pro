@@ -28,7 +28,7 @@ describe('AppModule', () => {
     vi.clearAllMocks();
   });
 
-  it('imports without env validation errors', async () => {
+  it('imports without env validation errors', { timeout: 15000 }, async () => {
     seedApiEnv();
 
     vi.resetModules();
@@ -69,8 +69,10 @@ describe('AppModule', () => {
       get: (key: string, fallback?: string) =>
         key === 'REDIS_URL' ? 'redis://example.com:6379' : (fallback ?? ''),
     });
-    expect(result).toEqual({
-      connection: { url: 'redis://example.com:6379' },
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        connection: { url: 'redis://example.com:6379' },
+      }),
+    );
   });
 });

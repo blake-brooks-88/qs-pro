@@ -8,6 +8,8 @@ import {
   LoggerModule,
   validateApiEnv,
 } from '@qpp/backend-shared';
+import { SentryModule } from '@sentry/nestjs/setup';
+import { BullMQOtel } from 'bullmq-otel';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,6 +18,7 @@ import { AuthModule } from './auth/auth.module';
 import { FeaturesModule } from './features/features.module';
 import { FoldersModule } from './folders/folders.module';
 import { MceModule } from './mce/mce.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { QueryActivitiesModule } from './query-activities/query-activities.module';
 import { QueryVersionsModule } from './query-versions/query-versions.module';
 import { RedisModule } from './redis/redis.module';
@@ -26,6 +29,7 @@ import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateApiEnv,
@@ -41,6 +45,7 @@ import { UsersModule } from './users/users.module';
         connection: {
           url: configService.get<string>('REDIS_URL', 'redis://localhost:6379'),
         },
+        telemetry: new BullMQOtel('qpp-api'),
       }),
       inject: [ConfigService],
     }),
@@ -57,6 +62,7 @@ import { UsersModule } from './users/users.module';
     QueryActivitiesModule,
     QueryVersionsModule,
     UsageModule,
+    ObservabilityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

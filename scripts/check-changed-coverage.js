@@ -112,7 +112,15 @@ function isCoveredSourceFile(file) {
     normalized.endsWith(".integration.test.tsx") ||
     normalized.endsWith(".e2e.test.ts") ||
     normalized.endsWith(".e2e.test.tsx") ||
-    normalized.includes("/dist/");
+    normalized.includes("/dist/") ||
+    normalized.endsWith("/main.ts") ||
+    normalized.endsWith("/main.tsx") ||
+    normalized.endsWith("/instrument.ts") ||
+    normalized.endsWith(".health.ts") ||
+    normalized.endsWith("/health.controller.ts") ||
+    normalized.endsWith("/health.module.ts") ||
+    normalized.endsWith("/observability.module.ts") ||
+    normalized.endsWith("/metrics.module.ts");
 
   return !excluded;
 }

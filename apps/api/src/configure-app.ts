@@ -37,7 +37,9 @@ export async function configureApp(
   const { globalPrefix = true, session, rls = false } = options;
 
   if (globalPrefix) {
-    app.setGlobalPrefix('api');
+    app.setGlobalPrefix('api', {
+      exclude: ['livez', 'readyz', 'metrics'],
+    });
   }
 
   app.useGlobalFilters(new GlobalExceptionFilter());

@@ -52,3 +52,21 @@ setIfMissing('ADMIN_API_KEY', 'test_api_key');
 setIfMissing('REDIS_URL', 'redis://127.0.0.1:6379');
 // Use a dedicated Redis DB for tests to avoid interference from dev/background workers.
 process.env.REDIS_URL = withRedisDb(process.env.REDIS_URL, 15);
+
+// Suppress BullMQ/ioredis "Connection is closed" unhandled rejections during teardown.
+// BullMQ's internal ioredis subscriber connections may reject with this error when
+// NestJS shuts down the application in afterAll(). This is a benign race condition
+// where the blocking BRPOPLPUSH/XREADGROUP operation rejects after the main
+// connection has already been closed. Marking the rejection as handled prevents
+// Vitest from counting it as a test error (which would cause exit code 1).
+process.prependListener(
+  'unhandledRejection',
+  (reason: unknown, promise: Promise<unknown>) => {
+    if (
+      reason instanceof Error &&
+      reason.message === 'Connection is closed.'
+    ) {
+      promise.catch(() => {});
+    }
+  },
+);

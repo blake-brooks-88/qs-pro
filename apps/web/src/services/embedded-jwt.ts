@@ -1,6 +1,10 @@
 let bufferedJwt: string | null = null;
 let listenerInitialized = false;
 
+function isProbablyJwt(candidate: string): boolean {
+  return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(candidate);
+}
+
 function isAllowedMceOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
@@ -19,9 +23,6 @@ function isAllowedMceOrigin(origin: string): boolean {
 }
 
 function extractJwtFromUnknown(value: unknown): string | null {
-  const isProbablyJwt = (candidate: string): boolean =>
-    /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(candidate);
-
   if (typeof value === "string") {
     const trimmed = value.trim();
     return trimmed && isProbablyJwt(trimmed) ? trimmed : null;
@@ -48,6 +49,14 @@ function extractJwtFromUnknown(value: unknown): string | null {
   return trimmed && isProbablyJwt(trimmed) ? trimmed : null;
 }
 
+export function bufferEmbeddedJwt(jwt: string): void {
+  const trimmed = jwt.trim();
+  if (!trimmed || !isProbablyJwt(trimmed)) {
+    return;
+  }
+  bufferedJwt = trimmed;
+}
+
 export function startEmbeddedJwtListener(targetWindow?: Window): void {
   const win = targetWindow ?? (typeof window !== "undefined" ? window : null);
   if (listenerInitialized || !win) {
@@ -71,7 +80,7 @@ export function startEmbeddedJwtListener(targetWindow?: Window): void {
     if (!jwt) {
       return;
     }
-    bufferedJwt = jwt;
+    bufferEmbeddedJwt(jwt);
   });
 }
 

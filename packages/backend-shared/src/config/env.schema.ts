@@ -80,18 +80,32 @@ export const adminSchema = z.object({
   ADMIN_API_KEY: z.string().min(1, "ADMIN_API_KEY is required"),
 });
 
+/**
+ * Observability schema - optional env vars for error tracking and log aggregation.
+ * All fields are optional so existing dev environments work without configuration.
+ */
+export const observabilitySchema = z.object({
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  LOKI_HOST: z.string().url().optional(),
+  LOKI_USERNAME: z.string().optional(),
+  LOKI_PASSWORD: z.string().optional(),
+  METRICS_API_KEY: z.string().min(1).optional(),
+});
+
 // =============================================================================
 // Application Schemas (composed from capability schemas)
 // =============================================================================
 
 /**
  * API application environment schema.
- * Composes: infrastructure + mceAuth + mceJwt + session
+ * Composes: infrastructure + mceAuth + mceJwt + session + observability
  */
 export const apiEnvSchema = infrastructureSchema
   .merge(mceAuthSchema)
   .merge(mceJwtSchema)
   .merge(sessionSchema)
+  .merge(observabilitySchema)
   .extend({
     PORT: z.coerce.number().default(3000),
   })
@@ -163,6 +177,7 @@ export const apiEnvSchema = infrastructureSchema
 export const workerEnvSchema = infrastructureSchema
   .merge(mceAuthSchema)
   .merge(adminSchema)
+  .merge(observabilitySchema)
   .extend({
     PORT: z.coerce.number().default(3001),
   });

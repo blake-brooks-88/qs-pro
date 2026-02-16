@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -271,6 +277,26 @@ describe("App", () => {
         expect(screen.getByText("Retry")).toBeInTheDocument();
       });
     });
+
+    it("attempts JWT auth when a message event delivers a buffered JWT", async () => {
+      setEmbeddedMode(true);
+
+      const testJwt = "aaa.bbb.ccc";
+      mockConsumeEmbeddedJwt
+        .mockReturnValueOnce(null) // initial bufferedJwt read
+        .mockReturnValueOnce(testJwt); // consumed inside message handler
+
+      mockLoginWithJwt.mockResolvedValue(undefined);
+      mockGetMe.mockImplementation(() => new Promise(() => {}));
+
+      render(<App />);
+
+      window.dispatchEvent(new MessageEvent("message", { data: {} }));
+
+      await waitFor(() => {
+        expect(mockLoginWithJwt).toHaveBeenCalledWith(testJwt);
+      });
+    });
   });
 
   describe("OAuth redirect flow", () => {
@@ -434,6 +460,17 @@ describe("App", () => {
         screen.getByText(/must be accessed directly through Salesforce/i),
       ).toBeInTheDocument();
     });
+
+    it("shows LaunchInstructionsPage when embedded and reauth is required", async () => {
+      setEmbeddedMode(true);
+      mockGetMe.mockRejectedValue(create401Error("reauth_required"));
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Launch Query++")).toBeInTheDocument();
+      });
+    });
   });
 
   describe("authenticated state", () => {
@@ -459,6 +496,22 @@ describe("App", () => {
       // Verify no error states
       expect(screen.queryByText("Connection Error")).not.toBeInTheDocument();
       expect(screen.queryByText("Launch Query++")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("error state", () => {
+    it("shows Connection Error UI when a non-401 error occurs", async () => {
+      mockGetMe.mockRejectedValue(new Error("Backend down"));
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Connection Error")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Backend down")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Retry Connection" }));
+      expect(mockLocationReload).toHaveBeenCalled();
     });
   });
 });
