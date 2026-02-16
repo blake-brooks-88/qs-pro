@@ -11,10 +11,6 @@ import { getMe, loginWithJwt } from "@/services/auth";
 import { consumeEmbeddedJwt } from "@/services/embedded-jwt";
 import { useAuthStore } from "@/store/auth-store";
 
-function isProbablyJwt(candidate: string): boolean {
-  return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(candidate);
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -163,16 +159,7 @@ function App() {
       }
     };
 
-    const jwtFromQuery =
-      typeof window !== "undefined"
-        ? (new URLSearchParams(window.location.search).get("jwt")?.trim() ??
-          null)
-        : null;
-
-    const jwtCandidate =
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Empty string JWT is invalid and should trigger fallback
-      bufferedJwt ||
-      (jwtFromQuery && isProbablyJwt(jwtFromQuery) ? jwtFromQuery : null);
+    const jwtCandidate = bufferedJwt;
     if (jwtCandidate) {
       void tryJwtLogin(jwtCandidate);
     }

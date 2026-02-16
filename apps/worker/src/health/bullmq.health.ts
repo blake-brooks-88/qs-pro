@@ -30,11 +30,19 @@ export class BullMQHealthIndicator {
         return indicator.up();
       }
       return indicator.down({
-        message: `BullMQ client status: ${String((client as { status?: string }).status)}`,
+        message:
+          process.env.NODE_ENV === "production"
+            ? "Unhealthy"
+            : `BullMQ client status: ${String((client as { status?: string }).status)}`,
       });
     } catch (error) {
       return indicator.down({
-        message: error instanceof Error ? error.message : "Unknown error",
+        message:
+          process.env.NODE_ENV === "production"
+            ? "Unhealthy"
+            : error instanceof Error
+              ? error.message
+              : "Unknown error",
       });
     }
   }

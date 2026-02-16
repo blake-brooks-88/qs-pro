@@ -29,7 +29,12 @@ export class PostgresHealthIndicator {
       return indicator.up();
     } catch (error) {
       return indicator.down({
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message:
+          process.env.NODE_ENV === 'production'
+            ? 'Unhealthy'
+            : error instanceof Error
+              ? error.message
+              : 'Unknown error',
       });
     }
   }

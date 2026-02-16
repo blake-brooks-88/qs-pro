@@ -37,11 +37,19 @@ export class RedisHealthIndicator {
         return indicator.up();
       }
       return indicator.down({
-        message: `Unexpected response: ${String(response)}`,
+        message:
+          process.env.NODE_ENV === "production"
+            ? "Unhealthy"
+            : `Unexpected response: ${String(response)}`,
       });
     } catch (error) {
       return indicator.down({
-        message: error instanceof Error ? error.message : "Unknown error",
+        message:
+          process.env.NODE_ENV === "production"
+            ? "Unhealthy"
+            : error instanceof Error
+              ? error.message
+              : "Unknown error",
       });
     }
   }

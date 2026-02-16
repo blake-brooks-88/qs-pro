@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { Counter, Gauge, Histogram, register } from "prom-client";
 
 import { MetricsController } from "./metrics.controller";
+import { MetricsGuard } from "./metrics.guard";
 
 function getOrCreateCounter(
   name: string,
@@ -33,6 +34,7 @@ function getOrCreateGauge(name: string, help: string): Gauge {
 @Module({
   controllers: [MetricsController],
   providers: [
+    MetricsGuard,
     {
       provide: "METRICS_JOBS_TOTAL",
       useFactory: () =>
