@@ -92,4 +92,16 @@ describe('RunExistsGuard', () => {
     });
     expect(shellQueryService.getRun).not.toHaveBeenCalled();
   });
+
+  it('throws VALIDATION_ERROR when runId is a UUID but not v4', async () => {
+    // Arrange (v1 UUID)
+    const runId = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+    const context = createMockExecutionContext(runId, user);
+
+    // Act & Assert
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      code: ErrorCode.VALIDATION_ERROR,
+    });
+    expect(shellQueryService.getRun).not.toHaveBeenCalled();
+  });
 });
