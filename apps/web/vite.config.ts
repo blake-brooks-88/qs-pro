@@ -1,3 +1,4 @@
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -11,7 +12,24 @@ export default defineConfig(({ mode }) => {
   const previewRoot = path.resolve(srcRoot, "./preview");
 
   return {
-    plugins: [tailwindcss(), react()],
+    build: {
+      sourcemap: true,
+    },
+
+    plugins: [
+      tailwindcss(),
+      react(),
+      process.env.SENTRY_AUTH_TOKEN
+        ? sentryVitePlugin({
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT_WEB,
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            sourcemaps: {
+              filesToDeleteAfterUpload: ["./dist/**/*.js.map"],
+            },
+          })
+        : null,
+    ].filter(Boolean),
 
     resolve: {
       alias: [
