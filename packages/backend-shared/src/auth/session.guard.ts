@@ -40,9 +40,10 @@ export class SessionGuard implements CanActivate {
       throw new UnauthorizedException("Not authenticated");
     }
 
-    let createdAt = session.get("createdAt");
-    if (typeof createdAt !== "number") {
-      createdAt = Date.now();
+    const rawCreatedAt = session.get("createdAt");
+    const createdAt =
+      typeof rawCreatedAt === "number" ? rawCreatedAt : Date.now();
+    if (typeof rawCreatedAt !== "number") {
       session.set("createdAt", createdAt);
     }
     if (Date.now() - createdAt > ABSOLUTE_TIMEOUT_MS) {

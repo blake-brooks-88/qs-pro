@@ -158,10 +158,10 @@ describe("SessionGuard", () => {
 
     expect(allowed).toBe(true);
     expect(session.set).toHaveBeenCalledOnce();
-    const [key, value] = session.set.mock.calls[0];
-    expect(key).toBe("createdAt");
-    expect(value).toBeGreaterThanOrEqual(before);
-    expect(value).toBeLessThanOrEqual(after);
+    const call = session.set.mock.calls[0] as [string, number];
+    expect(call[0]).toBe("createdAt");
+    expect(call[1]).toBeGreaterThanOrEqual(before);
+    expect(call[1]).toBeLessThanOrEqual(after);
     expect(session.touch).toHaveBeenCalledOnce();
   });
 
