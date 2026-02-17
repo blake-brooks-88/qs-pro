@@ -1,7 +1,56 @@
-import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { EventEmitter } from 'node:events';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const ORIGINAL_ENV = { ...process.env };
+
+function mockIoredis() {
+  vi.doMock('ioredis', () => {
+    class RedisMock extends EventEmitter {
+      constructor() {
+        super();
+      }
+
+      quit() {
+        return Promise.resolve('OK');
+      }
+
+      disconnect() {
+        // no-op
+      }
+    }
+
+    class ClusterMock extends EventEmitter {
+      constructor() {
+        super();
+      }
+
+      quit() {
+        return Promise.resolve('OK');
+      }
+
+      disconnect() {
+        // no-op
+      }
+    }
+
+    return { __esModule: true, default: RedisMock, Cluster: ClusterMock };
+  });
+}
+
+function mockThrottlerStorageRedis() {
+  vi.doMock('@nest-lab/throttler-storage-redis', () => {
+    class ThrottlerStorageRedisService {
+      readonly redis: unknown;
+
+      constructor(redis: unknown) {
+        this.redis = redis;
+      }
+    }
+
+    return { __esModule: true, ThrottlerStorageRedisService };
+  });
+}
 
 function seedApiEnv(): void {
   process.env.NODE_ENV = 'test';
@@ -85,6 +134,8 @@ describe('AppModule', () => {
     async () => {
       seedApiEnv();
       vi.resetModules();
+      mockIoredis();
+      mockThrottlerStorageRedis();
 
       const bull: { factory?: ModuleFactory } = {};
       const throttler: { factory?: ModuleFactory } = {};
@@ -123,6 +174,8 @@ describe('AppModule', () => {
       expect(throttlerResult.throttlers).toEqual([
         { name: 'default', ttl: 60_000, limit: 10_000 },
       ]);
+      const { ThrottlerStorageRedisService } =
+        await import('@nest-lab/throttler-storage-redis');
       expect(throttlerResult.storage).toBeInstanceOf(
         ThrottlerStorageRedisService,
       );
@@ -136,6 +189,8 @@ describe('AppModule', () => {
       seedApiEnv();
       process.env.NODE_ENV = 'production';
       vi.resetModules();
+      mockIoredis();
+      mockThrottlerStorageRedis();
 
       const throttler: { factory?: ModuleFactory } = {};
       interceptThrottlerModule(throttler);
