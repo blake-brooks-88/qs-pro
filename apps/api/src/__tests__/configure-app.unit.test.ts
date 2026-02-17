@@ -114,7 +114,7 @@ describe('configureApp', () => {
   let mockApp: ReturnType<typeof createMockApp>;
 
   beforeEach(async () => {
-    configureApp ??= (await import('../configure-app')).configureApp;
+    configureApp ??= (await import('../configure-app.js')).configureApp;
     mockApp = createMockApp();
     vi.clearAllMocks();
   });
