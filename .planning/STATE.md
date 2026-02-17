@@ -43,10 +43,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
-| 13 | Monetization | ○ Pending | 0/0 | 0% |
-| 14 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
-| 15 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
-| 16 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
+| 13 | Query Formatting | ○ Pending | 0/0 | 0% |
+| 14 | Monetization | ○ Pending | 0/0 | 0% |
+| 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
+| 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
+| 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
 
 ## Phase 1 Completion Summary
 
@@ -350,6 +351,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 - Phase 14 added after Phase 13: RBAC and Admit Controls for Enterprise Tier
 - GDPR & Data Lifecycle promoted from Deferred to Phase 15 (data model now stable)
 - Phase 16 added: AppExchange Security Review (OWASP ZAP + static analysis + full compliance audit)
+- Phase 13 inserted: Query Formatting (toolbar button to prettify SQL); phases 13-16 renumbered to 14-17
 
 ## Context for Next Session
 
@@ -1019,9 +1021,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-17T01:32:36.407Z
-**Stopped at:** Completed 12-03-PLAN.md
-**Resume file:** None
+**Last session:** 2026-02-17T20:27:10.949Z
+**Stopped at:** Phase 13 context updated with library research and architecture
+**Resume file:** .planning/phases/13-query-formatting/13-CONTEXT.md
 
 ## Blockers
 
