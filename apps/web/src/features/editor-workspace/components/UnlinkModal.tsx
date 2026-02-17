@@ -97,6 +97,8 @@ export function UnlinkModal({
     open && showsBlastRadius ? savedQueryId : undefined,
   );
 
+  const blastRadiusPartial = blastRadius.data?.partial === true;
+
   const automations = useMemo(
     () => blastRadius.data?.automations ?? [],
     [blastRadius.data?.automations],
@@ -107,8 +109,11 @@ export function UnlinkModal({
   );
 
   const effectiveSafetyTier = useMemo(
-    () => (showsBlastRadius && blastRadius.isError ? 2 : safetyTier),
-    [showsBlastRadius, blastRadius.isError, safetyTier],
+    () =>
+      showsBlastRadius && (blastRadius.isError || blastRadiusPartial)
+        ? Math.max(safetyTier, 2)
+        : safetyTier,
+    [showsBlastRadius, blastRadius.isError, blastRadiusPartial, safetyTier],
   );
 
   const highRiskCount = useMemo(
@@ -309,6 +314,13 @@ export function UnlinkModal({
                 </>
               ) : (
                 <>
+                  {blastRadiusPartial ? (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600">
+                      Some automation detail requests failed. Treat this result
+                      as incomplete and confirm the Query Activity name before
+                      deleting.
+                    </div>
+                  ) : null}
                   {effectiveSafetyTier === 1 ? (
                     <p className="text-xs text-muted-foreground py-1">
                       This Query Activity is not used by any automations.

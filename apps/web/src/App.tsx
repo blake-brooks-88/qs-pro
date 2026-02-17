@@ -142,8 +142,11 @@ function App() {
           return;
         }
         setAuth(response.user, response.tenant, response.csrfToken);
-      } catch {
+      } catch (jwtError) {
         // Intentionally ignore; backend will reject invalid/expired JWTs.
+        if (import.meta.env.DEV) {
+          console.warn("[auth] Embedded JWT login failed", jwtError);
+        }
       } finally {
         loginInFlight = false;
       }

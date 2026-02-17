@@ -1,6 +1,10 @@
 import secureSession from '@fastify/secure-session';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { getDbFromContext, runWithDbContext } from '@qpp/backend-shared';
+import {
+  getDbFromContext,
+  runWithDbContext,
+  triggerFailClosedExit,
+} from '@qpp/backend-shared';
 import { createDatabaseFromClient } from '@qpp/database';
 import type { Sql } from 'postgres';
 
@@ -120,12 +124,35 @@ export async function configureApp(
               return;
             }
             released = true;
+            let cleanupUnsafe = false;
             try {
               await reserved`SELECT set_config('app.tenant_id', '', false), set_config('app.mid', '', false), set_config('app.user_id', '', false)`;
-            } catch {
-              // ignore
+            } catch (clearError) {
+              cleanupUnsafe = true;
+              reply.log.error(
+                { err: clearError },
+                'Failed to clear RLS context before releasing connection',
+              );
+              try {
+                // SECURITY: If we can't clear tenant context, the connection may be returned
+                // to the pool with stale session variables, risking cross-tenant data access.
+                // DISCARD ALL is a stronger session reset; if it fails too, fail closed.
+                await reserved`DISCARD ALL`;
+                cleanupUnsafe = false;
+              } catch (discardError) {
+                reply.log.error(
+                  { err: discardError },
+                  'Failed to DISCARD ALL after RLS clear failure',
+                );
+              }
             }
-            reserved.release();
+            if (cleanupUnsafe && process.env.NODE_ENV === 'production') {
+              // SECURITY: Do NOT release — connection may carry stale tenant context.
+              // Fail closed: destroy pool connections and exit immediately.
+              triggerFailClosedExit(sqlClient);
+            } else {
+              reserved.release();
+            }
           };
 
           reply.raw.once('finish', () => {

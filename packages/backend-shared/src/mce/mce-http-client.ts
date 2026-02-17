@@ -10,6 +10,14 @@ import { validateOutboundHost } from "./outbound-host-policy";
 const MAX_STATUS_MESSAGE_LENGTH = 500;
 const MAX_CONTENT_LENGTH = 50 * 1024 * 1024; // 50 MB
 
+function tryParseUrlHostname(value: string): string | null {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
+}
+
 function truncate(value: string, maxLength: number): string {
   return value.length <= maxLength
     ? value
@@ -81,18 +89,16 @@ export class MceHttpClient {
     const hosts: string[] = [];
     const sentryDsn = this.configService.get<string>("SENTRY_DSN");
     if (sentryDsn) {
-      try {
-        hosts.push(new URL(sentryDsn).hostname);
-      } catch {
-        /* ignore invalid DSN */
+      const hostname = tryParseUrlHostname(sentryDsn);
+      if (hostname) {
+        hosts.push(hostname);
       }
     }
     const lokiHost = this.configService.get<string>("LOKI_HOST");
     if (lokiHost) {
-      try {
-        hosts.push(new URL(lokiHost).hostname);
-      } catch {
-        /* ignore invalid host */
+      const hostname = tryParseUrlHostname(lokiHost);
+      if (hostname) {
+        hosts.push(hostname);
       }
     }
     return hosts;

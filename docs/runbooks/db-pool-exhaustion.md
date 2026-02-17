@@ -65,7 +65,24 @@ Critical
    transaction-scoped `SET LOCAL` within `BEGIN/COMMIT`. Connection leaks from
    stale RLS context should no longer occur.
 
-6. Check pool configuration:
+6. Check for intentional fail-closed restarts (RLS cleanup / rollback failure):
+   - In production, if the API cannot reliably clear request-scoped RLS session
+     state (or cannot reliably roll back a transaction), it will fail closed by
+     draining/destroying the SQL client pool and exiting with code `1` so the
+     supervisor restarts the service.
+   - Look for log lines preceding the exit, e.g.:
+     ```
+     Failed to clear RLS context before releasing connection
+     Failed to DISCARD ALL after RLS clear failure
+     Failed to reset RLS context before releasing connection
+     Failed to DISCARD ALL after RLS reset failure
+     Failed to rollback transaction in ...
+     ```
+   - Treat repeated occurrences as a DB/session reliability incident (network
+     instability, DB overload, backend termination), not as an application bug
+     to “ignore”.
+
+7. Check pool configuration:
    ```
    grep "pool" .env
    # Default: DATABASE_POOL_SIZE or postgres.js default (10)

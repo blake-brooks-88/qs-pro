@@ -661,6 +661,8 @@ export class QueryActivitiesService {
     }
 
     const automations: BlastRadiusResponse['automations'] = [];
+    let detailRequests = 0;
+    let detailFailures = 0;
 
     for (
       let i = 0;
@@ -691,6 +693,8 @@ export class QueryActivitiesService {
           return rawDetail;
         }),
       );
+      detailRequests += details.length;
+      detailFailures += details.filter((r) => r.status === 'rejected').length;
 
       for (let j = 0; j < details.length; j++) {
         const listItem = batch[j];
@@ -736,7 +740,25 @@ export class QueryActivitiesService {
       }
     }
 
-    return { automations, totalCount: automations.length };
+    if (detailFailures > 0) {
+      // Monitoring: This indicates incomplete safety analysis. If this becomes
+      // common, consider retries/backoff or failing the endpoint.
+      this.logger.warn(
+        `[blast-radius] partial result detailFailures=${detailFailures} detailRequests=${detailRequests}`,
+      );
+    }
+
+    return {
+      automations,
+      totalCount: automations.length,
+      ...(detailFailures > 0
+        ? {
+            partial: true,
+            detailRequests,
+            detailFailures,
+          }
+        : {}),
+    };
   }
 
   private automationContainsQa(

@@ -7,6 +7,7 @@ import {
   getReservedSqlFromContext,
   runWithDbContext,
 } from "./db-context";
+import { triggerFailClosedExit } from "./fail-closed-exit";
 
 @Injectable()
 export class RlsContextService {
@@ -81,6 +82,7 @@ export class RlsContextService {
         `runWithTenantContext reserve wait was slow durationMs=${reserveDuration}`,
       );
     }
+    let rollbackFailed = false;
     try {
       // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
       await reserved`BEGIN`;
@@ -98,8 +100,14 @@ export class RlsContextService {
     } catch (error) {
       try {
         await reserved`ROLLBACK`;
-      } catch {
-        // Best-effort rollback
+      } catch (rollbackError) {
+        rollbackFailed = true;
+        this.logger.warn(
+          "Failed to rollback transaction in runWithTenantContext",
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError),
+        );
       }
       this.logger.error(
         "Failed to run with tenant context",
@@ -115,7 +123,13 @@ export class RlsContextService {
           resetError instanceof Error ? resetError.message : String(resetError),
         );
       }
-      reserved.release();
+      if (rollbackFailed && process.env.NODE_ENV === "production") {
+        // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
+      } else {
+        reserved.release();
+      }
     }
   }
 
@@ -144,6 +158,7 @@ export class RlsContextService {
         `runWithUserContext reserve wait was slow durationMs=${reserveDuration}`,
       );
     }
+    let rollbackFailed = false;
     try {
       // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
       await reserved`BEGIN`;
@@ -162,8 +177,14 @@ export class RlsContextService {
     } catch (error) {
       try {
         await reserved`ROLLBACK`;
-      } catch {
-        // Best-effort rollback
+      } catch (rollbackError) {
+        rollbackFailed = true;
+        this.logger.warn(
+          "Failed to rollback transaction in runWithUserContext",
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError),
+        );
       }
       this.logger.error(
         "Failed to run with user context",
@@ -179,7 +200,13 @@ export class RlsContextService {
           resetError instanceof Error ? resetError.message : String(resetError),
         );
       }
-      reserved.release();
+      if (rollbackFailed && process.env.NODE_ENV === "production") {
+        // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
+      } else {
+        reserved.release();
+      }
     }
   }
 
@@ -205,6 +232,7 @@ export class RlsContextService {
       );
     }
 
+    let rollbackFailed = false;
     try {
       // Transaction-scoped RLS context: SET LOCAL is automatically cleared on COMMIT/ROLLBACK
       await reserved`BEGIN`;
@@ -223,8 +251,14 @@ export class RlsContextService {
     } catch (error) {
       try {
         await reserved`ROLLBACK`;
-      } catch {
-        // Best-effort rollback
+      } catch (rollbackError) {
+        rollbackFailed = true;
+        this.logger.warn(
+          "Failed to rollback transaction in runWithIsolatedUserContext",
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError),
+        );
       }
       this.logger.error(
         "Failed to run with isolated user context",
@@ -240,7 +274,13 @@ export class RlsContextService {
           resetError instanceof Error ? resetError.message : String(resetError),
         );
       }
-      reserved.release();
+      if (rollbackFailed && process.env.NODE_ENV === "production") {
+        // SECURITY: Do NOT release — connection may be in indeterminate transaction state.
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
+      } else {
+        reserved.release();
+      }
     }
   }
 }

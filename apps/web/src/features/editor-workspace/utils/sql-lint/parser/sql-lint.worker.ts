@@ -48,9 +48,10 @@ function handleInit(): void {
   try {
     parseAndLint("SELECT 1");
     sendReady();
-  } catch {
+  } catch (initError) {
     // Parser init failed - still report ready but log the issue
     // In production, this would be sent to error monitoring
+    console.warn("[sql-lint.worker] Parser init failed", initError);
     sendReady();
   }
 }

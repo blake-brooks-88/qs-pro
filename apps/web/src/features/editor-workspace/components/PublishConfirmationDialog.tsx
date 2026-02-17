@@ -27,6 +27,7 @@ interface PublishConfirmationDialogProps {
   automations: AutomationInfo[];
   isLoadingBlastRadius: boolean;
   blastRadiusError?: boolean;
+  blastRadiusPartial?: boolean;
 }
 
 const HIGH_RISK_STATUSES = new Set([
@@ -53,6 +54,7 @@ export function PublishConfirmationDialog({
   automations,
   isLoadingBlastRadius,
   blastRadiusError,
+  blastRadiusPartial,
 }: PublishConfirmationDialogProps) {
   const baseOptions = getEditorOptions();
 
@@ -146,34 +148,50 @@ export function PublishConfirmationDialog({
                 Unable to load automation data. Proceed with caution.
               </p>
             ) : automations.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">
-                No automations use this Query Activity.
-              </p>
+              <>
+                {blastRadiusPartial ? (
+                  <p className="text-xs text-amber-500 py-2">
+                    Some automation detail requests failed. This result may be
+                    incomplete—proceed with caution.
+                  </p>
+                ) : null}
+                <p className="text-xs text-muted-foreground py-2">
+                  No automations use this Query Activity.
+                </p>
+              </>
             ) : (
-              <ul className="space-y-1">
-                {automations.map((automation) => (
-                  <li
-                    key={automation.id}
-                    className="flex items-center gap-2 text-xs py-1"
-                  >
-                    <span
-                      className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
-                        automation.isHighRisk
-                          ? "bg-amber-500"
-                          : "bg-muted-foreground"
-                      }`}
-                    />
-                    <span className="font-medium text-foreground">
-                      {automation.name}
-                    </span>
-                    <span
-                      className={`${automationStatusColor(automation.status, automation.isHighRisk)} font-medium`}
+              <>
+                {blastRadiusPartial ? (
+                  <p className="text-xs text-amber-500 py-2">
+                    Some automation detail requests failed. This list may be
+                    incomplete—proceed with caution.
+                  </p>
+                ) : null}
+                <ul className="space-y-1">
+                  {automations.map((automation) => (
+                    <li
+                      key={automation.id}
+                      className="flex items-center gap-2 text-xs py-1"
                     >
-                      {automation.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                      <span
+                        className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
+                          automation.isHighRisk
+                            ? "bg-amber-500"
+                            : "bg-muted-foreground"
+                        }`}
+                      />
+                      <span className="font-medium text-foreground">
+                        {automation.name}
+                      </span>
+                      <span
+                        className={`${automationStatusColor(automation.status, automation.isHighRisk)} font-medium`}
+                      >
+                        {automation.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
 

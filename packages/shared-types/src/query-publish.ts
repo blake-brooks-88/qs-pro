@@ -59,5 +59,10 @@ export type AutomationInfo = z.infer<typeof AutomationInfoSchema>;
 export const BlastRadiusResponseSchema = z.object({
   automations: z.array(AutomationInfoSchema),
   totalCount: z.number().int(),
+  // Optional metadata indicating the response may be incomplete due to upstream
+  // failures (e.g. partial automation detail fetch).
+  partial: z.boolean().optional(),
+  detailRequests: z.number().int().nonnegative().optional(),
+  detailFailures: z.number().int().nonnegative().optional(),
 });
 export type BlastRadiusResponse = z.infer<typeof BlastRadiusResponseSchema>;

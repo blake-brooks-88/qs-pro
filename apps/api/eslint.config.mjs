@@ -63,6 +63,16 @@ export default tseslint.config(
       "prefer-const": "error",
       "eqeqeq": ["error", "always"],
       "curly": ["error", "all"],
+      "no-empty": ["error", { allowEmptyCatch: false }],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='catch'] > :matches(ArrowFunctionExpression, FunctionExpression)[body.type='BlockStatement'][body.body.length=0]",
+          message:
+            "Do not swallow promise rejections with an empty .catch(() => {}) handler. Log/report, rethrow, or explicitly justify with an eslint-disable.",
+        },
+      ],
       "no-throw-literal": "error",
       "object-shorthand": "error",
 
@@ -76,9 +86,27 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.spec.ts', '**/*.test.ts', '**/test/**/*.ts'],
+    files: [
+      "**/*.spec.ts",
+      "**/*.test.ts",
+      "**/test/**/*.ts",
+    ],
     rules: {
       '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
+    files: [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/*.integration.test.*",
+      "**/*.e2e.test.*",
+      "**/__tests__/**",
+      "**/test/**",
+    ],
+    rules: {
+      "no-empty": "off",
+      "no-restricted-syntax": "off",
     },
   },
 );

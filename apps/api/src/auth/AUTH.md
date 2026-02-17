@@ -53,6 +53,12 @@ Implementation (current approach):
 - We reserve a DB connection for the request, set both settings on that connection, and bind the request to use that DB handle for all queries.
 - On response finish/close/error, we reset the settings and release the connection back to the pool.
 
+### Fail-Closed Behavior (Ops Note)
+
+If the API cannot reliably clear/reset the RLS session state for a request (or cannot reliably roll back a transaction), it will **fail closed** in production by draining/destroying the SQL client pool and exiting with code `1` so the supervisor restarts the service. This is intentional and prevents cross-tenant/session state bleed.
+
+Runbook: `docs/runbooks/db-pool-exhaustion.md` (see the “intentional fail-closed restarts” section)
+
 Code references:
 - Request-lifetime DB context + RLS setup: `apps/api/src/configure-app.ts`
 - Async request context holder: `apps/api/src/database/db-context.ts`

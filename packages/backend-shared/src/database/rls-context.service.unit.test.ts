@@ -73,6 +73,7 @@ describe("RlsContextService", () => {
 
   const mockSqlClient = {
     reserve: vi.fn(),
+    end: vi.fn().mockResolvedValue(undefined),
     options: {},
     parameters: {},
   };
@@ -347,6 +348,83 @@ describe("RlsContextService", () => {
         value: "user-iso",
         local: true,
       });
+    });
+  });
+
+  describe("rollback failure handling", () => {
+    let exitSpy: { mockRestore: () => void };
+    let originalNodeEnv: string | undefined;
+
+    beforeEach(() => {
+      originalNodeEnv = process.env.NODE_ENV;
+      exitSpy = vi
+        .spyOn(process, "exit")
+        .mockImplementation(() => undefined as never);
+    });
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
+      exitSpy.mockRestore();
+    });
+
+    it("should not release connection when rollback fails in production", async () => {
+      process.env.NODE_ENV = "production";
+
+      mockReservedSql.mockImplementation(
+        (strings: TemplateStringsArray, ...values: unknown[]) => {
+          const fullQuery = strings.reduce((acc, str, i) => {
+            const val = values.at(i);
+            return acc + str + (val !== undefined ? String(val) : "");
+          }, "");
+
+          if (fullQuery === "ROLLBACK") {
+            return Promise.reject(new Error("connection lost"));
+          }
+          return Promise.resolve([]);
+        },
+      );
+
+      await expect(
+        service.runWithTenantContext("t1", "m1", async () => {
+          throw new Error("callback failure");
+        }),
+      ).rejects.toThrow("callback failure");
+
+      // Flush the setImmediate that wraps process.exit
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(mockReservedSql.release).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("should still release connection when rollback fails in non-production", async () => {
+      process.env.NODE_ENV = "test";
+
+      mockReservedSql.mockImplementation(
+        (strings: TemplateStringsArray, ...values: unknown[]) => {
+          const fullQuery = strings.reduce((acc, str, i) => {
+            const val = values.at(i);
+            return acc + str + (val !== undefined ? String(val) : "");
+          }, "");
+
+          if (fullQuery === "ROLLBACK") {
+            return Promise.reject(new Error("connection lost"));
+          }
+          return Promise.resolve([]);
+        },
+      );
+
+      await expect(
+        service.runWithTenantContext("t1", "m1", async () => {
+          throw new Error("callback failure");
+        }),
+      ).rejects.toThrow("callback failure");
+
+      // Flush the setImmediate just in case
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(mockReservedSql.release).toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -830,6 +830,7 @@ export function EditorWorkspace({
             automations: blastRadius.data?.automations ?? [],
             isLoadingBlastRadius: blastRadius.isLoading,
             blastRadiusError: blastRadius.isError,
+            blastRadiusPartial: blastRadius.data?.partial ?? false,
           }}
           unlinkModal={{
             target: unlinkTarget,

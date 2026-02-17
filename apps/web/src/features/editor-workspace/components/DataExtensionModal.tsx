@@ -43,8 +43,11 @@ export function DataExtensionModal({
     try {
       await onSave(draft);
       onClose();
-    } catch {
+    } catch (saveError) {
       // Error handled upstream (toast). Keep modal open.
+      if (import.meta.env.DEV) {
+        console.warn("[DataExtensionModal] onSave failed", saveError);
+      }
     } finally {
       setIsSaving(false);
     }

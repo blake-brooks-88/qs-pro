@@ -1,8 +1,9 @@
-import { Inject, Injectable, NestMiddleware } from "@nestjs/common";
+import { Inject, Injectable, Logger, NestMiddleware } from "@nestjs/common";
 import { createDatabaseFromClient, createSqlClient } from "@qpp/database";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { getDbFromContext, runWithDbContext } from "./db-context";
+import { triggerFailClosedExit } from "./fail-closed-exit";
 
 type SecureSession = {
   get(key: string): unknown;
@@ -12,6 +13,8 @@ type SqlClient = ReturnType<typeof createSqlClient>;
 
 @Injectable()
 export class RlsContextMiddleware implements NestMiddleware {
+  private readonly logger = new Logger(RlsContextMiddleware.name);
+
   constructor(@Inject("SQL_CLIENT") private readonly sql: SqlClient) {}
 
   private makeDrizzleCompatibleSql(reserved: SqlClient): SqlClient {
@@ -82,13 +85,37 @@ export class RlsContextMiddleware implements NestMiddleware {
         return;
       }
       released = true;
+      let cleanupUnsafe = false;
       try {
         await reserved`RESET app.tenant_id`;
         await reserved`RESET app.mid`;
-      } catch {
-        // ignore
+      } catch (resetError) {
+        cleanupUnsafe = true;
+        this.logger.warn(
+          "Failed to reset RLS context before releasing connection",
+          resetError instanceof Error ? resetError.message : String(resetError),
+        );
+        try {
+          // SECURITY: if we can't reset session-scoped RLS variables, treat the
+          // connection as potentially unsafe to reuse.
+          await reserved`DISCARD ALL`;
+          cleanupUnsafe = false;
+        } catch (discardError) {
+          this.logger.error(
+            "Failed to DISCARD ALL after RLS reset failure",
+            discardError instanceof Error
+              ? discardError.message
+              : String(discardError),
+          );
+        }
       }
-      await reserved.release();
+      if (cleanupUnsafe && process.env.NODE_ENV === "production") {
+        // SECURITY: Do NOT release — connection may carry stale tenant context.
+        // Fail closed: destroy pool connections and exit immediately.
+        triggerFailClosedExit(this.sql);
+      } else {
+        await reserved.release();
+      }
     };
 
     res.raw.once("finish", () => void cleanup());
