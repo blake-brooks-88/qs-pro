@@ -11,6 +11,7 @@ vi.mock('@fastify/secure-session', () => ({
 }));
 
 vi.mock('@qpp/backend-shared', () => ({
+  IDLE_TIMEOUT_SECONDS: 1800,
   getDbFromContext: vi.fn(),
   runWithDbContext: vi.fn(),
   triggerFailClosedExit: vi.fn((sql: unknown) => {
@@ -173,6 +174,7 @@ describe('configureApp', () => {
         expect.objectContaining({
           secret: 'test-secret-32-chars-long-here!',
           salt: 'test-salt-16char',
+          expiry: 1800,
           cookie: expect.objectContaining({
             path: '/',
             httpOnly: true,

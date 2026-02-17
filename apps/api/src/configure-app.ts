@@ -2,6 +2,7 @@ import secureSession from '@fastify/secure-session';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import {
   getDbFromContext,
+  IDLE_TIMEOUT_SECONDS,
   runWithDbContext,
   triggerFailClosedExit,
 } from '@qpp/backend-shared';
@@ -52,6 +53,7 @@ export async function configureApp(
     await app.register(secureSession, {
       secret: session.secret,
       salt: session.salt,
+      expiry: IDLE_TIMEOUT_SECONDS,
       cookie: {
         path: '/',
         httpOnly: true,
