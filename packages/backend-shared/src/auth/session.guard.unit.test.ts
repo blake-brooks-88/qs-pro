@@ -68,7 +68,7 @@ describe("SessionGuard", () => {
     );
   });
 
-  it("decorates request.user with { userId, tenantId, mid }", () => {
+  it("decorates request.user with { userId, tenantId, mid } and resets idle timer", () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -86,6 +86,7 @@ describe("SessionGuard", () => {
       tenantId: "tenant-1",
       mid: "mid-1",
     });
+    expect(session.touch).toHaveBeenCalledOnce();
   });
 
   it("calls session.touch() on successful authentication", () => {
