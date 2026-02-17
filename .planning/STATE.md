@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Milestone:** v1.0 Launch (Full Phase 1)
 **Status:** Ready to plan
-**Progress:** [██████████] 97%
+**Progress:** [██████████] 98%
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
 | 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
-| 12 | Security Baseline | ◐ In Progress | 1/3 | 33% |
+| 12 | Security Baseline | ◐ In Progress | 2/3 | 67% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
 | 14 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 15 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
@@ -325,6 +325,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-16 | @fastify/secure-session expiry for idle timeout | Library's expiry + touch() handles idle timeout via internal __ts field; no manual lastActivityAt needed |
 | 2026-02-16 | request.sessionExpiredContext tagging pattern | Bridges SessionGuard (backend-shared) and AuditService (api) without circular DI |
 | 2026-02-16 | createdAt stored in session cookie for absolute timeout | Sessions are cookie-based; absolute timeout via session field, not DB column |
+| 2026-02-17 | pnpm.overrides for transitive dependency security | Root-level overrides pin fastify, axios, brace-expansion, qs, webpack, lodash, diff across all workspaces |
+| 2026-02-17 | esbuild moderate vuln accepted (dev-only) | vite@5 internal esbuild@0.21 cannot be overridden without breaking vite; no production impact |
+| 2026-02-17 | X-Frame-Options: SAMEORIGIN defense-in-depth | Legacy browser fallback alongside CSP frame-ancestors; harmless on modern browsers |
 
 ## Roadmap Evolution
 
@@ -350,8 +353,8 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 12 Plan 01 COMPLETE — Session timeout enforcement (30-min idle + 8-hr absolute), session regeneration, logout hardening, audit hook
-**Next step:** Phase 12 Plan 02 (CSRF guard) and Plan 03 (CORS/headers)
+**Last action:** Phase 12 Plan 02 COMPLETE — Stub endpoint removal, X-Frame-Options header, HIGH dependency vulnerability remediation
+**Next step:** Phase 12 Plan 03 (remaining security baseline work)
 
 **Phase 12 Plan 01 COMPLETE (2026-02-16):**
 
@@ -363,6 +366,18 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 - Frontend shows "Session refreshed" toast on successful silent re-auth
 - 1 auto-fix: toast.info mock missing in api-error-handling test
 - All 396 API tests pass, all packages typecheck clean
+
+**Phase 12 Plan 02 COMPLETE (2026-02-17):**
+
+- Removed AppController (GET / Hello World), AppService, UsersController (GET /api/users/me stub), UsersModule
+- Deleted 7 stub files and their associated tests, cleaned app.module.ts
+- Added X-Frame-Options: SAMEORIGIN header in setSecurityHeaders for legacy browser defense-in-depth
+- Upgraded fastify to 5.7.4 (content-type tab bypass HIGH fix), axios to 1.13.5+ (__proto__ DoS HIGH fix)
+- Added pnpm.overrides for 7 transitive deps: @isaacs/brace-expansion, qs, webpack, lodash, diff
+- Audit reduced from 13 vulnerabilities (3 HIGH) to 2 moderate (dev-only esbuild via vite@5)
+- Debug code scan: 2 TODOs (deferred work, neither Phase 12), 1 console.log in source (diagnostic utility), no stubs
+- 2 auto-fix deviations: deleted app.e2e.test.ts and removed GET / from session-guard e2e test
+- All 395 API tests pass, 2163 web tests pass
 
 **Phase 11 Plan 03 COMPLETE (2026-02-16):**
 
@@ -996,9 +1011,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-16T19:10:00Z
-**Stopped at:** Completed 12-01-PLAN.md (session timeout enforcement)
-**Resume file:** .planning/phases/12-security-baseline/12-01-SUMMARY.md
+**Last session:** 2026-02-17T01:17:06.645Z
+**Stopped at:** Completed 12-02-PLAN.md
+**Resume file:** None
 
 ## Blockers
 
