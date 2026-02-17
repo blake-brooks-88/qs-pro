@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 12 Security Baseline COMPLETE — all 3 plans delivered (session timeouts, CSRF/headers/dep-audit, session lifecycle tests).
+**Current focus:** Phase 13 Query Formatting COMPLETE — SQL formatting via toolbar button and Shift+Alt+F with T-SQL dialect.
 
 ## Current Milestone
 
@@ -43,7 +43,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
-| 13 | Query Formatting | ○ Pending | 0/0 | 0% |
+| 13 | Query Formatting | ✓ Complete | 1/1 | 100% |
 | 14 | Monetization | ○ Pending | 0/0 | 0% |
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
@@ -329,6 +329,10 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-17 | pnpm.overrides for transitive dependency security | Root-level overrides pin fastify, axios, brace-expansion, qs, webpack, lodash, diff across all workspaces |
 | 2026-02-17 | esbuild moderate vuln accepted (dev-only) | vite@5 internal esbuild@0.21 cannot be overridden without breaking vite; no production impact |
 | 2026-02-17 | X-Frame-Options: SAMEORIGIN defense-in-depth | Legacy browser fallback alongside CSP frame-ancestors; harmless on modern browsers |
+| 2026-02-17 | formatDialect with transactsql dialect for tree-shaking | Drops ~19 unused dialect modules vs format() with language string |
+| 2026-02-17 | functionCase preserve, dataTypeCase upper | Preserve user function casing (DATEADD/dateadd); uppercase data types for keyword consistency |
+| 2026-02-17 | Trailing commas accepted (commaPosition removed in v15.x) | Leading commas impossible without fragile post-processing; accept sql-formatter default |
+| 2026-02-17 | onFormat removed from EditorWorkspaceProps | Format is self-contained via useFormatQuery hook; no external prop needed |
 
 ## Roadmap Evolution
 
@@ -355,8 +359,19 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 12 Plan 03 COMPLETE — SessionGuard and auth controller session lifecycle regression tests
-**Next step:** Phase 12 Security Baseline COMPLETE. Proceed to Phase 13 (Monetization) or next priority.
+**Last action:** Phase 13 Plan 01 COMPLETE — SQL formatting utility, hook, editor wiring, and tests
+**Next step:** Phase 13 Query Formatting COMPLETE (1/1 plans). Proceed to Phase 14 (Monetization) or next priority.
+
+**Phase 13 Plan 01 COMPLETE (2026-02-17):**
+
+- formatSql() pure utility wrapping sql-formatter v15.7.2 with T-SQL dialect
+- useFormatQuery() hook with empty/error toast handling and store-driven content updates
+- Shift+Alt+F keyboard shortcut registered via getter pattern in Monaco keybindings
+- Format button in toolbar wired to hook's handleFormat
+- onFormat removed from EditorWorkspaceProps (format now self-contained)
+- 19 unit tests for formatSql (keyword uppercasing, identifier preservation, MCE edge cases, idempotency)
+- 6 integration tests for useFormatQuery (happy path, empty editor, whitespace, null tab, error, raw content)
+- All 2190 web tests pass, zero regressions
 
 **Phase 12 Plan 03 COMPLETE (2026-02-17):**
 
@@ -1021,9 +1036,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-17T20:27:10.949Z
-**Stopped at:** Phase 13 context updated with library research and architecture
-**Resume file:** .planning/phases/13-query-formatting/13-CONTEXT.md
+**Last session:** 2026-02-17T21:52:12Z
+**Stopped at:** Completed 13-01-PLAN.md
+**Resume file:** .planning/phases/13-query-formatting/13-01-SUMMARY.md
 
 ## Blockers
 
