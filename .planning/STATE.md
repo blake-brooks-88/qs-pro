@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 12 Security Baseline — Plan 01 COMPLETE (session timeouts, regeneration, audit hook). Plans 02 (CSRF) and 03 (CORS/headers) pending.
+**Current focus:** Phase 12 Security Baseline COMPLETE — all 3 plans delivered (session timeouts, CSRF/headers/dep-audit, session lifecycle tests).
 
 ## Current Milestone
 
@@ -42,7 +42,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
 | 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
-| 12 | Security Baseline | ◐ In Progress | 2/3 | 67% |
+| 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
 | 14 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 15 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
@@ -353,8 +353,16 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 12 Plan 02 COMPLETE — Stub endpoint removal, X-Frame-Options header, HIGH dependency vulnerability remediation
-**Next step:** Phase 12 Plan 03 (remaining security baseline work)
+**Last action:** Phase 12 Plan 03 COMPLETE — SessionGuard and auth controller session lifecycle regression tests
+**Next step:** Phase 12 Security Baseline COMPLETE. Proceed to Phase 13 (Monetization) or next priority.
+
+**Phase 12 Plan 03 COMPLETE (2026-02-17):**
+
+- SessionGuard test suite at 9 tests: timeout rejection, touch, sessionExpiredContext, delete on expiry, within-window, legacy graceful degradation, no-touch-on-expiry
+- Auth controller session lifecycle tests (8 new): regenerate on all 3 login paths, createdAt on all 3 login paths, Cache-Control: no-store on logout, ok:true on logout
+- Plan 01 already expanded SessionGuard tests from 4 to 9; Plan 03 added touch assertion to user decoration test
+- All 348 backend-shared + 404 API tests pass, full typecheck clean
+- Phase 12 Security Baseline now COMPLETE (3/3 plans)
 
 **Phase 12 Plan 01 COMPLETE (2026-02-16):**
 
@@ -1011,8 +1019,8 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-17T01:17:06.645Z
-**Stopped at:** Completed 12-02-PLAN.md
+**Last session:** 2026-02-17T01:32:36.407Z
+**Stopped at:** Completed 12-03-PLAN.md
 **Resume file:** None
 
 ## Blockers
