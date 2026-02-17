@@ -6,6 +6,7 @@ import { ABSOLUTE_TIMEOUT_MS } from "./session-timeout.constants";
 
 type TestSession = {
   get: (key: string) => unknown;
+  set: ReturnType<typeof vi.fn>;
   touch: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
 };
@@ -13,6 +14,7 @@ type TestSession = {
 function createSession(data: Record<string, unknown>): TestSession {
   return {
     get: (key: string) => data[key],
+    set: vi.fn(),
     touch: vi.fn(),
     delete: vi.fn(),
   };
@@ -142,7 +144,7 @@ describe("SessionGuard", () => {
     expect(session.delete).not.toHaveBeenCalled();
   });
 
-  it("accepts session when createdAt is not set (legacy sessions)", () => {
+  it("backfills createdAt on legacy sessions missing it", () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -150,9 +152,16 @@ describe("SessionGuard", () => {
       mid: "mid-1",
     });
 
+    const before = Date.now();
     const allowed = guard.canActivate(createContext({ session }));
+    const after = Date.now();
 
     expect(allowed).toBe(true);
+    expect(session.set).toHaveBeenCalledOnce();
+    const [key, value] = session.set.mock.calls[0];
+    expect(key).toBe("createdAt");
+    expect(value).toBeGreaterThanOrEqual(before);
+    expect(value).toBeLessThanOrEqual(after);
     expect(session.touch).toHaveBeenCalledOnce();
   });
 

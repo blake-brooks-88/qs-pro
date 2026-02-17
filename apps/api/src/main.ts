@@ -17,6 +17,9 @@ import { configureApp } from './configure-app';
 
 const setSecurityHeaders = (reply: FastifyReply, cookieSecure: boolean) => {
   reply.header('X-Content-Type-Options', 'nosniff');
+  // XFO is redundant with CSP frame-ancestors below, but kept for
+  // defense-in-depth (older browsers) and AppExchange security review.
+  // It does not affect fetch/XHR calls from the MCE-framed frontend.
   reply.header('X-Frame-Options', 'SAMEORIGIN');
   reply.header('Referrer-Policy', 'no-referrer');
   reply.header(
@@ -106,14 +109,17 @@ async function bootstrap() {
         }
 
         const parsed = new URL(rawUrl, 'http://localhost');
-        const code = parsed.searchParams.get('code');
-        const state = parsed.searchParams.get('state');
-        if (!code || !state) {
+        if (
+          !parsed.searchParams.has('code') ||
+          !parsed.searchParams.has('state')
+        ) {
           return done();
         }
 
-        const qs = new URLSearchParams({ code, state }).toString();
-        void reply.redirect(`/api/auth/callback?${qs}`, 302);
+        void reply.redirect(
+          `/api/auth/callback?${parsed.searchParams.toString()}`,
+          302,
+        );
         return done();
       } catch (redirectError) {
         // Monitoring: if this starts firing in production it may indicate invalid
@@ -143,6 +149,9 @@ async function bootstrap() {
       ).sessionExpiredContext;
 
       if (expiredCtx && reply.statusCode === 401) {
+        // Fire-and-forget is intentional: AuditService.log() reserves its own
+        // pooled connection (via runWithTenantContext), so it is independent of
+        // the request-scoped connection lifecycle. Errors are caught internally.
         void auditService.log({
           eventType: 'auth.session_expired',
           actorType: 'user',
