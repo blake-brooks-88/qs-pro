@@ -11,11 +11,13 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
+import { AuditService } from './audit/audit.service';
 import { handleFatalError } from './bootstrap/handle-fatal-error';
 import { configureApp } from './configure-app';
 
 const setSecurityHeaders = (reply: FastifyReply, cookieSecure: boolean) => {
   reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('X-Frame-Options', 'SAMEORIGIN');
   reply.header('Referrer-Policy', 'no-referrer');
   reply.header(
     'Permissions-Policy',
@@ -125,6 +127,35 @@ async function bootstrap() {
         }
         done();
       }
+    });
+
+    const auditService = app.get(AuditService);
+    adapter.getInstance().addHook('onResponse', (req, reply, done) => {
+      const expiredCtx = (
+        req as unknown as {
+          sessionExpiredContext?: {
+            reason: string;
+            userId: string;
+            tenantId: string;
+            mid: string;
+          };
+        }
+      ).sessionExpiredContext;
+
+      if (expiredCtx && reply.statusCode === 401) {
+        void auditService.log({
+          eventType: 'auth.session_expired',
+          actorType: 'user',
+          actorId: expiredCtx.userId,
+          tenantId: expiredCtx.tenantId,
+          mid: expiredCtx.mid,
+          targetId: expiredCtx.userId,
+          metadata: { reason: expiredCtx.reason },
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
+      done();
     });
 
     const port = configService.get('PORT', { infer: true });

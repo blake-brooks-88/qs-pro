@@ -26,6 +26,7 @@ type SecureSession = {
   get(key: string): unknown;
   set(key: string, value: unknown): void;
   delete(): void;
+  regenerate(ignoreFields?: string[]): void;
 };
 
 type SessionRequest = FastifyRequest & { session?: SecureSession };
@@ -46,7 +47,6 @@ const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  // TODO(Phase 12): auth.session_expired — requires SessionGuard DI wiring in @qpp/backend-shared
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
@@ -105,10 +105,12 @@ export class AuthController {
     try {
       const { user, tenant, mid } = await this.authService.handleJwtLogin(jwt);
 
+      req.session.regenerate();
       this.ensureCsrfToken(req.session);
       req.session.set('userId', user.id);
       req.session.set('tenantId', tenant.id);
       req.session.set('mid', mid);
+      req.session.set('createdAt', Date.now());
 
       void this.auditService.log({
         eventType: 'auth.login',
@@ -125,7 +127,6 @@ export class AuthController {
       const requestedJson = accept.includes('application/json');
 
       if (requestedJson) {
-        // Override redirect behavior for JSON responses
         res.status(200).send({ ok: true });
         return;
       }
@@ -203,7 +204,6 @@ export class AuthController {
     const resolvedTssd = this.resolveAuthTssd(tssd);
 
     try {
-      // If we have a legacy/partial session (missing MID), clear it so we don't loop on `/api/auth/me`.
       if (
         session &&
         typeof userId === 'string' &&
@@ -240,9 +240,12 @@ export class AuthController {
           tenant,
           mid: resolvedMid,
         } = await this.authService.handleJwtLogin(jwt);
+        session.regenerate();
+        this.ensureCsrfToken(session);
         session.set('userId', user.id);
         session.set('tenantId', tenant.id);
         session.set('mid', resolvedMid);
+        session.set('createdAt', Date.now());
 
         void this.auditService.log({
           eventType: 'auth.login',
@@ -339,10 +342,12 @@ export class AuthController {
       `OAuth callback AuthService completed durationMs=${Date.now() - authServiceStartedAt}`,
     );
 
+    req.session.regenerate();
     this.ensureCsrfToken(req.session);
     req.session.set('userId', result.user.id);
     req.session.set('tenantId', result.tenant.id);
     req.session.set('mid', result.mid);
+    req.session.set('createdAt', Date.now());
 
     void this.auditService.log({
       eventType: 'auth.login',
@@ -388,7 +393,10 @@ export class AuthController {
   }
 
   @Get('logout')
-  logout(@Req() req: SessionRequest) {
+  logout(
+    @Req() req: SessionRequest,
+    @Res({ passthrough: true }) res: FastifyReply,
+  ) {
     const tenantId = req.session?.get('tenantId');
     const mid = req.session?.get('mid');
     const userId = req.session?.get('userId');
@@ -411,6 +419,7 @@ export class AuthController {
     }
 
     req.session?.delete();
+    res.header('Cache-Control', 'no-store');
     return { ok: true };
   }
 
