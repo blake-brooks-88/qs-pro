@@ -131,7 +131,6 @@ export interface EditorWorkspaceProps {
   guardrailTitle?: string;
   onSave?: (tabId: string, content: string) => void;
   onSaveAs?: (tabId: string, name: string, folderId: string) => void;
-  onFormat?: () => void;
   onDeploy?: (queryId: string) => void;
   onCreateQueryActivity?: (draft: QueryActivityDraft) => void;
   onSelectQuery?: (id: string) => void;

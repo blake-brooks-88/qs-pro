@@ -5,6 +5,7 @@ export function registerSqlEditorKeybindings(options: {
   monaco: typeof Monaco;
   getOnSave: () => (() => void) | undefined;
   getOnSaveAs: () => (() => void) | undefined;
+  getOnFormat: () => (() => void) | undefined;
   enableSaveAs: boolean;
   enableRunRequest: boolean;
   getOnRunRequest: () => (() => void) | undefined;
@@ -14,6 +15,7 @@ export function registerSqlEditorKeybindings(options: {
     monaco,
     getOnSave,
     getOnSaveAs,
+    getOnFormat,
     enableSaveAs,
     enableRunRequest,
     getOnRunRequest,
@@ -41,6 +43,13 @@ export function registerSqlEditorKeybindings(options: {
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash, () => {
     void editor.getAction("editor.action.commentLine")?.run();
   });
+
+  editor.addCommand(
+    monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+    () => {
+      getOnFormat()?.();
+    },
+  );
 }
 
 export function registerCursorPositionListener(options: {
