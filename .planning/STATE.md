@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 11 API Hardening — all 3 plans COMPLETE. ZodValidationPipe + ParseUUIDPipe (Plan 01), RLS isolation regression suite (Plan 02), outbound host allowlist + rate limiting (Plan 03).
+**Current focus:** Phase 12 Security Baseline — Plan 01 COMPLETE (session timeouts, regeneration, audit hook). Plans 02 (CSRF) and 03 (CORS/headers) pending.
 
 ## Current Milestone
 
 **Milestone:** v1.0 Launch (Full Phase 1)
 **Status:** Ready to plan
-**Progress:** [██████████] 98%
+**Progress:** [██████████] 97%
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
 | 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
-| 12 | Security Baseline | ○ Pending | 0/0 | 0% |
+| 12 | Security Baseline | ◐ In Progress | 1/3 | 33% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
 | 14 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 15 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
@@ -322,6 +322,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-16 | relkind IN ('r','p') for FORCE RLS pg_class query | audit_logs is partitioned (relkind='p'); must include both regular and partitioned tables |
 | 2026-02-16 | DISABLE TRIGGER for audit_logs immutability bypass in tests | set_config('app.audit_retention_purge') unreliable in purge context; ALTER TABLE DISABLE TRIGGER is deterministic |
 | 2026-02-16 | withRlsContext helper for RLS integration tests | Reserves connection, sets set_config vars, executes callback, resets in finally block |
+| 2026-02-16 | @fastify/secure-session expiry for idle timeout | Library's expiry + touch() handles idle timeout via internal __ts field; no manual lastActivityAt needed |
+| 2026-02-16 | request.sessionExpiredContext tagging pattern | Bridges SessionGuard (backend-shared) and AuditService (api) without circular DI |
+| 2026-02-16 | createdAt stored in session cookie for absolute timeout | Sessions are cookie-based; absolute timeout via session field, not DB column |
 
 ## Roadmap Evolution
 
@@ -347,8 +350,19 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 11 COMPLETE — All 3 plans delivered (ZodValidationPipe, RLS regression suite, outbound host policy + rate limiting)
-**Next step:** Phase 12 Security Baseline (pending planning)
+**Last action:** Phase 12 Plan 01 COMPLETE — Session timeout enforcement (30-min idle + 8-hr absolute), session regeneration, logout hardening, audit hook
+**Next step:** Phase 12 Plan 02 (CSRF guard) and Plan 03 (CORS/headers)
+
+**Phase 12 Plan 01 COMPLETE (2026-02-16):**
+
+- SessionGuard enforces 8-hour absolute timeout via createdAt check, resets idle timer via session.touch()
+- @fastify/secure-session expiry set to 1800 seconds for idle timeout
+- All three login paths (POST, GET JWT, OAuth callback) regenerate session before setting data (fixation prevention)
+- onResponse audit hook logs auth.session_expired events with reason and actor context
+- Logout hardened with Cache-Control: no-store header
+- Frontend shows "Session refreshed" toast on successful silent re-auth
+- 1 auto-fix: toast.info mock missing in api-error-handling test
+- All 396 API tests pass, all packages typecheck clean
 
 **Phase 11 Plan 03 COMPLETE (2026-02-16):**
 
@@ -982,9 +996,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-16T18:07:06.059Z
-**Stopped at:** Phase 12 context gathered
-**Resume file:** .planning/phases/12-security-baseline/12-CONTEXT.md
+**Last session:** 2026-02-16T19:10:00Z
+**Stopped at:** Completed 12-01-PLAN.md (session timeout enforcement)
+**Resume file:** .planning/phases/12-security-baseline/12-01-SUMMARY.md
 
 ## Blockers
 
@@ -1006,4 +1020,4 @@ None currently.
 
 ---
 *State initialized: 2026-01-20*
-*Last updated: 2026-02-16 — Phase 11 Plan 03 COMPLETE (outbound host policy, response size limits, session-based rate limiting)*
+*Last updated: 2026-02-16 — Phase 12 Plan 01 COMPLETE (session timeouts, regeneration, audit hook, logout hardening)*
