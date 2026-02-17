@@ -148,7 +148,9 @@ describe('AppModule', () => {
           key === 'NODE_ENV' ? 'production' : (fallback ?? ''),
       }) as { throttlers: { limit: number }[] };
 
-      expect(result.throttlers[0].limit).toBe(120);
+      const first = result.throttlers[0];
+      expect(first).toBeDefined();
+      expect(first?.limit).toBe(120);
     },
   );
 });
