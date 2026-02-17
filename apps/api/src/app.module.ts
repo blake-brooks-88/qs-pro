@@ -15,8 +15,6 @@ import { SentryModule } from '@sentry/nestjs/setup';
 import { BullMQOtel } from 'bullmq-otel';
 import Redis from 'ioredis';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { SessionThrottlerGuard } from './common/guards/session-throttler.guard';
@@ -30,7 +28,6 @@ import { RedisModule } from './redis/redis.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { ShellQueryModule } from './shell-query/shell-query.module';
 import { UsageModule } from './usage/usage.module';
-import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -79,7 +76,6 @@ import { UsersModule } from './users/users.module';
     DatabaseModule,
     AuditModule,
     AuthModule,
-    UsersModule,
     MceModule,
     RedisModule,
     ShellQueryModule,
@@ -91,9 +87,7 @@ import { UsersModule } from './users/users.module';
     UsageModule,
     ObservabilityModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: SessionThrottlerGuard,

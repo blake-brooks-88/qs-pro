@@ -85,6 +85,10 @@ export * from "./auth/auth.module";
 export * from "./auth/auth.service";
 export * from "./auth/seat-limit.service";
 export { SessionGuard } from "./auth/session.guard";
+export {
+  ABSOLUTE_TIMEOUT_MS,
+  IDLE_TIMEOUT_SECONDS,
+} from "./auth/session-timeout.constants";
 export * from "./config";
 export * from "./encryption";
 export * from "./logger";

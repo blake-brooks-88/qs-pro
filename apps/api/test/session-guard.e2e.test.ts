@@ -175,12 +175,6 @@ describe('Session Guard (e2e)', () => {
       expect(response.body.status).toBe('ok');
     });
 
-    it('should allow GET / without session', async () => {
-      const response = await request(app.getHttpServer()).get('/').expect(200);
-
-      expect(response.text).toBe('Hello World!');
-    });
-
     it('should allow GET /auth/login without session (redirects to OAuth)', async () => {
       const response = await request(app.getHttpServer())
         .get('/auth/login')

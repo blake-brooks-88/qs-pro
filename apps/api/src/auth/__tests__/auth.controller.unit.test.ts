@@ -21,6 +21,7 @@ type SecureSession = {
   get(key: string): unknown;
   set(key: string, value: unknown): void;
   delete(): void;
+  regenerate(ignoreFields?: string[]): void;
 };
 
 type SessionRequest = FastifyRequest & { session?: SecureSession };
@@ -44,6 +45,7 @@ function createMockSession(
       }
     }),
     delete: vi.fn(() => data.clear()),
+    regenerate: vi.fn(() => data.clear()),
   };
 }
 
@@ -63,6 +65,7 @@ function createMockResponse(): FastifyReply {
   const mock = {
     status: vi.fn().mockReturnThis(),
     send: vi.fn().mockReturnThis(),
+    header: vi.fn().mockReturnThis(),
   };
   return mock as unknown as FastifyReply;
 }
@@ -831,9 +834,10 @@ describe('AuthController', () => {
         tenantId: 'tenant-1',
       });
       const request = createMockRequest({ session });
+      const response = createMockResponse();
 
       // Act
-      controller.logout(request);
+      controller.logout(request, response);
 
       // Assert
       expect(session.delete).toHaveBeenCalled();
@@ -843,12 +847,26 @@ describe('AuthController', () => {
       // Arrange
       const session = createMockSession();
       const request = createMockRequest({ session });
+      const response = createMockResponse();
 
       // Act
-      const result = controller.logout(request);
+      const result = controller.logout(request, response);
 
       // Assert
       expect(result).toEqual({ ok: true });
+    });
+
+    it('sets Cache-Control: no-store header', () => {
+      // Arrange
+      const session = createMockSession();
+      const request = createMockRequest({ session });
+      const response = createMockResponse();
+
+      // Act
+      controller.logout(request, response);
+
+      // Assert
+      expect(response.header).toHaveBeenCalledWith('Cache-Control', 'no-store');
     });
   });
 });

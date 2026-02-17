@@ -10,6 +10,7 @@ import api from "../api";
 vi.mock("sonner", () => ({
   toast: {
     error: vi.fn(),
+    info: vi.fn(),
   },
 }));
 

@@ -49,6 +49,7 @@ api.interceptors.response.use(
             _retry: true,
           } as RetriableRequestConfig);
 
+          toast.info("Session refreshed");
           return api(originalRequest);
         } catch (refreshError) {
           logout();

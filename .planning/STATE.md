@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 11 API Hardening — all 3 plans COMPLETE. ZodValidationPipe + ParseUUIDPipe (Plan 01), RLS isolation regression suite (Plan 02), outbound host allowlist + rate limiting (Plan 03).
+**Current focus:** Phase 12 Security Baseline COMPLETE — all 3 plans delivered (session timeouts, CSRF/headers/dep-audit, session lifecycle tests).
 
 ## Current Milestone
 
@@ -42,7 +42,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 9 | Audit Logging Infrastructure | ✓ Complete | 6/6 | 100% |
 | 10 | Observability & Monitoring | ✓ Complete | 5/5 | 100% |
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
-| 12 | Security Baseline | ○ Pending | 0/0 | 0% |
+| 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
 | 13 | Monetization | ○ Pending | 0/0 | 0% |
 | 14 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 15 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
@@ -322,6 +322,12 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-16 | relkind IN ('r','p') for FORCE RLS pg_class query | audit_logs is partitioned (relkind='p'); must include both regular and partitioned tables |
 | 2026-02-16 | DISABLE TRIGGER for audit_logs immutability bypass in tests | set_config('app.audit_retention_purge') unreliable in purge context; ALTER TABLE DISABLE TRIGGER is deterministic |
 | 2026-02-16 | withRlsContext helper for RLS integration tests | Reserves connection, sets set_config vars, executes callback, resets in finally block |
+| 2026-02-16 | @fastify/secure-session expiry for idle timeout | Library's expiry + touch() handles idle timeout via internal __ts field; no manual lastActivityAt needed |
+| 2026-02-16 | request.sessionExpiredContext tagging pattern | Bridges SessionGuard (backend-shared) and AuditService (api) without circular DI |
+| 2026-02-16 | createdAt stored in session cookie for absolute timeout | Sessions are cookie-based; absolute timeout via session field, not DB column |
+| 2026-02-17 | pnpm.overrides for transitive dependency security | Root-level overrides pin fastify, axios, brace-expansion, qs, webpack, lodash, diff across all workspaces |
+| 2026-02-17 | esbuild moderate vuln accepted (dev-only) | vite@5 internal esbuild@0.21 cannot be overridden without breaking vite; no production impact |
+| 2026-02-17 | X-Frame-Options: SAMEORIGIN defense-in-depth | Legacy browser fallback alongside CSP frame-ancestors; harmless on modern browsers |
 
 ## Roadmap Evolution
 
@@ -347,8 +353,39 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 11 COMPLETE — All 3 plans delivered (ZodValidationPipe, RLS regression suite, outbound host policy + rate limiting)
-**Next step:** Phase 12 Security Baseline (pending planning)
+**Last action:** Phase 12 Plan 03 COMPLETE — SessionGuard and auth controller session lifecycle regression tests
+**Next step:** Phase 12 Security Baseline COMPLETE. Proceed to Phase 13 (Monetization) or next priority.
+
+**Phase 12 Plan 03 COMPLETE (2026-02-17):**
+
+- SessionGuard test suite at 9 tests: timeout rejection, touch, sessionExpiredContext, delete on expiry, within-window, legacy graceful degradation, no-touch-on-expiry
+- Auth controller session lifecycle tests (8 new): regenerate on all 3 login paths, createdAt on all 3 login paths, Cache-Control: no-store on logout, ok:true on logout
+- Plan 01 already expanded SessionGuard tests from 4 to 9; Plan 03 added touch assertion to user decoration test
+- All 348 backend-shared + 404 API tests pass, full typecheck clean
+- Phase 12 Security Baseline now COMPLETE (3/3 plans)
+
+**Phase 12 Plan 01 COMPLETE (2026-02-16):**
+
+- SessionGuard enforces 8-hour absolute timeout via createdAt check, resets idle timer via session.touch()
+- @fastify/secure-session expiry set to 1800 seconds for idle timeout
+- All three login paths (POST, GET JWT, OAuth callback) regenerate session before setting data (fixation prevention)
+- onResponse audit hook logs auth.session_expired events with reason and actor context
+- Logout hardened with Cache-Control: no-store header
+- Frontend shows "Session refreshed" toast on successful silent re-auth
+- 1 auto-fix: toast.info mock missing in api-error-handling test
+- All 396 API tests pass, all packages typecheck clean
+
+**Phase 12 Plan 02 COMPLETE (2026-02-17):**
+
+- Removed AppController (GET / Hello World), AppService, UsersController (GET /api/users/me stub), UsersModule
+- Deleted 7 stub files and their associated tests, cleaned app.module.ts
+- Added X-Frame-Options: SAMEORIGIN header in setSecurityHeaders for legacy browser defense-in-depth
+- Upgraded fastify to 5.7.4 (content-type tab bypass HIGH fix), axios to 1.13.5+ (__proto__ DoS HIGH fix)
+- Added pnpm.overrides for 7 transitive deps: @isaacs/brace-expansion, qs, webpack, lodash, diff
+- Audit reduced from 13 vulnerabilities (3 HIGH) to 2 moderate (dev-only esbuild via vite@5)
+- Debug code scan: 2 TODOs (deferred work, neither Phase 12), 1 console.log in source (diagnostic utility), no stubs
+- 2 auto-fix deviations: deleted app.e2e.test.ts and removed GET / from session-guard e2e test
+- All 395 API tests pass, 2163 web tests pass
 
 **Phase 11 Plan 03 COMPLETE (2026-02-16):**
 
@@ -982,9 +1019,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-16T18:07:06.059Z
-**Stopped at:** Phase 12 context gathered
-**Resume file:** .planning/phases/12-security-baseline/12-CONTEXT.md
+**Last session:** 2026-02-17T01:32:36.407Z
+**Stopped at:** Completed 12-03-PLAN.md
+**Resume file:** None
 
 ## Blockers
 
@@ -1006,4 +1043,4 @@ None currently.
 
 ---
 *State initialized: 2026-01-20*
-*Last updated: 2026-02-16 — Phase 11 Plan 03 COMPLETE (outbound host policy, response size limits, session-based rate limiting)*
+*Last updated: 2026-02-16 — Phase 12 Plan 01 COMPLETE (session timeouts, regeneration, audit hook, logout hardening)*
