@@ -414,6 +414,42 @@ describe("formatSql", () => {
         "OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY",
       );
     });
+
+    it("handles FETCH FIRST variant", () => {
+      expect(fixOffsetFetchCase("FETCH FIRST 5 rows only")).toBe(
+        "FETCH FIRST 5 ROWS ONLY",
+      );
+    });
+
+    it("does not mutate string literals containing rows or only", () => {
+      const input = "SELECT 'only rows' FROM [DE]";
+      expect(fixOffsetFetchCase(input)).toBe(input);
+    });
+
+    it("does not mutate single-quoted only", () => {
+      const input = "SELECT 'only' AS flag FROM [DE]";
+      expect(fixOffsetFetchCase(input)).toBe(input);
+    });
+
+    it("does not mutate single-quoted rows", () => {
+      const input = "SELECT 'rows' AS label FROM [DE]";
+      expect(fixOffsetFetchCase(input)).toBe(input);
+    });
+
+    it("does not mutate inline comments containing rows or only", () => {
+      const input = "SELECT a -- only rows here\nFROM [DE]";
+      expect(fixOffsetFetchCase(input)).toBe(input);
+    });
+
+    it("does not mutate block comments containing rows or only", () => {
+      const input = "SELECT a /* only rows */ FROM [DE]";
+      expect(fixOffsetFetchCase(input)).toBe(input);
+    });
+
+    it("does not mutate column named rows or only", () => {
+      const input = "SELECT rows, only FROM [DE]";
+      expect(fixOffsetFetchCase(input)).toBe(input);
+    });
   });
 
   describe("moveCommasToLeading (unit)", () => {
@@ -524,6 +560,20 @@ describe("formatSql", () => {
       const input = "        PARTITION BY\n            a,\n            b";
       const expected = "        PARTITION BY\n            a\n            , b";
       expect(moveCommasToLeading(input)).toBe(expected);
+    });
+
+    it("skips lines inside a multi-line block comment", () => {
+      const input =
+        "SELECT\n    a,\n    /* start\n    middle line\n    end */\n    b\nFROM\n    [T]";
+      const expected =
+        "SELECT\n    a\n    , /* start\n    middle line\n    end */\n    b\nFROM\n    [T]";
+      expect(moveCommasToLeading(input)).toBe(expected);
+    });
+
+    it("passes through lines with block comment opening without close", () => {
+      const input =
+        "SELECT\n    a, /* open\n    inside\n    */\n    b\nFROM\n    [T]";
+      expect(moveCommasToLeading(input)).toBe(input);
     });
   });
 

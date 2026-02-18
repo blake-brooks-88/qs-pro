@@ -37,9 +37,15 @@ export function stripTrailingSemicolon(sql: string): string {
 /**
  * Uppercases ROWS and ONLY keywords in OFFSET FETCH clauses.
  * These keywords are not handled by sql-formatter's keywordCase option.
+ * Targets only the rigid OFFSET/FETCH syntax to avoid mutating string literals or comments.
  */
 export function fixOffsetFetchCase(sql: string): string {
-  return sql.replace(/\brows\b/gi, "ROWS").replace(/\bonly\b/gi, "ONLY");
+  return sql
+    .replace(/(\bOFFSET\s+\d+\s+)rows\b/gi, "$1ROWS")
+    .replace(
+      /(\bFETCH\s+(?:NEXT|FIRST)\s+\d+\s+)rows(\s+)only\b/gi,
+      "$1ROWS$2ONLY",
+    );
 }
 
 /**
