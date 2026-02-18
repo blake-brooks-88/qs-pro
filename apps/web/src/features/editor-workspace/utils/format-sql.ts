@@ -44,10 +44,72 @@ export function fixOffsetFetchCase(sql: string): string {
 
 /**
  * Transforms trailing commas to leading commas for readability.
- * Handles commas before inline comments and preserves commas inside strings.
+ * Operates line-by-line to correctly handle:
+ * - Standard trailing commas: `col1,\n    col2` → `col1\n    , col2`
+ * - Commas before inline comments: `col1, -- desc\n    col2` → `col1 -- desc\n    , col2`
+ * - Commas inside string literals (never trailing, left untouched)
+ * - Block comments spanning multiple lines
  */
 export function moveCommasToLeading(sql: string): string {
-  return sql;
+  const lines = sql.split("\n");
+  const result: string[] = [];
+  let pendingComma = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    if (pendingComma) {
+      const indentMatch = line.match(/^(\s*)(.*)/s);
+      if (indentMatch?.[2]) {
+        line = `${indentMatch[1]}, ${indentMatch[2]}`;
+      }
+      pendingComma = false;
+    }
+
+    if (inBlockComment) {
+      if (line.includes("*/")) {
+        inBlockComment = false;
+      } else {
+        result.push(line);
+        continue;
+      }
+    }
+
+    const lastOpen = line.lastIndexOf("/*");
+    const lastClose = line.lastIndexOf("*/");
+    if (lastOpen > lastClose) {
+      inBlockComment = true;
+      result.push(line);
+      continue;
+    }
+
+    const trimmedEnd = line.trimEnd();
+
+    if (trimmedEnd.endsWith(",")) {
+      const beforeComma = trimmedEnd.slice(0, -1);
+      const quoteCount = (beforeComma.match(/'/g) || []).length;
+
+      if (quoteCount % 2 === 0) {
+        line = beforeComma;
+        pendingComma = true;
+      }
+    } else {
+      const inlineCommentMatch = trimmedEnd.match(/^(.*\S),\s+(--.*$)/);
+      if (inlineCommentMatch) {
+        const beforeComma = inlineCommentMatch[1];
+        const quoteCount = (beforeComma.match(/'/g) || []).length;
+        if (quoteCount % 2 === 0) {
+          line = `${beforeComma} ${inlineCommentMatch[2]}`;
+          pendingComma = true;
+        }
+      }
+    }
+
+    result.push(line);
+  }
+
+  return result.join("\n");
 }
 
 const postProcessingPipeline: Array<(sql: string) => string> = [
