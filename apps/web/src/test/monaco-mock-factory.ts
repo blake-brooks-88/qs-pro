@@ -86,7 +86,7 @@ export type MockEditor = ReturnType<typeof createMockEditor>["editor"];
 export function createMockMonaco() {
   return {
     KeyMod: { CtrlCmd: 1, Shift: 2, Alt: 4, WinCtrl: 8 },
-    KeyCode: { KeyS: 49, Enter: 3, Tab: 2, Slash: 56 },
+    KeyCode: { KeyS: 49, Enter: 3, Tab: 2, Slash: 56, KeyF: 36 },
     Range: vi.fn((sl: number, sc: number, el: number, ec: number) => ({
       startLineNumber: sl,
       startColumn: sc,
