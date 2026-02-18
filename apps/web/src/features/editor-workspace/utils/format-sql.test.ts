@@ -182,7 +182,7 @@ describe("formatSql", () => {
       expect(result).toContain("SELECT TOP 10\n");
       const lines = result.split("\n");
       const columnLines = lines.filter(
-        (l) => l.trim() === "a," || l.trim() === "b," || l.trim() === "c",
+        (l) => l.trim() === "a" || l.trim() === ", b" || l.trim() === ", c",
       );
       expect(columnLines.length).toBeGreaterThanOrEqual(1);
       for (const line of columnLines) {

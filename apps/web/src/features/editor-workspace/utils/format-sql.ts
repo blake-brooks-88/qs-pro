@@ -114,6 +114,7 @@ export function moveCommasToLeading(sql: string): string {
 
 const postProcessingPipeline: Array<(sql: string) => string> = [
   fixSelectTop,
+  moveCommasToLeading,
   stripTrailingSemicolon,
   fixOffsetFetchCase,
 ];
