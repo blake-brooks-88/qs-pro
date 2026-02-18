@@ -526,4 +526,40 @@ describe("formatSql", () => {
       expect(moveCommasToLeading(input)).toBe(expected);
     });
   });
+
+  describe("leading comma formatting (integration)", () => {
+    it("outputs leading commas in SELECT column lists", () => {
+      const result = formatSql("select a, b, c from [DE]");
+      expect(result).toBe("SELECT\n    a\n    , b\n    , c\nFROM\n    [DE]");
+    });
+
+    it("outputs leading commas in GROUP BY and ORDER BY", () => {
+      const result = formatSql(
+        "select a, b, count(*) from [T] group by a, b order by a, b",
+      );
+      expect(result).toContain("GROUP BY\n    a\n    , b");
+      expect(result).toContain("ORDER BY\n    a\n    , b");
+    });
+
+    it("moves only list-separator commas, not function-internal commas", () => {
+      const result = formatSql(
+        "select dateadd(day, -7, getdate()), col2 from [DE]",
+      );
+      expect(result).toContain("DATEADD(day, -7, GETDATE())");
+      expect(result).toContain("\n    , col2");
+    });
+
+    it("preserves commas inside string literals while moving list commas", () => {
+      const result = formatSql("select 'hello,', col2 from [T]");
+      expect(result).toContain("'hello,'");
+      expect(result).toContain("\n    , col2");
+    });
+
+    it("produces idempotent output with leading commas", () => {
+      const original = "select a, b, c from [DE] where x = 1";
+      const formatted = formatSql(original);
+      const reformatted = formatSql(formatted);
+      expect(reformatted).toBe(formatted);
+    });
+  });
 });
