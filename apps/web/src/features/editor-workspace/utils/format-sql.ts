@@ -49,10 +49,30 @@ export function fixOffsetFetchCase(sql: string): string {
 }
 
 /**
+ * Splits a SQL line into its code portion and optional inline comment,
+ * correctly handling `--` that appears inside string literals.
+ */
+export function splitCodeAndComment(line: string): {
+  code: string;
+  comment: string;
+} {
+  let inString = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === "'") {
+      inString = !inString;
+    } else if (!inString && line[i] === "-" && line[i + 1] === "-") {
+      return { code: line.slice(0, i), comment: line.slice(i) };
+    }
+  }
+  return { code: line, comment: "" };
+}
+
+/**
  * Transforms trailing commas to leading commas for readability.
  * Operates line-by-line to correctly handle:
  * - Standard trailing commas: `col1,\n    col2` → `col1\n    , col2`
  * - Commas before inline comments: `col1, -- desc\n    col2` → `col1 -- desc\n    , col2`
+ * - Comment-only lines (transparent — pendingComma carries through)
  * - Commas inside string literals (never trailing, left untouched)
  * - Block comments spanning multiple lines
  */
@@ -65,14 +85,6 @@ export function moveCommasToLeading(sql: string): string {
   for (const rawLine of lines) {
     let line = rawLine;
 
-    if (pendingComma) {
-      const indentMatch = line.match(/^(\s*)(.*)/s);
-      if (indentMatch?.[2]) {
-        line = `${indentMatch[1]}, ${indentMatch[2]}`;
-      }
-      pendingComma = false;
-    }
-
     if (inBlockComment) {
       if (line.includes("*/")) {
         inBlockComment = false;
@@ -80,6 +92,22 @@ export function moveCommasToLeading(sql: string): string {
         result.push(line);
         continue;
       }
+    }
+
+    const { code, comment } = splitCodeAndComment(line);
+    const isCommentOnly = code.trim() === "" && comment !== "";
+
+    if (isCommentOnly) {
+      result.push(line);
+      continue;
+    }
+
+    if (pendingComma) {
+      const indentMatch = line.match(/^(\s*)(.*)/s);
+      if (indentMatch?.[2]) {
+        line = `${indentMatch[1]}, ${indentMatch[2]}`;
+      }
+      pendingComma = false;
     }
 
     const lastOpen = line.lastIndexOf("/*");
@@ -90,25 +118,19 @@ export function moveCommasToLeading(sql: string): string {
       continue;
     }
 
-    const trimmedEnd = line.trimEnd();
+    const { code: currentCode, comment: currentComment } =
+      splitCodeAndComment(line);
+    const trimmedCode = currentCode.trimEnd();
 
-    if (trimmedEnd.endsWith(",")) {
-      const beforeComma = trimmedEnd.slice(0, -1);
+    if (trimmedCode.endsWith(",")) {
+      const beforeComma = trimmedCode.slice(0, -1).trimEnd();
       const quoteCount = (beforeComma.match(/'/g) ?? []).length;
 
       if (quoteCount % 2 === 0) {
-        line = beforeComma;
+        line = currentComment
+          ? `${beforeComma} ${currentComment}`
+          : beforeComma;
         pendingComma = true;
-      }
-    } else {
-      const inlineCommentMatch = trimmedEnd.match(/^(.*\S),\s+(--.*$)/);
-      if (inlineCommentMatch?.[1] && inlineCommentMatch[2]) {
-        const beforeComma = inlineCommentMatch[1];
-        const quoteCount = (beforeComma.match(/'/g) ?? []).length;
-        if (quoteCount % 2 === 0) {
-          line = `${beforeComma} ${inlineCommentMatch[2]}`;
-          pendingComma = true;
-        }
       }
     }
 

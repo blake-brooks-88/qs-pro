@@ -5,6 +5,7 @@ import {
   fixSelectTop,
   formatSql,
   moveCommasToLeading,
+  splitCodeAndComment,
   SQL_TAB_SIZE,
   stripTrailingSemicolon,
 } from "./format-sql";
@@ -574,6 +575,91 @@ describe("formatSql", () => {
       const input =
         "SELECT\n    a, /* open\n    inside\n    */\n    b\nFROM\n    [T]";
       expect(moveCommasToLeading(input)).toBe(input);
+    });
+
+    it("skips comment-only lines and carries pending comma through", () => {
+      const input = "SELECT\n    a,\n    -- b,\n    c\nFROM\n    [T]";
+      const expected = "SELECT\n    a\n    -- b,\n    , c\nFROM\n    [T]";
+      expect(moveCommasToLeading(input)).toBe(expected);
+    });
+
+    it("carries pending comma through multiple consecutive comment lines", () => {
+      const input =
+        "SELECT\n    a,\n    -- b,\n    -- c,\n    d\nFROM\n    [T]";
+      const expected =
+        "SELECT\n    a\n    -- b,\n    -- c,\n    , d\nFROM\n    [T]";
+      expect(moveCommasToLeading(input)).toBe(expected);
+    });
+
+    it("handles string literal containing -- followed by real inline comment with comma", () => {
+      const input = "SELECT\n    '--b',\n    col2\nFROM\n    [T]";
+      const expected = "SELECT\n    '--b'\n    , col2\nFROM\n    [T]";
+      expect(moveCommasToLeading(input)).toBe(expected);
+    });
+
+    it("handles trailing comma in code portion when inline comment also contains a comma", () => {
+      const input = "SELECT\n    '--b', --b,\n    c\nFROM\n    [T]";
+      const expected = "SELECT\n    '--b' --b,\n    , c\nFROM\n    [T]";
+      expect(moveCommasToLeading(input)).toBe(expected);
+    });
+  });
+
+  describe("splitCodeAndComment (unit)", () => {
+    it("returns entire line as code when no comment present", () => {
+      expect(splitCodeAndComment("    col1,")).toEqual({
+        code: "    col1,",
+        comment: "",
+      });
+    });
+
+    it("splits at -- outside a string", () => {
+      expect(splitCodeAndComment("    col1, -- desc")).toEqual({
+        code: "    col1, ",
+        comment: "-- desc",
+      });
+    });
+
+    it("does not split at -- inside a string literal", () => {
+      expect(splitCodeAndComment("    '--b', col2")).toEqual({
+        code: "    '--b', col2",
+        comment: "",
+      });
+    });
+
+    it("splits at real -- after a string containing --", () => {
+      expect(splitCodeAndComment("    '--b', --b,")).toEqual({
+        code: "    '--b', ",
+        comment: "--b,",
+      });
+    });
+
+    it("handles escaped quotes in string literals", () => {
+      expect(splitCodeAndComment("    'it''s', --comment")).toEqual({
+        code: "    'it''s', ",
+        comment: "--comment",
+      });
+    });
+
+    it("returns full comment-only line", () => {
+      expect(splitCodeAndComment("    -- full line comment")).toEqual({
+        code: "    ",
+        comment: "-- full line comment",
+      });
+    });
+
+    it("handles empty string", () => {
+      expect(splitCodeAndComment("")).toEqual({ code: "", comment: "" });
+    });
+
+    it("handles line with only --", () => {
+      expect(splitCodeAndComment("--")).toEqual({ code: "", comment: "--" });
+    });
+
+    it("handles empty string literal before comment", () => {
+      expect(splitCodeAndComment("'' -- comment")).toEqual({
+        code: "'' ",
+        comment: "-- comment",
+      });
     });
   });
 
