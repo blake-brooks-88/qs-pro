@@ -56,8 +56,8 @@ export function moveCommasToLeading(sql: string): string {
   let pendingComma = false;
   let inBlockComment = false;
 
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
+  for (const rawLine of lines) {
+    let line = rawLine;
 
     if (pendingComma) {
       const indentMatch = line.match(/^(\s*)(.*)/s);
@@ -88,7 +88,7 @@ export function moveCommasToLeading(sql: string): string {
 
     if (trimmedEnd.endsWith(",")) {
       const beforeComma = trimmedEnd.slice(0, -1);
-      const quoteCount = (beforeComma.match(/'/g) || []).length;
+      const quoteCount = (beforeComma.match(/'/g) ?? []).length;
 
       if (quoteCount % 2 === 0) {
         line = beforeComma;
@@ -96,9 +96,9 @@ export function moveCommasToLeading(sql: string): string {
       }
     } else {
       const inlineCommentMatch = trimmedEnd.match(/^(.*\S),\s+(--.*$)/);
-      if (inlineCommentMatch) {
+      if (inlineCommentMatch?.[1] && inlineCommentMatch[2]) {
         const beforeComma = inlineCommentMatch[1];
-        const quoteCount = (beforeComma.match(/'/g) || []).length;
+        const quoteCount = (beforeComma.match(/'/g) ?? []).length;
         if (quoteCount % 2 === 0) {
           line = `${beforeComma} ${inlineCommentMatch[2]}`;
           pendingComma = true;
