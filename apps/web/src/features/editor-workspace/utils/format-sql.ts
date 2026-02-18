@@ -124,9 +124,13 @@ export function formatSql(sql: string): string {
     return "";
   }
 
-  const formatted = formatDialect(sql, FORMATTER_CONFIG);
-  return postProcessingPipeline.reduce(
-    (result, transform) => transform(result),
-    formatted,
-  );
+  try {
+    const formatted = formatDialect(sql, FORMATTER_CONFIG);
+    return postProcessingPipeline.reduce(
+      (result, transform) => transform(result),
+      formatted,
+    );
+  } catch {
+    return sql;
+  }
 }

@@ -328,6 +328,13 @@ describe("formatSql", () => {
       const caseCount = (result.match(/CASE/g) || []).length;
       expect(caseCount).toBe(3);
     });
+
+    it("returns input unchanged when sql-formatter throws a parse error", () => {
+      const input =
+        "select Name, case when Type = 'A' then 'yes' else 'no' end from [Products]";
+      const result = formatSql(input);
+      expect(result).toBe(input);
+    });
   });
 
   describe("trailing semicolon handling", () => {
