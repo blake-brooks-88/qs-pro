@@ -2,7 +2,7 @@ import { AltArrowDown, AltArrowUp } from "@solar-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import type { Folder } from "@/features/editor-workspace/types";
+import type { FolderLike } from "@/features/editor-workspace/utils/folder-utils";
 import { cn } from "@/lib/utils";
 
 import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
@@ -10,11 +10,12 @@ import { FolderTree } from "./FolderTree";
 
 interface FolderTreePickerProps {
   id?: string;
-  folders: Folder[];
+  folders: FolderLike[];
   value: string;
   onChange: (folderId: string) => void;
   placeholder?: string;
   triggerClassName?: string;
+  showRootOption?: boolean;
 }
 
 export function FolderTreePicker({
@@ -24,26 +25,33 @@ export function FolderTreePicker({
   onChange,
   placeholder = "Select a folder...",
   triggerClassName,
+  showRootOption = false,
 }: FolderTreePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const generatedId = useId();
   const listboxId = `${id ?? generatedId}-listbox`;
 
+  const selectableFolders = useMemo(
+    () => folders.filter((f) => !f.id.startsWith("temp-")),
+    [folders],
+  );
+
   const displayValue = useMemo(() => {
     if (!value) {
       return null;
     }
-    return getFolderPath(folders, value);
-  }, [folders, value]);
+    const path = getFolderPath(selectableFolders, value);
+    return path || null;
+  }, [selectableFolders, value]);
 
   const initialExpandedIds = useMemo(() => {
     if (!value) {
       return [];
     }
-    const ancestors = getFolderAncestors(folders, value);
+    const ancestors = getFolderAncestors(selectableFolders, value);
     return ancestors.map((f) => f.id);
-  }, [folders, value]);
+  }, [selectableFolders, value]);
 
   const handleSelect = (folderId: string) => {
     onChange(folderId);
@@ -117,9 +125,28 @@ export function FolderTreePicker({
             className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg overflow-hidden"
           >
             <div className="max-h-64 overflow-y-auto p-2">
-              {folders.length > 0 ? (
+              {showRootOption ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSelect("")}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded transition-colors",
+                      !value
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-foreground/80 hover:bg-surface-hover",
+                    )}
+                  >
+                    No folder
+                  </button>
+                  {selectableFolders.length > 0 ? (
+                    <div className="h-px bg-border my-1" />
+                  ) : null}
+                </>
+              ) : null}
+              {selectableFolders.length > 0 ? (
                 <FolderTree
-                  folders={folders}
+                  folders={selectableFolders}
                   selectedId={value}
                   onSelect={handleSelect}
                   initialExpandedIds={initialExpandedIds}

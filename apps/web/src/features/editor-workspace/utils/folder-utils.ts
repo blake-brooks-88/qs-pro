@@ -1,18 +1,22 @@
-import type { Folder } from "../types";
+export interface FolderLike {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
 
 /**
  * Returns an array of folders representing the ancestor chain from root to the given folderId.
  * The chain includes the folder identified by folderId if it exists.
  */
-export function getFolderAncestors(
-  folders: Folder[],
+export function getFolderAncestors<T extends FolderLike>(
+  folders: T[],
   folderId: string | null,
-): Folder[] {
+): T[] {
   if (!folderId) {
     return [];
   }
 
-  const ancestors: Folder[] = [];
+  const ancestors: T[] = [];
   const visited = new Set<string>();
   let currentId: string | null = folderId;
   const folderMap = new Map(folders.map((f) => [f.id, f]));
@@ -38,8 +42,8 @@ export function getFolderAncestors(
 /**
  * Returns a displayable path string for a folder (e.g., "Root > Subfolder > TargetedFolder").
  */
-export function getFolderPath(
-  folders: Folder[],
+export function getFolderPath<T extends FolderLike>(
+  folders: T[],
   folderId: string | null,
 ): string {
   const ancestors = getFolderAncestors(folders, folderId);

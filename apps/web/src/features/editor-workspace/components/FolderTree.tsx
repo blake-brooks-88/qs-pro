@@ -1,11 +1,11 @@
 import { AltArrowRight, Folder as FolderIcon } from "@solar-icons/react";
 import { useMemo, useState } from "react";
 
-import type { Folder } from "@/features/editor-workspace/types";
+import type { FolderLike } from "@/features/editor-workspace/utils/folder-utils";
 import { cn } from "@/lib/utils";
 
 interface FolderTreeProps {
-  folders: Folder[];
+  folders: FolderLike[];
   selectedId: string | null;
   onSelect: (folderId: string) => void;
   initialExpandedIds?: string[];
@@ -16,9 +16,9 @@ const sortByName = (a: { name: string }, b: { name: string }) =>
   a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 
 interface FolderTreeNodeProps {
-  folder: Folder;
+  folder: FolderLike;
   depth: number;
-  foldersByParent: Map<string | null, Folder[]>;
+  foldersByParent: Map<string | null, FolderLike[]>;
   selectedId: string | null;
   expandedIds: Set<string>;
   onToggleExpand: (folderId: string) => void;
@@ -123,7 +123,7 @@ export function FolderTree({
   );
 
   const foldersByParent = useMemo(() => {
-    const map = new Map<string | null, Folder[]>();
+    const map = new Map<string | null, FolderLike[]>();
     folders.forEach((folder) => {
       const key = folder.parentId ?? null;
       const existing = map.get(key) ?? [];

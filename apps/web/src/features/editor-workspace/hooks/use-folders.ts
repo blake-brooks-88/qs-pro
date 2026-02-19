@@ -9,6 +9,13 @@ import api from "@/services/api";
 
 const FOLDERS_KEY = ["folders"] as const;
 
+function createOptimisticFolderId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `temp-${crypto.randomUUID()}`;
+  }
+  return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 // Query hook - fetch all folders
 export function useFolders(options?: { enabled?: boolean }) {
   return useQuery({
@@ -30,7 +37,49 @@ export function useCreateFolder() {
       const response = await api.post<FolderResponse>("/folders", data);
       return response.data;
     },
-    onSuccess: () => {
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: FOLDERS_KEY });
+
+      const previous = queryClient.getQueryData<FolderResponse[]>(FOLDERS_KEY);
+      const optimisticId = createOptimisticFolderId();
+
+      queryClient.setQueryData<FolderResponse[]>(FOLDERS_KEY, (old) => [
+        ...(old ?? []),
+        {
+          id: optimisticId,
+          name: data.name,
+          parentId: data.parentId ?? null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]);
+
+      return { previous, optimisticId };
+    },
+    onSuccess: (created, _vars, context) => {
+      if (!context?.optimisticId) {
+        return;
+      }
+
+      queryClient.setQueryData<FolderResponse[]>(FOLDERS_KEY, (old) => {
+        const next = old ?? [];
+        const idx = next.findIndex((f) => f.id === context.optimisticId);
+        if (idx === -1) {
+          return [...next, created];
+        }
+        const copy = [...next];
+        copy[idx] = created;
+        return copy;
+      });
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(FOLDERS_KEY, context.previous);
+        return;
+      }
+      queryClient.removeQueries({ queryKey: FOLDERS_KEY, exact: true });
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: FOLDERS_KEY });
     },
   });

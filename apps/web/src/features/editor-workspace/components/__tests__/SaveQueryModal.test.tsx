@@ -166,23 +166,7 @@ describe("SaveQueryModal", () => {
   });
 
   describe("folder selector", () => {
-    it("shows folder selector locked message for free users", async () => {
-      render(
-        <SaveQueryModal isOpen={true} content="SELECT 1" onClose={vi.fn()} />,
-        { wrapper: createWrapper() },
-      );
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(/Folders available in Pro/),
-        ).toBeInTheDocument();
-      });
-    });
-
-    it("shows folder dropdown for Pro users", async () => {
-      mockUseTier.mockReturnValue({ tier: "pro", isLoading: false });
-      mockUseSavedQueryLimit.mockReturnValue(null);
-
+    it("shows folder picker for all users", async () => {
       render(
         <SaveQueryModal isOpen={true} content="SELECT 1" onClose={vi.fn()} />,
         { wrapper: createWrapper() },
@@ -192,10 +176,25 @@ describe("SaveQueryModal", () => {
         expect(screen.getByLabelText(/target folder/i)).toBeInTheDocument();
       });
 
-      // Should have folder options
-      expect(
-        screen.getByRole("option", { name: "No folder" }),
-      ).toBeInTheDocument();
+      // Should render a combobox trigger (FolderTreePicker)
+      expect(screen.getByRole("combobox")).toBeInTheDocument();
+    });
+
+    it("shows folder picker with placeholder for all tiers", async () => {
+      mockUseTier.mockReturnValue({ tier: "pro", isLoading: false });
+      mockUseSavedQueryLimit.mockReturnValue(null);
+
+      render(
+        <SaveQueryModal isOpen={true} content="SELECT 1" onClose={vi.fn()} />,
+        { wrapper: createWrapper() },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("combobox")).toBeInTheDocument();
+      });
+
+      // Placeholder should say "No folder"
+      expect(screen.getByText("No folder")).toBeInTheDocument();
     });
   });
 

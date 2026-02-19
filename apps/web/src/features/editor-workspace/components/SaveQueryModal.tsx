@@ -1,9 +1,4 @@
-import {
-  Diskette,
-  Folder as FolderIcon,
-  InfoCircle,
-  LockKeyhole,
-} from "@solar-icons/react";
+import { Diskette, InfoCircle } from "@solar-icons/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -22,7 +17,9 @@ import {
   useSavedQueries,
   useSavedQueryCount,
 } from "@/features/editor-workspace/hooks/use-saved-queries";
-import { useSavedQueryLimit, useTier } from "@/hooks/use-tier";
+import { useSavedQueryLimit } from "@/hooks/use-tier";
+
+import { FolderTreePicker } from "./FolderTreePicker";
 
 interface SaveQueryModalProps {
   isOpen: boolean;
@@ -57,8 +54,6 @@ export function SaveQueryModal({
   // Quota and tier hooks
   const { data: queryCount = 0 } = useSavedQueryCount({ enabled: isOpen });
   const queryLimit = useSavedQueryLimit();
-  const { tier } = useTier();
-  const foldersEnabled = tier !== "free"; // Folders are Pro+ only
 
   // Folder data
   const { data: folders = [] } = useFolders({ enabled: isOpen });
@@ -91,7 +86,7 @@ export function SaveQueryModal({
       const query = await createQuery.mutateAsync({
         name: name.trim(),
         sqlText: content,
-        folderId: foldersEnabled ? folderId : null,
+        folderId,
       });
 
       toast.success("Query saved", {
@@ -160,7 +155,7 @@ export function SaveQueryModal({
               ) : null}
             </div>
 
-            {/* Folder selector - Pro+ only */}
+            {/* Folder selector */}
             <div className="space-y-1.5">
               <label
                 htmlFor="query-folder"
@@ -168,32 +163,14 @@ export function SaveQueryModal({
               >
                 Target Folder
               </label>
-              {foldersEnabled ? (
-                <div className="relative">
-                  <FolderIcon
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                  />
-                  <select
-                    id="query-folder"
-                    value={folderId ?? ""}
-                    onChange={(e) => setFolderId(e.target.value || null)}
-                    className="w-full bg-muted/50 border border-border rounded-lg pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">No folder</option>
-                    {folders.map((folder) => (
-                      <option key={folder.id} value={folder.id}>
-                        {folder.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/30 border border-border/50 text-xs text-muted-foreground">
-                  <LockKeyhole size={14} className="text-muted-foreground" />
-                  <span>Folders available in Pro</span>
-                </div>
-              )}
+              <FolderTreePicker
+                id="query-folder"
+                folders={folders}
+                value={folderId ?? ""}
+                onChange={(val) => setFolderId(val || null)}
+                placeholder="No folder"
+                showRootOption
+              />
             </div>
 
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/30 border border-border/50 text-[11px] text-muted-foreground">
