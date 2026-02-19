@@ -380,7 +380,12 @@ function FolderNode({
             ref={setCombinedRef}
             type="button"
             onClick={onToggle}
-            onDoubleClick={() => onStartRename(`folder-${folder.id}`)}
+            onDoubleClick={() => {
+              if (isOptimistic) {
+                return;
+              }
+              onStartRename(`folder-${folder.id}`);
+            }}
             {...listeners}
             {...attributes}
             className={cn(
@@ -408,14 +413,16 @@ function FolderNode({
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[160px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
             <ContextMenu.Item
-              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              disabled={isOptimistic}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none data-[disabled]:opacity-50 data-[disabled]:pointer-events-none"
               onSelect={() => onStartCreate(folder.id)}
             >
               <AddFolder size={14} />
               New Subfolder
             </ContextMenu.Item>
             <ContextMenu.Item
-              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              disabled={isOptimistic}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none data-[disabled]:opacity-50 data-[disabled]:pointer-events-none"
               onSelect={() => onStartRename(`folder-${folder.id}`)}
             >
               <Pen size={14} />
@@ -423,7 +430,8 @@ function FolderNode({
             </ContextMenu.Item>
             <ContextMenu.Separator className="h-px bg-border my-1" />
             <ContextMenu.Item
-              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-destructive/10 text-destructive cursor-pointer outline-none"
+              disabled={isOptimistic}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-destructive/10 text-destructive cursor-pointer outline-none data-[disabled]:opacity-50 data-[disabled]:pointer-events-none"
               onSelect={() => onDeleteFolder(folder.id)}
             >
               <TrashBinMinimalistic size={14} />
@@ -619,6 +627,10 @@ export function QueryTreeView({
 
   const handleRenameFolder = useCallback(
     (id: string, name: string) => {
+      if (isOptimisticFolderId(id)) {
+        setRenamingId(null);
+        return;
+      }
       updateFolder.mutate({ id, data: { name } });
       setRenamingId(null);
     },
@@ -627,6 +639,9 @@ export function QueryTreeView({
 
   const handleDeleteFolder = useCallback(
     (id: string) => {
+      if (isOptimisticFolderId(id)) {
+        return;
+      }
       deleteFolder.mutate(id);
     },
     [deleteFolder],
@@ -649,6 +664,9 @@ export function QueryTreeView({
 
   const handleStartCreate = useCallback(
     (parentId: string | null) => {
+      if (parentId && isOptimisticFolderId(parentId)) {
+        return;
+      }
       setCreatingIn(parentId ?? "");
       if (parentId) {
         handleExpandFolder(parentId);

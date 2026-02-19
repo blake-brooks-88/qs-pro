@@ -347,7 +347,8 @@ describe("QueryTreeView drag-and-drop behavior", () => {
     let patchBody: unknown = null;
     server.use(
       http.patch("/api/folders/:id", async ({ request, params }) => {
-        patchBody = { id: params.id, ...(await request.json()) };
+        const body = (await request.json()) as Record<string, unknown>;
+        patchBody = { id: String(params.id), ...body };
         return HttpResponse.json({
           id: String(params.id),
           name: String(params.id) === "f2" ? "Folder B" : "Folder A",
@@ -526,7 +527,8 @@ describe("QueryTreeView drag-and-drop behavior", () => {
     let patchBody: unknown = null;
     server.use(
       http.patch("/api/folders/:id", async ({ request, params }) => {
-        patchBody = { id: params.id, ...(await request.json()) };
+        const body = (await request.json()) as Record<string, unknown>;
+        patchBody = { id: String(params.id), ...body };
         return HttpResponse.json({
           id: String(params.id),
           name: String(params.id) === "f2" ? "Folder B" : "Folder A",
