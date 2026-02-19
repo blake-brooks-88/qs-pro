@@ -45,6 +45,7 @@ interface MonacoQueryEditorProps {
   onSave?: () => void;
   onSaveAs?: () => void;
   onRunRequest?: () => void;
+  onFormat?: () => void;
   onCursorPositionChange?: (position: number) => void;
   diagnostics: SqlDiagnostic[];
   dataExtensions: DataExtension[];
@@ -59,6 +60,7 @@ export function MonacoQueryEditor({
   onSave,
   onSaveAs,
   onRunRequest,
+  onFormat,
   onCursorPositionChange,
   diagnostics,
   dataExtensions,
@@ -82,6 +84,7 @@ export function MonacoQueryEditor({
   const onSaveRef = useRef(onSave);
   const onSaveAsRef = useRef(onSaveAs);
   const onRunRequestRef = useRef(onRunRequest);
+  const onFormatRef = useRef(onFormat);
   const queryClient = useQueryClient();
 
   const debouncedValue = useDebouncedValue(value, 150);
@@ -236,6 +239,10 @@ export function MonacoQueryEditor({
     onRunRequestRef.current = onRunRequest;
   }, [onRunRequest]);
 
+  useEffect(() => {
+    onFormatRef.current = onFormat;
+  }, [onFormat]);
+
   const handleEditorMount: OnMount = useCallback(
     (editorInstance, monacoInstance) => {
       editorRef.current = editorInstance;
@@ -351,6 +358,7 @@ export function MonacoQueryEditor({
         monaco: monacoInstance,
         getOnSave: () => onSaveRef.current,
         getOnSaveAs: () => onSaveAsRef.current,
+        getOnFormat: () => onFormatRef.current,
         enableSaveAs: Boolean(onSaveAs),
         enableRunRequest: Boolean(onRunRequest),
         getOnRunRequest: () => onRunRequestRef.current,

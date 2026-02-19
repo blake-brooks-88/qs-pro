@@ -11,6 +11,7 @@ import { useBeforeUnloadDirtyTabs } from "@/features/editor-workspace/hooks/use-
 import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
 import { useCreateDataExtensionFlow } from "@/features/editor-workspace/hooks/use-create-data-extension-flow";
 import { useDriftCheck } from "@/features/editor-workspace/hooks/use-drift-check";
+import { useFormatQuery } from "@/features/editor-workspace/hooks/use-format-query";
 import { useLazyOpenSavedQuery } from "@/features/editor-workspace/hooks/use-lazy-open-saved-query";
 import { usePublishFlow } from "@/features/editor-workspace/hooks/use-publish-flow";
 import { usePublishQuery } from "@/features/editor-workspace/hooks/use-publish-query";
@@ -76,7 +77,6 @@ export function EditorWorkspace({
   guardrailTitle: _guardrailTitleProp = "Guardrail Violation",
   onSave,
   onSaveAs: _onSaveAs,
-  onFormat,
   onDeploy: _onDeploy,
   onCreateQueryActivity: _onCreateQueryActivity,
   onSelectQuery,
@@ -250,6 +250,12 @@ export function EditorWorkspace({
     queryClient,
     versionHistoryKeys,
     onSave,
+  });
+
+  const { handleFormat } = useFormatQuery({
+    activeTabId,
+    activeTabContent: safeActiveTab.content,
+    storeUpdateTabContent,
   });
 
   const {
@@ -683,7 +689,7 @@ export function EditorWorkspace({
                       tooltipMessage: runTooltipMessage,
                     }}
                     onSave={() => void handleSave()}
-                    onFormat={onFormat}
+                    onFormat={handleFormat}
                     onCreateDE={handleCreateDE}
                     onOpenImport={() => setIsImportModalOpen(true)}
                     isDeployFeatureEnabled={isDeployFeatureEnabled}
@@ -723,6 +729,7 @@ export function EditorWorkspace({
                           onSave={handleSave}
                           onSaveAs={handleSaveAs}
                           onRunRequest={handleRunRequest}
+                          onFormat={handleFormat}
                           onCursorPositionChange={setCursorPosition}
                           diagnostics={sqlDiagnostics}
                           dataExtensions={dataExtensions}

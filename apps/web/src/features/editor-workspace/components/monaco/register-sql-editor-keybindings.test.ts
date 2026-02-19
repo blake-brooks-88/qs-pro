@@ -40,6 +40,7 @@ describe("registerSqlEditorKeybindings", () => {
       monaco: mockMonaco as unknown as Monaco,
       getOnSave: () => onSave,
       getOnSaveAs: () => undefined,
+      getOnFormat: () => undefined,
       enableSaveAs: false,
       enableRunRequest: false,
       getOnRunRequest: () => undefined,
@@ -68,6 +69,7 @@ describe("registerSqlEditorKeybindings", () => {
       monaco: mockMonaco as unknown as Monaco,
       getOnSave: () => undefined,
       getOnSaveAs: () => onSaveAs,
+      getOnFormat: () => undefined,
       enableSaveAs: true,
       enableRunRequest: false,
       getOnRunRequest: () => undefined,
@@ -92,6 +94,7 @@ describe("registerSqlEditorKeybindings", () => {
       monaco: mockMonaco as unknown as Monaco,
       getOnSave: () => undefined,
       getOnSaveAs: () => undefined,
+      getOnFormat: () => undefined,
       enableSaveAs: false,
       enableRunRequest: false,
       getOnRunRequest: () => undefined,
@@ -115,6 +118,7 @@ describe("registerSqlEditorKeybindings", () => {
       monaco: mockMonaco as unknown as Monaco,
       getOnSave: () => undefined,
       getOnSaveAs: () => undefined,
+      getOnFormat: () => undefined,
       enableSaveAs: false,
       enableRunRequest: true,
       getOnRunRequest: () => onRunRequest,
@@ -136,6 +140,7 @@ describe("registerSqlEditorKeybindings", () => {
       monaco: mockMonaco as unknown as Monaco,
       getOnSave: () => undefined,
       getOnSaveAs: () => undefined,
+      getOnFormat: () => undefined,
       enableSaveAs: false,
       enableRunRequest: false,
       getOnRunRequest: () => undefined,
@@ -148,12 +153,38 @@ describe("registerSqlEditorKeybindings", () => {
     expect(runCall).toBeUndefined();
   });
 
+  it("registers Shift+Alt+F and triggers getOnFormat", () => {
+    const onFormat = vi.fn();
+
+    registerSqlEditorKeybindings({
+      editor: mockEditor as unknown as MonacoEditor,
+      monaco: mockMonaco as unknown as Monaco,
+      getOnSave: () => undefined,
+      getOnSaveAs: () => undefined,
+      getOnFormat: () => onFormat,
+      enableSaveAs: false,
+      enableRunRequest: false,
+      getOnRunRequest: () => undefined,
+    });
+
+    const expectedKey =
+      mockMonaco.KeyMod.Shift | mockMonaco.KeyMod.Alt | mockMonaco.KeyCode.KeyF;
+    const formatCall = (
+      mockEditor.addCommand as ReturnType<typeof vi.fn>
+    ).mock.calls.find((call) => call[0] === expectedKey);
+    expect(formatCall).toBeDefined();
+
+    formatCall?.[1]();
+    expect(onFormat).toHaveBeenCalledTimes(1);
+  });
+
   it("registers Ctrl+/ for toggle comment", () => {
     registerSqlEditorKeybindings({
       editor: mockEditor as unknown as MonacoEditor,
       monaco: mockMonaco as unknown as Monaco,
       getOnSave: () => undefined,
       getOnSaveAs: () => undefined,
+      getOnFormat: () => undefined,
       enableSaveAs: false,
       enableRunRequest: false,
       getOnRunRequest: () => undefined,
