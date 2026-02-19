@@ -1,3 +1,14 @@
+import {
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import type { FolderResponse, SavedQueryListItem } from "@qpp/shared-types";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import {
@@ -12,11 +23,12 @@ import {
   Pen,
   TrashBinMinimalistic,
 } from "@solar-icons/react";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
 import {
+  useCreateFolder,
   useDeleteFolder,
   useFolders,
   useUpdateFolder,
@@ -26,13 +38,13 @@ import {
   useSavedQueries,
   useUpdateSavedQuery,
 } from "../hooks/use-saved-queries";
+import { getFolderPath } from "../utils/folder-utils";
 import { InlineRenameInput } from "./InlineRenameInput";
 import { LinkedBadge } from "./LinkedBadge";
 
 interface QueryTreeViewProps {
   searchQuery: string;
   onSelectQuery: (queryId: string) => void;
-  onCreateFolder?: () => void;
   onViewQueryHistory?: (queryId: string) => void;
   onViewVersionHistory?: (queryId: string) => void;
   onLinkQuery?: (queryId: string) => void;
@@ -63,6 +75,11 @@ interface FolderNodeProps {
   onViewVersionHistory?: (queryId: string) => void;
   onLinkQuery?: (queryId: string) => void;
   onUnlinkQuery?: (queryId: string) => void;
+  creatingIn: string | null;
+  onStartCreate: (parentId: string) => void;
+  onFinishCreate: (name: string | null) => void;
+  allFolders: FolderResponse[];
+  onMoveQueryToFolder: (queryId: string, folderId: string | null) => void;
 }
 
 interface QueryNodeProps {
@@ -78,6 +95,42 @@ interface QueryNodeProps {
   onViewVersionHistory?: () => void;
   onLinkQuery?: () => void;
   onUnlinkQuery?: () => void;
+  allFolders: FolderResponse[];
+  onMoveToFolder: (folderId: string | null) => void;
+}
+
+function DraggableQueryNode(props: QueryNodeProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: props.query.id,
+    disabled: props.isRenaming,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={cn(isDragging && "opacity-40")}
+    >
+      <QueryNode {...props} />
+    </div>
+  );
+}
+
+function RootDropZone({ children }: { children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "__root__" });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded transition-colors",
+        isOver && "bg-primary/5 ring-1 ring-primary/50",
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 function QueryNode({
@@ -93,6 +146,8 @@ function QueryNode({
   onViewVersionHistory,
   onLinkQuery,
   onUnlinkQuery,
+  allFolders,
+  onMoveToFolder,
 }: QueryNodeProps) {
   if (isRenaming) {
     return (
@@ -176,6 +231,32 @@ function QueryNode({
               Unlink from Query Activity
             </ContextMenu.Item>
           ) : null}
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none">
+              <FolderIcon size={14} /> Move to Folder
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent className="min-w-[200px] max-h-64 overflow-y-auto bg-popover border border-border rounded-md shadow-lg p-1 z-50">
+                <ContextMenu.Item
+                  className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+                  onSelect={() => onMoveToFolder(null)}
+                >
+                  No Folder (Root)
+                </ContextMenu.Item>
+                <ContextMenu.Separator className="h-px bg-border my-1" />
+                {allFolders.map((folder) => (
+                  <ContextMenu.Item
+                    key={folder.id}
+                    className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+                    onSelect={() => onMoveToFolder(folder.id)}
+                  >
+                    <FolderIcon size={14} />{" "}
+                    {getFolderPath(allFolders, folder.id) || folder.name}
+                  </ContextMenu.Item>
+                ))}
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
           <ContextMenu.Item
             className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
             onSelect={onStartRename}
@@ -221,7 +302,15 @@ function FolderNode({
   onViewVersionHistory,
   onLinkQuery,
   onUnlinkQuery,
+  creatingIn,
+  onStartCreate,
+  onFinishCreate,
+  allFolders,
+  onMoveQueryToFolder,
 }: FolderNodeProps) {
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: folder.id,
+  });
   const isRenaming = renamingId === `folder-${folder.id}`;
 
   if (isRenaming) {
@@ -249,12 +338,14 @@ function FolderNode({
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>
           <button
+            ref={setDropRef}
             type="button"
             onClick={onToggle}
             onDoubleClick={() => onStartRename(`folder-${folder.id}`)}
             className={cn(
               "w-full flex items-center gap-2 px-2 py-1 text-xs font-medium",
               "text-muted-foreground hover:text-foreground hover:bg-surface-hover cursor-pointer group rounded",
+              isOver && "ring-1 ring-primary bg-primary/5",
             )}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
@@ -276,6 +367,13 @@ function FolderNode({
           <ContextMenu.Content className="min-w-[160px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
             <ContextMenu.Item
               className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              onSelect={() => onStartCreate(folder.id)}
+            >
+              <AddFolder size={14} />
+              New Subfolder
+            </ContextMenu.Item>
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
               onSelect={() => onStartRename(`folder-${folder.id}`)}
             >
               <Pen size={14} />
@@ -295,6 +393,22 @@ function FolderNode({
 
       {isExpanded ? (
         <div className="space-y-0.5">
+          {creatingIn === folder.id && (
+            <div
+              className="flex items-center gap-2 px-2 py-1 text-xs"
+              style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}
+            >
+              <FolderIcon
+                size={16}
+                className="text-muted-foreground/60 shrink-0"
+              />
+              <InlineRenameInput
+                initialValue=""
+                onSave={(name) => onFinishCreate(name)}
+                onCancel={() => onFinishCreate(null)}
+              />
+            </div>
+          )}
           {childFolders.map((child) => {
             const grandchildFolders = foldersByParent.get(child.id) ?? [];
             const grandchildQueries = queriesByFolder.get(child.id) ?? [];
@@ -328,11 +442,16 @@ function FolderNode({
                 onViewVersionHistory={onViewVersionHistory}
                 onLinkQuery={onLinkQuery}
                 onUnlinkQuery={onUnlinkQuery}
+                creatingIn={creatingIn}
+                onStartCreate={onStartCreate}
+                onFinishCreate={onFinishCreate}
+                allFolders={allFolders}
+                onMoveQueryToFolder={onMoveQueryToFolder}
               />
             );
           })}
           {childQueries.map((query) => (
-            <QueryNode
+            <DraggableQueryNode
               key={query.id}
               query={query}
               depth={depth + 1}
@@ -358,6 +477,10 @@ function FolderNode({
               onUnlinkQuery={
                 onUnlinkQuery ? () => onUnlinkQuery(query.id) : undefined
               }
+              allFolders={allFolders}
+              onMoveToFolder={(folderId) =>
+                onMoveQueryToFolder(query.id, folderId)
+              }
             />
           ))}
         </div>
@@ -369,7 +492,6 @@ function FolderNode({
 export function QueryTreeView({
   searchQuery,
   onSelectQuery,
-  onCreateFolder,
   onViewQueryHistory,
   onViewVersionHistory,
   onLinkQuery,
@@ -377,15 +499,22 @@ export function QueryTreeView({
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
+  const createFolder = useCreateFolder();
   const updateFolder = useUpdateFolder();
   const deleteFolder = useDeleteFolder();
   const updateQuery = useUpdateSavedQuery();
   const deleteQuery = useDeleteSavedQuery();
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+
   const [expandedFolders, setExpandedFolders] = useState<
     Record<string, boolean>
   >({});
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [creatingIn, setCreatingIn] = useState<string | null>(null);
+  const [draggedQueryId, setDraggedQueryId] = useState<string | null>(null);
 
   const filteredFolders = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -473,8 +602,72 @@ export function QueryTreeView({
     [deleteQuery],
   );
 
+  const handleStartCreate = useCallback(
+    (parentId: string | null) => {
+      setCreatingIn(parentId ?? "");
+      if (parentId) {
+        handleExpandFolder(parentId);
+      }
+    },
+    [handleExpandFolder],
+  );
+
+  const handleFinishCreate = useCallback(
+    (name: string | null) => {
+      if (name) {
+        createFolder.mutate({
+          name,
+          parentId: creatingIn === "" ? null : creatingIn,
+        });
+      }
+      setCreatingIn(null);
+    },
+    [createFolder, creatingIn],
+  );
+
+  const handleMoveQuery = useCallback(
+    (queryId: string, folderId: string | null) => {
+      updateQuery.mutate({ id: queryId, data: { folderId } });
+    },
+    [updateQuery],
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setDraggedQueryId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setDraggedQueryId(null);
+
+      if (!over) {
+        return;
+      }
+
+      const queryId = String(active.id);
+      const targetFolderId = over.id === "__root__" ? null : String(over.id);
+
+      const query = queries.find((q) => q.id === queryId);
+      if (!query) {
+        return;
+      }
+
+      if (query.folderId === targetFolderId) {
+        return;
+      }
+
+      updateQuery.mutate({ id: queryId, data: { folderId: targetFolderId } });
+    },
+    [queries, updateQuery],
+  );
+
   const rootFolders = foldersByParent.get(null) ?? [];
   const rootQueries = queriesByFolder.get(null) ?? [];
+
+  const draggedQuery = draggedQueryId
+    ? queries.find((q) => q.id === draggedQueryId)
+    : null;
 
   return (
     <div className="space-y-1">
@@ -482,95 +675,138 @@ export function QueryTreeView({
         <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
           Query Library
         </span>
-        {onCreateFolder ? (
-          <button
-            type="button"
-            onClick={onCreateFolder}
-            className="p-1 text-muted-foreground hover:text-primary rounded hover:bg-surface-hover"
-            title="New Folder"
-          >
-            <AddFolder size={16} />
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => handleStartCreate(null)}
+          className="p-1 text-muted-foreground hover:text-primary rounded hover:bg-surface-hover"
+          title="New Folder"
+        >
+          <AddFolder size={16} />
+        </button>
       </div>
 
-      {rootFolders.length === 0 && rootQueries.length === 0 ? (
-        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-          No saved queries yet.
-          <br />
-          <span className="text-muted-foreground/70">
-            Press Ctrl+S to save your first query.
-          </span>
-        </div>
-      ) : (
-        <>
-          {rootFolders.map((folder) => {
-            const childFolders = foldersByParent.get(folder.id) ?? [];
-            const childQueries = queriesByFolder.get(folder.id) ?? [];
-            return (
-              <FolderNode
-                key={folder.id}
-                folder={folder}
-                depth={0}
-                isExpanded={Boolean(expandedFolders[folder.id])}
-                onToggle={() =>
-                  expandedFolders[folder.id]
-                    ? handleCollapseFolder(folder.id)
-                    : handleExpandFolder(folder.id)
-                }
-                childFolders={childFolders}
-                childQueries={childQueries}
-                expandedFolders={expandedFolders}
-                onExpandFolder={handleExpandFolder}
-                onCollapseFolder={handleCollapseFolder}
-                foldersByParent={foldersByParent}
-                queriesByFolder={queriesByFolder}
-                onSelectQuery={onSelectQuery}
-                renamingId={renamingId}
-                onStartRename={setRenamingId}
-                onFinishRename={() => setRenamingId(null)}
-                onRenameFolder={handleRenameFolder}
-                onDeleteFolder={handleDeleteFolder}
-                onRenameQuery={handleRenameQuery}
-                onDeleteQuery={handleDeleteQuery}
-                onViewQueryHistory={onViewQueryHistory}
-                onViewVersionHistory={onViewVersionHistory}
-                onLinkQuery={onLinkQuery}
-                onUnlinkQuery={onUnlinkQuery}
-              />
-            );
-          })}
-          {rootQueries.map((query) => (
-            <QueryNode
-              key={query.id}
-              query={query}
-              depth={0}
-              onSelect={() => onSelectQuery(query.id)}
-              isRenaming={renamingId === `query-${query.id}`}
-              onStartRename={() => setRenamingId(`query-${query.id}`)}
-              onFinishRename={() => setRenamingId(null)}
-              onRename={(name) => handleRenameQuery(query.id, name)}
-              onDelete={() => handleDeleteQuery(query.id)}
-              onViewHistory={
-                onViewQueryHistory
-                  ? () => onViewQueryHistory(query.id)
-                  : undefined
-              }
-              onViewVersionHistory={
-                onViewVersionHistory
-                  ? () => onViewVersionHistory(query.id)
-                  : undefined
-              }
-              onLinkQuery={
-                onLinkQuery ? () => onLinkQuery(query.id) : undefined
-              }
-              onUnlinkQuery={
-                onUnlinkQuery ? () => onUnlinkQuery(query.id) : undefined
-              }
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {creatingIn === "" && (
+          <div
+            className="flex items-center gap-2 px-2 py-1 text-xs"
+            style={{ paddingLeft: "8px" }}
+          >
+            <FolderIcon
+              size={16}
+              className="text-muted-foreground/60 shrink-0"
             />
-          ))}
-        </>
-      )}
+            <InlineRenameInput
+              initialValue=""
+              onSave={(name) => handleFinishCreate(name)}
+              onCancel={() => handleFinishCreate(null)}
+            />
+          </div>
+        )}
+
+        {rootFolders.length === 0 &&
+        rootQueries.length === 0 &&
+        creatingIn === null ? (
+          <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+            No saved queries yet.
+            <br />
+            <span className="text-muted-foreground/70">
+              Press Ctrl+S to save your first query.
+            </span>
+          </div>
+        ) : (
+          <>
+            {rootFolders.map((folder) => {
+              const childFolders = foldersByParent.get(folder.id) ?? [];
+              const childQueries = queriesByFolder.get(folder.id) ?? [];
+              return (
+                <FolderNode
+                  key={folder.id}
+                  folder={folder}
+                  depth={0}
+                  isExpanded={Boolean(expandedFolders[folder.id])}
+                  onToggle={() =>
+                    expandedFolders[folder.id]
+                      ? handleCollapseFolder(folder.id)
+                      : handleExpandFolder(folder.id)
+                  }
+                  childFolders={childFolders}
+                  childQueries={childQueries}
+                  expandedFolders={expandedFolders}
+                  onExpandFolder={handleExpandFolder}
+                  onCollapseFolder={handleCollapseFolder}
+                  foldersByParent={foldersByParent}
+                  queriesByFolder={queriesByFolder}
+                  onSelectQuery={onSelectQuery}
+                  renamingId={renamingId}
+                  onStartRename={setRenamingId}
+                  onFinishRename={() => setRenamingId(null)}
+                  onRenameFolder={handleRenameFolder}
+                  onDeleteFolder={handleDeleteFolder}
+                  onRenameQuery={handleRenameQuery}
+                  onDeleteQuery={handleDeleteQuery}
+                  onViewQueryHistory={onViewQueryHistory}
+                  onViewVersionHistory={onViewVersionHistory}
+                  onLinkQuery={onLinkQuery}
+                  onUnlinkQuery={onUnlinkQuery}
+                  creatingIn={creatingIn}
+                  onStartCreate={handleStartCreate}
+                  onFinishCreate={handleFinishCreate}
+                  allFolders={folders}
+                  onMoveQueryToFolder={handleMoveQuery}
+                />
+              );
+            })}
+            <RootDropZone>
+              {rootQueries.map((query) => (
+                <DraggableQueryNode
+                  key={query.id}
+                  query={query}
+                  depth={0}
+                  onSelect={() => onSelectQuery(query.id)}
+                  isRenaming={renamingId === `query-${query.id}`}
+                  onStartRename={() => setRenamingId(`query-${query.id}`)}
+                  onFinishRename={() => setRenamingId(null)}
+                  onRename={(name) => handleRenameQuery(query.id, name)}
+                  onDelete={() => handleDeleteQuery(query.id)}
+                  onViewHistory={
+                    onViewQueryHistory
+                      ? () => onViewQueryHistory(query.id)
+                      : undefined
+                  }
+                  onViewVersionHistory={
+                    onViewVersionHistory
+                      ? () => onViewVersionHistory(query.id)
+                      : undefined
+                  }
+                  onLinkQuery={
+                    onLinkQuery ? () => onLinkQuery(query.id) : undefined
+                  }
+                  onUnlinkQuery={
+                    onUnlinkQuery ? () => onUnlinkQuery(query.id) : undefined
+                  }
+                  allFolders={folders}
+                  onMoveToFolder={(folderId) =>
+                    handleMoveQuery(query.id, folderId)
+                  }
+                />
+              ))}
+            </RootDropZone>
+          </>
+        )}
+
+        <DragOverlay>
+          {draggedQuery ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 text-xs bg-popover border border-border rounded-md shadow-lg">
+              <CodeFile size={16} className="text-secondary/60 shrink-0" />
+              <span className="truncate">{draggedQuery.name}</span>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }

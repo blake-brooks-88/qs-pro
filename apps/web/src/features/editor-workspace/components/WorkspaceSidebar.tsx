@@ -187,7 +187,6 @@ export function WorkspaceSidebar({
   isDataExtensionsFetching = false,
   onSelectQuery,
   onSelectDE,
-  onCreateFolder,
   onViewQueryHistory,
   onViewVersionHistory,
   onLinkQuery,
@@ -668,7 +667,6 @@ export function WorkspaceSidebar({
             <QueryTreeView
               searchQuery={searchQuery}
               onSelectQuery={(queryId) => onSelectQuery?.(queryId)}
-              onCreateFolder={() => onCreateFolder?.(null)}
               onViewQueryHistory={onViewQueryHistory}
               onViewVersionHistory={onViewVersionHistory}
               onLinkQuery={onLinkQuery}

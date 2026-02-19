@@ -30,7 +30,32 @@ export function useCreateFolder() {
       const response = await api.post<FolderResponse>("/folders", data);
       return response.data;
     },
-    onSuccess: () => {
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: FOLDERS_KEY });
+
+      const previous = queryClient.getQueryData<FolderResponse[]>(FOLDERS_KEY);
+
+      if (previous) {
+        queryClient.setQueryData<FolderResponse[]>(FOLDERS_KEY, (old) => [
+          ...(old ?? []),
+          {
+            id: `temp-${Date.now()}`,
+            name: data.name,
+            parentId: data.parentId ?? null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ]);
+      }
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(FOLDERS_KEY, context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: FOLDERS_KEY });
     },
   });

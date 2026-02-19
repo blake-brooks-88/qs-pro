@@ -285,4 +285,55 @@ describe("FolderTreePicker", () => {
       expect(screen.getByText("No folders available")).toBeInTheDocument();
     });
   });
+
+  describe("showRootOption", () => {
+    it("FolderTreePicker_ShowRootOption_RendersNoFolderButton", async () => {
+      // Arrange
+      const user = userEvent.setup();
+      render(<FolderTreePicker {...defaultProps} showRootOption />);
+
+      // Act
+      const trigger = screen.getByRole("combobox");
+      await user.click(trigger);
+
+      // Assert
+      expect(screen.getByText("No folder")).toBeInTheDocument();
+    });
+
+    it("FolderTreePicker_ShowRootOption_SelectingCallsOnChangeWithEmpty", async () => {
+      // Arrange
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(
+        <FolderTreePicker
+          {...defaultProps}
+          onChange={onChange}
+          value="root-1"
+          showRootOption
+        />,
+      );
+
+      // Act - Open and select "No folder"
+      const trigger = screen.getByRole("combobox");
+      await user.click(trigger);
+      const noFolderButton = screen.getByText("No folder");
+      await user.click(noFolderButton);
+
+      // Assert
+      expect(onChange).toHaveBeenCalledWith("");
+    });
+
+    it("FolderTreePicker_ShowRootOptionFalse_HidesNoFolderButton", async () => {
+      // Arrange
+      const user = userEvent.setup();
+      render(<FolderTreePicker {...defaultProps} showRootOption={false} />);
+
+      // Act
+      const trigger = screen.getByRole("combobox");
+      await user.click(trigger);
+
+      // Assert
+      expect(screen.queryByText("No folder")).not.toBeInTheDocument();
+    });
+  });
 });
