@@ -38,9 +38,28 @@ import {
   useSavedQueries,
   useUpdateSavedQuery,
 } from "../hooks/use-saved-queries";
-import { getFolderPath } from "../utils/folder-utils";
+import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
 import { InlineRenameInput } from "./InlineRenameInput";
 import { LinkedBadge } from "./LinkedBadge";
+
+const ROOT_DROPPABLE_ID = "__root__";
+
+function isOptimisticFolderId(folderId: string) {
+  return folderId.startsWith("temp-");
+}
+
+function parseDraggableId(id: string): {
+  type: "query" | "folder";
+  id: string;
+} {
+  if (id.startsWith("query-")) {
+    return { type: "query", id: id.slice("query-".length) };
+  }
+  if (id.startsWith("folder-")) {
+    return { type: "folder", id: id.slice("folder-".length) };
+  }
+  return { type: "query", id };
+}
 
 interface QueryTreeViewProps {
   searchQuery: string;
@@ -76,7 +95,7 @@ interface FolderNodeProps {
   onLinkQuery?: (queryId: string) => void;
   onUnlinkQuery?: (queryId: string) => void;
   creatingIn: string | null;
-  onStartCreate: (parentId: string) => void;
+  onStartCreate: (parentId: string | null) => void;
   onFinishCreate: (name: string | null) => void;
   allFolders: FolderResponse[];
   onMoveQueryToFolder: (queryId: string, folderId: string | null) => void;
@@ -101,7 +120,8 @@ interface QueryNodeProps {
 
 function DraggableQueryNode(props: QueryNodeProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: props.query.id,
+    id: `query-${props.query.id}`,
+    data: { type: "query", queryId: props.query.id },
     disabled: props.isRenaming,
   });
 
@@ -118,15 +138,16 @@ function DraggableQueryNode(props: QueryNodeProps) {
 }
 
 function RootDropZone({ children }: { children: ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: "__root__" });
+  const { setNodeRef, isOver } = useDroppable({ id: ROOT_DROPPABLE_ID });
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "rounded transition-colors",
+        "rounded transition-colors min-h-6",
         isOver && "bg-primary/5 ring-1 ring-primary/50",
       )}
+      aria-label="Root drop zone"
     >
       {children}
     </div>
@@ -248,6 +269,7 @@ function QueryNode({
                   <ContextMenu.Item
                     key={folder.id}
                     className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+                    disabled={isOptimisticFolderId(folder.id)}
                     onSelect={() => onMoveToFolder(folder.id)}
                   >
                     <FolderIcon size={14} />{" "}
@@ -308,8 +330,20 @@ function FolderNode({
   allFolders,
   onMoveQueryToFolder,
 }: FolderNodeProps) {
+  const isOptimistic = isOptimisticFolderId(folder.id);
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: folder.id,
+    disabled: isOptimistic,
+  });
+  const {
+    setNodeRef: setDragRef,
+    attributes,
+    listeners,
+    isDragging,
+  } = useDraggable({
+    id: `folder-${folder.id}`,
+    data: { type: "folder", folderId: folder.id },
+    disabled: isOptimistic,
   });
   const isRenaming = renamingId === `folder-${folder.id}`;
 
@@ -333,19 +367,27 @@ function FolderNode({
     );
   }
 
+  const setCombinedRef = (node: HTMLButtonElement | null) => {
+    setDropRef(node);
+    setDragRef(node);
+  };
+
   return (
     <div className="space-y-0.5">
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>
           <button
-            ref={setDropRef}
+            ref={setCombinedRef}
             type="button"
             onClick={onToggle}
             onDoubleClick={() => onStartRename(`folder-${folder.id}`)}
+            {...listeners}
+            {...attributes}
             className={cn(
               "w-full flex items-center gap-2 px-2 py-1 text-xs font-medium",
               "text-muted-foreground hover:text-foreground hover:bg-surface-hover cursor-pointer group rounded",
               isOver && "ring-1 ring-primary bg-primary/5",
+              isDragging && "opacity-40",
             )}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
@@ -509,12 +551,15 @@ export function QueryTreeView({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
+  const [draggedItem, setDraggedItem] = useState<{
+    type: "query" | "folder";
+    id: string;
+  } | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<
     Record<string, boolean>
   >({});
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [creatingIn, setCreatingIn] = useState<string | null>(null);
-  const [draggedQueryId, setDraggedQueryId] = useState<string | null>(null);
 
   const filteredFolders = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -633,41 +678,94 @@ export function QueryTreeView({
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    setDraggedQueryId(String(event.active.id));
+    const parsed = parseDraggableId(String(event.active.id));
+    setDraggedItem(parsed);
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
-      setDraggedQueryId(null);
+      setDraggedItem(null);
 
       if (!over) {
         return;
       }
 
-      const queryId = String(active.id);
-      const targetFolderId = over.id === "__root__" ? null : String(over.id);
+      const parsed = parseDraggableId(String(active.id));
+      const targetFolderId =
+        over.id === ROOT_DROPPABLE_ID ? null : String(over.id);
 
-      const query = queries.find((q) => q.id === queryId);
-      if (!query) {
+      if (parsed.type === "query") {
+        if (targetFolderId && isOptimisticFolderId(targetFolderId)) {
+          return;
+        }
+
+        const query = queries.find((q) => q.id === parsed.id);
+        if (!query) {
+          return;
+        }
+
+        if (query.folderId === targetFolderId) {
+          return;
+        }
+
+        updateQuery.mutate({
+          id: parsed.id,
+          data: { folderId: targetFolderId },
+        });
         return;
       }
 
-      if (query.folderId === targetFolderId) {
-        return;
-      }
+      if (parsed.type === "folder") {
+        if (isOptimisticFolderId(parsed.id)) {
+          return;
+        }
 
-      updateQuery.mutate({ id: queryId, data: { folderId: targetFolderId } });
+        if (targetFolderId && isOptimisticFolderId(targetFolderId)) {
+          return;
+        }
+
+        if (targetFolderId === parsed.id) {
+          return;
+        }
+
+        const draggedFolder = folders.find((f) => f.id === parsed.id);
+        if (!draggedFolder) {
+          return;
+        }
+
+        if (draggedFolder.parentId === targetFolderId) {
+          return;
+        }
+
+        if (targetFolderId) {
+          const targetAncestors = getFolderAncestors(folders, targetFolderId);
+          const isDescendant = targetAncestors.some((a) => a.id === parsed.id);
+          if (isDescendant) {
+            return;
+          }
+        }
+
+        updateFolder.mutate({
+          id: parsed.id,
+          data: { parentId: targetFolderId },
+        });
+      }
     },
-    [queries, updateQuery],
+    [folders, queries, updateFolder, updateQuery],
   );
 
   const rootFolders = foldersByParent.get(null) ?? [];
   const rootQueries = queriesByFolder.get(null) ?? [];
 
-  const draggedQuery = draggedQueryId
-    ? queries.find((q) => q.id === draggedQueryId)
-    : null;
+  const draggedQuery =
+    draggedItem?.type === "query"
+      ? queries.find((q) => q.id === draggedItem.id)
+      : null;
+  const draggedFolder =
+    draggedItem?.type === "folder"
+      ? folders.find((f) => f.id === draggedItem.id)
+      : null;
 
   return (
     <div className="space-y-1">
@@ -761,6 +859,11 @@ export function QueryTreeView({
               );
             })}
             <RootDropZone>
+              {draggedItem && rootQueries.length === 0 ? (
+                <div className="px-2 py-1 text-[11px] text-muted-foreground/70">
+                  Drop here to move to root
+                </div>
+              ) : null}
               {rootQueries.map((query) => (
                 <DraggableQueryNode
                   key={query.id}
@@ -803,6 +906,11 @@ export function QueryTreeView({
             <div className="flex items-center gap-2 px-3 py-1.5 text-xs bg-popover border border-border rounded-md shadow-lg">
               <CodeFile size={16} className="text-secondary/60 shrink-0" />
               <span className="truncate">{draggedQuery.name}</span>
+            </div>
+          ) : draggedFolder ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 text-xs bg-popover border border-border rounded-md shadow-lg">
+              <FolderIcon size={16} className="text-primary/70 shrink-0" />
+              <span className="truncate">{draggedFolder.name}</span>
             </div>
           ) : null}
         </DragOverlay>

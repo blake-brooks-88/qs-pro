@@ -32,20 +32,26 @@ export function FolderTreePicker({
   const generatedId = useId();
   const listboxId = `${id ?? generatedId}-listbox`;
 
+  const selectableFolders = useMemo(
+    () => folders.filter((f) => !f.id.startsWith("temp-")),
+    [folders],
+  );
+
   const displayValue = useMemo(() => {
     if (!value) {
       return null;
     }
-    return getFolderPath(folders, value);
-  }, [folders, value]);
+    const path = getFolderPath(selectableFolders, value);
+    return path || null;
+  }, [selectableFolders, value]);
 
   const initialExpandedIds = useMemo(() => {
     if (!value) {
       return [];
     }
-    const ancestors = getFolderAncestors(folders, value);
+    const ancestors = getFolderAncestors(selectableFolders, value);
     return ancestors.map((f) => f.id);
-  }, [folders, value]);
+  }, [selectableFolders, value]);
 
   const handleSelect = (folderId: string) => {
     onChange(folderId);
@@ -133,14 +139,14 @@ export function FolderTreePicker({
                   >
                     No folder
                   </button>
-                  {folders.length > 0 ? (
+                  {selectableFolders.length > 0 ? (
                     <div className="h-px bg-border my-1" />
                   ) : null}
                 </>
               ) : null}
-              {folders.length > 0 ? (
+              {selectableFolders.length > 0 ? (
                 <FolderTree
-                  folders={folders}
+                  folders={selectableFolders}
                   selectedId={value}
                   onSelect={handleSelect}
                   initialExpandedIds={initialExpandedIds}
