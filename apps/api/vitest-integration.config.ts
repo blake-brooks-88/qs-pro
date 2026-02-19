@@ -21,11 +21,6 @@ export default defineConfig({
     testTimeout: 60000, // 60s for individual tests (integration can be slow under coverage)
     root: './',
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
     coverage: {
       provider: 'v8',
       include: ['src/**'],
