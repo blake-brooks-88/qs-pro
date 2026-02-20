@@ -33,6 +33,7 @@ export class DrizzleFoldersRepository implements FoldersRepository {
         userId: params.userId,
         name: params.name,
         parentId: params.parentId ?? null,
+        visibility: params.visibility ?? 'personal',
       })
       .returning();
     const folder = result[0];
@@ -64,6 +65,9 @@ export class DrizzleFoldersRepository implements FoldersRepository {
     }
     if (params.parentId !== undefined) {
       updateData.parentId = params.parentId;
+    }
+    if (params.visibility !== undefined) {
+      updateData.visibility = params.visibility;
     }
 
     const [folder] = await this.getDb()

@@ -104,6 +104,8 @@ export class FoldersController {
     id: string;
     name: string;
     parentId: string | null;
+    visibility: 'personal' | 'shared';
+    userId: string;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -111,6 +113,8 @@ export class FoldersController {
       id: folder.id,
       name: folder.name,
       parentId: folder.parentId,
+      visibility: folder.visibility,
+      userId: folder.userId,
       createdAt: folder.createdAt.toISOString(),
       updatedAt: folder.updatedAt.toISOString(),
     };

@@ -50,6 +50,8 @@ describe('FoldersController', () => {
         id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Folder 1',
         parentId: null,
+        visibility: 'personal',
+        userId: mockUser.userId,
         createdAt: now,
         updatedAt: now,
       });
@@ -69,6 +71,8 @@ describe('FoldersController', () => {
         id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Folder 1',
         parentId: null,
+        visibility: 'personal',
+        userId: mockUser.userId,
         createdAt: '2026-02-14T12:00:00.000Z',
         updatedAt: '2026-02-14T12:00:00.000Z',
       });
@@ -83,6 +87,8 @@ describe('FoldersController', () => {
           id: '550e8400-e29b-41d4-a716-446655440000',
           name: 'Folder 1',
           parentId: null,
+          visibility: 'personal',
+          userId: mockUser.userId,
           createdAt: now,
           updatedAt: now,
         },
@@ -106,6 +112,8 @@ describe('FoldersController', () => {
         id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Folder 1',
         parentId: null,
+        visibility: 'personal',
+        userId: mockUser.userId,
         createdAt: now,
         updatedAt: now,
       });
@@ -132,6 +140,8 @@ describe('FoldersController', () => {
         id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Updated',
         parentId: null,
+        visibility: 'personal',
+        userId: mockUser.userId,
         createdAt: now,
         updatedAt: now,
       });

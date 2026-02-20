@@ -8,11 +8,13 @@ export interface CreateFolderParams {
   userId: string;
   name: string;
   parentId?: string | null;
+  visibility?: 'personal' | 'shared';
 }
 
 export interface UpdateFolderParams {
   name?: string;
   parentId?: string | null;
+  visibility?: 'personal' | 'shared';
 }
 
 export interface FoldersRepository {

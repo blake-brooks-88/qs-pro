@@ -49,6 +49,8 @@ export function useCreateFolder() {
           id: optimisticId,
           name: data.name,
           parentId: data.parentId ?? null,
+          visibility: data.visibility ?? "personal",
+          userId: "",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },

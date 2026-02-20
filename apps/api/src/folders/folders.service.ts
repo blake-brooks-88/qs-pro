@@ -39,6 +39,7 @@ export class FoldersService {
           userId,
           name: dto.name,
           parentId: dto.parentId ?? null,
+          visibility: dto.visibility ?? 'personal',
         });
       },
     );
