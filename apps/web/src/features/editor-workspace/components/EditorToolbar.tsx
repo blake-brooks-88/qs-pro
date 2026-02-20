@@ -48,6 +48,7 @@ export function EditorToolbar(props: {
   onUnlink: (queryId: string) => void;
   onLink: (queryId: string) => void;
   onCreateInAS: () => void;
+  isActiveQueryInSharedFolder?: boolean;
 }) {
   const {
     activeTab,
@@ -65,6 +66,7 @@ export function EditorToolbar(props: {
     onUnlink,
     onLink,
     onCreateInAS,
+    isActiveQueryInSharedFolder = false,
   } = props;
 
   return (
@@ -168,13 +170,13 @@ export function EditorToolbar(props: {
                         onClick={() => onUnlink(activeTab.queryId as string)}
                       />
                     </>
-                  ) : (
+                  ) : isActiveQueryInSharedFolder ? (
                     <ToolbarButton
                       icon={<LinkMinimalistic size={18} />}
                       label="Link to Query Activity"
                       onClick={() => onLink(activeTab.queryId as string)}
                     />
-                  )}
+                  ) : null}
                 </>
               ) : null}
             </>

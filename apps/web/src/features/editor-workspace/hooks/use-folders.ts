@@ -124,6 +124,41 @@ export function useUpdateFolder() {
   });
 }
 
+// Mutation - share folder (change visibility to shared)
+export function useShareFolder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<FolderResponse>(`/folders/${id}/share`);
+      return response.data;
+    },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: FOLDERS_KEY });
+
+      const previous = queryClient.getQueryData<FolderResponse[]>(FOLDERS_KEY);
+
+      if (previous) {
+        queryClient.setQueryData<FolderResponse[]>(FOLDERS_KEY, (old) =>
+          old?.map((f) =>
+            f.id === id ? { ...f, visibility: "shared" as const } : f,
+          ),
+        );
+      }
+
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(FOLDERS_KEY, context.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: FOLDERS_KEY });
+    },
+  });
+}
+
 // Mutation - delete folder
 export function useDeleteFolder() {
   const queryClient = useQueryClient();

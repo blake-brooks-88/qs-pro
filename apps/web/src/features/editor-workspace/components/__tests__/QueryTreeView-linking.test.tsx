@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +13,8 @@ const mockFolders = [
     id: "f1",
     name: "Folder A",
     parentId: null,
+    visibility: "personal",
+    userId: "u1",
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",
   },
@@ -57,6 +58,11 @@ describe("QueryTreeView linking features", () => {
     server.use(
       http.get("/api/folders", () => HttpResponse.json(mockFolders)),
       http.get("/api/saved-queries", () => HttpResponse.json(mockQueries)),
+      http.get("/api/features", () =>
+        HttpResponse.json({
+          features: { teamCollaboration: false },
+        }),
+      ),
     );
   });
 
@@ -69,7 +75,6 @@ describe("QueryTreeView linking features", () => {
       expect(screen.getByText("Linked Query")).toBeInTheDocument(),
     );
 
-    // The linked query should have a badge with the QA name title
     expect(screen.getByTitle("Linked to My QA")).toBeInTheDocument();
   });
 
@@ -82,12 +87,11 @@ describe("QueryTreeView linking features", () => {
       expect(screen.getByText("Unlinked Query")).toBeInTheDocument(),
     );
 
-    // Only one badge should exist (for "Linked Query")
     const badges = screen.queryAllByTitle(/Linked to/);
     expect(badges).toHaveLength(1);
   });
 
-  it("shows 'Link to Query Activity' in context menu for unlinked queries", async () => {
+  it("does NOT show 'Link to Query Activity' in context menu for personal queries", async () => {
     const onLinkQuery = vi.fn();
     render(
       <QueryTreeView
@@ -105,8 +109,12 @@ describe("QueryTreeView linking features", () => {
     fireEvent.contextMenu(screen.getByText("Unlinked Query"));
 
     await waitFor(() => {
-      expect(screen.getByText("Link to Query Activity")).toBeInTheDocument();
+      expect(screen.getByText("Rename")).toBeInTheDocument();
     });
+
+    expect(
+      screen.queryByText("Link to Query Activity"),
+    ).not.toBeInTheDocument();
   });
 
   it("does not show 'Link to Query Activity' in context menu for linked queries", async () => {
@@ -133,33 +141,5 @@ describe("QueryTreeView linking features", () => {
     expect(
       screen.queryByText("Link to Query Activity"),
     ).not.toBeInTheDocument();
-  });
-
-  it("calls onLinkQuery callback when link menu item is selected", async () => {
-    const user = userEvent.setup();
-    const onLinkQuery = vi.fn();
-
-    render(
-      <QueryTreeView
-        searchQuery=""
-        onSelectQuery={vi.fn()}
-        onLinkQuery={onLinkQuery}
-      />,
-      { wrapper: createWrapper() },
-    );
-
-    await waitFor(() =>
-      expect(screen.getByText("Unlinked Query")).toBeInTheDocument(),
-    );
-
-    fireEvent.contextMenu(screen.getByText("Unlinked Query"));
-
-    await waitFor(() => {
-      expect(screen.getByText("Link to Query Activity")).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText("Link to Query Activity"));
-
-    expect(onLinkQuery).toHaveBeenCalledWith("q2");
   });
 });

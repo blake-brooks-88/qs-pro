@@ -11,6 +11,7 @@ import { useBeforeUnloadDirtyTabs } from "@/features/editor-workspace/hooks/use-
 import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
 import { useCreateDataExtensionFlow } from "@/features/editor-workspace/hooks/use-create-data-extension-flow";
 import { useDriftCheck } from "@/features/editor-workspace/hooks/use-drift-check";
+import { useFolders } from "@/features/editor-workspace/hooks/use-folders";
 import { useFormatQuery } from "@/features/editor-workspace/hooks/use-format-query";
 import { useLazyOpenSavedQuery } from "@/features/editor-workspace/hooks/use-lazy-open-saved-query";
 import { usePublishFlow } from "@/features/editor-workspace/hooks/use-publish-flow";
@@ -147,6 +148,9 @@ export function EditorWorkspace({
   // Mutation for auto-saving existing queries
   const updateQuery = useUpdateSavedQuery();
 
+  // Folder data for shared folder detection
+  const { data: allFolders = [] } = useFolders();
+
   // Query Activity hooks
   const { data: qaFolders = [] } = useQueryActivityFolders(eid);
   const publishMutation = usePublishQuery();
@@ -232,6 +236,17 @@ export function EditorWorkspace({
       isNew: true,
     };
   }, [activeTab, tabs]);
+
+  const isActiveQueryInSharedFolder = useMemo(() => {
+    const folderId = safeActiveTab.queryId
+      ? savedQueries?.find((q) => q.id === safeActiveTab.queryId)?.folderId
+      : null;
+    if (!folderId) {
+      return false;
+    }
+    const folder = allFolders.find((f) => f.id === folderId);
+    return folder?.visibility === "shared";
+  }, [safeActiveTab.queryId, savedQueries, allFolders]);
 
   const {
     isSaveModalOpen,
@@ -703,6 +718,7 @@ export function EditorWorkspace({
                     onUnlink={(queryId) => handleOpenUnlinkModal(queryId)}
                     onLink={(queryId) => handleOpenLinkModal(queryId)}
                     onCreateInAS={handleOpenQueryActivityModal}
+                    isActiveQueryInSharedFolder={isActiveQueryInSharedFolder}
                   />
 
                   {/* Usage Warning Banner */}
