@@ -142,28 +142,30 @@ export function EditorToolbar(props: {
                         qaName={activeTab.linkedQaName}
                         automationCount={automationCount}
                       />
-                      <Tooltip.Root>
-                        <Tooltip.Trigger asChild>
-                          <button
-                            onClick={onPublish}
-                            disabled={isPublishing}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground rounded-md transition-all active:scale-95 disabled:opacity-50"
-                          >
-                            <Export size={16} />
-                            Publish
-                          </button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content
-                            className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50 font-bold uppercase tracking-tight"
-                            sideOffset={5}
-                            collisionPadding={10}
-                          >
-                            Push SQL to linked Query Activity
-                            <Tooltip.Arrow className="fill-foreground" />
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
+                      {isActiveQueryInSharedFolder ? (
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <button
+                              onClick={onPublish}
+                              disabled={isPublishing}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground rounded-md transition-all active:scale-95 disabled:opacity-50"
+                            >
+                              <Export size={16} />
+                              Publish
+                            </button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content
+                              className="bg-foreground text-background text-[10px] px-2 py-1 rounded shadow-md z-50 font-bold uppercase tracking-tight"
+                              sideOffset={5}
+                              collisionPadding={10}
+                            >
+                              Push SQL to linked Query Activity
+                              <Tooltip.Arrow className="fill-foreground" />
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      ) : null}
                       <ToolbarButton
                         icon={<LinkBrokenMinimalistic size={18} />}
                         label="Unlink from Query Activity"

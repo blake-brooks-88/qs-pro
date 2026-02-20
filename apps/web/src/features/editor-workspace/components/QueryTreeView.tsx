@@ -25,6 +25,7 @@ import {
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useFeature } from "@/hooks/use-feature";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
 
@@ -42,6 +43,7 @@ import {
   useUpdateSavedQuery,
 } from "../hooks/use-saved-queries";
 import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 import { InlineRenameInput } from "./InlineRenameInput";
 import { LinkedBadge } from "./LinkedBadge";
 import { ShareConfirmationDialog } from "./ShareConfirmationDialog";
@@ -571,6 +573,7 @@ export function QueryTreeView({
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
+  const { enabled: isTeamCollabEnabled } = useFeature("teamCollaboration");
   const createFolder = useCreateFolder();
   const updateFolder = useUpdateFolder();
   const deleteFolder = useDeleteFolder();
@@ -599,6 +602,12 @@ export function QueryTreeView({
     itemType: "folder" | "query";
     itemId: string;
     targetFolderId: string | null;
+  } | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    itemId: string;
+    itemType: "folder" | "query";
+    isShared: boolean;
   } | null>(null);
 
   const folderVisibilityMap = useMemo(() => {
@@ -768,9 +777,14 @@ export function QueryTreeView({
       if (isOptimisticFolderId(id)) {
         return;
       }
+      const isShared = folderVisibilityMap.get(id) === "shared";
+      if (isShared) {
+        setDeleteConfirm({ itemId: id, itemType: "folder", isShared: true });
+        return;
+      }
       deleteFolder.mutate(id);
     },
-    [deleteFolder],
+    [deleteFolder, folderVisibilityMap],
   );
 
   const handleRenameQuery = useCallback(
@@ -783,10 +797,30 @@ export function QueryTreeView({
 
   const handleDeleteQuery = useCallback(
     (id: string) => {
+      const query = queries.find((q) => q.id === id);
+      const isShared = query?.folderId
+        ? folderVisibilityMap.get(query.folderId) === "shared"
+        : false;
+      if (isShared) {
+        setDeleteConfirm({ itemId: id, itemType: "query", isShared: true });
+        return;
+      }
       deleteQuery.mutate(id);
     },
-    [deleteQuery],
+    [deleteQuery, queries, folderVisibilityMap],
   );
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (!deleteConfirm) {
+      return;
+    }
+    if (deleteConfirm.itemType === "folder") {
+      deleteFolder.mutate(deleteConfirm.itemId);
+    } else {
+      deleteQuery.mutate(deleteConfirm.itemId);
+    }
+    setDeleteConfirm(null);
+  }, [deleteConfirm, deleteFolder, deleteQuery]);
 
   const handleStartCreate = useCallback(
     (parentId: string | null) => {
@@ -952,6 +986,10 @@ export function QueryTreeView({
         }
 
         if (sourceVisibility === "personal" && targetVisibility === "shared") {
+          if (!isTeamCollabEnabled) {
+            toast.info("Sharing requires an Enterprise subscription.");
+            return;
+          }
           setShareConfirm({
             itemName: query.name,
             itemType: "query",
@@ -983,6 +1021,10 @@ export function QueryTreeView({
 
         if (targetId === SHARED_DROP_ZONE_ID) {
           if (sourceVisibility === "shared") {
+            return;
+          }
+          if (!isTeamCollabEnabled) {
+            toast.info("Sharing requires an Enterprise subscription.");
             return;
           }
           setShareConfirm({
@@ -1026,6 +1068,10 @@ export function QueryTreeView({
         }
 
         if (sourceVisibility === "personal" && targetVisibility === "shared") {
+          if (!isTeamCollabEnabled) {
+            toast.info("Sharing requires an Enterprise subscription.");
+            return;
+          }
           setShareConfirm({
             itemName: draggedFolder.name,
             itemType: "folder",
@@ -1048,6 +1094,7 @@ export function QueryTreeView({
       updateQuery,
       folderVisibilityMap,
       getQueryVisibility,
+      isTeamCollabEnabled,
     ],
   );
 
@@ -1265,6 +1312,24 @@ export function QueryTreeView({
         onCancel={() => setShareConfirm(null)}
         itemName={shareConfirm?.itemName ?? ""}
         itemType={shareConfirm?.itemType ?? "query"}
+      />
+
+      <ConfirmationDialog
+        isOpen={deleteConfirm !== null}
+        title={
+          deleteConfirm?.itemType === "folder"
+            ? "Delete shared folder?"
+            : "Delete shared query?"
+        }
+        description={
+          deleteConfirm?.itemType === "folder"
+            ? "This shared folder and its contents are visible to your team. Deleting it will remove it for everyone. This action cannot be undone."
+            : "This shared query is visible to your team. Deleting it will remove it for everyone. This action cannot be undone."
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDeleteConfirm}
       />
     </div>
   );
