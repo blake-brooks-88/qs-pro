@@ -7,6 +7,7 @@ import {
   Copy,
   Folder as FolderIcon,
   LinkMinimalistic,
+  LockKeyhole,
   Pen,
   TrashBinMinimalistic,
   UsersGroupRounded,
@@ -144,6 +145,7 @@ function SharedQueryNode({
           className={cn(
             "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors",
             "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
+            readOnly && "opacity-60",
           )}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
@@ -153,6 +155,12 @@ function SharedQueryNode({
             className="text-secondary/60 group-hover:text-secondary shrink-0"
           />
           <span className="truncate">{query.name}</span>
+          {readOnly ? (
+            <LockKeyhole
+              size={12}
+              className="text-muted-foreground/50 shrink-0"
+            />
+          ) : null}
           {query.linkedQaCustomerKey ? (
             <LinkedBadge
               size="sm"
@@ -331,6 +339,7 @@ function SharedFolderNode({
             className={cn(
               "w-full flex items-center gap-2 px-2 py-1 text-xs font-medium",
               "text-muted-foreground hover:text-foreground hover:bg-surface-hover cursor-pointer group rounded",
+              readOnly && "opacity-60",
             )}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
@@ -346,6 +355,12 @@ function SharedFolderNode({
               className="text-muted-foreground/60 group-hover:text-primary transition-colors shrink-0"
             />
             <span className="truncate">{folder.name}</span>
+            {readOnly ? (
+              <LockKeyhole
+                size={12}
+                className="text-muted-foreground/50 shrink-0"
+              />
+            ) : null}
             <CreatorAttribution
               creatorName={folder.creatorName ?? null}
               updatedAt={folder.updatedAt}
@@ -557,13 +572,17 @@ export function SharedQuerySection({
       return <LockedSharedTeaser />;
     }
 
-    if (rootFolders.length === 0 && rootQueries.length === 0) {
+    if (
+      rootFolders.length === 0 &&
+      rootQueries.length === 0 &&
+      creatingIn !== ""
+    ) {
       return (
         <div className="px-3 py-3 text-center text-xs text-muted-foreground/70">
           No shared queries yet.
           <br />
           <span className="text-muted-foreground/50">
-            Drag a folder here to share with your team.
+            Create a new shared folder or drag one here to share with your team.
           </span>
         </div>
       );
@@ -571,6 +590,22 @@ export function SharedQuerySection({
 
     return (
       <div className="space-y-0.5">
+        {creatingIn === "" && (
+          <div
+            className="flex items-center gap-2 px-2 py-1 text-xs"
+            style={{ paddingLeft: "8px" }}
+          >
+            <FolderIcon
+              size={16}
+              className="text-muted-foreground/60 shrink-0"
+            />
+            <InlineRenameInput
+              initialValue=""
+              onSave={(name) => onFinishCreate(name)}
+              onCancel={() => onFinishCreate(null)}
+            />
+          </div>
+        )}
         {rootFolders.map((folder) => {
           const childFolders = foldersByParent.get(folder.id) ?? [];
           const childQueries = queriesByFolder.get(folder.id) ?? [];
