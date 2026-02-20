@@ -16,6 +16,7 @@ export const defaultFeatures: TenantFeatures = {
   runToTargetDE: false,
   executionHistory: false,
   versionHistory: false,
+  teamCollaboration: false,
 };
 
 export const handlers = [
