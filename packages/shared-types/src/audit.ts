@@ -20,6 +20,7 @@ export type AuditEventType =
   | "folder.updated"
   | "folder.deleted"
   | "folder.moved"
+  | "folder.shared"
   // Query activities
   | "query_activity.created"
   | "query_activity.linked"
@@ -48,6 +49,7 @@ export const AUDIT_EVENT_TYPES: AuditEventType[] = [
   "folder.updated",
   "folder.deleted",
   "folder.moved",
+  "folder.shared",
   "query_activity.created",
   "query_activity.linked",
   "query_activity.unlinked",

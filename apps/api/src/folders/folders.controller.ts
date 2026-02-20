@@ -24,6 +24,7 @@ import {
   type UserSession,
 } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import type { Folder } from './folders.repository';
 import { FoldersService } from './folders.service';
 
 @Controller('folders')
@@ -89,6 +90,22 @@ export class FoldersController {
     return this.toResponse(folder);
   }
 
+  @Post(':id/share')
+  @UseGuards(CsrfGuard)
+  @Audited('folder.shared', { targetIdParam: 'id' })
+  async share(
+    @CurrentUser() user: UserSession,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    const folder = await this.foldersService.shareFolder(
+      user.tenantId,
+      user.mid,
+      user.userId,
+      id,
+    );
+    return this.toResponse(folder);
+  }
+
   @Delete(':id')
   @UseGuards(CsrfGuard)
   @Audited('folder.deleted', { targetIdParam: 'id' })
@@ -100,21 +117,14 @@ export class FoldersController {
     return { success: true };
   }
 
-  private toResponse(folder: {
-    id: string;
-    name: string;
-    parentId: string | null;
-    visibility: 'personal' | 'shared';
-    userId: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }) {
+  private toResponse(folder: Folder) {
     return {
       id: folder.id,
       name: folder.name,
       parentId: folder.parentId,
       visibility: folder.visibility,
       userId: folder.userId,
+      creatorName: folder.creatorName,
       createdAt: folder.createdAt.toISOString(),
       updatedAt: folder.updatedAt.toISOString(),
     };

@@ -15,6 +15,7 @@ function createServiceStub() {
     findById: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    shareFolder: vi.fn(),
   };
 }
 
@@ -52,6 +53,7 @@ describe('FoldersController', () => {
         parentId: null,
         visibility: 'personal',
         userId: mockUser.userId,
+        creatorName: null,
         createdAt: now,
         updatedAt: now,
       });
@@ -73,6 +75,7 @@ describe('FoldersController', () => {
         parentId: null,
         visibility: 'personal',
         userId: mockUser.userId,
+        creatorName: null,
         createdAt: '2026-02-14T12:00:00.000Z',
         updatedAt: '2026-02-14T12:00:00.000Z',
       });
@@ -89,6 +92,7 @@ describe('FoldersController', () => {
           parentId: null,
           visibility: 'personal',
           userId: mockUser.userId,
+          creatorName: 'Test User',
           createdAt: now,
           updatedAt: now,
         },
@@ -102,6 +106,7 @@ describe('FoldersController', () => {
         mockUser.userId,
       );
       expect(result[0]?.createdAt).toBe('2026-02-14T12:00:00.000Z');
+      expect(result[0]?.creatorName).toBe('Test User');
     });
   });
 
@@ -114,6 +119,7 @@ describe('FoldersController', () => {
         parentId: null,
         visibility: 'personal',
         userId: mockUser.userId,
+        creatorName: null,
         createdAt: now,
         updatedAt: now,
       });
@@ -142,6 +148,7 @@ describe('FoldersController', () => {
         parentId: null,
         visibility: 'personal',
         userId: mockUser.userId,
+        creatorName: null,
         createdAt: now,
         updatedAt: now,
       });
@@ -160,6 +167,44 @@ describe('FoldersController', () => {
         { name: 'Updated' },
       );
       expect(result.name).toBe('Updated');
+    });
+  });
+
+  describe('POST share()', () => {
+    it('delegates to service.shareFolder() and maps response', async () => {
+      const now = new Date('2026-02-14T12:00:00.000Z');
+      service.shareFolder.mockResolvedValue({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        name: 'Shared Folder',
+        parentId: null,
+        visibility: 'shared',
+        userId: mockUser.userId,
+        creatorName: 'Test User',
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const result = await controller.share(
+        mockUser,
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+
+      expect(service.shareFolder).toHaveBeenCalledWith(
+        mockUser.tenantId,
+        mockUser.mid,
+        mockUser.userId,
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+      expect(result).toEqual({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        name: 'Shared Folder',
+        parentId: null,
+        visibility: 'shared',
+        userId: mockUser.userId,
+        creatorName: 'Test User',
+        createdAt: '2026-02-14T12:00:00.000Z',
+        updatedAt: '2026-02-14T12:00:00.000Z',
+      });
     });
   });
 

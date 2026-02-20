@@ -6,6 +6,7 @@ import {
   folders,
   savedQueries,
   sql,
+  users,
 } from '@qpp/database';
 
 import type {
@@ -40,20 +41,59 @@ export class DrizzleFoldersRepository implements FoldersRepository {
     if (!folder) {
       throw new Error('Failed to create folder');
     }
-    return folder;
+    return { ...folder, creatorName: null };
   }
 
   async findById(id: string): Promise<Folder | null> {
-    const [folder] = await this.getDb()
-      .select()
+    const rows = await this.getDb()
+      .select({
+        id: folders.id,
+        tenantId: folders.tenantId,
+        mid: folders.mid,
+        userId: folders.userId,
+        parentId: folders.parentId,
+        name: folders.name,
+        visibility: folders.visibility,
+        creatorName: users.name,
+        createdAt: folders.createdAt,
+        updatedAt: folders.updatedAt,
+      })
       .from(folders)
+      .leftJoin(users, eq(folders.userId, users.id))
       .where(eq(folders.id, id))
       .limit(1);
-    return folder ?? null;
+
+    const row = rows[0];
+    if (!row) {
+      return null;
+    }
+    return {
+      ...row,
+      creatorName: row.creatorName ?? null,
+    };
   }
 
   async findAll(): Promise<Folder[]> {
-    return this.getDb().select().from(folders);
+    const rows = await this.getDb()
+      .select({
+        id: folders.id,
+        tenantId: folders.tenantId,
+        mid: folders.mid,
+        userId: folders.userId,
+        parentId: folders.parentId,
+        name: folders.name,
+        visibility: folders.visibility,
+        creatorName: users.name,
+        createdAt: folders.createdAt,
+        updatedAt: folders.updatedAt,
+      })
+      .from(folders)
+      .leftJoin(users, eq(folders.userId, users.id));
+
+    return rows.map((row) => ({
+      ...row,
+      creatorName: row.creatorName ?? null,
+    }));
   }
 
   async update(id: string, params: UpdateFolderParams): Promise<Folder | null> {
@@ -70,12 +110,42 @@ export class DrizzleFoldersRepository implements FoldersRepository {
       updateData.visibility = params.visibility;
     }
 
-    const [folder] = await this.getDb()
+    const [updatedRow] = await this.getDb()
       .update(folders)
       .set(updateData)
       .where(eq(folders.id, id))
       .returning();
-    return folder ?? null;
+
+    if (!updatedRow) {
+      return null;
+    }
+
+    const rows = await this.getDb()
+      .select({
+        id: folders.id,
+        tenantId: folders.tenantId,
+        mid: folders.mid,
+        userId: folders.userId,
+        parentId: folders.parentId,
+        name: folders.name,
+        visibility: folders.visibility,
+        creatorName: users.name,
+        createdAt: folders.createdAt,
+        updatedAt: folders.updatedAt,
+      })
+      .from(folders)
+      .leftJoin(users, eq(folders.userId, users.id))
+      .where(eq(folders.id, id))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      return null;
+    }
+    return {
+      ...row,
+      creatorName: row.creatorName ?? null,
+    };
   }
 
   async delete(id: string): Promise<boolean> {
