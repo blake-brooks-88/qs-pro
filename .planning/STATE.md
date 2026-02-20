@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 18 Shared Query Workspaces IN PROGRESS — Plan 03 complete (frontend sidebar with personal/shared split, DnD, feature gating).
+**Current focus:** Phase 18 Shared Query Workspaces IN PROGRESS — Plan 04 complete (stale detection, enhanced delete warnings, publish gating).
 
 ## Current Milestone
 
@@ -48,7 +48,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
-| 18 | Shared Query Workspaces | ◐ In Progress | 3/5 | 60% |
+| 18 | Shared Query Workspaces | ◐ In Progress | 4/5 | 80% |
 
 ## Phase 1 Completion Summary
 
@@ -86,6 +86,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-20 | Publish button requires shared folder + linked status | Publish only shown for queries both linked AND in shared folders; personal linked queries cannot publish |
+| 2026-02-20 | Stale detection uses useRef for hash tracking | Avoids re-renders; hash only read during save, not during render |
+| 2026-02-20 | executeSave(forceOverwrite) pattern for stale resolution | Single function handles normal and force-overwrite saves; 409 errors show dialog instead of generic error |
 | 2026-02-20 | Link option hidden entirely for personal queries | Per locked decision: not disabled, not shown — users discover shared-folder requirement organically |
 | 2026-02-20 | isActiveQueryInSharedFolder derived from folder visibility map | EditorWorkspace computes shared status for toolbar link button gating via useFolders() + savedQueries |
 | 2026-02-20 | USER_REPOSITORY injection in SavedQueriesModule | Needed for updatedByUserName resolution; follows existing repository injection pattern |
