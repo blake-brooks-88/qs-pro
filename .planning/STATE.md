@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 18 Shared Query Workspaces IN PROGRESS — Plan 02 complete (backend API logic for shared folders and stale detection).
+**Current focus:** Phase 18 Shared Query Workspaces IN PROGRESS — Plan 03 complete (frontend sidebar with personal/shared split, DnD, feature gating).
 
 ## Current Milestone
 
@@ -48,7 +48,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
-| 18 | Shared Query Workspaces | ◐ In Progress | 2/5 | 40% |
+| 18 | Shared Query Workspaces | ◐ In Progress | 3/5 | 60% |
 
 ## Phase 1 Completion Summary
 
@@ -86,6 +86,8 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-20 | Link option hidden entirely for personal queries | Per locked decision: not disabled, not shown — users discover shared-folder requirement organically |
+| 2026-02-20 | isActiveQueryInSharedFolder derived from folder visibility map | EditorWorkspace computes shared status for toolbar link button gating via useFolders() + savedQueries |
 | 2026-02-20 | USER_REPOSITORY injection in SavedQueriesModule | Needed for updatedByUserName resolution; follows existing repository injection pattern |
 | 2026-02-20 | VALIDATION_ERROR for ownership checks (not FORBIDDEN) | FORBIDDEN error code doesn't exist; VALIDATION_ERROR (400) is consistent with business rule violations |
 | 2026-02-20 | Custom Folder interface (not Drizzle $inferSelect) | Enables creatorName from LEFT JOIN to be part of the type without Drizzle schema changes |
