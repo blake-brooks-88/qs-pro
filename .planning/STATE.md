@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 18 Shared Query Workspaces IN PROGRESS — Plan 04 complete (stale detection, enhanced delete warnings, publish gating).
+**Current focus:** Phase 18 Shared Query Workspaces COMPLETE — all 5 plans delivered (schema, backend, frontend sidebar, stale detection UX, comprehensive tests).
 
 ## Current Milestone
 
 **Milestone:** v1.0 Launch (Full Phase 1)
 **Status:** Ready to plan
-**Progress:** [██████████] 98%
+**Progress:** [██████████] 100%
 
 ## Phase Status
 
@@ -48,7 +48,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
-| 18 | Shared Query Workspaces | ◐ In Progress | 4/5 | 80% |
+| 18 | Shared Query Workspaces | ✓ Complete | 5/5 | 100% |
 
 ## Phase 1 Completion Summary
 
@@ -345,6 +345,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-20 | z.input for CreateFolderDto with .default() | z.infer makes visibility required after .default(); z.input lets callers omit it (default applied server-side) |
 | 2026-02-20 | Conditional RLS: visibility=shared OR user_id match | Personal folders user-scoped, shared folders BU-scoped (tenant+mid); replaces folders_user_isolation |
 | 2026-02-20 | drizzle-kit --custom reserved for RLS-only DDL | Column/index DDL via db:generate; RLS policy DDL via --custom (drizzle-kit cannot generate RLS) |
+| 2026-02-20 | RLS prevents cross-user personal folder visibility | User B gets RESOURCE_NOT_FOUND (not VALIDATION_ERROR) when attempting to share User A's personal folder |
+| 2026-02-20 | Deploy gating tests use HTTP-level assertions | Full controller+guard pipeline via supertest rather than service-level to verify complete feature gate chain |
+| 2026-02-20 | useRef hook tests require explicit rerender() | Ref mutations don't trigger re-renders; must call rerender() after act() to observe updated values |
 
 ## Roadmap Evolution
 
@@ -371,10 +374,22 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 18 Plan 01 COMPLETE — Database foundation for shared query workspaces
-**Next step:** Phase 18 Plan 02 — Backend API endpoints for shared folder operations
+**Last action:** Phase 18 Plan 05 COMPLETE — Comprehensive test coverage for shared query workspaces
+**Next step:** Phase 18 complete. Ready for next milestone phase.
 
-**Phase 18 Plan 01 COMPLETE (2026-02-20):**
+**Phase 18 Plan 05 COMPLETE (2025-02-20):**
+
+- 71 new test cases across 7 files
+- Backend: 17 shared folder integration tests (feature gating, RLS, CRUD, creatorName)
+- Backend: 8 stale detection integration tests (hash match/mismatch, 409, updatedByUserName, latestVersionHash)
+- Backend: 17 deploy gating integration tests (free blocked, pro/enterprise succeed for link/publish/drift/blast)
+- Frontend: 9 SharedQuerySection tests (Enterprise badge, locked teaser, folder tree, context menus, downgrade)
+- Frontend: 7 StaleWarningDialog tests + 6 ShareConfirmationDialog tests
+- Frontend: 7 useStaleDetection hook tests (ref-based hash tracking, callback stability)
+- All 2325 web tests pass, all backend tests pass
+- Phase 18 fully complete: schema, backend, frontend, UX, tests
+
+**Phase 18 Plan 01 COMPLETE (2025-02-20):**
 
 - Drizzle schema: visibility column on folders (personal/shared), updatedByUserId on savedQueries
 - Migration 0029: auto-generated for columns + visibility index
@@ -384,8 +399,6 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 - Saved-query schemas: expectedHash, latestVersionHash, updatedByUserName for stale detection
 - STALE_CONTENT error code: shared-types + backend-shared (HTTP 409, terminal, RFC 9457 title)
 - Downstream propagation: API folders controller/service/repository updated for visibility
-- All 2297 web tests pass, 405 API tests pass, 348 backend-shared tests pass, 93 shared-types tests pass
-- Full typecheck clean across all packages
 
 **Phase 12 Plan 01 COMPLETE (2026-02-16):**
 
