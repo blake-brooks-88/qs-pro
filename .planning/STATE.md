@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 18 Shared Query Workspaces IN PROGRESS — Plan 01 complete (database foundation, feature key, shared-types, error codes).
+**Current focus:** Phase 18 Shared Query Workspaces IN PROGRESS — Plan 02 complete (backend API logic for shared folders and stale detection).
 
 ## Current Milestone
 
@@ -48,7 +48,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
-| 18 | Shared Query Workspaces | ◐ In Progress | 1/5 | 20% |
+| 18 | Shared Query Workspaces | ◐ In Progress | 2/5 | 40% |
 
 ## Phase 1 Completion Summary
 
@@ -86,6 +86,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-20 | USER_REPOSITORY injection in SavedQueriesModule | Needed for updatedByUserName resolution; follows existing repository injection pattern |
+| 2026-02-20 | VALIDATION_ERROR for ownership checks (not FORBIDDEN) | FORBIDDEN error code doesn't exist; VALIDATION_ERROR (400) is consistent with business rule violations |
+| 2026-02-20 | Custom Folder interface (not Drizzle $inferSelect) | Enables creatorName from LEFT JOIN to be part of the type without Drizzle schema changes |
 | 2026-01-23 | Type suffix naming convention (.unit.test.ts, etc.) | Enables Vitest filtering by test type and aligns with industry standards |
 | 2026-01-23 | mergeConfig pattern for Vitest configs | Per-package configs extend shared base while preserving package-specific settings |
 | 2026-01-23 | workspace projects in root vitest.config | Enables coverage aggregation across packages |
