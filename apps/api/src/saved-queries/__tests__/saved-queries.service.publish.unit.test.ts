@@ -89,6 +89,14 @@ describe('SavedQueriesService (version-SQL methods)', () => {
           useValue: queryVersionsRepo,
         },
         {
+          provide: 'USER_REPOSITORY',
+          useValue: {
+            findById: vi.fn().mockResolvedValue(undefined),
+            findBySfUserId: vi.fn().mockResolvedValue(undefined),
+            upsert: vi.fn(),
+          },
+        },
+        {
           provide: FeaturesService,
           useValue: {
             getTenantFeatures: vi.fn().mockResolvedValue({

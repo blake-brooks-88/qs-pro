@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
+import { DrizzleUserRepository } from '@qpp/database';
 
 import { CsrfGuard } from '../auth/csrf.guard';
 import { FeaturesModule } from '../features/features.module';
@@ -25,6 +26,11 @@ import { SavedQueriesService } from './saved-queries.service';
       provide: 'QUERY_VERSIONS_REPOSITORY',
       useFactory: (db: unknown) =>
         new DrizzleQueryVersionsRepository(db as never),
+      inject: ['DATABASE'],
+    },
+    {
+      provide: 'USER_REPOSITORY',
+      useFactory: (db: unknown) => new DrizzleUserRepository(db as never),
       inject: ['DATABASE'],
     },
   ],
