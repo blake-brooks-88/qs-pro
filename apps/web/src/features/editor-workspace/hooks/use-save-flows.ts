@@ -1,6 +1,14 @@
+import type { SavedQueryResponse } from "@qpp/shared-types";
 import type { QueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+import api from "@/services/api";
+
+export interface StaleConflict {
+  conflictingUserName: string | null;
+}
 
 export function useSaveFlows(options: {
   activeTabId: string | null;
@@ -24,14 +32,18 @@ export function useSaveFlows(options: {
   updateQuery: {
     mutateAsync: (args: {
       id: string;
-      data: { sqlText: string };
-    }) => Promise<unknown>;
+      data: { sqlText: string; expectedHash?: string };
+    }) => Promise<SavedQueryResponse>;
   };
   queryClient: QueryClient;
   versionHistoryKeys: {
     list: (savedQueryId: string) => readonly unknown[];
   };
+  storeUpdateTabContent?: (tabId: string, content: string) => void;
   onSave?: (tabId: string, content: string) => void;
+  isActiveQueryInSharedFolder?: boolean;
+  openedHash: string | null;
+  onHashUpdated?: (newHash: string) => void;
 }): {
   isSaveModalOpen: boolean;
   saveModalInitialName: string;
@@ -40,6 +52,10 @@ export function useSaveFlows(options: {
   handleSave: () => Promise<void>;
   handleSaveAs: () => void;
   handleSaveModalSuccess: (queryId: string, name: string) => void;
+  staleConflict: StaleConflict | null;
+  handleStaleOverwrite: () => void;
+  handleStaleReload: () => void;
+  handleStaleCancel: () => void;
 } {
   const {
     activeTabId,
@@ -49,12 +65,19 @@ export function useSaveFlows(options: {
     updateQuery,
     queryClient,
     versionHistoryKeys,
+    storeUpdateTabContent,
     onSave,
+    isActiveQueryInSharedFolder = false,
+    openedHash,
+    onHashUpdated,
   } = options;
 
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSaveAsMode, setIsSaveAsMode] = useState(false);
   const [saveAsInitialName, setSaveAsInitialName] = useState("");
+  const [staleConflict, setStaleConflict] = useState<StaleConflict | null>(
+    null,
+  );
 
   const saveModalInitialName = useMemo(() => {
     return isSaveAsMode ? saveAsInitialName : activeTab.name;
@@ -70,52 +93,88 @@ export function useSaveFlows(options: {
     setSaveAsInitialName("");
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!activeTab.queryId) {
-      openSaveModal();
-      return;
-    }
-
-    if (!activeTab.isDirty) {
-      return;
-    }
-
-    try {
-      await updateQuery.mutateAsync({
-        id: activeTab.queryId,
-        data: { sqlText: activeTab.content },
-      });
-
-      if (activeTabId) {
-        storeMarkTabSaved(activeTabId, activeTab.queryId, activeTab.name);
+  const executeSave = useCallback(
+    async (forceOverwrite = false) => {
+      if (!activeTab.queryId) {
+        openSaveModal();
+        return;
       }
 
-      toast.success("Query saved");
-      onSave?.(activeTab.id, activeTab.content);
+      if (!activeTab.isDirty && !forceOverwrite) {
+        return;
+      }
 
-      void queryClient.invalidateQueries({
-        queryKey: versionHistoryKeys.list(activeTab.queryId),
-      });
-    } catch (error) {
-      toast.error("Failed to save query", {
-        description:
-          error instanceof Error ? error.message : "An error occurred",
-      });
-    }
-  }, [
-    activeTab.content,
-    activeTab.id,
-    activeTab.isDirty,
-    activeTab.name,
-    activeTab.queryId,
-    activeTabId,
-    openSaveModal,
-    onSave,
-    queryClient,
-    storeMarkTabSaved,
-    updateQuery,
-    versionHistoryKeys,
-  ]);
+      const data: { sqlText: string; expectedHash?: string } = {
+        sqlText: activeTab.content,
+      };
+
+      if (isActiveQueryInSharedFolder && openedHash && !forceOverwrite) {
+        data.expectedHash = openedHash;
+      }
+
+      try {
+        const response = await updateQuery.mutateAsync({
+          id: activeTab.queryId,
+          data,
+        });
+
+        if (activeTabId) {
+          storeMarkTabSaved(activeTabId, activeTab.queryId, activeTab.name);
+        }
+
+        if (response.latestVersionHash) {
+          onHashUpdated?.(response.latestVersionHash);
+        }
+
+        toast.success("Query saved");
+        onSave?.(activeTab.id, activeTab.content);
+
+        void queryClient.invalidateQueries({
+          queryKey: versionHistoryKeys.list(activeTab.queryId),
+        });
+      } catch (error) {
+        if (
+          axios.isAxiosError(error) &&
+          error.response?.status === 409 &&
+          (error.response.data as { code?: string })?.code === "STALE_CONTENT"
+        ) {
+          const errorData = error.response.data as {
+            context?: { reason?: string };
+          };
+          setStaleConflict({
+            conflictingUserName: errorData.context?.reason ?? null,
+          });
+          return;
+        }
+
+        toast.error("Failed to save query", {
+          description:
+            error instanceof Error ? error.message : "An error occurred",
+        });
+      }
+    },
+    [
+      activeTab.content,
+      activeTab.id,
+      activeTab.isDirty,
+      activeTab.name,
+      activeTab.queryId,
+      activeTabId,
+      isActiveQueryInSharedFolder,
+      openedHash,
+      openSaveModal,
+      onHashUpdated,
+      onSave,
+      queryClient,
+      storeMarkTabSaved,
+      updateQuery,
+      versionHistoryKeys,
+    ],
+  );
+
+  const handleSave = useCallback(async () => {
+    await executeSave(false);
+  }, [executeSave]);
 
   const handleSaveAs = useCallback(() => {
     const name = activeTab.name || "Untitled";
@@ -141,6 +200,55 @@ export function useSaveFlows(options: {
     ],
   );
 
+  const handleStaleOverwrite = useCallback(() => {
+    setStaleConflict(null);
+    void executeSave(true);
+  }, [executeSave]);
+
+  const reloadLatest = useCallback(async () => {
+    if (!activeTab.queryId || !activeTabId) {
+      return;
+    }
+
+    try {
+      const response = await api.get<SavedQueryResponse>(
+        `/saved-queries/${activeTab.queryId}`,
+      );
+      const latest = response.data;
+
+      storeUpdateTabContent?.(activeTabId, latest.sqlText);
+      storeMarkTabSaved(activeTabId, activeTab.queryId, latest.name);
+
+      if (latest.latestVersionHash) {
+        onHashUpdated?.(latest.latestVersionHash);
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ["saved-query", activeTab.queryId],
+      });
+
+      toast.info("Reloaded latest version");
+    } catch {
+      toast.error("Failed to reload query");
+    }
+  }, [
+    activeTab.queryId,
+    activeTabId,
+    storeUpdateTabContent,
+    storeMarkTabSaved,
+    onHashUpdated,
+    queryClient,
+  ]);
+
+  const handleStaleReload = useCallback(() => {
+    setStaleConflict(null);
+    void reloadLatest();
+  }, [reloadLatest]);
+
+  const handleStaleCancel = useCallback(() => {
+    setStaleConflict(null);
+  }, []);
+
   return {
     isSaveModalOpen,
     saveModalInitialName,
@@ -149,5 +257,9 @@ export function useSaveFlows(options: {
     handleSave,
     handleSaveAs,
     handleSaveModalSuccess,
+    staleConflict,
+    handleStaleOverwrite,
+    handleStaleReload,
+    handleStaleCancel,
   };
 }

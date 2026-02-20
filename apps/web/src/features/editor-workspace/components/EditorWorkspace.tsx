@@ -27,6 +27,7 @@ import { useResultsPaneResize } from "@/features/editor-workspace/hooks/use-resu
 import { useRunRequestHandler } from "@/features/editor-workspace/hooks/use-run-request-handler";
 import { useSaveFlows } from "@/features/editor-workspace/hooks/use-save-flows";
 import { useUpdateSavedQuery } from "@/features/editor-workspace/hooks/use-saved-queries";
+import { useStaleDetection } from "@/features/editor-workspace/hooks/use-stale-detection";
 import { useUnlinkFlow } from "@/features/editor-workspace/hooks/use-unlink-flow";
 import { useVersionHistoryFlow } from "@/features/editor-workspace/hooks/use-version-history-flow";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
@@ -60,6 +61,7 @@ import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
 import { QueryTabBar } from "./QueryTabBar";
+import { StaleWarningDialog } from "./StaleWarningDialog";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { VersionHistoryWarningDialog } from "./VersionHistoryWarningDialog";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
@@ -147,6 +149,9 @@ export function EditorWorkspace({
 
   // Mutation for auto-saving existing queries
   const updateQuery = useUpdateSavedQuery();
+
+  // Stale detection for shared queries
+  const staleDetection = useStaleDetection();
 
   // Folder data for shared folder detection
   const { data: allFolders = [] } = useFolders();
@@ -256,6 +261,10 @@ export function EditorWorkspace({
     handleSave,
     handleSaveAs,
     handleSaveModalSuccess,
+    staleConflict,
+    handleStaleOverwrite,
+    handleStaleReload,
+    handleStaleCancel,
   } = useSaveFlows({
     activeTabId,
     activeTab: safeActiveTab,
@@ -264,7 +273,11 @@ export function EditorWorkspace({
     updateQuery,
     queryClient,
     versionHistoryKeys,
+    storeUpdateTabContent,
     onSave,
+    isActiveQueryInSharedFolder,
+    openedHash: staleDetection.openedHash,
+    onHashUpdated: staleDetection.updateHash,
   });
 
   const { handleFormat } = useFormatQuery({
@@ -441,6 +454,10 @@ export function EditorWorkspace({
             }
           : undefined,
       );
+
+      if (query.latestVersionHash) {
+        staleDetection.trackOpened(query.latestVersionHash);
+      }
     },
   });
 
@@ -923,6 +940,14 @@ export function EditorWorkspace({
           onCancel={handleVersionHistoryWarningCancel}
           onContinueWithoutSaving={handleVersionHistoryContinueWithoutSaving}
           onSaveAndContinue={() => void handleVersionHistorySaveAndContinue()}
+        />
+
+        <StaleWarningDialog
+          open={staleConflict !== null}
+          conflictingUserName={staleConflict?.conflictingUserName ?? null}
+          onOverwrite={handleStaleOverwrite}
+          onReload={handleStaleReload}
+          onCancel={handleStaleCancel}
         />
       </div>
     </Tooltip.Provider>
