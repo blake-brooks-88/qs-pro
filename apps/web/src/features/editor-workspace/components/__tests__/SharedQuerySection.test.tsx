@@ -308,4 +308,91 @@ describe("SharedQuerySection", () => {
       expect(screen.getByTitle("New Shared Folder")).toBeInTheDocument(),
     );
   });
+
+  it("shows inline rename input at root level when creating shared folder", async () => {
+    server.use(
+      http.get("/api/features", () =>
+        HttpResponse.json({ features: { teamCollaboration: true } }),
+      ),
+    );
+
+    render(<SharedQuerySection {...buildProps({ creatingIn: "" })} />, {
+      wrapper: createWrapper(),
+    });
+
+    const input = await screen.findByRole("textbox");
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue("");
+    expect(screen.getByText("Team Folder")).toBeInTheDocument();
+  });
+
+  it("shows inline rename input when creating shared folder in empty section", async () => {
+    server.use(
+      http.get("/api/features", () =>
+        HttpResponse.json({ features: { teamCollaboration: true } }),
+      ),
+    );
+
+    const emptyFoldersByParent = new Map<string | null, FolderResponse[]>();
+    const emptyQueriesByFolder = new Map<string | null, SavedQueryListItem[]>();
+
+    render(
+      <SharedQuerySection
+        {...buildProps({
+          folders: [],
+          queries: [],
+          foldersByParent: emptyFoldersByParent,
+          queriesByFolder: emptyQueriesByFolder,
+          creatingIn: "",
+        })}
+      />,
+      { wrapper: createWrapper() },
+    );
+
+    const input = await screen.findByRole("textbox");
+    expect(input).toBeInTheDocument();
+  });
+
+  it("empty state mentions creating a new shared folder", async () => {
+    server.use(
+      http.get("/api/features", () =>
+        HttpResponse.json({ features: { teamCollaboration: true } }),
+      ),
+    );
+
+    const emptyFoldersByParent = new Map<string | null, FolderResponse[]>();
+    const emptyQueriesByFolder = new Map<string | null, SavedQueryListItem[]>();
+
+    render(
+      <SharedQuerySection
+        {...buildProps({
+          folders: [],
+          queries: [],
+          foldersByParent: emptyFoldersByParent,
+          queriesByFolder: emptyQueriesByFolder,
+        })}
+      />,
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTitle("New Shared Folder")).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText(/Create a new shared folder/i)).toBeInTheDocument();
+    expect(screen.getByText(/drag/i)).toBeInTheDocument();
+  });
+
+  it("downgrade: shows opacity on read-only shared folder", async () => {
+    render(<SharedQuerySection {...buildProps()} />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("Team Folder")).toBeInTheDocument(),
+    );
+
+    const folderButton = screen.getByText("Team Folder").closest("button");
+    expect(folderButton).toHaveClass("opacity-60");
+  });
 });
