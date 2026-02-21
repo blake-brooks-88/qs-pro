@@ -245,8 +245,10 @@ describe('WebhookHandlerService', () => {
 
       await service.process(event);
 
-      const updateCall = orgSubRepo.updateFromWebhook.mock.calls[0][1];
-      expect(updateCall).not.toHaveProperty('currentPeriodEnds');
+      expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.not.objectContaining({ currentPeriodEnds: expect.anything() }),
+      );
     });
 
     it('throws when eid is missing from session metadata', async () => {
@@ -368,9 +370,14 @@ describe('WebhookHandlerService', () => {
 
       await service.process(event);
 
-      const updateData = orgSubRepo.updateFromWebhook.mock.calls[0][1];
-      expect(updateData).not.toHaveProperty('tier');
-      expect(updateData).toHaveProperty('currentPeriodEnds');
+      expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.not.objectContaining({ tier: expect.anything() }),
+      );
+      expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ currentPeriodEnds: expect.any(Date) }),
+      );
     });
 
     it('does NOT change tier when subscription status is unpaid', async () => {
@@ -380,8 +387,10 @@ describe('WebhookHandlerService', () => {
 
       await service.process(event);
 
-      const updateData = orgSubRepo.updateFromWebhook.mock.calls[0][1];
-      expect(updateData).not.toHaveProperty('tier');
+      expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.not.objectContaining({ tier: expect.anything() }),
+      );
     });
 
     it('throws when eid is missing from subscription metadata', async () => {
