@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 13 Query Formatting COMPLETE — SQL formatting via toolbar button and Shift+Alt+F with T-SQL dialect.
+**Current focus:** Phase 14 Monetization IN PROGRESS — Plan 01 complete (database foundation: org_subscriptions, stripe_webhook_events, Stripe env vars, TrialState schema).
 
 ## Current Milestone
 
@@ -44,7 +44,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
 | 13 | Query Formatting | ✓ Complete | 1/1 | 100% |
-| 14 | Monetization | ○ Pending | 0/0 | 0% |
+| 14 | Monetization | ◐ In Progress | 1/4 | 25% |
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
@@ -85,6 +85,10 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-21 | stripe_webhook_events intentionally non-RLS | System-level idempotency table without tenant_id, accessed by webhook handler outside tenant context |
+| 2026-02-21 | org_subscriptions tenant-only RLS (no mid) | Subscriptions are org-level not BU-level, matching tenant_feature_overrides pattern |
+| 2026-02-21 | Stripe env vars optional in schema | Follow observabilitySchema pattern; BillingModule validates at runtime in production |
+| 2026-02-21 | TenantFeaturesResponse extended with nullable trial | Backward-compatible; existing consumers return trial: null until trial lifecycle is implemented |
 | 2026-01-23 | Type suffix naming convention (.unit.test.ts, etc.) | Enables Vitest filtering by test type and aligns with industry standards |
 | 2026-01-23 | mergeConfig pattern for Vitest configs | Per-package configs extend shared base while preserving package-specific settings |
 | 2026-01-23 | workspace projects in root vitest.config | Enables coverage aggregation across packages |
