@@ -53,7 +53,7 @@ export class FeaturesService {
       }
     }
 
-    return { tier, features };
+    return { tier, features, trial: null };
   }
 
   async updateTier(

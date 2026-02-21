@@ -82,6 +82,16 @@ export const adminSchema = z.object({
 });
 
 /**
+ * Stripe schema - optional env vars for Stripe billing integration.
+ * All fields are optional so existing dev environments work without Stripe keys.
+ * The BillingModule validates presence at runtime in production.
+ */
+export const stripeSchema = z.object({
+  STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
+});
+
+/**
  * Observability schema - optional env vars for error tracking and log aggregation.
  * All fields are optional so existing dev environments work without configuration.
  */
@@ -100,12 +110,13 @@ export const observabilitySchema = z.object({
 
 /**
  * API application environment schema.
- * Composes: infrastructure + mceAuth + mceJwt + session + observability
+ * Composes: infrastructure + mceAuth + mceJwt + session + stripe + observability
  */
 export const apiEnvSchema = infrastructureSchema
   .merge(mceAuthSchema)
   .merge(mceJwtSchema)
   .merge(sessionSchema)
+  .merge(stripeSchema)
   .merge(observabilitySchema)
   .extend({
     PORT: z.coerce.number().default(3000),

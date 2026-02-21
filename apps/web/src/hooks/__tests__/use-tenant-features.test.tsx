@@ -43,6 +43,7 @@ const mockFeatures: TenantFeatures = {
 const mockFeaturesResponse: TenantFeaturesResponse = {
   tier: "free",
   features: mockFeatures,
+  trial: null,
 };
 
 describe("useTenantFeatures", () => {

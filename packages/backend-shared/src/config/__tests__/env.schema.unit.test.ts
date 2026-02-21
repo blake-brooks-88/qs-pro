@@ -137,6 +137,35 @@ describe("env.schema", () => {
       expect(present.success).toBe(true);
     });
 
+    it("accepts env without Stripe keys (optional)", () => {
+      const result = apiEnvSchema.safeParse(makeApiEnv());
+      expect(result.success).toBe(true);
+    });
+
+    it("validates STRIPE_SECRET_KEY prefix when provided", () => {
+      const valid = apiEnvSchema.safeParse(
+        makeApiEnv({ STRIPE_SECRET_KEY: "sk_test_abc123" }),
+      );
+      expect(valid.success).toBe(true);
+
+      const invalid = apiEnvSchema.safeParse(
+        makeApiEnv({ STRIPE_SECRET_KEY: "pk_test_abc123" }),
+      );
+      expect(invalid.success).toBe(false);
+    });
+
+    it("validates STRIPE_WEBHOOK_SECRET prefix when provided", () => {
+      const valid = apiEnvSchema.safeParse(
+        makeApiEnv({ STRIPE_WEBHOOK_SECRET: "whsec_abc123" }),
+      );
+      expect(valid.success).toBe(true);
+
+      const invalid = apiEnvSchema.safeParse(
+        makeApiEnv({ STRIPE_WEBHOOK_SECRET: "wrong_abc123" }),
+      );
+      expect(invalid.success).toBe(false);
+    });
+
     it("exposes validateApiEnv() for NestJS ConfigModule usage", () => {
       const parsed = validateApiEnv(makeApiEnv());
       expect(parsed.PORT).toBe(3000);

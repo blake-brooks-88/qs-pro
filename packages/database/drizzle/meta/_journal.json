@@ -218,6 +218,13 @@
       "when": 1771695900000,
       "tag": "0030_rls_org_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1771696000000,
+      "tag": "0031_migrate_existing_tenants",
+      "breakpoints": true
     }
   ]
 }
