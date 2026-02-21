@@ -161,6 +161,10 @@ export const folders = pgTable(
       .notNull(),
     parentId: uuid("parent_id").references((): AnyPgColumn => folders.id),
     name: varchar("name").notNull(),
+    visibility: varchar("visibility")
+      .$type<"personal" | "shared">()
+      .default("personal")
+      .notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -168,6 +172,7 @@ export const folders = pgTable(
     tenantIdIdx: index("folders_tenant_id_idx").on(t.tenantId),
     userIdIdx: index("folders_user_id_idx").on(t.userId),
     parentIdIdx: index("folders_parent_id_idx").on(t.parentId),
+    visibilityIdx: index("folders_visibility_idx").on(t.visibility),
   }),
 );
 
@@ -192,6 +197,7 @@ export const savedQueries = pgTable(
     linkedAt: timestamp("linked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedByUserId: uuid("updated_by_user_id").references(() => users.id),
   },
   (t) => ({
     tenantIdIdx: index("saved_queries_tenant_id_idx").on(t.tenantId),

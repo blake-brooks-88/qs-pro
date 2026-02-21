@@ -1,6 +1,15 @@
-import type { folders } from '@qpp/database';
-
-export type Folder = typeof folders.$inferSelect;
+export interface Folder {
+  id: string;
+  tenantId: string;
+  mid: string;
+  userId: string;
+  parentId: string | null;
+  name: string;
+  visibility: 'personal' | 'shared';
+  creatorName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface CreateFolderParams {
   tenantId: string;
@@ -8,11 +17,13 @@ export interface CreateFolderParams {
   userId: string;
   name: string;
   parentId?: string | null;
+  visibility?: 'personal' | 'shared';
 }
 
 export interface UpdateFolderParams {
   name?: string;
   parentId?: string | null;
+  visibility?: 'personal' | 'shared';
 }
 
 export interface FoldersRepository {

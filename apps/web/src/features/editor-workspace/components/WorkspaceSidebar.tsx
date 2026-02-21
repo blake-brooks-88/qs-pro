@@ -5,10 +5,12 @@ import {
   Database,
   Folder as FolderIcon,
 } from "@solar-icons/react";
+import { UsersGroupRounded } from "@solar-icons/react";
 import Fuse from "fuse.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { QuotaCountBadge } from "@/components/QuotaGate";
+import { useFolders } from "@/features/editor-workspace/hooks/use-folders";
 import { useDataExtensionFields } from "@/features/editor-workspace/hooks/use-metadata";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import type {
@@ -195,6 +197,15 @@ export function WorkspaceSidebar({
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { tier } = useTier();
   const { data: usageData } = useRunUsage();
+  const { data: savedQueryFolders = [] } = useFolders();
+
+  const folderVisibilityMap = useMemo(() => {
+    const map = new Map<string, "personal" | "shared">();
+    for (const f of savedQueryFolders) {
+      map.set(f.id, f.visibility ?? "personal");
+    }
+    return map;
+  }, [savedQueryFolders]);
 
   const [expandedFolderIds, setExpandedFolderIds] = useState<
     Record<string, boolean>
@@ -323,14 +334,29 @@ export function WorkspaceSidebar({
 
     return fuse
       .search(searchQuery)
-      .map((result) => ({
-        id: result.item.id,
-        name: result.item.name,
-        type: "query" as const,
-        path: getFolderPath(folders, result.item.folderId),
-      }))
+      .map((result) => {
+        const folderId = result.item.folderId;
+        const section = folderId
+          ? (folderVisibilityMap.get(folderId) ?? "personal")
+          : "personal";
+        return {
+          id: result.item.id,
+          name: result.item.name,
+          type: "query" as const,
+          path: getFolderPath(savedQueryFolders, folderId),
+          section,
+        };
+      })
       .slice(0, 50);
-  }, [activeView, searchQuery, folders, dataExtensions, savedQueries]);
+  }, [
+    activeView,
+    searchQuery,
+    folders,
+    dataExtensions,
+    savedQueries,
+    savedQueryFolders,
+    folderVisibilityMap,
+  ]);
 
   const handleSelectResult = (id: string, type: "de" | "query" | "folder") => {
     if (!focusedItemId) {
@@ -619,6 +645,12 @@ export function WorkspaceSidebar({
                       <span className="font-medium truncate">
                         {result.name}
                       </span>
+                      {"section" in result && result.section === "shared" && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-muted-foreground/60 uppercase tracking-wider shrink-0">
+                          <UsersGroupRounded size={10} />
+                          Shared
+                        </span>
+                      )}
                     </div>
                     {result.path ? (
                       <span className="text-xs opacity-70 text-muted-foreground truncate pl-5">

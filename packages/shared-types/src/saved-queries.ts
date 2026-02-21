@@ -11,6 +11,7 @@ export const UpdateSavedQuerySchema = z.object({
   name: z.string().min(1).max(255).optional(),
   sqlText: z.string().min(1).max(100000).optional(),
   folderId: z.string().uuid().nullable().optional(),
+  expectedHash: z.string().optional(),
 });
 
 // Response schema (full query with SQL text)
@@ -23,6 +24,8 @@ export const SavedQueryResponseSchema = z.object({
   linkedQaCustomerKey: z.string().nullable(),
   linkedQaName: z.string().nullable(),
   linkedAt: z.string().datetime().nullable(),
+  latestVersionHash: z.string().nullable().optional(),
+  updatedByUserName: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -35,6 +38,7 @@ export const SavedQueryListItemSchema = z.object({
   linkedQaCustomerKey: z.string().nullable(),
   linkedQaName: z.string().nullable(),
   linkedAt: z.string().datetime().nullable(),
+  updatedByUserName: z.string().nullable().optional(),
   updatedAt: z.string().datetime(),
 });
 

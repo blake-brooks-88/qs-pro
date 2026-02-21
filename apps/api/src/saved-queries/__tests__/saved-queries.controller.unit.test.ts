@@ -56,6 +56,8 @@ describe('SavedQueriesController', () => {
         linkedQaCustomerKey: null,
         linkedQaName: null,
         linkedAt: null,
+        latestVersionHash: null,
+        updatedByUserName: null,
         createdAt: now,
         updatedAt: now,
       });
@@ -83,12 +85,14 @@ describe('SavedQueriesController', () => {
         linkedQaCustomerKey: null,
         linkedQaName: null,
         linkedAt: null,
+        latestVersionHash: null,
+        updatedByUserName: null,
       });
     });
   });
 
   describe('GET findAll()', () => {
-    it('returns list items mapped to ISO strings', async () => {
+    it('returns list items mapped to ISO strings with updatedByUserName', async () => {
       service.findAllListItems.mockResolvedValue([
         {
           id: '550e8400-e29b-41d4-a716-446655440000',
@@ -98,6 +102,7 @@ describe('SavedQueriesController', () => {
           linkedQaCustomerKey: null,
           linkedQaName: null,
           linkedAt: null,
+          updatedByUserName: 'Jane Doe',
         },
       ]);
 
@@ -117,6 +122,7 @@ describe('SavedQueriesController', () => {
           linkedQaCustomerKey: null,
           linkedQaName: null,
           linkedAt: null,
+          updatedByUserName: 'Jane Doe',
         },
       ]);
     });
@@ -138,7 +144,7 @@ describe('SavedQueriesController', () => {
   });
 
   describe('GET findById()', () => {
-    it('delegates to service.findById() and maps response', async () => {
+    it('delegates to service.findById() and maps response with latestVersionHash', async () => {
       const createdAt = new Date('2026-02-14T12:00:00.000Z');
       const updatedAt = new Date('2026-02-14T13:00:00.000Z');
       service.findById.mockResolvedValue({
@@ -150,6 +156,8 @@ describe('SavedQueriesController', () => {
         linkedQaCustomerKey: null,
         linkedQaName: null,
         linkedAt: null,
+        latestVersionHash: 'abc123hash',
+        updatedByUserName: 'John Smith',
         createdAt,
         updatedAt,
       });
@@ -176,6 +184,8 @@ describe('SavedQueriesController', () => {
         linkedQaCustomerKey: null,
         linkedQaName: null,
         linkedAt: null,
+        latestVersionHash: 'abc123hash',
+        updatedByUserName: 'John Smith',
       });
     });
   });
@@ -192,6 +202,8 @@ describe('SavedQueriesController', () => {
         linkedQaCustomerKey: null,
         linkedQaName: null,
         linkedAt: null,
+        latestVersionHash: 'def456hash',
+        updatedByUserName: 'Jane Doe',
         createdAt: now,
         updatedAt: now,
       });
@@ -210,6 +222,8 @@ describe('SavedQueriesController', () => {
         { name: 'Renamed' },
       );
       expect(result.name).toBe('Renamed');
+      expect(result.latestVersionHash).toBe('def456hash');
+      expect(result.updatedByUserName).toBe('Jane Doe');
     });
   });
 

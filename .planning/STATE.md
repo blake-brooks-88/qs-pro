@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 13 Query Formatting COMPLETE — SQL formatting via toolbar button and Shift+Alt+F with T-SQL dialect.
+**Current focus:** Phase 18 Shared Query Workspaces COMPLETE — all 7 plans delivered (schema, backend, frontend sidebar, stale detection UX, comprehensive tests, UX audit gap closure, SC6 Enterprise tier gating).
 
 ## Current Milestone
 
 **Milestone:** v1.0 Launch (Full Phase 1)
-**Status:** Ready to plan
-**Progress:** [██████████] 98%
+**Status:** Milestone complete
+**Progress:** [██████████] 100%
 
 ## Phase Status
 
@@ -48,6 +48,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
+| 18 | Shared Query Workspaces | ✓ Complete | 7/7 | 100% |
 
 ## Phase 1 Completion Summary
 
@@ -85,6 +86,16 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-20 | Link/publish/drift/blast gated by teamCollaboration (Enterprise-only) | Overrides prior CONTEXT.md decision; ROADMAP tier table (SC6) is authoritative for tier boundaries |
+| 2026-02-20 | Dual-gate controller pattern for query-activities | requireDeployFeature for create/list/detail (Pro), requireTeamCollaboration for link/unlink/publish/drift/blast (Enterprise) |
+| 2026-02-20 | Publish button requires shared folder + linked status | Publish only shown for queries both linked AND in shared folders; personal linked queries cannot publish |
+| 2026-02-20 | Stale detection uses useRef for hash tracking | Avoids re-renders; hash only read during save, not during render |
+| 2026-02-20 | executeSave(forceOverwrite) pattern for stale resolution | Single function handles normal and force-overwrite saves; 409 errors show dialog instead of generic error |
+| 2026-02-20 | Link option hidden entirely for personal queries | Per locked decision: not disabled, not shown — users discover shared-folder requirement organically |
+| 2026-02-20 | isActiveQueryInSharedFolder derived from folder visibility map | EditorWorkspace computes shared status for toolbar link button gating via useFolders() + savedQueries |
+| 2026-02-20 | USER_REPOSITORY injection in SavedQueriesModule | Needed for updatedByUserName resolution; follows existing repository injection pattern |
+| 2026-02-20 | VALIDATION_ERROR for ownership checks (not FORBIDDEN) | FORBIDDEN error code doesn't exist; VALIDATION_ERROR (400) is consistent with business rule violations |
+| 2026-02-20 | Custom Folder interface (not Drizzle $inferSelect) | Enables creatorName from LEFT JOIN to be part of the type without Drizzle schema changes |
 | 2026-01-23 | Type suffix naming convention (.unit.test.ts, etc.) | Enables Vitest filtering by test type and aligns with industry standards |
 | 2026-01-23 | mergeConfig pattern for Vitest configs | Per-package configs extend shared base while preserving package-specific settings |
 | 2026-01-23 | workspace projects in root vitest.config | Enables coverage aggregation across packages |
@@ -333,6 +344,12 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 2026-02-17 | functionCase preserve, dataTypeCase upper | Preserve user function casing (DATEADD/dateadd); uppercase data types for keyword consistency |
 | 2026-02-17 | Trailing commas accepted (commaPosition removed in v15.x) | Leading commas impossible without fragile post-processing; accept sql-formatter default |
 | 2026-02-17 | onFormat removed from EditorWorkspaceProps | Format is self-contained via useFormatQuery hook; no external prop needed |
+| 2026-02-20 | z.input for CreateFolderDto with .default() | z.infer makes visibility required after .default(); z.input lets callers omit it (default applied server-side) |
+| 2026-02-20 | Conditional RLS: visibility=shared OR user_id match | Personal folders user-scoped, shared folders BU-scoped (tenant+mid); replaces folders_user_isolation |
+| 2026-02-20 | drizzle-kit --custom reserved for RLS-only DDL | Column/index DDL via db:generate; RLS policy DDL via --custom (drizzle-kit cannot generate RLS) |
+| 2026-02-20 | RLS prevents cross-user personal folder visibility | User B gets RESOURCE_NOT_FOUND (not VALIDATION_ERROR) when attempting to share User A's personal folder |
+| 2026-02-20 | Deploy gating tests use HTTP-level assertions | Full controller+guard pipeline via supertest rather than service-level to verify complete feature gate chain |
+| 2026-02-20 | useRef hook tests require explicit rerender() | Ref mutations don't trigger re-renders; must call rerender() after act() to observe updated values |
 
 ## Roadmap Evolution
 
@@ -359,27 +376,31 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Context for Next Session
 
-**Last action:** Phase 13 Plan 01 COMPLETE — SQL formatting utility, hook, editor wiring, and tests
-**Next step:** Phase 13 Query Formatting COMPLETE (1/1 plans). Proceed to Phase 14 (Monetization) or next priority.
+**Last action:** Phase 18 Plan 05 COMPLETE — Comprehensive test coverage for shared query workspaces
+**Next step:** Phase 18 complete. Ready for next milestone phase.
 
-**Phase 13 Plan 01 COMPLETE (2026-02-17):**
+**Phase 18 Plan 05 COMPLETE (2025-02-20):**
 
-- formatSql() pure utility wrapping sql-formatter v15.7.2 with T-SQL dialect
-- useFormatQuery() hook with empty/error toast handling and store-driven content updates
-- Shift+Alt+F keyboard shortcut registered via getter pattern in Monaco keybindings
-- Format button in toolbar wired to hook's handleFormat
-- onFormat removed from EditorWorkspaceProps (format now self-contained)
-- 19 unit tests for formatSql (keyword uppercasing, identifier preservation, MCE edge cases, idempotency)
-- 6 integration tests for useFormatQuery (happy path, empty editor, whitespace, null tab, error, raw content)
-- All 2190 web tests pass, zero regressions
+- 71 new test cases across 7 files
+- Backend: 17 shared folder integration tests (feature gating, RLS, CRUD, creatorName)
+- Backend: 8 stale detection integration tests (hash match/mismatch, 409, updatedByUserName, latestVersionHash)
+- Backend: 17 deploy gating integration tests (free blocked, pro/enterprise succeed for link/publish/drift/blast)
+- Frontend: 9 SharedQuerySection tests (Enterprise badge, locked teaser, folder tree, context menus, downgrade)
+- Frontend: 7 StaleWarningDialog tests + 6 ShareConfirmationDialog tests
+- Frontend: 7 useStaleDetection hook tests (ref-based hash tracking, callback stability)
+- All 2325 web tests pass, all backend tests pass
+- Phase 18 fully complete: schema, backend, frontend, UX, tests
 
-**Phase 12 Plan 03 COMPLETE (2026-02-17):**
+**Phase 18 Plan 01 COMPLETE (2025-02-20):**
 
-- SessionGuard test suite at 9 tests: timeout rejection, touch, sessionExpiredContext, delete on expiry, within-window, legacy graceful degradation, no-touch-on-expiry
-- Auth controller session lifecycle tests (8 new): regenerate on all 3 login paths, createdAt on all 3 login paths, Cache-Control: no-store on logout, ok:true on logout
-- Plan 01 already expanded SessionGuard tests from 4 to 9; Plan 03 added touch assertion to user decoration test
-- All 348 backend-shared + 404 API tests pass, full typecheck clean
-- Phase 12 Security Baseline now COMPLETE (3/3 plans)
+- Drizzle schema: visibility column on folders (personal/shared), updatedByUserId on savedQueries
+- Migration 0029: auto-generated for columns + visibility index
+- Migration 0030: custom RLS policy replacing folders_user_isolation with conditional folders_visibility_policy
+- teamCollaboration feature key added to Enterprise tier
+- FolderVisibilitySchema and updated folder request/response types (visibility, userId, creatorName)
+- Saved-query schemas: expectedHash, latestVersionHash, updatedByUserName for stale detection
+- STALE_CONTENT error code: shared-types + backend-shared (HTTP 409, terminal, RFC 9457 title)
+- Downstream propagation: API folders controller/service/repository updated for visibility
 
 **Phase 12 Plan 01 COMPLETE (2026-02-16):**
 
@@ -1036,9 +1057,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-17T21:52:12Z
-**Stopped at:** Completed 13-01-PLAN.md
-**Resume file:** .planning/phases/13-query-formatting/13-01-SUMMARY.md
+**Last session:** 2026-02-20T23:44:47.168Z
+**Stopped at:** Completed 18-06-PLAN.md
+**Resume file:** None
 
 ## Blockers
 

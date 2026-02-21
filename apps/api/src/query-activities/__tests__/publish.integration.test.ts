@@ -207,8 +207,8 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
 
     const tenantResult = await sqlClient`
       INSERT INTO tenants (eid, tssd, subscription_tier)
-      VALUES (${TEST_EID}, ${TEST_TSSD}, 'pro')
-      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}, subscription_tier = 'pro'
+      VALUES (${TEST_EID}, ${TEST_TSSD}, 'enterprise')
+      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}, subscription_tier = 'enterprise'
       RETURNING id
     `;
     const tenantRow = tenantResult[0];
@@ -260,7 +260,7 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('pro');
+    await setTenantTier('enterprise');
 
     for (const id of [...createdSavedQueryIds]) {
       try {

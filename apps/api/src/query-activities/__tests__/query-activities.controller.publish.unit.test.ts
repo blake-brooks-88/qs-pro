@@ -25,9 +25,10 @@ function createServiceStub() {
 function createFeaturesServiceStub() {
   return {
     getTenantFeatures: vi.fn().mockResolvedValue({
-      tier: 'pro',
+      tier: 'enterprise',
       features: {
         deployToAutomation: true,
+        teamCollaboration: true,
         runToTargetDE: true,
         basicLinting: true,
         syntaxHighlighting: true,
@@ -45,21 +46,21 @@ function createFeaturesServiceStub() {
   };
 }
 
-function enableDeploy(
+function enableTeamCollab(
+  featuresService: ReturnType<typeof createFeaturesServiceStub>,
+) {
+  featuresService.getTenantFeatures.mockResolvedValue({
+    tier: 'enterprise',
+    features: { deployToAutomation: true, teamCollaboration: true },
+  });
+}
+
+function disableTeamCollab(
   featuresService: ReturnType<typeof createFeaturesServiceStub>,
 ) {
   featuresService.getTenantFeatures.mockResolvedValue({
     tier: 'pro',
-    features: { deployToAutomation: true },
-  });
-}
-
-function disableDeploy(
-  featuresService: ReturnType<typeof createFeaturesServiceStub>,
-) {
-  featuresService.getTenantFeatures.mockResolvedValue({
-    tier: 'free',
-    features: { deployToAutomation: false },
+    features: { deployToAutomation: true, teamCollaboration: false },
   });
 }
 
@@ -94,8 +95,8 @@ describe('QueryActivitiesController (publish)', () => {
   describe('POST publish/:savedQueryId (publishQuery)', () => {
     const mockUser = createMockUserSession() as UserSession;
 
-    it('delegates to service.publish() with correct args when body is valid and feature enabled', async () => {
-      enableDeploy(featuresService);
+    it('delegates to service.publish() with correct args when body is valid and teamCollaboration enabled', async () => {
+      enableTeamCollab(featuresService);
       const body = {
         versionId: '550e8400-e29b-41d4-a716-446655440000',
       };
@@ -120,8 +121,8 @@ describe('QueryActivitiesController (publish)', () => {
       expect(result).toEqual(mockResponse);
     });
 
-    it('throws FEATURE_NOT_ENABLED when deploy feature is disabled', async () => {
-      disableDeploy(featuresService);
+    it('throws FEATURE_NOT_ENABLED when teamCollaboration is disabled', async () => {
+      disableTeamCollab(featuresService);
       const body = {
         versionId: '550e8400-e29b-41d4-a716-446655440000',
       };
@@ -134,7 +135,7 @@ describe('QueryActivitiesController (publish)', () => {
     });
 
     it('returns the service response on success', async () => {
-      enableDeploy(featuresService);
+      enableTeamCollab(featuresService);
       const body = {
         versionId: '550e8400-e29b-41d4-a716-446655440000',
       };
@@ -156,8 +157,8 @@ describe('QueryActivitiesController (publish)', () => {
   describe('GET drift/:savedQueryId (checkDrift)', () => {
     const mockUser = createMockUserSession() as UserSession;
 
-    it('delegates to service.checkDrift() with correct args when feature enabled', async () => {
-      enableDeploy(featuresService);
+    it('delegates to service.checkDrift() with correct args when teamCollaboration enabled', async () => {
+      enableTeamCollab(featuresService);
       const mockResponse = {
         hasDrift: true,
         localSql: 'SELECT 1',
@@ -178,8 +179,8 @@ describe('QueryActivitiesController (publish)', () => {
       expect(result).toEqual(mockResponse);
     });
 
-    it('throws FEATURE_NOT_ENABLED when deploy feature is disabled', async () => {
-      disableDeploy(featuresService);
+    it('throws FEATURE_NOT_ENABLED when teamCollaboration is disabled', async () => {
+      disableTeamCollab(featuresService);
 
       await expect(
         controller.checkDrift(mockUser, 'sq-1'),
@@ -189,7 +190,7 @@ describe('QueryActivitiesController (publish)', () => {
     });
 
     it('returns the service response on success', async () => {
-      enableDeploy(featuresService);
+      enableTeamCollab(featuresService);
       const expected = {
         hasDrift: false,
         localSql: 'SELECT Name FROM [Sub]',
@@ -208,8 +209,8 @@ describe('QueryActivitiesController (publish)', () => {
   describe('GET blast-radius/:savedQueryId (getBlastRadius)', () => {
     const mockUser = createMockUserSession() as UserSession;
 
-    it('delegates to service.getBlastRadius() with correct args when feature enabled', async () => {
-      enableDeploy(featuresService);
+    it('delegates to service.getBlastRadius() with correct args when teamCollaboration enabled', async () => {
+      enableTeamCollab(featuresService);
       const mockResponse = {
         automations: [
           {
@@ -234,8 +235,8 @@ describe('QueryActivitiesController (publish)', () => {
       expect(result).toEqual(mockResponse);
     });
 
-    it('throws FEATURE_NOT_ENABLED when deploy feature is disabled', async () => {
-      disableDeploy(featuresService);
+    it('throws FEATURE_NOT_ENABLED when teamCollaboration is disabled', async () => {
+      disableTeamCollab(featuresService);
 
       await expect(
         controller.getBlastRadius(mockUser, 'sq-1'),
@@ -245,7 +246,7 @@ describe('QueryActivitiesController (publish)', () => {
     });
 
     it('returns the service response on success', async () => {
-      enableDeploy(featuresService);
+      enableTeamCollab(featuresService);
       const expected = {
         automations: [],
         totalCount: 0,

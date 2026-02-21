@@ -25,8 +25,8 @@ function createServiceStub() {
 function createFeaturesServiceStub() {
   return {
     getTenantFeatures: vi.fn().mockResolvedValue({
-      tier: 'pro',
-      features: { deployToAutomation: true },
+      tier: 'enterprise',
+      features: { deployToAutomation: true, teamCollaboration: true },
     }),
   };
 }

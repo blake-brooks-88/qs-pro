@@ -35,6 +35,7 @@ const TERMINAL_CODES = new Set<ErrorCode>([
   ErrorCode.LINK_CONFLICT,
   ErrorCode.VALIDATION_ERROR,
   ErrorCode.FEATURE_NOT_ENABLED,
+  ErrorCode.STALE_CONTENT,
 
   // Query Activity errors
   ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME,
@@ -157,6 +158,8 @@ export function getHttpStatus(code: ErrorCode): number {
       return 409;
     case ErrorCode.FEATURE_NOT_ENABLED:
       return 403;
+    case ErrorCode.STALE_CONTENT:
+      return 409;
 
     // Query Activity errors
     case ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME:
@@ -202,6 +205,7 @@ export function getErrorTitle(code: ErrorCode): string {
     [ErrorCode.LINK_CONFLICT]: "Link Conflict",
     [ErrorCode.VALIDATION_ERROR]: "Validation Error",
     [ErrorCode.FEATURE_NOT_ENABLED]: "Feature Not Enabled",
+    [ErrorCode.STALE_CONTENT]: "Stale Content",
     [ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME]: "Duplicate Query Activity Name",
     [ErrorCode.DUPLICATE_CUSTOMER_KEY]: "Duplicate Customer Key",
     [ErrorCode.SHARED_DE_ACCESS_DENIED]: "Shared Data Extension Access Denied",
