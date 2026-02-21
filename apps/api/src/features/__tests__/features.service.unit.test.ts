@@ -82,6 +82,7 @@ describe('FeaturesService', () => {
         executionHistory: false,
         versionHistory: false,
       },
+      trial: null,
     });
   });
 
@@ -121,6 +122,7 @@ describe('FeaturesService', () => {
         executionHistory: true,
         versionHistory: true,
       },
+      trial: null,
     });
   });
 
@@ -170,6 +172,7 @@ describe('FeaturesService', () => {
         executionHistory: false,
         versionHistory: false,
       },
+      trial: null,
     });
   });
 
@@ -220,6 +223,7 @@ describe('FeaturesService', () => {
         executionHistory: true,
         versionHistory: true,
       },
+      trial: null,
     });
   });
 
@@ -258,6 +262,7 @@ describe('FeaturesService', () => {
         executionHistory: true,
         versionHistory: true,
       },
+      trial: null,
     });
   });
 

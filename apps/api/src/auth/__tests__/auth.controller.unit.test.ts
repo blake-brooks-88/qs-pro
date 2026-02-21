@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuditService } from '../../audit/audit.service';
 import type { UserSession } from '../../common/decorators/current-user.decorator';
+import { TrialService } from '../../trial/trial.service';
 import { AuthController } from '../auth.controller';
 
 type SecureSession = {
@@ -96,16 +97,24 @@ function decodeOAuthState(state: string): OAuthStatePayload {
   return JSON.parse(json) as OAuthStatePayload;
 }
 
+function createMockTrialService() {
+  return {
+    activateTrial: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: ReturnType<typeof createMockAuthService>;
   let configService: ReturnType<typeof createMockConfigService>;
+  let trialService: ReturnType<typeof createMockTrialService>;
 
   beforeEach(async () => {
     resetFactories();
 
     authService = createMockAuthService();
     configService = createMockConfigService();
+    trialService = createMockTrialService();
     configService.get.mockReturnValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -114,6 +123,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: ConfigService, useValue: configService },
         { provide: AuditService, useValue: { log: vi.fn() } },
+        { provide: TrialService, useValue: trialService },
       ],
     })
       .overrideGuard(SessionGuard)
@@ -199,6 +209,10 @@ describe('AuthController', () => {
       expect(session.set).toHaveBeenCalledWith('userId', mockUser.id);
       expect(session.set).toHaveBeenCalledWith('tenantId', mockTenant.id);
       expect(session.set).toHaveBeenCalledWith('mid', mockMid);
+      expect(trialService.activateTrial).toHaveBeenCalledWith(mockTenant.id, {
+        actorId: mockUser.id,
+        mid: mockMid,
+      });
     });
 
     it('throws UnauthorizedException when JWT is missing', async () => {
@@ -451,6 +465,10 @@ describe('AuthController', () => {
       expect(session.set).toHaveBeenCalledWith('userId', mockUser.id);
       expect(session.set).toHaveBeenCalledWith('tenantId', mockTenant.id);
       expect(session.set).toHaveBeenCalledWith('mid', mockMid);
+      expect(trialService.activateTrial).toHaveBeenCalledWith(mockTenant.id, {
+        actorId: mockUser.id,
+        mid: mockMid,
+      });
       expect(result).toEqual({ url: '/', statusCode: 302 });
     });
 
@@ -734,6 +752,10 @@ describe('AuthController', () => {
       expect(session.set).toHaveBeenCalledWith('userId', mockUser.id);
       expect(session.set).toHaveBeenCalledWith('tenantId', mockTenant.id);
       expect(session.set).toHaveBeenCalledWith('mid', mockMid);
+      expect(trialService.activateTrial).toHaveBeenCalledWith(mockTenant.id, {
+        actorId: mockUser.id,
+        mid: mockMid,
+      });
       expect(result).toEqual({ url: '/', statusCode: 302 });
     });
 

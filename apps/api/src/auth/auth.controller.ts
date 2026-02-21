@@ -21,6 +21,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AuditService } from '../audit/audit.service';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { TrialService } from '../trial/trial.service';
 
 type SecureSession = {
   get(key: string): unknown;
@@ -51,6 +52,7 @@ export class AuthController {
     private authService: AuthService,
     private configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly trialService: TrialService,
   ) {}
 
   private clearAuthSession(session: SecureSession | undefined): void {
@@ -104,6 +106,11 @@ export class AuthController {
 
     try {
       const { user, tenant, mid } = await this.authService.handleJwtLogin(jwt);
+
+      await this.trialService.activateTrial(tenant.id, {
+        actorId: user.id,
+        mid,
+      });
 
       req.session.regenerate();
       this.ensureCsrfToken(req.session);
@@ -240,6 +247,12 @@ export class AuthController {
           tenant,
           mid: resolvedMid,
         } = await this.authService.handleJwtLogin(jwt);
+
+        await this.trialService.activateTrial(tenant.id, {
+          actorId: user.id,
+          mid: resolvedMid,
+        });
+
         session.regenerate();
         this.ensureCsrfToken(session);
         session.set('userId', user.id);
@@ -341,6 +354,11 @@ export class AuthController {
     this.logger.log(
       `OAuth callback AuthService completed durationMs=${Date.now() - authServiceStartedAt}`,
     );
+
+    await this.trialService.activateTrial(result.tenant.id, {
+      actorId: result.user.id,
+      mid: result.mid,
+    });
 
     req.session.regenerate();
     this.ensureCsrfToken(req.session);
