@@ -7,13 +7,15 @@
  * - Session and CSRF guards overridden for HTTP testing
  * - MCE SOAP/REST services mocked (external dependencies)
  *
- * Purpose: Confirm that deployToAutomation continues to gate link/publish/drift/blast
- * endpoints. Phase 18 introduced teamCollaboration (Enterprise-only) for shared folders.
- * This test file proves that link/publish/drift/blast is gated by deployToAutomation
- * (Pro+Enterprise), NOT teamCollaboration (Enterprise-only).
+ * Purpose: Confirm the dual-gate model for query-activity endpoints.
+ * - POST /query-activities (create), GET /query-activities (list), GET /:customerKey (detail)
+ *   are gated by deployToAutomation (Pro+Enterprise).
+ * - link/unlink/publish/drift/blast-radius are gated by teamCollaboration (Enterprise-only).
  *
- * Key assertion: Pro-tier users CAN link/publish/drift/blast because they have
- * deployToAutomation. The gating is deployToAutomation, NOT teamCollaboration.
+ * Key assertions:
+ * - Free-tier: blocked from ALL endpoints (neither feature enabled)
+ * - Pro-tier: CAN create/list/detail, CANNOT link/publish/drift/blast (no teamCollaboration)
+ * - Enterprise-tier: CAN do everything (both features enabled)
  */
 import {
   FastifyAdapter,
@@ -287,7 +289,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
   });
 
-  describe('pro-tier (deployToAutomation=true, teamCollaboration=false) succeeds', () => {
+  describe('pro-tier (deployToAutomation=true, teamCollaboration=false)', () => {
     it('GET /query-activities succeeds for pro-tier', async () => {
       await setTenantTier('pro');
 
@@ -327,117 +329,59 @@ describe('QueryActivities deploy gating (integration)', () => {
       expect(res.status).toBe(201);
     });
 
-    it('POST /query-activities/link/:savedQueryId succeeds for pro-tier', async () => {
+    it('POST /query-activities/link/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
       await setTenantTier('pro');
-
-      const query = await savedQueriesService.create(
-        testTenantId,
-        TEST_MID,
-        testUserId,
-        { name: 'Pro Link Query', sqlText: 'SELECT 1' },
-      );
-      createdSavedQueryIds.push(query.id);
-
-      mockQDService.retrieveDetail.mockResolvedValue({
-        objectId: 'qa-obj-pro-link',
-        customerKey: 'qa-key-pro-link',
-        name: 'Pro Link QA',
-        queryText: 'SELECT 1',
-      });
 
       const res = await request(app.getHttpServer())
-        .post(`/query-activities/link/${query.id}`)
-        .send({ qaCustomerKey: 'qa-key-pro-link' });
+        .post(`/query-activities/link/${FAKE_UUID}`)
+        .send({ qaCustomerKey: 'qa-key-1' });
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FEATURE_NOT_ENABLED');
     });
 
-    it('DELETE /query-activities/link/:savedQueryId succeeds for pro-tier', async () => {
+    it('DELETE /query-activities/link/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
       await setTenantTier('pro');
-
-      const query = await savedQueriesService.create(
-        testTenantId,
-        TEST_MID,
-        testUserId,
-        { name: 'Pro Unlink Query', sqlText: 'SELECT 1' },
-      );
-      createdSavedQueryIds.push(query.id);
-
-      // Link it first
-      await savedQueriesService.linkToQA(
-        testTenantId,
-        TEST_MID,
-        testUserId,
-        query.id,
-        {
-          linkedQaObjectId: 'qa-obj-pro-unlink',
-          linkedQaCustomerKey: 'qa-key-pro-unlink',
-          linkedQaName: 'Pro Unlink QA',
-        },
-      );
 
       const res = await request(app.getHttpServer()).delete(
-        `/query-activities/link/${query.id}`,
+        `/query-activities/link/${FAKE_UUID}`,
       );
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FEATURE_NOT_ENABLED');
     });
 
-    it('POST /query-activities/publish/:savedQueryId succeeds for pro-tier (returns resource error, not gating error)', async () => {
+    it('POST /query-activities/publish/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
       await setTenantTier('pro');
-
-      const query = await savedQueriesService.create(
-        testTenantId,
-        TEST_MID,
-        testUserId,
-        { name: 'Pro Publish Query', sqlText: 'SELECT 1' },
-      );
-      createdSavedQueryIds.push(query.id);
 
       const res = await request(app.getHttpServer())
-        .post(`/query-activities/publish/${query.id}`)
-        .send({ versionId: 'ver-1' });
+        .post(`/query-activities/publish/${FAKE_UUID}`)
+        .send({ versionId: FAKE_UUID });
 
-      // Should pass feature gating (not 403) -- will fail with 404/500 for missing version, which is fine
-      expect(res.status).not.toBe(403);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FEATURE_NOT_ENABLED');
     });
 
-    it('GET /query-activities/drift/:savedQueryId succeeds for pro-tier (returns resource error, not gating error)', async () => {
+    it('GET /query-activities/drift/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
       await setTenantTier('pro');
 
-      const query = await savedQueriesService.create(
-        testTenantId,
-        TEST_MID,
-        testUserId,
-        { name: 'Pro Drift Query', sqlText: 'SELECT 1' },
-      );
-      createdSavedQueryIds.push(query.id);
-
       const res = await request(app.getHttpServer()).get(
-        `/query-activities/drift/${query.id}`,
+        `/query-activities/drift/${FAKE_UUID}`,
       );
 
-      // Should pass feature gating (not 403)
-      expect(res.status).not.toBe(403);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FEATURE_NOT_ENABLED');
     });
 
-    it('GET /query-activities/blast-radius/:savedQueryId succeeds for pro-tier (returns resource error, not gating error)', async () => {
+    it('GET /query-activities/blast-radius/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
       await setTenantTier('pro');
 
-      const query = await savedQueriesService.create(
-        testTenantId,
-        TEST_MID,
-        testUserId,
-        { name: 'Pro Blast Query', sqlText: 'SELECT 1' },
-      );
-      createdSavedQueryIds.push(query.id);
-
       const res = await request(app.getHttpServer()).get(
-        `/query-activities/blast-radius/${query.id}`,
+        `/query-activities/blast-radius/${FAKE_UUID}`,
       );
 
-      // Should pass feature gating (not 403)
-      expect(res.status).not.toBe(403);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FEATURE_NOT_ENABLED');
     });
   });
 
