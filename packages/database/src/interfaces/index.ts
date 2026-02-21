@@ -1,4 +1,11 @@
-import { credentials, tenantFeatureOverrides, tenants, users } from "../schema";
+import {
+  credentials,
+  orgSubscriptions,
+  stripeWebhookEvents,
+  tenantFeatureOverrides,
+  tenants,
+  users,
+} from "../schema";
 
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
@@ -12,6 +19,12 @@ export type NewCredential = typeof credentials.$inferInsert;
 export type TenantFeatureOverride = typeof tenantFeatureOverrides.$inferSelect;
 export type NewTenantFeatureOverride =
   typeof tenantFeatureOverrides.$inferInsert;
+
+export type OrgSubscription = typeof orgSubscriptions.$inferSelect;
+export type NewOrgSubscription = typeof orgSubscriptions.$inferInsert;
+
+export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
+export type NewStripeWebhookEvent = typeof stripeWebhookEvents.$inferInsert;
 
 export interface ITenantRepository {
   findById(id: string): Promise<Tenant | undefined>;
@@ -38,4 +51,27 @@ export interface ICredentialsRepository {
 
 export interface IFeatureOverrideRepository {
   findByTenantId(tenantId: string): Promise<TenantFeatureOverride[]>;
+}
+
+export interface IOrgSubscriptionRepository {
+  findByTenantId(tenantId: string): Promise<OrgSubscription | undefined>;
+  findByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<OrgSubscription | undefined>;
+  upsert(subscription: NewOrgSubscription): Promise<OrgSubscription>;
+  insertIfNotExists(subscription: NewOrgSubscription): Promise<boolean>;
+  updateTierByTenantId(
+    tenantId: string,
+    tier: "free" | "pro" | "enterprise",
+  ): Promise<void>;
+  updateFromWebhook(
+    tenantId: string,
+    data: Partial<OrgSubscription>,
+  ): Promise<void>;
+}
+
+export interface IStripeWebhookEventRepository {
+  markProcessing(eventId: string, eventType: string): Promise<boolean>;
+  markCompleted(eventId: string): Promise<void>;
+  markFailed(eventId: string, errorMessage: string): Promise<void>;
 }

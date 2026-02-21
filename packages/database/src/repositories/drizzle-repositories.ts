@@ -1,5 +1,5 @@
 import { ErrorCode } from "@qpp/shared-types";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { DatabaseError } from "../errors";
@@ -7,16 +7,27 @@ import {
   Credential,
   ICredentialsRepository,
   IFeatureOverrideRepository,
+  IOrgSubscriptionRepository,
+  IStripeWebhookEventRepository,
   ITenantRepository,
   IUserRepository,
   NewCredential,
+  NewOrgSubscription,
   NewTenant,
   NewUser,
+  OrgSubscription,
   Tenant,
   TenantFeatureOverride,
   User,
 } from "../interfaces";
-import { credentials, tenantFeatureOverrides, tenants, users } from "../schema";
+import {
+  credentials,
+  orgSubscriptions,
+  stripeWebhookEvents,
+  tenantFeatureOverrides,
+  tenants,
+  users,
+} from "../schema";
 
 export class DrizzleTenantRepository implements ITenantRepository {
   constructor(private db: PostgresJsDatabase) {}
@@ -173,5 +184,135 @@ export class DrizzleFeatureOverrideRepository implements IFeatureOverrideReposit
       .select()
       .from(tenantFeatureOverrides)
       .where(eq(tenantFeatureOverrides.tenantId, tenantId));
+  }
+}
+
+export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionRepository {
+  constructor(private db: PostgresJsDatabase) {}
+
+  async findByTenantId(tenantId: string): Promise<OrgSubscription | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(orgSubscriptions)
+      .where(eq(orgSubscriptions.tenantId, tenantId));
+    return result;
+  }
+
+  async findByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<OrgSubscription | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(orgSubscriptions)
+      .where(eq(orgSubscriptions.stripeCustomerId, stripeCustomerId));
+    return result;
+  }
+
+  async upsert(subscription: NewOrgSubscription): Promise<OrgSubscription> {
+    const [result] = await this.db
+      .insert(orgSubscriptions)
+      .values(subscription)
+      .onConflictDoUpdate({
+        target: orgSubscriptions.tenantId,
+        set: {
+          tier: subscription.tier,
+          seatLimit: subscription.seatLimit,
+          stripeCustomerId: subscription.stripeCustomerId,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+          trialEndsAt: subscription.trialEndsAt,
+          currentPeriodEnds: subscription.currentPeriodEnds,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!result) {
+      throw new DatabaseError(
+        ErrorCode.DATABASE_ERROR,
+        "OrgSubscription upsert failed to return a result",
+        { operation: "upsertOrgSubscription" },
+      );
+    }
+    return result;
+  }
+
+  async insertIfNotExists(subscription: NewOrgSubscription): Promise<boolean> {
+    const result = await this.db
+      .insert(orgSubscriptions)
+      .values(subscription)
+      .onConflictDoNothing({ target: orgSubscriptions.tenantId })
+      .returning({ id: orgSubscriptions.id });
+    return result.length > 0;
+  }
+
+  async updateTierByTenantId(
+    tenantId: string,
+    tier: "free" | "pro" | "enterprise",
+  ): Promise<void> {
+    await this.db
+      .update(orgSubscriptions)
+      .set({ tier, updatedAt: new Date() })
+      .where(eq(orgSubscriptions.tenantId, tenantId));
+  }
+
+  async updateFromWebhook(
+    tenantId: string,
+    data: Partial<OrgSubscription>,
+  ): Promise<void> {
+    const {
+      id: _id,
+      tenantId: _tenantId,
+      createdAt: _createdAt,
+      ...updateData
+    } = data;
+    await this.db
+      .update(orgSubscriptions)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(orgSubscriptions.tenantId, tenantId));
+  }
+}
+
+const UNIQUE_VIOLATION = "23505";
+
+export class DrizzleStripeWebhookEventRepository implements IStripeWebhookEventRepository {
+  constructor(private db: PostgresJsDatabase) {}
+
+  async markProcessing(eventId: string, eventType: string): Promise<boolean> {
+    try {
+      await this.db.insert(stripeWebhookEvents).values({
+        id: eventId,
+        eventType,
+        status: "processing",
+      });
+      return true;
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error as { code: string }).code === UNIQUE_VIOLATION
+      ) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  async markCompleted(eventId: string): Promise<void> {
+    await this.db
+      .update(stripeWebhookEvents)
+      .set({
+        status: "completed",
+        completedAt: sql`NOW()`,
+      })
+      .where(eq(stripeWebhookEvents.id, eventId));
+  }
+
+  async markFailed(eventId: string, errorMessage: string): Promise<void> {
+    await this.db
+      .update(stripeWebhookEvents)
+      .set({
+        status: "failed",
+        errorMessage,
+      })
+      .where(eq(stripeWebhookEvents.id, eventId));
   }
 }
