@@ -160,6 +160,7 @@ export function EditorWorkspace({
   const { data: qaFolders = [] } = useQueryActivityFolders(eid);
   const publishMutation = usePublishQuery();
   const { enabled: isDeployFeatureEnabled } = useFeature("deployToAutomation");
+  const { enabled: isTeamCollabEnabled } = useFeature("teamCollaboration");
 
   // Zustand store - single source of truth for tabs
   const tabs = useTabsStore((state) => state.tabs);
@@ -682,10 +683,10 @@ export function EditorWorkspace({
                   handleOpenVersionHistory(queryId)
                 }
                 onLinkQuery={
-                  isDeployFeatureEnabled ? handleOpenLinkModal : undefined
+                  isTeamCollabEnabled ? handleOpenLinkModal : undefined
                 }
                 onUnlinkQuery={
-                  isDeployFeatureEnabled ? handleOpenUnlinkModal : undefined
+                  isTeamCollabEnabled ? handleOpenUnlinkModal : undefined
                 }
               />
             ) : null}
@@ -703,7 +704,7 @@ export function EditorWorkspace({
                   onRestore={handleVersionRestore}
                   onUpgradeClick={() => setIsUpgradeModalOpen(true)}
                   onPublishVersion={
-                    isDeployFeatureEnabled && safeActiveTab.linkedQaCustomerKey
+                    isTeamCollabEnabled && safeActiveTab.linkedQaCustomerKey
                       ? handleVersionPublish
                       : undefined
                   }
@@ -725,6 +726,7 @@ export function EditorWorkspace({
                     onCreateDE={handleCreateDE}
                     onOpenImport={() => setIsImportModalOpen(true)}
                     isDeployFeatureEnabled={isDeployFeatureEnabled}
+                    isTeamCollabEnabled={isTeamCollabEnabled}
                     onViewRunHistory={(queryId) => showHistoryForQuery(queryId)}
                     onOpenVersionHistory={() => handleOpenVersionHistory()}
                     onPublish={() => void handlePublishClick()}

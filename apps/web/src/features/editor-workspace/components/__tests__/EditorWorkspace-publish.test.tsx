@@ -34,6 +34,7 @@ const {
   mockPublishMutateAsync: vi.fn(),
   mockState: {
     deployFeatureEnabled: true,
+    teamCollabEnabled: true,
     publishIsPending: false,
     driftData: null as {
       hasDrift: boolean;
@@ -129,6 +130,9 @@ vi.mock("@/hooks/use-feature", () => ({
   useFeature: (key: string) => {
     if (key === "deployToAutomation") {
       return { enabled: mockState.deployFeatureEnabled, isLoading: false };
+    }
+    if (key === "teamCollaboration") {
+      return { enabled: mockState.teamCollabEnabled, isLoading: false };
     }
     return { enabled: true, isLoading: false };
   },
@@ -422,6 +426,7 @@ describe("EditorWorkspace - Publish Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockState.deployFeatureEnabled = true;
+    mockState.teamCollabEnabled = true;
     mockState.publishIsPending = false;
     mockState.driftData = null;
     mockDriftRefetch.mockResolvedValue({ data: { hasDrift: false } });
@@ -465,8 +470,8 @@ describe("EditorWorkspace - Publish Integration", () => {
       expect(screen.queryByText("Publish")).not.toBeInTheDocument();
     });
 
-    it("does NOT show publish button when deployToAutomation is disabled", async () => {
-      mockState.deployFeatureEnabled = false;
+    it("does NOT show publish button when teamCollaboration is disabled", async () => {
+      mockState.teamCollabEnabled = false;
       renderLinkedWorkspace();
 
       await waitFor(() => {

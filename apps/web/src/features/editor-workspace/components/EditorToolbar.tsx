@@ -40,6 +40,7 @@ export function EditorToolbar(props: {
   onCreateDE: () => void;
   onOpenImport: () => void;
   isDeployFeatureEnabled: boolean;
+  isTeamCollabEnabled?: boolean;
   onViewRunHistory: (queryId: string) => void;
   onOpenVersionHistory: () => void;
   onPublish: () => void;
@@ -58,6 +59,7 @@ export function EditorToolbar(props: {
     onCreateDE,
     onOpenImport,
     isDeployFeatureEnabled,
+    isTeamCollabEnabled = false,
     onViewRunHistory,
     onOpenVersionHistory,
     onPublish,
@@ -132,7 +134,7 @@ export function EditorToolbar(props: {
                 onClick={onOpenVersionHistory}
               />
 
-              {isDeployFeatureEnabled ? (
+              {isTeamCollabEnabled ? (
                 <>
                   <div className="h-4 w-px bg-border mx-1" />
                   {activeTab.linkedQaCustomerKey ? (

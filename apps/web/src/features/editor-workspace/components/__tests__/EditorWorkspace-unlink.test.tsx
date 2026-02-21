@@ -22,6 +22,7 @@ import { EditorWorkspace } from "../EditorWorkspace";
 const { mockState, mockUnlinkMutateAsync } = vi.hoisted(() => ({
   mockState: {
     deployFeatureEnabled: true,
+    teamCollabEnabled: true,
   },
   mockUnlinkMutateAsync: vi.fn(),
 }));
@@ -124,6 +125,9 @@ vi.mock("@/hooks/use-feature", () => ({
   useFeature: (key: string) => {
     if (key === "deployToAutomation") {
       return { enabled: mockState.deployFeatureEnabled, isLoading: false };
+    }
+    if (key === "teamCollaboration") {
+      return { enabled: mockState.teamCollabEnabled, isLoading: false };
     }
     return { enabled: true, isLoading: false };
   },
@@ -371,6 +375,7 @@ describe("EditorWorkspace - Unlink Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockState.deployFeatureEnabled = true;
+    mockState.teamCollabEnabled = true;
     mockUnlinkMutateAsync.mockResolvedValue({});
     useTabsStore.getState().reset();
     useActivityBarStore.setState({ activeView: "dataExtensions" });
@@ -407,8 +412,8 @@ describe("EditorWorkspace - Unlink Integration", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("hides unlink button when deploy feature is disabled", async () => {
-      mockState.deployFeatureEnabled = false;
+    it("hides unlink button when teamCollaboration is disabled", async () => {
+      mockState.teamCollabEnabled = false;
       renderLinkedWorkspace();
 
       await waitFor(() => {
