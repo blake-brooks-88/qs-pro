@@ -61,6 +61,14 @@ async function bootstrap() {
 
     await app.register(formBody);
 
+    const rawBodyModule = await import('fastify-raw-body');
+    await app.register(rawBodyModule.default, {
+      field: 'rawBody',
+      global: false,
+      encoding: 'utf8',
+      runFirst: true,
+    });
+
     const configService = app.get(ConfigService);
 
     const sessionSecret = configService.get('SESSION_SECRET', { infer: true });
@@ -86,6 +94,15 @@ async function bootstrap() {
         },
       },
       rls: true,
+    });
+
+    adapter.getInstance().addHook('onRoute', (routeOptions) => {
+      if (routeOptions.url === '/api/billing/webhook') {
+        routeOptions.config = {
+          ...(routeOptions.config as Record<string, unknown>),
+          rawBody: true,
+        };
+      }
     });
 
     adapter
