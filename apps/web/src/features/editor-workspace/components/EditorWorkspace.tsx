@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ActivityBar } from "@/components/ActivityBar";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
+import { buildPricingUrl, PRICING_PAGE_URL } from "@/config/urls";
 import { useBeforeUnloadDirtyTabs } from "@/features/editor-workspace/hooks/use-before-unload-dirty-tabs";
 import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
 import { useCreateDataExtensionFlow } from "@/features/editor-workspace/hooks/use-create-data-extension-flow";
@@ -101,6 +102,7 @@ export function EditorWorkspace({
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
   const [isTargetDEModalOpen, setIsTargetDEModalOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const upgradePricingUrl = eid ? buildPricingUrl(eid) : PRICING_PAGE_URL;
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkTargetQueryId, setLinkTargetQueryId] = useState<string | null>(
@@ -900,6 +902,7 @@ export function EditorWorkspace({
         <UpgradeModal
           isOpen={isUpgradeModalOpen}
           onClose={() => setIsUpgradeModalOpen(false)}
+          pricingUrl={upgradePricingUrl}
         />
 
         <VersionHistoryWarningDialog
