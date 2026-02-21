@@ -218,6 +218,10 @@ export class SavedQueriesService {
           }
         }
 
+        if (!features.teamCollaboration) {
+          await this.requireNotInSharedFolder(id);
+        }
+
         if (dto.sqlText && dto.expectedHash) {
           const latestVersion =
             await this.queryVersionsRepository.findLatestBySavedQueryId(id);
@@ -323,6 +327,10 @@ export class SavedQueriesService {
               reason: `Saved query not found: ${id}`,
             });
           }
+        }
+
+        if (!features.teamCollaboration) {
+          await this.requireNotInSharedFolder(id);
         }
 
         const deleted = await this.savedQueriesRepository.delete(id);
@@ -591,6 +599,19 @@ export class SavedQueriesService {
         };
       },
     );
+  }
+
+  private async requireNotInSharedFolder(queryId: string): Promise<void> {
+    const existing = await this.savedQueriesRepository.findById(queryId);
+    if (existing?.folderId) {
+      const folder = await this.foldersRepository.findById(existing.folderId);
+      if (folder?.visibility === 'shared') {
+        throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+          operation: 'mutate_shared_query',
+          reason: 'Shared query editing requires an Enterprise subscription',
+        });
+      }
+    }
   }
 
   private async linkToQAWithConflictCheck(

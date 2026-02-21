@@ -138,12 +138,7 @@ export function useSaveFlows(options: {
           error.response?.status === 409 &&
           (error.response.data as { code?: string })?.code === "STALE_CONTENT"
         ) {
-          const errorData = error.response.data as {
-            context?: { reason?: string };
-          };
-          setStaleConflict({
-            conflictingUserName: errorData.context?.reason ?? null,
-          });
+          setStaleConflict({ conflictingUserName: null });
           return;
         }
 

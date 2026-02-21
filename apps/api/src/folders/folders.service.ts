@@ -110,6 +110,10 @@ export class FoldersService {
           });
         }
 
+        if (existing.visibility === 'shared') {
+          await this.requireTeamCollaboration(tenantId);
+        }
+
         if (
           dto.visibility === 'shared' &&
           existing.visibility !== 'shared' &&
@@ -212,6 +216,18 @@ export class FoldersService {
       mid,
       userId,
       async () => {
+        const existing = await this.foldersRepository.findById(id);
+        if (!existing) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'delete_folder',
+            reason: `Folder not found: ${id}`,
+          });
+        }
+
+        if (existing.visibility === 'shared') {
+          await this.requireTeamCollaboration(tenantId);
+        }
+
         const hasChildren = await this.foldersRepository.hasChildren(id);
         if (hasChildren) {
           throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
