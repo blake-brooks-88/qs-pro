@@ -3,10 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { DevTierSelector } from "@/components/dev/DevTierSelector";
+import { TrialBanner } from "@/components/TrialBanner";
+import { TrialExpiredBanner } from "@/components/TrialExpiredBanner";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { buildPricingUrl, PRICING_PAGE_URL } from "@/config/urls";
 import { LaunchInstructionsPage } from "@/features/auth/launch-instructions-page";
 import { EditorWorkspacePage } from "@/features/editor-workspace/EditorWorkspacePage";
+import { useTrial } from "@/hooks/use-trial";
 import { getMe, loginWithJwt } from "@/services/auth";
 import { consumeEmbeddedJwt } from "@/services/embedded-jwt";
 import { useAuthStore } from "@/store/auth-store";
@@ -40,10 +44,16 @@ function getHttpData(error: unknown): unknown {
 
 function App() {
   const { isAuthenticated, setAuth, logout } = useAuthStore();
+  const tenant = useAuthStore((s) => s.tenant);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLaunchHelp, setShowLaunchHelp] = useState(false);
   const [oauthRedirectAttempted, setOauthRedirectAttempted] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const { showCountdown, isTrialExpired, daysRemaining } = useTrial();
+  const pricingUrl = tenant?.eid
+    ? buildPricingUrl(tenant.eid)
+    : PRICING_PAGE_URL;
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") {
       return false;
@@ -264,6 +274,29 @@ function App() {
       )}
     >
       <AppShell
+        topNotice={(() => {
+          if (bannerDismissed) {
+            return undefined;
+          }
+          if (showCountdown && daysRemaining !== null) {
+            return (
+              <TrialBanner
+                daysRemaining={daysRemaining}
+                pricingUrl={pricingUrl}
+                onDismiss={() => setBannerDismissed(true)}
+              />
+            );
+          }
+          if (isTrialExpired) {
+            return (
+              <TrialExpiredBanner
+                pricingUrl={pricingUrl}
+                onDismiss={() => setBannerDismissed(true)}
+              />
+            );
+          }
+          return undefined;
+        })()}
         brandingExtra={import.meta.env.DEV ? <DevTierSelector /> : undefined}
       >
         <EditorWorkspacePage />
