@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 18 Shared Query Workspaces COMPLETE — all 6 plans delivered (schema, backend, frontend sidebar, stale detection UX, comprehensive tests, UX audit gap closure).
+**Current focus:** Phase 18 Shared Query Workspaces COMPLETE — all 7 plans delivered (schema, backend, frontend sidebar, stale detection UX, comprehensive tests, UX audit gap closure, SC6 Enterprise tier gating).
 
 ## Current Milestone
 
@@ -48,7 +48,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
-| 18 | Shared Query Workspaces | ✓ Complete | 6/6 | 100% |
+| 18 | Shared Query Workspaces | ✓ Complete | 7/7 | 100% |
 
 ## Phase 1 Completion Summary
 
@@ -86,6 +86,8 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-20 | Link/publish/drift/blast gated by teamCollaboration (Enterprise-only) | Overrides prior CONTEXT.md decision; ROADMAP tier table (SC6) is authoritative for tier boundaries |
+| 2026-02-20 | Dual-gate controller pattern for query-activities | requireDeployFeature for create/list/detail (Pro), requireTeamCollaboration for link/unlink/publish/drift/blast (Enterprise) |
 | 2026-02-20 | Publish button requires shared folder + linked status | Publish only shown for queries both linked AND in shared folders; personal linked queries cannot publish |
 | 2026-02-20 | Stale detection uses useRef for hash tracking | Avoids re-renders; hash only read during save, not during render |
 | 2026-02-20 | executeSave(forceOverwrite) pattern for stale resolution | Single function handles normal and force-overwrite saves; 409 errors show dialog instead of generic error |
