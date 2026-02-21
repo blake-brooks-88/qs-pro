@@ -234,7 +234,7 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
     sqlClient = app.get<Sql>('SQL_CLIENT');
     savedQueriesService = app.get(SavedQueriesService);
 
-    testTenantId = await createTestTenant(TEST_EID, TEST_TSSD, 'pro');
+    testTenantId = await createTestTenant(TEST_EID, TEST_TSSD, 'enterprise');
     testUserId = await createTestUser(
       'sf-qa-unlink-int',
       testTenantId,
@@ -242,7 +242,11 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
       'QA Unlink Test User',
     );
 
-    testTenantId2 = await createTestTenant(TEST_EID_2, TEST_TSSD_2, 'pro');
+    testTenantId2 = await createTestTenant(
+      TEST_EID_2,
+      TEST_TSSD_2,
+      'enterprise',
+    );
     testUserId2 = await createTestUser(
       'sf-qa-unlink-int-2',
       testTenantId2,
@@ -436,8 +440,8 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('FEATURE_NOT_ENABLED');
 
-    // Cleanup — restore pro tier
-    await setTenantTier(testTenantId, 'pro');
+    // Cleanup — restore enterprise tier
+    await setTenantTier(testTenantId, 'enterprise');
   });
 
   it('RLS isolation: cross-tenant session cannot unlink another tenant query', async () => {
