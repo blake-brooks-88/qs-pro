@@ -1,19 +1,71 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import type {
   IFeatureOverrideRepository,
+  IOrgSubscriptionRepository,
   ITenantRepository,
+  OrgSubscription,
   TenantFeatureOverride,
 } from '@qpp/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TrialService } from '../../trial/trial.service';
 import { FeaturesService } from '../features.service';
+
+function createMockOrgSubscriptionRepo() {
+  return {
+    findByTenantId: vi.fn(),
+    findByStripeCustomerId: vi.fn(),
+    upsert: vi.fn(),
+    insertIfNotExists: vi.fn(),
+    updateTierByTenantId: vi.fn(),
+    updateFromWebhook: vi.fn(),
+  } satisfies Record<
+    keyof IOrgSubscriptionRepository,
+    ReturnType<typeof vi.fn>
+  >;
+}
+
+function createMockTrialService() {
+  return {
+    activateTrial: vi.fn().mockResolvedValue(undefined),
+    getTrialState: vi.fn().mockResolvedValue(null),
+  };
+}
+
+const baseTenant = {
+  id: 'tenant-1',
+  eid: 'eid-1',
+  tssd: 'test-tssd',
+  subscriptionTier: 'free' as const,
+  seatLimit: null,
+  auditRetentionDays: 365,
+  installedAt: new Date(),
+};
+
+const baseSubscription: OrgSubscription = {
+  id: 'sub-1',
+  tenantId: 'tenant-1',
+  tier: 'pro',
+  trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  stripeSubscriptionId: null,
+  stripeCustomerId: null,
+  seatLimit: null,
+  currentPeriodEnds: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 describe('FeaturesService', () => {
   let service: FeaturesService;
   let featureOverrideRepo: IFeatureOverrideRepository;
   let tenantRepo: ITenantRepository;
+  let orgSubscriptionRepo: ReturnType<typeof createMockOrgSubscriptionRepo>;
+  let trialService: ReturnType<typeof createMockTrialService>;
 
   beforeEach(async () => {
+    orgSubscriptionRepo = createMockOrgSubscriptionRepo();
+    trialService = createMockTrialService();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FeaturesService,
@@ -26,17 +78,15 @@ describe('FeaturesService', () => {
         {
           provide: 'TENANT_REPOSITORY',
           useValue: {
-            findById: vi.fn().mockResolvedValue({
-              id: 'tenant-1',
-              eid: 'eid-1',
-              tssd: 'test-tssd',
-              subscriptionTier: 'free',
-              seatLimit: null,
-              auditRetentionDays: 365,
-              installedAt: new Date(),
-            }),
+            findById: vi.fn().mockResolvedValue({ ...baseTenant }),
+            updateTier: vi.fn(),
           },
         },
+        {
+          provide: 'ORG_SUBSCRIPTION_REPOSITORY',
+          useValue: orgSubscriptionRepo,
+        },
+        { provide: TrialService, useValue: trialService },
       ],
     }).compile();
 
@@ -47,152 +97,115 @@ describe('FeaturesService', () => {
     tenantRepo = module.get<ITenantRepository>('TENANT_REPOSITORY');
   });
 
-  it('resolves free tier to free features only', async () => {
+  it('returns pro tier when trial is active', async () => {
     // Arrange
-    const tenantId = 'tenant-1';
-    vi.mocked(tenantRepo.findById).mockResolvedValue({
-      id: tenantId,
-      eid: 'eid-1',
-      tssd: 'test-tssd',
-      subscriptionTier: 'free',
-      seatLimit: null,
-      auditRetentionDays: 365,
-      installedAt: new Date(),
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+      ...baseSubscription,
+      trialEndsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    });
+    trialService.getTrialState.mockResolvedValue({
+      active: true,
+      daysRemaining: 5,
+      endsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
     // Act
-    const features = await service.getTenantFeatures(tenantId);
+    const result = await service.getTenantFeatures('tenant-1');
 
-    // Assert - free tier gets basic features + systemDataViews only
-    expect(features).toEqual({
-      tier: 'free',
-      features: {
-        basicLinting: true,
-        syntaxHighlighting: true,
-        systemDataViews: true,
-        quickFixes: false,
-        minimap: false,
-        advancedAutocomplete: false,
-        querySharing: false,
-        createDataExtension: false,
-        teamSnippets: false,
-        auditLogs: false,
-        deployToAutomation: false,
-        runToTargetDE: false,
-        executionHistory: false,
-        versionHistory: false,
-      },
-      trial: null,
-    });
+    // Assert
+    expect(result.tier).toBe('pro');
+    expect(result.features.advancedAutocomplete).toBe(true);
+    expect(result.features.executionHistory).toBe(true);
+    expect(result.trial).toEqual(
+      expect.objectContaining({ active: true, daysRemaining: 5 }),
+    );
   });
 
-  it('resolves pro tier to pro+free features', async () => {
+  it('returns free tier when trial is expired and no Stripe subscription', async () => {
     // Arrange
-    const tenantId = 'tenant-2';
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+      ...baseSubscription,
+      trialEndsAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      stripeSubscriptionId: null,
+    });
+    trialService.getTrialState.mockResolvedValue({
+      active: false,
+      daysRemaining: 0,
+      endsAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    // Act
+    const result = await service.getTenantFeatures('tenant-1');
+
+    // Assert
+    expect(result.tier).toBe('free');
+    expect(result.features.advancedAutocomplete).toBe(false);
+    expect(result.features.basicLinting).toBe(true);
+    expect(result.trial).toEqual(
+      expect.objectContaining({ active: false, daysRemaining: 0 }),
+    );
+  });
+
+  it('uses subscription tier when Stripe subscription exists', async () => {
+    // Arrange
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+      ...baseSubscription,
+      tier: 'enterprise',
+      stripeSubscriptionId: 'sub_stripe_123',
+      trialEndsAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    });
+
+    // Act
+    const result = await service.getTenantFeatures('tenant-1');
+
+    // Assert
+    expect(result.tier).toBe('enterprise');
+    expect(result.features.teamSnippets).toBe(true);
+    expect(result.features.auditLogs).toBe(true);
+  });
+
+  it('falls back to tenant.subscriptionTier when no org_subscriptions row', async () => {
+    // Arrange
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue(undefined);
     vi.mocked(tenantRepo.findById).mockResolvedValue({
-      id: tenantId,
-      eid: 'eid-2',
-      tssd: 'test-tssd',
+      ...baseTenant,
       subscriptionTier: 'pro',
-      seatLimit: 10,
-      auditRetentionDays: 365,
-      installedAt: new Date(),
     });
 
     // Act
-    const features = await service.getTenantFeatures(tenantId);
+    const result = await service.getTenantFeatures('tenant-1');
 
-    // Assert - pro tier gets additional features but not enterprise features
-    // Note: deployToAutomation was moved from enterprise to pro tier
-    expect(features).toEqual({
-      tier: 'pro',
-      features: {
-        basicLinting: true,
-        syntaxHighlighting: true,
-        systemDataViews: true,
-        quickFixes: true,
-        minimap: true,
-        advancedAutocomplete: true,
-        querySharing: true,
-        createDataExtension: true,
-        teamSnippets: false,
-        auditLogs: false,
-        deployToAutomation: true,
-        runToTargetDE: true,
-        executionHistory: true,
-        versionHistory: true,
-      },
-      trial: null,
-    });
+    // Assert
+    expect(result.tier).toBe('pro');
+    expect(result.features.advancedAutocomplete).toBe(true);
+    expect(result.trial).toBeNull();
   });
 
-  it('applies enable override (free tenant gets pro feature)', async () => {
+  it('defaults to free tier when no subscription and no tenant tier', async () => {
     // Arrange
-    const tenantId = 'tenant-3';
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue(undefined);
     vi.mocked(tenantRepo.findById).mockResolvedValue({
-      id: tenantId,
-      eid: 'eid-3',
-      tssd: 'test-tssd',
-      subscriptionTier: 'free',
-      seatLimit: null,
-      auditRetentionDays: 365,
-      installedAt: new Date(),
+      ...baseTenant,
+      subscriptionTier: null as never,
     });
 
+    // Act
+    const result = await service.getTenantFeatures('tenant-1');
+
+    // Assert
+    expect(result.tier).toBe('free');
+  });
+
+  it('applies feature overrides on top of org_subscriptions tier', async () => {
+    // Arrange
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+      ...baseSubscription,
+      trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
     const overrides: TenantFeatureOverride[] = [
       {
         id: 'override-1',
-        tenantId,
-        featureKey: 'quickFixes',
-        enabled: true,
-        createdAt: new Date(),
-      },
-    ];
-    vi.mocked(featureOverrideRepo.findByTenantId).mockResolvedValue(overrides);
-
-    // Act
-    const features = await service.getTenantFeatures(tenantId);
-
-    // Assert - free tier with quickFixes enabled via override
-    expect(features).toEqual({
-      tier: 'free',
-      features: {
-        basicLinting: true,
-        syntaxHighlighting: true,
-        systemDataViews: true,
-        quickFixes: true, // Enabled by override
-        minimap: false,
-        advancedAutocomplete: false,
-        querySharing: false,
-        createDataExtension: false,
-        teamSnippets: false,
-        auditLogs: false,
-        deployToAutomation: false,
-        runToTargetDE: false,
-        executionHistory: false,
-        versionHistory: false,
-      },
-      trial: null,
-    });
-  });
-
-  it('applies disable override (pro tenant loses feature)', async () => {
-    // Arrange
-    const tenantId = 'tenant-4';
-    vi.mocked(tenantRepo.findById).mockResolvedValue({
-      id: tenantId,
-      eid: 'eid-4',
-      tssd: 'test-tssd',
-      subscriptionTier: 'pro',
-      seatLimit: 10,
-      auditRetentionDays: 365,
-      installedAt: new Date(),
-    });
-
-    const overrides: TenantFeatureOverride[] = [
-      {
-        id: 'override-2',
-        tenantId,
+        tenantId: 'tenant-1',
         featureKey: 'minimap',
         enabled: false,
         createdAt: new Date(),
@@ -201,86 +214,162 @@ describe('FeaturesService', () => {
     vi.mocked(featureOverrideRepo.findByTenantId).mockResolvedValue(overrides);
 
     // Act
-    const features = await service.getTenantFeatures(tenantId);
+    const result = await service.getTenantFeatures('tenant-1');
 
-    // Assert - pro tier with minimap disabled via override
-    // Note: deployToAutomation was moved from enterprise to pro tier
-    expect(features).toEqual({
-      tier: 'pro',
-      features: {
-        basicLinting: true,
-        syntaxHighlighting: true,
-        systemDataViews: true,
-        quickFixes: true,
-        minimap: false, // Disabled by override
-        advancedAutocomplete: true,
-        querySharing: true,
-        createDataExtension: true,
-        teamSnippets: false,
-        auditLogs: false,
-        deployToAutomation: true,
-        runToTargetDE: true,
-        executionHistory: true,
-        versionHistory: true,
-      },
-      trial: null,
-    });
+    // Assert
+    expect(result.tier).toBe('pro');
+    expect(result.features.minimap).toBe(false);
+    expect(result.features.advancedAutocomplete).toBe(true);
   });
 
-  it('resolves enterprise tier to enterprise+pro+free features', async () => {
+  it('calls orgSubscriptionRepo.findByTenantId for tier lookup', async () => {
     // Arrange
-    const tenantId = 'tenant-5';
-    vi.mocked(tenantRepo.findById).mockResolvedValue({
-      id: tenantId,
-      eid: 'eid-5',
-      tssd: 'test-tssd',
-      subscriptionTier: 'enterprise',
-      seatLimit: 50,
-      auditRetentionDays: 365,
-      installedAt: new Date(),
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+      ...baseSubscription,
     });
 
     // Act
-    const features = await service.getTenantFeatures(tenantId);
+    await service.getTenantFeatures('tenant-1');
 
-    // Assert - enterprise tier gets all features
-    expect(features).toEqual({
-      tier: 'enterprise',
-      features: {
-        basicLinting: true,
-        syntaxHighlighting: true,
-        systemDataViews: true,
-        quickFixes: true,
-        minimap: true,
-        advancedAutocomplete: true,
-        querySharing: true,
-        createDataExtension: true,
-        teamSnippets: true,
-        auditLogs: true,
-        deployToAutomation: true,
-        runToTargetDE: true,
-        executionHistory: true,
-        versionHistory: true,
-      },
-      trial: null,
+    // Assert
+    expect(orgSubscriptionRepo.findByTenantId).toHaveBeenCalledWith('tenant-1');
+  });
+
+  it('throws RESOURCE_NOT_FOUND when tenant does not exist', async () => {
+    // Arrange
+    vi.mocked(tenantRepo.findById).mockResolvedValue(undefined);
+
+    // Act & Assert
+    await expect(
+      service.getTenantFeatures('nonexistent'),
+    ).rejects.toMatchObject({
+      code: 'RESOURCE_NOT_FOUND',
     });
   });
 
-  it('throws INTERNAL_ERROR when tenant subscriptionTier is missing', async () => {
-    const tenantId = 'tenant-missing-tier';
+  describe('updateTier()', () => {
+    it('calls orgSubscriptionRepo.updateTierByTenantId', async () => {
+      // Arrange
+      orgSubscriptionRepo.updateTierByTenantId.mockResolvedValue(undefined);
+      orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+        ...baseSubscription,
+        tier: 'enterprise',
+        stripeSubscriptionId: 'sub_123',
+      });
 
-    vi.mocked(tenantRepo.findById).mockResolvedValue({
-      id: tenantId,
-      eid: 'eid-missing-tier',
-      tssd: 'test-tssd',
-      subscriptionTier: '' as never,
-      seatLimit: null,
-      auditRetentionDays: 365,
-      installedAt: new Date(),
+      // Act
+      const result = await service.updateTier('tenant-1', 'enterprise');
+
+      // Assert
+      expect(orgSubscriptionRepo.updateTierByTenantId).toHaveBeenCalledWith(
+        'tenant-1',
+        'enterprise',
+      );
+      expect(result.tier).toBe('enterprise');
+    });
+  });
+
+  describe('backward compatibility', () => {
+    it('resolves free tier features correctly', async () => {
+      // Arrange
+      orgSubscriptionRepo.findByTenantId.mockResolvedValue(undefined);
+      vi.mocked(tenantRepo.findById).mockResolvedValue({
+        ...baseTenant,
+        subscriptionTier: 'free',
+      });
+
+      // Act
+      const result = await service.getTenantFeatures('tenant-1');
+
+      // Assert
+      expect(result).toEqual({
+        tier: 'free',
+        features: {
+          basicLinting: true,
+          syntaxHighlighting: true,
+          systemDataViews: true,
+          quickFixes: false,
+          minimap: false,
+          advancedAutocomplete: false,
+          querySharing: false,
+          createDataExtension: false,
+          teamSnippets: false,
+          auditLogs: false,
+          deployToAutomation: false,
+          runToTargetDE: false,
+          executionHistory: false,
+          versionHistory: false,
+        },
+        trial: null,
+      });
     });
 
-    await expect(service.getTenantFeatures(tenantId)).rejects.toMatchObject({
-      code: 'INTERNAL_ERROR',
+    it('resolves pro tier features correctly', async () => {
+      // Arrange
+      orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+        ...baseSubscription,
+        stripeSubscriptionId: 'sub_123',
+        tier: 'pro',
+      });
+
+      // Act
+      const result = await service.getTenantFeatures('tenant-1');
+
+      // Assert
+      expect(result).toEqual({
+        tier: 'pro',
+        features: {
+          basicLinting: true,
+          syntaxHighlighting: true,
+          systemDataViews: true,
+          quickFixes: true,
+          minimap: true,
+          advancedAutocomplete: true,
+          querySharing: true,
+          createDataExtension: true,
+          teamSnippets: false,
+          auditLogs: false,
+          deployToAutomation: true,
+          runToTargetDE: true,
+          executionHistory: true,
+          versionHistory: true,
+        },
+        trial: null,
+      });
+    });
+
+    it('resolves enterprise tier features correctly', async () => {
+      // Arrange
+      orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+        ...baseSubscription,
+        stripeSubscriptionId: 'sub_123',
+        tier: 'enterprise',
+      });
+
+      // Act
+      const result = await service.getTenantFeatures('tenant-1');
+
+      // Assert
+      expect(result).toEqual({
+        tier: 'enterprise',
+        features: {
+          basicLinting: true,
+          syntaxHighlighting: true,
+          systemDataViews: true,
+          quickFixes: true,
+          minimap: true,
+          advancedAutocomplete: true,
+          querySharing: true,
+          createDataExtension: true,
+          teamSnippets: true,
+          auditLogs: true,
+          deployToAutomation: true,
+          runToTargetDE: true,
+          executionHistory: true,
+          versionHistory: true,
+        },
+        trial: null,
+      });
     });
   });
 });

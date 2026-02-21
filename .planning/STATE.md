@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 14 Monetization IN PROGRESS — Plan 01 complete (database foundation: org_subscriptions, stripe_webhook_events, Stripe env vars, TrialState schema).
+**Current focus:** Phase 14 Monetization IN PROGRESS — Plan 02 complete (BillingModule with Stripe webhook integration, 6 event types, 50 unit tests).
 
 ## Current Milestone
 
@@ -44,7 +44,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
 | 13 | Query Formatting | ✓ Complete | 1/1 | 100% |
-| 14 | Monetization | ◐ In Progress | 1/4 | 25% |
+| 14 | Monetization | ◐ In Progress | 2/4 | 50% |
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
@@ -85,6 +85,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-21 | Stripe SDK v20 type adaptations for webhook handler | subscription.items.data[0].current_period_end replaces subscription.current_period_end; invoice.parent.subscription_details.subscription replaces invoice.subscription |
+| 2026-02-21 | Webhook event.type string extraction for switch routing | Breaks TypeScript discriminated union tracking to avoid exhaustiveness check on 200+ Stripe event types |
+| 2026-02-21 | fastify-raw-body with onRoute hook for targeted enablement | global: false with route-specific config avoids raw body overhead on all routes |
 | 2026-02-21 | stripe_webhook_events intentionally non-RLS | System-level idempotency table without tenant_id, accessed by webhook handler outside tenant context |
 | 2026-02-21 | org_subscriptions tenant-only RLS (no mid) | Subscriptions are org-level not BU-level, matching tenant_feature_overrides pattern |
 | 2026-02-21 | Stripe env vars optional in schema | Follow observabilitySchema pattern; BillingModule validates at runtime in production |
@@ -1040,9 +1043,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-17T21:52:12Z
-**Stopped at:** Completed 13-01-PLAN.md
-**Resume file:** .planning/phases/13-query-formatting/13-01-SUMMARY.md
+**Last session:** 2026-02-21T18:28:48.080Z
+**Stopped at:** Completed 14-02-PLAN.md
+**Resume file:** None
 
 ## Blockers
 
