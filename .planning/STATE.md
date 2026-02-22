@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 14 Monetization IN PROGRESS — Plan 02 complete (BillingModule with Stripe webhook integration, 6 event types, 50 unit tests).
+**Current focus:** Phase 14 Monetization COMPLETE — All 4 plans delivered: database foundation, Stripe webhooks, trial lifecycle, and frontend trial UX with pricing CTAs.
 
 ## Current Milestone
 
@@ -44,7 +44,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
 | 13 | Query Formatting | ✓ Complete | 1/1 | 100% |
-| 14 | Monetization | ◐ In Progress | 2/4 | 50% |
+| 14 | Monetization | ✓ Complete | 4/4 | 100% |
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
@@ -85,6 +85,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-21 | AppShell topNotice neutralized to structural container | Each banner owns its styling; makes topNotice slot reusable for any banner type |
+| 2026-02-21 | UpgradeModal pricingUrl as prop (pure component) | Keeps UpgradeModal testable and decoupled; call sites build URL with tenant eid |
+| 2026-02-21 | Session-scoped banner dismiss via useState | Banner resets on page reload (fair UX, not aggressive); consistent with user guidance |
 | 2026-02-21 | Stripe SDK v20 type adaptations for webhook handler | subscription.items.data[0].current_period_end replaces subscription.current_period_end; invoice.parent.subscription_details.subscription replaces invoice.subscription |
 | 2026-02-21 | Webhook event.type string extraction for switch routing | Breaks TypeScript discriminated union tracking to avoid exhaustiveness check on 200+ Stripe event types |
 | 2026-02-21 | fastify-raw-body with onRoute hook for targeted enablement | global: false with route-specific config avoids raw body overhead on all routes |

@@ -235,6 +235,10 @@ export class AuthController {
         ]);
 
         if (existingUser && existingTenant) {
+          await this.trialService.activateTrial(tenantId, {
+            actorId: userId,
+            mid,
+          });
           return { url: '/', statusCode: 302 };
         }
 

@@ -421,6 +421,10 @@ describe('AuthController', () => {
 
       // Assert
       expect(result).toEqual({ url: '/', statusCode: 302 });
+      expect(trialService.activateTrial).toHaveBeenCalledWith(mockTenant.id, {
+        actorId: mockUser.id,
+        mid: mockMid,
+      });
     });
 
     it('clears legacy session when MID is missing', async () => {
