@@ -79,7 +79,6 @@ describe('FeaturesService', () => {
           provide: 'TENANT_REPOSITORY',
           useValue: {
             findById: vi.fn().mockResolvedValue({ ...baseTenant }),
-            updateTier: vi.fn(),
           },
         },
         {
@@ -164,7 +163,7 @@ describe('FeaturesService', () => {
     expect(result.features.auditLogs).toBe(true);
   });
 
-  it('falls back to tenant.subscriptionTier when no org_subscriptions row', async () => {
+  it('defaults to free tier when no org_subscriptions row exists', async () => {
     // Arrange
     orgSubscriptionRepo.findByTenantId.mockResolvedValue(undefined);
     vi.mocked(tenantRepo.findById).mockResolvedValue({
@@ -175,25 +174,11 @@ describe('FeaturesService', () => {
     // Act
     const result = await service.getTenantFeatures('tenant-1');
 
-    // Assert
-    expect(result.tier).toBe('pro');
-    expect(result.features.advancedAutocomplete).toBe(true);
-    expect(result.trial).toBeNull();
-  });
-
-  it('defaults to free tier when no subscription and no tenant tier', async () => {
-    // Arrange
-    orgSubscriptionRepo.findByTenantId.mockResolvedValue(undefined);
-    vi.mocked(tenantRepo.findById).mockResolvedValue({
-      ...baseTenant,
-      subscriptionTier: null as never,
-    });
-
-    // Act
-    const result = await service.getTenantFeatures('tenant-1');
-
-    // Assert
+    // Assert — tier defaults to 'free' regardless of tenant.subscriptionTier
     expect(result.tier).toBe('free');
+    expect(result.features.advancedAutocomplete).toBe(false);
+    expect(result.features.basicLinting).toBe(true);
+    expect(result.trial).toBeNull();
   });
 
   it('applies feature overrides on top of org_subscriptions tier', async () => {

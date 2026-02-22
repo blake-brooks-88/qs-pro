@@ -74,16 +74,6 @@ export class DrizzleTenantRepository implements ITenantRepository {
       .where(eq(users.tenantId, tenantId));
     return result?.count ?? 0;
   }
-
-  async updateTier(
-    id: string,
-    tier: "free" | "pro" | "enterprise",
-  ): Promise<void> {
-    await this.db
-      .update(tenants)
-      .set({ subscriptionTier: tier })
-      .where(eq(tenants.id, id));
-  }
 }
 
 export class DrizzleUserRepository implements IUserRepository {

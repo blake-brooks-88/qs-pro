@@ -47,7 +47,6 @@ function createTenantRepoStub(): {
     findByEid: vi.fn().mockResolvedValue(mockTenant),
     upsert: vi.fn(),
     countUsersByTenantId: vi.fn(),
-    updateTier: vi.fn(),
   };
 }
 

@@ -50,7 +50,7 @@ export class FeaturesService {
         effectiveTier = 'free';
       }
     } else {
-      effectiveTier = tenant.subscriptionTier ?? 'free';
+      effectiveTier = 'free';
     }
 
     const features = getTierFeatures(effectiveTier);

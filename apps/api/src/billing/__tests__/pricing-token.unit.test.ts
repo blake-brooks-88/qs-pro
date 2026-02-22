@@ -38,7 +38,6 @@ function createTenantRepoMock() {
     findByEid: vi.fn(),
     upsert: vi.fn(),
     countUsersByTenantId: vi.fn(),
-    updateTier: vi.fn(),
   };
 }
 
