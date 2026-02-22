@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Headers,
   HttpCode,
   Inject,
@@ -7,10 +8,17 @@ import {
   Post,
   Req,
   ServiceUnavailableException,
+  UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
-import { AppError, ErrorCode } from '@qpp/backend-shared';
+import {
+  AppError,
+  EncryptionService,
+  ErrorCode,
+  SessionGuard,
+} from '@qpp/backend-shared';
+import type { ITenantRepository } from '@qpp/database';
 import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 
@@ -26,7 +34,40 @@ export class BillingController {
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null,
     private readonly configService: ConfigService,
     private readonly webhookHandler: WebhookHandlerService,
+    private readonly encryptionService: EncryptionService,
+    @Inject('TENANT_REPOSITORY')
+    private readonly tenantRepo: ITenantRepository,
   ) {}
+
+  @Get('pricing-token')
+  @UseGuards(SessionGuard)
+  async getPricingToken(
+    @Req() req: FastifyRequest,
+  ): Promise<{ token: string }> {
+    const session = req.session;
+    const tenantId = session?.get('tenantId') as string | undefined;
+    if (!tenantId) {
+      throw new AppError(ErrorCode.AUTH_UNAUTHORIZED, undefined, {
+        reason: 'No active session',
+      });
+    }
+
+    const tenant = await this.tenantRepo.findById(tenantId);
+    if (!tenant) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        reason: 'Tenant not found',
+      });
+    }
+
+    const token = this.encryptionService.encrypt(tenant.eid);
+    if (!token) {
+      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+        reason: 'Failed to generate pricing token',
+      });
+    }
+
+    return { token };
+  }
 
   @Post('webhook')
   @HttpCode(200)
@@ -54,6 +95,10 @@ export class BillingController {
       'STRIPE_WEBHOOK_SECRET',
     );
 
+    this.logger.log(
+      `[DIAG] Webhook received — signature present: ${!!signature}, rawBody length: ${req.rawBody.length}`,
+    );
+
     let event: Stripe.Event;
     try {
       event = this.stripe.webhooks.constructEvent(
@@ -61,14 +106,21 @@ export class BillingController {
         signature,
         webhookSecret,
       );
-    } catch {
-      this.logger.warn('Stripe webhook signature verification failed');
+    } catch (err) {
+      this.logger.warn(
+        `[DIAG] Signature verification FAILED: ${err instanceof Error ? err.message : String(err)}`,
+      );
       throw new AppError(ErrorCode.AUTH_UNAUTHORIZED, undefined, {
         reason: 'Invalid webhook signature',
       });
     }
 
+    this.logger.log(
+      `[DIAG] Webhook verified — event.type: ${event.type}, event.id: ${event.id}`,
+    );
+
     await this.webhookHandler.process(event);
+    this.logger.log(`[DIAG] Webhook processed successfully — ${event.type}`);
     return { received: true };
   }
 }

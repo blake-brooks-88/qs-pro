@@ -60,6 +60,18 @@ function createAuditServiceStub(): {
   };
 }
 
+function createEncryptionServiceStub() {
+  return {
+    encrypt: vi.fn((v: string) => `enc_${v}`),
+    decrypt: vi.fn((v: string) => {
+      if (v.startsWith('enc_')) {
+        return v.slice(4);
+      }
+      throw new Error('Not encrypted');
+    }),
+  };
+}
+
 function createStripeStub() {
   return {
     products: {
@@ -154,6 +166,7 @@ describe('WebhookHandlerService', () => {
   let tenantRepo: ReturnType<typeof createTenantRepoStub>;
   let rlsStub: RlsContextStub;
   let auditStub: ReturnType<typeof createAuditServiceStub>;
+  let encryptionStub: ReturnType<typeof createEncryptionServiceStub>;
   let loggerWarnSpy: ReturnType<typeof vi.spyOn>;
   let loggerDebugSpy: ReturnType<typeof vi.spyOn>;
 
@@ -164,6 +177,7 @@ describe('WebhookHandlerService', () => {
     tenantRepo = createTenantRepoStub();
     rlsStub = createRlsContextStub();
     auditStub = createAuditServiceStub();
+    encryptionStub = createEncryptionServiceStub();
 
     service = new WebhookHandlerService(
       stripeStub as any,
@@ -172,6 +186,7 @@ describe('WebhookHandlerService', () => {
       tenantRepo as unknown as ITenantRepository,
       rlsStub as any,
       auditStub as unknown as AuditService,
+      encryptionStub as any,
     );
 
     loggerWarnSpy = vi

@@ -33,6 +33,20 @@ function createWebhookHandlerMock(): {
   };
 }
 
+function createEncryptionServiceMock() {
+  return { encrypt: vi.fn(), decrypt: vi.fn() };
+}
+
+function createTenantRepoMock() {
+  return {
+    findById: vi.fn(),
+    findByEid: vi.fn(),
+    upsert: vi.fn(),
+    countUsersByTenantId: vi.fn(),
+    updateTier: vi.fn(),
+  };
+}
+
 function createReq(rawBody?: string) {
   return { rawBody } as any;
 }
@@ -52,6 +66,8 @@ describe('BillingController', () => {
       stripeMock as any,
       configMock as any,
       handlerMock as unknown as WebhookHandlerService,
+      createEncryptionServiceMock() as any,
+      createTenantRepoMock() as any,
     );
   });
 
@@ -61,6 +77,8 @@ describe('BillingController', () => {
         null,
         configMock as any,
         handlerMock as unknown as WebhookHandlerService,
+        createEncryptionServiceMock() as any,
+        createTenantRepoMock() as any,
       );
 
       await expect(

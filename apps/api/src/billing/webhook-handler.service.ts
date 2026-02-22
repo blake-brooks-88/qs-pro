@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { RlsContextService } from '@qpp/backend-shared';
+import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
   IStripeWebhookEventRepository,
@@ -31,15 +31,30 @@ export class WebhookHandlerService {
     private readonly tenantRepo: ITenantRepository,
     private readonly rlsContext: RlsContextService,
     private readonly auditService: AuditService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
+  private resolveEid(rawEid: string): string {
+    try {
+      const decrypted = this.encryptionService.decrypt(rawEid);
+      if (decrypted && typeof decrypted === 'string') {
+        return decrypted;
+      }
+      return rawEid;
+    } catch {
+      return rawEid;
+    }
+  }
+
   async process(event: Stripe.Event): Promise<void> {
+    this.logger.log(`[DIAG] Processing event: ${event.type} (${event.id})`);
+
     const isNew = await this.webhookEventRepo.markProcessing(
       event.id,
       event.type,
     );
     if (!isNew) {
-      this.logger.debug(`Duplicate event skipped: ${event.id}`);
+      this.logger.warn(`[DIAG] Duplicate event skipped: ${event.id}`);
       return;
     }
 
@@ -76,6 +91,9 @@ export class WebhookHandlerService {
       }
       await this.webhookEventRepo.markCompleted(event.id);
     } catch (error) {
+      this.logger.error(
+        `[DIAG] Event processing FAILED — ${event.type} (${event.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
       await this.webhookEventRepo.markFailed(
         event.id,
         error instanceof Error ? error.message : String(error),
@@ -90,14 +108,22 @@ export class WebhookHandlerService {
     const stripeCustomerId = session.customer as string | null;
     const stripeSubscriptionId = session.subscription as string | null;
 
+    this.logger.log(
+      `[DIAG] checkout.session.completed — customerId: ${stripeCustomerId}, subscriptionId: ${stripeSubscriptionId}`,
+    );
+    this.logger.log(
+      `[DIAG] checkout.session.completed — metadata: ${JSON.stringify(session.metadata)}`,
+    );
+
     if (!stripeCustomerId || !stripeSubscriptionId) {
       throw new Error('Checkout session missing customer or subscription ID');
     }
 
-    const eid = session.metadata?.eid;
-    if (!eid) {
+    const rawEid = session.metadata?.eid;
+    if (!rawEid) {
       throw new Error('Checkout session missing metadata.eid');
     }
+    const eid = this.resolveEid(rawEid);
 
     const tier = session.metadata?.tier;
     if (!isValidPaidTier(tier)) {
@@ -107,6 +133,9 @@ export class WebhookHandlerService {
     }
 
     const tenant = await this.tenantRepo.findByEid(eid);
+    this.logger.log(
+      `[DIAG] checkout.session.completed — eid: ${eid}, tenant found: ${!!tenant}, tenantId: ${tenant?.id}`,
+    );
     if (!tenant) {
       throw new Error(`Tenant not found for eid: ${eid}`);
     }
@@ -115,11 +144,17 @@ export class WebhookHandlerService {
       tenant.id,
       'system',
       async () => {
+        this.logger.log(
+          `[DIAG] checkout.session.completed — updating subscription: tier=${tier}, tenantId=${tenant.id}`,
+        );
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
           stripeCustomerId,
           stripeSubscriptionId,
           tier,
         });
+        this.logger.log(
+          `[DIAG] checkout.session.completed — DB update complete`,
+        );
       },
     );
 
@@ -137,18 +172,26 @@ export class WebhookHandlerService {
   private async handleSubscriptionChange(
     subscription: Stripe.Subscription,
   ): Promise<void> {
+    this.logger.log(
+      `[DIAG] subscription change — status: ${subscription.status}, metadata: ${JSON.stringify(subscription.metadata)}`,
+    );
+
     if (!subscription.items.data[0]) {
       throw new Error('Subscription event missing line items');
     }
 
-    const eid = subscription.metadata?.eid;
-    if (!eid) {
+    const rawEid = subscription.metadata?.eid;
+    if (!rawEid) {
       throw new Error(
         'Subscription missing metadata.eid — external pricing site must set subscription_data.metadata.eid at Checkout creation',
       );
     }
+    const eid = this.resolveEid(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
+    this.logger.log(
+      `[DIAG] subscription change — eid: ${eid}, tenant found: ${!!tenant}`,
+    );
     if (!tenant) {
       this.logger.warn(
         `Tenant not found for eid=${eid} — tenant may have been deleted`,
@@ -157,7 +200,11 @@ export class WebhookHandlerService {
     }
 
     const productId = subscription.items.data[0].price.product as string;
+    this.logger.log(
+      `[DIAG] subscription change — resolving tier from product: ${productId}`,
+    );
     const tier = await this.resolveTierFromProduct(productId);
+    this.logger.log(`[DIAG] subscription change — resolved tier: ${tier}`);
 
     const isPastDueOrUnpaid =
       subscription.status === 'past_due' || subscription.status === 'unpaid';
@@ -198,10 +245,11 @@ export class WebhookHandlerService {
   private async handleSubscriptionDeleted(
     subscription: Stripe.Subscription,
   ): Promise<void> {
-    const eid = subscription.metadata?.eid;
-    if (!eid) {
+    const rawEid = subscription.metadata?.eid;
+    if (!rawEid) {
       throw new Error('Subscription missing metadata.eid');
     }
+    const eid = this.resolveEid(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
     if (!tenant) {
@@ -253,13 +301,14 @@ export class WebhookHandlerService {
 
     const subscription =
       await this.stripe.subscriptions.retrieve(subscriptionId);
-    const eid = subscription.metadata?.eid;
-    if (!eid) {
+    const rawEid = subscription.metadata?.eid;
+    if (!rawEid) {
       this.logger.warn(
         'invoice.paid: subscription missing metadata.eid — skipping',
       );
       return;
     }
+    const eid = this.resolveEid(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
     if (!tenant) {
@@ -311,13 +360,14 @@ export class WebhookHandlerService {
     try {
       const subscription =
         await this.stripe.subscriptions.retrieve(subscriptionId);
-      const eid = subscription.metadata?.eid;
-      if (!eid) {
+      const rawEid = subscription.metadata?.eid;
+      if (!rawEid) {
         this.logger.warn(
           'invoice.payment_failed: subscription missing metadata.eid — skipping',
         );
         return;
       }
+      const eid = this.resolveEid(rawEid);
 
       const tenant = await this.tenantRepo.findByEid(eid);
       if (!tenant) {
@@ -349,6 +399,9 @@ export class WebhookHandlerService {
       throw new Error('Stripe client not configured');
     }
     const product = await this.stripe.products.retrieve(productId);
+    this.logger.log(
+      `[DIAG] resolveTierFromProduct — product: ${productId}, metadata: ${JSON.stringify(product.metadata)}`,
+    );
     const tier = product.metadata?.tier;
     if (!isValidPaidTier(tier)) {
       throw new Error(
