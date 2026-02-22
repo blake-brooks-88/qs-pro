@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 14 Monetization COMPLETE — All 4 plans delivered: database foundation, Stripe webhooks, trial lifecycle, and frontend trial UX with pricing CTAs.
+**Current focus:** Phase 14 Monetization — 5/7 plans delivered: database foundation, Stripe webhooks, trial lifecycle, frontend trial UX, and UAT gap closure (production code).
 
 ## Current Milestone
 
 **Milestone:** v1.0 Launch (Full Phase 1)
 **Status:** Ready to plan
-**Progress:** [██████████] 98%
+**Progress:** [█████████░] 90%
 
 ## Phase Status
 
@@ -44,7 +44,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
 | 13 | Query Formatting | ✓ Complete | 1/1 | 100% |
-| 14 | Monetization | ✓ Complete | 4/4 | 100% |
+| 14 | Monetization | ▶ Active | 5/7 | 71% |
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
@@ -85,6 +85,8 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-22 | org_subscriptions sole source of truth for tier | No fallback to tenants.subscriptionTier in production code; defaults to 'free' when no row exists |
+| 2026-02-22 | ITenantRepository.updateTier removed as dead code | org_subscriptions.updateTierByTenantId is the only tier mutation path |
 | 2026-02-21 | AppShell topNotice neutralized to structural container | Each banner owns its styling; makes topNotice slot reusable for any banner type |
 | 2026-02-21 | UpgradeModal pricingUrl as prop (pure component) | Keeps UpgradeModal testable and decoupled; call sites build URL with tenant eid |
 | 2026-02-21 | Session-scoped banner dismiss via useState | Banner resets on page reload (fair UX, not aggressive); consistent with user guidance |
@@ -1046,9 +1048,9 @@ Context captured in `.planning/phases/deferred-gdpr-readiness/CONTEXT.md` — in
 
 ## Session Continuity
 
-**Last session:** 2026-02-21T18:28:48.080Z
-**Stopped at:** Completed 14-02-PLAN.md
-**Resume file:** None
+**Last session:** 2026-02-22T21:58:00Z
+**Stopped at:** Completed 14-05-PLAN.md
+**Resume file:** .planning/phases/14-monetization/14-06-PLAN.md
 
 ## Blockers
 

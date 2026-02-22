@@ -2,14 +2,14 @@ import * as Sentry from "@sentry/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
-import { DevTierSelector } from "@/components/dev/DevTierSelector";
+import { DevSubscriptionPanel } from "@/components/dev/DevSubscriptionPanel";
 import { TrialBanner } from "@/components/TrialBanner";
 import { TrialExpiredBanner } from "@/components/TrialExpiredBanner";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { buildPricingUrl, PRICING_PAGE_URL } from "@/config/urls";
 import { LaunchInstructionsPage } from "@/features/auth/launch-instructions-page";
 import { EditorWorkspacePage } from "@/features/editor-workspace/EditorWorkspacePage";
+import { usePricingUrl } from "@/hooks/use-pricing-url";
 import { useTrial } from "@/hooks/use-trial";
 import { getMe, loginWithJwt } from "@/services/auth";
 import { consumeEmbeddedJwt } from "@/services/embedded-jwt";
@@ -44,16 +44,13 @@ function getHttpData(error: unknown): unknown {
 
 function App() {
   const { isAuthenticated, setAuth, logout } = useAuthStore();
-  const tenant = useAuthStore((s) => s.tenant);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLaunchHelp, setShowLaunchHelp] = useState(false);
   const [oauthRedirectAttempted, setOauthRedirectAttempted] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const { showCountdown, isTrialExpired, daysRemaining } = useTrial();
-  const pricingUrl = tenant?.eid
-    ? buildPricingUrl(tenant.eid)
-    : PRICING_PAGE_URL;
+  const pricingUrl = usePricingUrl();
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") {
       return false;
@@ -297,7 +294,9 @@ function App() {
           }
           return undefined;
         })()}
-        brandingExtra={import.meta.env.DEV ? <DevTierSelector /> : undefined}
+        brandingExtra={
+          import.meta.env.DEV ? <DevSubscriptionPanel /> : undefined
+        }
       >
         <EditorWorkspacePage />
         <Toaster />
