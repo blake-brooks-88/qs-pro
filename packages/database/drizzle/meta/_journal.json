@@ -225,6 +225,13 @@
       "when": 1771696000000,
       "tag": "0031_migrate_existing_tenants",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1771799512639,
+      "tag": "0032_melted_toxin",
+      "breakpoints": true
     }
   ]
 }

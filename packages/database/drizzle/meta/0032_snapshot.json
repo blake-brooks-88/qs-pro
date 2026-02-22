@@ -1,6 +1,6 @@
 {
-  "id": "250ccc49-32e2-4fb0-ac16-80549b5b593c",
-  "prevId": "41b0baf8-1aba-4439-a948-057b1ccf0d1c",
+  "id": "6f793803-a5bc-4ea0-830f-038fcf683d7f",
+  "prevId": "4ce6bac5-db7a-48ca-8e55-1eef154782dc",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1540,19 +1540,6 @@
           "type": "varchar",
           "primaryKey": false,
           "notNull": true
-        },
-        "subscription_tier": {
-          "name": "subscription_tier",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'free'"
-        },
-        "seat_limit": {
-          "name": "seat_limit",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         },
         "audit_retention_days": {
           "name": "audit_retention_days",

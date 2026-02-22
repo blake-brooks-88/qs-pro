@@ -20,11 +20,6 @@ export const tenants = pgTable("tenants", {
   id: uuid("id").defaultRandom().primaryKey(),
   eid: varchar("eid").notNull().unique(), // Enterprise ID
   tssd: varchar("tssd").notNull(), // Tenant Specific Subdomain
-  subscriptionTier: varchar("subscription_tier")
-    .$type<"free" | "pro" | "enterprise">()
-    .default("free")
-    .notNull(),
-  seatLimit: integer("seat_limit"), // null = unlimited
   auditRetentionDays: integer("audit_retention_days").default(365),
   installedAt: timestamp("installed_at").defaultNow(),
 });

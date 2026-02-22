@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Reduce context switching for MCE query development — write, run, save, deploy without leaving App Switcher.
-**Current focus:** Phase 14 Monetization — 5/7 plans delivered: database foundation, Stripe webhooks, trial lifecycle, frontend trial UX, and UAT gap closure (production code).
+**Current focus:** Phase 14 Monetization — 6/7 plans delivered: database foundation, Stripe webhooks, trial lifecycle, frontend trial UX, UAT gap closure (production code), and encrypted pricing tokens.
 
 ## Current Milestone
 
@@ -44,7 +44,7 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 | 11 | API Hardening | ✓ Complete | 3/3 | 100% |
 | 12 | Security Baseline | ✓ Complete | 3/3 | 100% |
 | 13 | Query Formatting | ✓ Complete | 1/1 | 100% |
-| 14 | Monetization | ▶ Active | 5/7 | 71% |
+| 14 | Monetization | ▶ Active | 6/7 | 86% |
 | 15 | RBAC & Admit Controls | ○ Pending | 0/0 | 0% |
 | 16 | GDPR & Data Lifecycle | ○ Pending | 0/0 | 0% |
 | 17 | AppExchange Security Review | ○ Pending | 0/0 | 0% |
@@ -85,6 +85,9 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-22 | Method-level SessionGuard on pricing-token endpoint | Webhook endpoint must remain unauthenticated; class-level guard would break it |
+| 2026-02-22 | resolveEid try/catch fallback for backward compat | In-flight checkouts with raw EIDs still work; decrypt failure silently returns raw value |
+| 2026-02-22 | usePricingUrl hook with 5-min staleTime | Token is stable (tied to tenant EID); avoids unnecessary API calls |
 | 2026-02-22 | org_subscriptions sole source of truth for tier | No fallback to tenants.subscriptionTier in production code; defaults to 'free' when no row exists |
 | 2026-02-22 | ITenantRepository.updateTier removed as dead code | org_subscriptions.updateTierByTenantId is the only tier mutation path |
 | 2026-02-21 | AppShell topNotice neutralized to structural container | Each banner owns its styling; makes topNotice slot reusable for any banner type |
