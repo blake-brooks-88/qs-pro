@@ -36,8 +36,6 @@ const baseTenant = {
   id: 'tenant-1',
   eid: 'eid-1',
   tssd: 'test-tssd',
-  subscriptionTier: 'free' as const,
-  seatLimit: null,
   auditRetentionDays: 365,
   installedAt: new Date(),
 };
@@ -168,13 +166,12 @@ describe('FeaturesService', () => {
     orgSubscriptionRepo.findByTenantId.mockResolvedValue(undefined);
     vi.mocked(tenantRepo.findById).mockResolvedValue({
       ...baseTenant,
-      subscriptionTier: 'pro',
     });
 
     // Act
     const result = await service.getTenantFeatures('tenant-1');
 
-    // Assert — tier defaults to 'free' regardless of tenant.subscriptionTier
+    // Assert — tier defaults to 'free' when no org_subscriptions row
     expect(result.tier).toBe('free');
     expect(result.features.advancedAutocomplete).toBe(false);
     expect(result.features.basicLinting).toBe(true);
@@ -260,7 +257,6 @@ describe('FeaturesService', () => {
       orgSubscriptionRepo.findByTenantId.mockResolvedValue(undefined);
       vi.mocked(tenantRepo.findById).mockResolvedValue({
         ...baseTenant,
-        subscriptionTier: 'free',
       });
 
       // Act

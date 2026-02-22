@@ -104,9 +104,9 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
     tier: 'free' | 'pro' | 'enterprise',
   ) => {
     await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${tenantId}::uuid
+      INSERT INTO org_subscriptions (tenant_id, tier)
+      VALUES (${tenantId}::uuid, ${tier})
+      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
     `;
   };
 
@@ -136,15 +136,20 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
     tier: string,
   ): Promise<string> {
     const result = await sqlClient`
-      INSERT INTO tenants (eid, tssd, subscription_tier)
-      VALUES (${eid}, ${tssd}, ${tier})
-      ON CONFLICT (eid) DO UPDATE SET tssd = ${tssd}, subscription_tier = ${tier}
+      INSERT INTO tenants (eid, tssd)
+      VALUES (${eid}, ${tssd})
+      ON CONFLICT (eid) DO UPDATE SET tssd = ${tssd}
       RETURNING id
     `;
     const row = result[0];
     if (!row) {
       throw new Error('Failed to insert test tenant');
     }
+    await sqlClient`
+      INSERT INTO org_subscriptions (tenant_id, tier)
+      VALUES (${row.id}::uuid, ${tier})
+      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
+    `;
     return row.id;
   }
 

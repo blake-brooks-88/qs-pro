@@ -7,8 +7,8 @@
  * - Error: Tenant not found throws RESOURCE_NOT_FOUND
  * - Edge case: Invalid featureKey in override is ignored (doesn't throw)
  *
- * Note: The "missing subscriptionTier" test case is not possible in production
- * because the database has a NOT NULL constraint with default 'free'.
+ * Note: Tier is now resolved via org_subscriptions table (not tenants).
+ * When no org_subscriptions row exists, FeaturesService defaults to 'free'.
  *
  * Test Strategy:
  * - Uses FeaturesService directly with test database
@@ -133,13 +133,12 @@ describe('Features Remaining Gaps (integration)', () => {
       const uniqueEid = `invalid-key-eid-${Date.now()}`;
       createdTenantEids.push(uniqueEid);
 
-      // Insert tenant with free tier (using Drizzle)
+      // Insert tenant (using Drizzle)
       const [tenant] = await db
         .insert(tenants)
         .values({
           eid: uniqueEid,
           tssd: 'test-tssd',
-          subscriptionTier: 'free',
         })
         .returning();
       if (!tenant) {
@@ -174,13 +173,12 @@ describe('Features Remaining Gaps (integration)', () => {
       const uniqueEid = `valid-override-eid-${Date.now()}`;
       createdTenantEids.push(uniqueEid);
 
-      // Insert tenant with free tier
+      // Insert tenant
       const [tenant] = await db
         .insert(tenants)
         .values({
           eid: uniqueEid,
           tssd: 'test-tssd',
-          subscriptionTier: 'free',
         })
         .returning();
       if (!tenant) {

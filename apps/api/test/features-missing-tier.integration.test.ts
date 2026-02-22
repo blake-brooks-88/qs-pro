@@ -9,8 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureApp } from '../src/configure-app';
 import { FeaturesController } from '../src/features/features.controller';
 import { FeaturesService } from '../src/features/features.service';
+import { TrialService } from '../src/trial/trial.service';
 
-describe('FeaturesController error cases (integration)', () => {
+describe('FeaturesController missing org_subscriptions row (integration)', () => {
   let app: NestFastifyApplication;
 
   beforeEach(async () => {
@@ -31,10 +32,21 @@ describe('FeaturesController error cases (integration)', () => {
               id: 'tenant-1',
               eid: 'eid-1',
               tssd: 'test-tssd',
-              subscriptionTier: '' as never,
-              seatLimit: null,
+              auditRetentionDays: 365,
               installedAt: new Date(),
             }),
+          },
+        },
+        {
+          provide: 'ORG_SUBSCRIPTION_REPOSITORY',
+          useValue: {
+            findByTenantId: vi.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: TrialService,
+          useValue: {
+            getTrialState: vi.fn().mockResolvedValue(null),
           },
         },
       ],
@@ -75,10 +87,14 @@ describe('FeaturesController error cases (integration)', () => {
     await app.close();
   });
 
-  it('returns 500 when tenant subscription tier is missing', async () => {
+  it('defaults to free tier when no org_subscriptions row exists', async () => {
     const response = await app.inject({ method: 'GET', url: '/features' });
 
-    expect(response.statusCode).toBe(500);
-    expect(response.json().type).toBe('urn:qpp:error:internal-server-error');
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.tier).toBe('free');
+    expect(body.features.basicLinting).toBe(true);
+    expect(body.features.advancedAutocomplete).toBe(false);
+    expect(body.trial).toBeNull();
   });
 });

@@ -122,7 +122,7 @@ describe('FeaturesController (integration)', () => {
     const tssd = 'features-int-tssd';
 
     const tenantRows =
-      await sqlClient`INSERT INTO tenants (eid, tssd, subscription_tier) VALUES (${eid}, ${tssd}, ${'free'}) RETURNING id`;
+      await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, ${tssd}) RETURNING id`;
     const tenantRow = tenantRows[0];
     if (!tenantRow) {
       throw new Error('Failed to insert test tenant');

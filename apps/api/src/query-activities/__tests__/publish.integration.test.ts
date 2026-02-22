@@ -95,9 +95,9 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
 
   const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
     await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
+      INSERT INTO org_subscriptions (tenant_id, tier)
+      VALUES (${testTenantId}::uuid, ${tier})
+      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
     `;
   };
 
@@ -206,9 +206,9 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
     savedQueriesService = app.get(SavedQueriesService);
 
     const tenantResult = await sqlClient`
-      INSERT INTO tenants (eid, tssd, subscription_tier)
-      VALUES (${TEST_EID}, ${TEST_TSSD}, 'pro')
-      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}, subscription_tier = 'pro'
+      INSERT INTO tenants (eid, tssd)
+      VALUES (${TEST_EID}, ${TEST_TSSD})
+      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}
       RETURNING id
     `;
     const tenantRow = tenantResult[0];
@@ -216,6 +216,12 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
       throw new Error('Failed to insert test tenant');
     }
     testTenantId = tenantRow.id;
+
+    await sqlClient`
+      INSERT INTO org_subscriptions (tenant_id, tier)
+      VALUES (${testTenantId}::uuid, 'pro')
+      ON CONFLICT (tenant_id) DO UPDATE SET tier = 'pro'
+    `;
 
     const userResult = await sqlClient`
       INSERT INTO users (sf_user_id, tenant_id, email, name)

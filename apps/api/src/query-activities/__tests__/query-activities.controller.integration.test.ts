@@ -50,9 +50,9 @@ describe('QueryActivitiesController (integration)', () => {
 
   const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
     await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
+      INSERT INTO org_subscriptions (tenant_id, tier)
+      VALUES (${testTenantId}::uuid, ${tier})
+      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
     `;
   };
 
