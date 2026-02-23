@@ -215,7 +215,9 @@ export class WebhookHandlerService {
     const isPastDueOrUnpaid =
       subscription.status === 'past_due' || subscription.status === 'unpaid';
 
-    const currentPeriodEnds = new Date(subscription.current_period_end * 1000);
+    const currentPeriodEnds = new Date(
+      subscription.items.data[0].current_period_end * 1000,
+    );
     const seatLimit = subscription.items.data[0].quantity ?? null;
 
     await this.rlsContext.runWithTenantContext(

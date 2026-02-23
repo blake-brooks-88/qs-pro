@@ -82,12 +82,12 @@ function createStripeStub() {
     subscriptions: {
       retrieve: vi.fn().mockResolvedValue({
         metadata: { eid: TENANT_EID_TOKEN },
-        current_period_end: 1700000000,
         items: {
           data: [
             {
               price: { product: 'prod_123' },
               quantity: 10,
+              current_period_end: 1700000000,
             },
           ],
         },
@@ -130,22 +130,18 @@ function makeSubscriptionEvent(
     metadata: Record<string, string>;
     status: string;
     items: { data: unknown[] };
-    current_period_end: number;
   }> = {},
 ): Stripe.Event {
   return makeEvent(type, {
     customer: 'cus_abc',
     metadata: overrides.metadata ?? { eid: TENANT_EID_TOKEN },
     status: overrides.status ?? 'active',
-    current_period_end:
-      'current_period_end' in overrides
-        ? overrides.current_period_end
-        : 1700000000,
     items: overrides.items ?? {
       data: [
         {
           price: { product: 'prod_123' },
           quantity: 10,
+          current_period_end: 1700000000,
         },
       ],
     },
@@ -691,12 +687,12 @@ describe('WebhookHandlerService', () => {
         });
         stripeStub.subscriptions.retrieve.mockResolvedValue({
           metadata: { eid: TENANT_EID_TOKEN },
-          current_period_end: 1700000000,
           items: {
             data: [
               {
                 price: { product: 'prod_123' },
                 quantity: 10,
+                current_period_end: 1700000000,
               },
             ],
           },
@@ -735,12 +731,12 @@ describe('WebhookHandlerService', () => {
         });
         stripeStub.subscriptions.retrieve.mockResolvedValue({
           metadata: { eid: TENANT_EID_TOKEN },
-          current_period_end: 1700000000,
           items: {
             data: [
               {
                 price: { product: 'prod_123' },
                 quantity: 10,
+                current_period_end: 1700000000,
               },
             ],
           },
