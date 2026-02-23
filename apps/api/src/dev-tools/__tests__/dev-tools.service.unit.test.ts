@@ -2,10 +2,13 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import { EncryptionService } from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
   ITenantRepository,
 } from '@qpp/database';
+import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FeaturesService } from '../../features/features.service';
@@ -112,10 +115,10 @@ describe('DevToolsService', () => {
     service = new DevToolsService(
       orgSubRepo as unknown as IOrgSubscriptionRepository,
       tenantRepo as unknown as ITenantRepository,
-      stripeMock as any,
-      configMock as any,
+      stripeMock as unknown as Stripe,
+      configMock as unknown as ConfigService,
       featuresStub as unknown as FeaturesService,
-      encryptionStub as any,
+      encryptionStub as unknown as EncryptionService,
     );
   });
 
@@ -165,8 +168,9 @@ describe('DevToolsService', () => {
         orgSubRepo as unknown as IOrgSubscriptionRepository,
         tenantRepo as unknown as ITenantRepository,
         null,
-        configMock as any,
+        configMock as unknown as ConfigService,
         featuresStub as unknown as FeaturesService,
+        encryptionStub as unknown as EncryptionService,
       );
 
       await expect(
@@ -182,10 +186,10 @@ describe('DevToolsService', () => {
       const svc = new DevToolsService(
         orgSubRepo as unknown as IOrgSubscriptionRepository,
         tenantRepo as unknown as ITenantRepository,
-        stripeMock as any,
-        emptyConfigMock as any,
+        stripeMock as unknown as Stripe,
+        emptyConfigMock as unknown as ConfigService,
         featuresStub as unknown as FeaturesService,
-        encryptionStub as any,
+        encryptionStub as unknown as EncryptionService,
       );
 
       await expect(
@@ -240,9 +244,9 @@ describe('DevToolsService', () => {
         orgSubRepo as unknown as IOrgSubscriptionRepository,
         tenantRepo as unknown as ITenantRepository,
         null,
-        configMock as any,
+        configMock as unknown as ConfigService,
         featuresStub as unknown as FeaturesService,
-        encryptionStub as any,
+        encryptionStub as unknown as EncryptionService,
       );
 
       await expect(
