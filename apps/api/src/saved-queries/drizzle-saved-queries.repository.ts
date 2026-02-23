@@ -5,6 +5,7 @@ import {
   eq,
   isNotNull,
   savedQueries,
+  users,
 } from '@qpp/database';
 
 import type {
@@ -77,8 +78,10 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
         linkedQaCustomerKey: savedQueries.linkedQaCustomerKey,
         linkedQaName: savedQueries.linkedQaName,
         linkedAt: savedQueries.linkedAt,
+        updatedByUserName: users.name,
       })
-      .from(savedQueries);
+      .from(savedQueries)
+      .leftJoin(users, eq(savedQueries.updatedByUserId, users.id));
 
     if (querySharingEnabled) {
       return base;
@@ -101,6 +104,9 @@ export class DrizzleSavedQueriesRepository implements SavedQueriesRepository {
     }
     if (params.folderId !== undefined) {
       updateData.folderId = params.folderId;
+    }
+    if (params.updatedByUserId !== undefined) {
+      updateData.updatedByUserId = params.updatedByUserId;
     }
 
     const results = await this.getDb()

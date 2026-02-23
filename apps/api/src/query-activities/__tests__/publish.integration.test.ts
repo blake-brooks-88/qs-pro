@@ -266,7 +266,7 @@ describe('POST /query-activities/publish/:savedQueryId (integration)', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('pro');
+    await setTenantTier('enterprise');
 
     for (const id of [...createdSavedQueryIds]) {
       try {

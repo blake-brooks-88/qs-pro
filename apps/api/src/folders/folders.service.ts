@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AppError, ErrorCode, RlsContextService } from '@qpp/backend-shared';
 import type { CreateFolderDto, UpdateFolderDto } from '@qpp/shared-types';
 
+import { FeaturesService } from '../features/features.service';
 import type { Folder, FoldersRepository } from './folders.repository';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class FoldersService {
     @Inject('FOLDERS_REPOSITORY')
     private readonly foldersRepository: FoldersRepository,
     private readonly rlsContext: RlsContextService,
+    private readonly featuresService: FeaturesService,
   ) {}
 
   async create(
@@ -18,6 +20,12 @@ export class FoldersService {
     userId: string,
     dto: CreateFolderDto,
   ): Promise<Folder> {
+    const visibility = dto.visibility ?? 'personal';
+
+    if (visibility === 'shared') {
+      await this.requireTeamCollaboration(tenantId);
+    }
+
     return this.rlsContext.runWithUserContext(
       tenantId,
       mid,
@@ -39,6 +47,7 @@ export class FoldersService {
           userId,
           name: dto.name,
           parentId: dto.parentId ?? null,
+          visibility,
         });
       },
     );
@@ -84,11 +93,37 @@ export class FoldersService {
     id: string,
     dto: UpdateFolderDto,
   ): Promise<Folder> {
+    if (dto.visibility === 'shared') {
+      await this.requireTeamCollaboration(tenantId);
+    }
+
     return this.rlsContext.runWithUserContext(
       tenantId,
       mid,
       userId,
       async () => {
+        const existing = await this.foldersRepository.findById(id);
+        if (!existing) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'update_folder',
+            reason: `Folder not found: ${id}`,
+          });
+        }
+
+        if (existing.visibility === 'shared') {
+          await this.requireTeamCollaboration(tenantId);
+        }
+
+        if (
+          dto.visibility === 'shared' &&
+          existing.visibility !== 'shared' &&
+          existing.userId !== userId
+        ) {
+          throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+            reason: 'Only the folder creator can share a folder',
+          });
+        }
+
         if (dto.parentId) {
           if (dto.parentId === id) {
             throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
@@ -125,6 +160,51 @@ export class FoldersService {
     );
   }
 
+  async shareFolder(
+    tenantId: string,
+    mid: string,
+    userId: string,
+    id: string,
+  ): Promise<Folder> {
+    await this.requireTeamCollaboration(tenantId);
+
+    return this.rlsContext.runWithUserContext(
+      tenantId,
+      mid,
+      userId,
+      async () => {
+        const folder = await this.foldersRepository.findById(id);
+        if (!folder) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'share_folder',
+            reason: `Folder not found: ${id}`,
+          });
+        }
+
+        if (folder.userId !== userId) {
+          throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+            reason: 'Only the folder creator can share a folder',
+          });
+        }
+
+        if (folder.visibility === 'shared') {
+          return folder;
+        }
+
+        const updated = await this.foldersRepository.update(id, {
+          visibility: 'shared',
+        });
+        if (!updated) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'share_folder',
+            reason: `Folder not found: ${id}`,
+          });
+        }
+        return updated;
+      },
+    );
+  }
+
   async delete(
     tenantId: string,
     mid: string,
@@ -136,6 +216,18 @@ export class FoldersService {
       mid,
       userId,
       async () => {
+        const existing = await this.foldersRepository.findById(id);
+        if (!existing) {
+          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+            operation: 'delete_folder',
+            reason: `Folder not found: ${id}`,
+          });
+        }
+
+        if (existing.visibility === 'shared') {
+          await this.requireTeamCollaboration(tenantId);
+        }
+
         const hasChildren = await this.foldersRepository.hasChildren(id);
         if (hasChildren) {
           throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
@@ -152,5 +244,14 @@ export class FoldersService {
         }
       },
     );
+  }
+
+  private async requireTeamCollaboration(tenantId: string): Promise<void> {
+    const { features } = await this.featuresService.getTenantFeatures(tenantId);
+    if (!features.teamCollaboration) {
+      throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+        reason: 'Team collaboration requires an Enterprise subscription',
+      });
+    }
   }
 }

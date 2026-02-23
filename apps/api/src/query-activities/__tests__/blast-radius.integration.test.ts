@@ -333,7 +333,7 @@ describe('GET /query-activities/blast-radius/:savedQueryId (integration)', () =>
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('pro');
+    await setTenantTier('enterprise');
 
     for (const id of [...createdSavedQueryIds]) {
       try {

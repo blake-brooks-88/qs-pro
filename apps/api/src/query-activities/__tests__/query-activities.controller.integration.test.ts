@@ -414,7 +414,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('POST /api/query-activities/link/:savedQueryId', () => {
     it('links saved query to query activity', async () => {
-      await setTenantTier('pro');
+      await setTenantTier('enterprise');
 
       const savedQuery = await savedQueriesService.create(
         testTenantId,
@@ -459,7 +459,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('returns 400 when body is missing qaCustomerKey', async () => {
-      await setTenantTier('pro');
+      await setTenantTier('enterprise');
 
       const res = await request(app.getHttpServer())
         .post('/query-activities/link/00000000-0000-4000-8000-000000000000')
@@ -471,7 +471,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('DELETE /api/query-activities/link/:savedQueryId', () => {
     it('unlinks saved query from query activity', async () => {
-      await setTenantTier('pro');
+      await setTenantTier('enterprise');
 
       const savedQuery = await savedQueriesService.create(
         testTenantId,

@@ -731,6 +731,8 @@ describe('QueryActivitiesService', () => {
         linkedQaCustomerKey: null,
         linkedQaName: null,
         linkedAt: null,
+        latestVersionHash: null,
+        updatedByUserName: null,
       });
 
       // Act & Assert
@@ -780,6 +782,8 @@ describe('QueryActivitiesService', () => {
         linkedQaCustomerKey: 'qa-key-captured',
         linkedQaName: 'Captured QA',
         linkedAt: new Date(),
+        latestVersionHash: null,
+        updatedByUserName: null,
       });
 
       // Act

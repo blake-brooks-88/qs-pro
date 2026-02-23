@@ -7,6 +7,7 @@ import {
   ErrorCode,
   RlsContextService,
 } from '@qpp/backend-shared';
+import type { IUserRepository } from '@qpp/database';
 import type {
   CreateSavedQueryDto,
   UpdateSavedQueryDto,
@@ -35,6 +36,8 @@ export interface DecryptedSavedQuery {
   linkedQaCustomerKey: string | null;
   linkedQaName: string | null;
   linkedAt: Date | null;
+  latestVersionHash: string | null;
+  updatedByUserName: string | null;
 }
 
 @Injectable()
@@ -46,6 +49,8 @@ export class SavedQueriesService {
     private readonly foldersRepository: FoldersRepository,
     @Inject('QUERY_VERSIONS_REPOSITORY')
     private readonly queryVersionsRepository: QueryVersionsRepository,
+    @Inject('USER_REPOSITORY')
+    private readonly userRepository: IUserRepository,
     private readonly featuresService: FeaturesService,
     private readonly encryptionService: EncryptionService,
     private readonly rlsContext: RlsContextService,
@@ -170,7 +175,19 @@ export class SavedQueriesService {
             reason: `Saved query not found: ${id}`,
           });
         }
-        return this.decryptQuery(query);
+
+        const latestVersion =
+          await this.queryVersionsRepository.findLatestBySavedQueryId(id);
+        const latestVersionHash = latestVersion?.sqlTextHash ?? null;
+
+        const updatedByUserName = await this.resolveUserName(
+          query.updatedByUserId,
+        );
+
+        return this.decryptQuery(query, {
+          latestVersionHash,
+          updatedByUserName,
+        });
       },
     );
   }
@@ -201,6 +218,20 @@ export class SavedQueriesService {
           }
         }
 
+        if (!features.teamCollaboration) {
+          await this.requireNotInSharedFolder(id);
+        }
+
+        if (dto.sqlText && dto.expectedHash) {
+          const latestVersion =
+            await this.queryVersionsRepository.findLatestBySavedQueryId(id);
+          if (latestVersion && latestVersion.sqlTextHash !== dto.expectedHash) {
+            throw new AppError(ErrorCode.STALE_CONTENT, undefined, {
+              reason: 'Query was modified since you opened it',
+            });
+          }
+        }
+
         if (dto.folderId) {
           const folder = await this.foldersRepository.findById(dto.folderId);
           if (!folder) {
@@ -211,7 +242,9 @@ export class SavedQueriesService {
           }
         }
 
-        const updateParams: UpdateSavedQueryParams = {};
+        const updateParams: UpdateSavedQueryParams = {
+          updatedByUserId: userId,
+        };
         if (dto.name !== undefined) {
           updateParams.name = dto.name;
         }
@@ -257,7 +290,16 @@ export class SavedQueriesService {
           }
         }
 
-        return this.decryptQuery(query);
+        const afterVersion =
+          await this.queryVersionsRepository.findLatestBySavedQueryId(id);
+        const latestVersionHash = afterVersion?.sqlTextHash ?? null;
+
+        const updatedByUserName = await this.resolveUserName(userId);
+
+        return this.decryptQuery(query, {
+          latestVersionHash,
+          updatedByUserName,
+        });
       },
     );
   }
@@ -285,6 +327,10 @@ export class SavedQueriesService {
               reason: `Saved query not found: ${id}`,
             });
           }
+        }
+
+        if (!features.teamCollaboration) {
+          await this.requireNotInSharedFolder(id);
         }
 
         const deleted = await this.savedQueriesRepository.delete(id);
@@ -382,6 +428,7 @@ export class SavedQueriesService {
 
         const updated = await this.savedQueriesRepository.update(id, {
           sqlTextEncrypted,
+          updatedByUserId: userId,
         });
         if (!updated || (!querySharingEnabled && updated.userId !== userId)) {
           throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
@@ -554,6 +601,19 @@ export class SavedQueriesService {
     );
   }
 
+  private async requireNotInSharedFolder(queryId: string): Promise<void> {
+    const existing = await this.savedQueriesRepository.findById(queryId);
+    if (existing?.folderId) {
+      const folder = await this.foldersRepository.findById(existing.folderId);
+      if (folder?.visibility === 'shared') {
+        throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+          operation: 'mutate_shared_query',
+          reason: 'Shared query editing requires an Enterprise subscription',
+        });
+      }
+    }
+  }
+
   private async linkToQAWithConflictCheck(
     id: string,
     params: LinkToQAParams,
@@ -589,7 +649,23 @@ export class SavedQueriesService {
     return crypto.createHash('sha256').update(sqlText).digest('hex');
   }
 
-  private decryptQuery(query: SavedQuery): DecryptedSavedQuery {
+  private async resolveUserName(
+    userId: string | null | undefined,
+  ): Promise<string | null> {
+    if (!userId) {
+      return null;
+    }
+    const user = await this.userRepository.findById(userId);
+    return user?.name ?? null;
+  }
+
+  private decryptQuery(
+    query: SavedQuery,
+    overrides?: {
+      latestVersionHash?: string | null;
+      updatedByUserName?: string | null;
+    },
+  ): DecryptedSavedQuery {
     const sqlText = this.encryptionService.decrypt(query.sqlTextEncrypted);
     if (sqlText === null || sqlText === undefined) {
       throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
@@ -607,6 +683,8 @@ export class SavedQueriesService {
       linkedQaCustomerKey: query.linkedQaCustomerKey,
       linkedQaName: query.linkedQaName,
       linkedAt: query.linkedAt,
+      latestVersionHash: overrides?.latestVersionHash ?? null,
+      updatedByUserName: overrides?.updatedByUserName ?? null,
     };
   }
 }

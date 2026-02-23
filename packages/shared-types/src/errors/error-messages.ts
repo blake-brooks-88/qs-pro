@@ -59,6 +59,8 @@ export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCode.VALIDATION_ERROR]: "Invalid input. Please check your request.",
   [ErrorCode.FEATURE_NOT_ENABLED]:
     "This feature is not enabled for your subscription.",
+  [ErrorCode.STALE_CONTENT]:
+    "This content was modified by another user. Please reload and try again.",
 
   // Query Activity Errors
   [ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME]:

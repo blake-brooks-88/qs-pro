@@ -11,6 +11,7 @@ import { useBeforeUnloadDirtyTabs } from "@/features/editor-workspace/hooks/use-
 import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
 import { useCreateDataExtensionFlow } from "@/features/editor-workspace/hooks/use-create-data-extension-flow";
 import { useDriftCheck } from "@/features/editor-workspace/hooks/use-drift-check";
+import { useFolders } from "@/features/editor-workspace/hooks/use-folders";
 import { useFormatQuery } from "@/features/editor-workspace/hooks/use-format-query";
 import { useLazyOpenSavedQuery } from "@/features/editor-workspace/hooks/use-lazy-open-saved-query";
 import { usePublishFlow } from "@/features/editor-workspace/hooks/use-publish-flow";
@@ -26,6 +27,7 @@ import { useResultsPaneResize } from "@/features/editor-workspace/hooks/use-resu
 import { useRunRequestHandler } from "@/features/editor-workspace/hooks/use-run-request-handler";
 import { useSaveFlows } from "@/features/editor-workspace/hooks/use-save-flows";
 import { useUpdateSavedQuery } from "@/features/editor-workspace/hooks/use-saved-queries";
+import { useStaleDetection } from "@/features/editor-workspace/hooks/use-stale-detection";
 import { useUnlinkFlow } from "@/features/editor-workspace/hooks/use-unlink-flow";
 import { useVersionHistoryFlow } from "@/features/editor-workspace/hooks/use-version-history-flow";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
@@ -60,6 +62,7 @@ import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
 import { QueryTabBar } from "./QueryTabBar";
+import { StaleWarningDialog } from "./StaleWarningDialog";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { VersionHistoryWarningDialog } from "./VersionHistoryWarningDialog";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
@@ -149,10 +152,17 @@ export function EditorWorkspace({
   // Mutation for auto-saving existing queries
   const updateQuery = useUpdateSavedQuery();
 
+  // Stale detection for shared queries
+  const staleDetection = useStaleDetection();
+
+  // Folder data for shared folder detection
+  const { data: allFolders = [] } = useFolders();
+
   // Query Activity hooks
   const { data: qaFolders = [] } = useQueryActivityFolders(eid);
   const publishMutation = usePublishQuery();
   const { enabled: isDeployFeatureEnabled } = useFeature("deployToAutomation");
+  const { enabled: isTeamCollabEnabled } = useFeature("teamCollaboration");
 
   // Zustand store - single source of truth for tabs
   const tabs = useTabsStore((state) => state.tabs);
@@ -235,6 +245,17 @@ export function EditorWorkspace({
     };
   }, [activeTab, tabs]);
 
+  const isActiveQueryInSharedFolder = useMemo(() => {
+    const folderId = safeActiveTab.queryId
+      ? savedQueries?.find((q) => q.id === safeActiveTab.queryId)?.folderId
+      : null;
+    if (!folderId) {
+      return false;
+    }
+    const folder = allFolders.find((f) => f.id === folderId);
+    return folder?.visibility === "shared";
+  }, [safeActiveTab.queryId, savedQueries, allFolders]);
+
   const {
     isSaveModalOpen,
     saveModalInitialName,
@@ -243,6 +264,10 @@ export function EditorWorkspace({
     handleSave,
     handleSaveAs,
     handleSaveModalSuccess,
+    staleConflict,
+    handleStaleOverwrite,
+    handleStaleReload,
+    handleStaleCancel,
   } = useSaveFlows({
     activeTabId,
     activeTab: safeActiveTab,
@@ -251,7 +276,11 @@ export function EditorWorkspace({
     updateQuery,
     queryClient,
     versionHistoryKeys,
+    storeUpdateTabContent,
     onSave,
+    isActiveQueryInSharedFolder,
+    openedHash: staleDetection.openedHash,
+    onHashUpdated: staleDetection.updateHash,
   });
 
   const { handleFormat } = useFormatQuery({
@@ -428,6 +457,10 @@ export function EditorWorkspace({
             }
           : undefined,
       );
+
+      if (query.latestVersionHash) {
+        staleDetection.trackOpened(query.latestVersionHash);
+      }
     },
   });
 
@@ -652,10 +685,10 @@ export function EditorWorkspace({
                   handleOpenVersionHistory(queryId)
                 }
                 onLinkQuery={
-                  isDeployFeatureEnabled ? handleOpenLinkModal : undefined
+                  isTeamCollabEnabled ? handleOpenLinkModal : undefined
                 }
                 onUnlinkQuery={
-                  isDeployFeatureEnabled ? handleOpenUnlinkModal : undefined
+                  isTeamCollabEnabled ? handleOpenUnlinkModal : undefined
                 }
               />
             ) : null}
@@ -673,7 +706,7 @@ export function EditorWorkspace({
                   onRestore={handleVersionRestore}
                   onUpgradeClick={() => setIsUpgradeModalOpen(true)}
                   onPublishVersion={
-                    isDeployFeatureEnabled && safeActiveTab.linkedQaCustomerKey
+                    isTeamCollabEnabled && safeActiveTab.linkedQaCustomerKey
                       ? handleVersionPublish
                       : undefined
                   }
@@ -695,6 +728,7 @@ export function EditorWorkspace({
                     onCreateDE={handleCreateDE}
                     onOpenImport={() => setIsImportModalOpen(true)}
                     isDeployFeatureEnabled={isDeployFeatureEnabled}
+                    isTeamCollabEnabled={isTeamCollabEnabled}
                     onViewRunHistory={(queryId) => showHistoryForQuery(queryId)}
                     onOpenVersionHistory={() => handleOpenVersionHistory()}
                     onPublish={() => void handlePublishClick()}
@@ -705,6 +739,7 @@ export function EditorWorkspace({
                     onUnlink={(queryId) => handleOpenUnlinkModal(queryId)}
                     onLink={(queryId) => handleOpenLinkModal(queryId)}
                     onCreateInAS={handleOpenQueryActivityModal}
+                    isActiveQueryInSharedFolder={isActiveQueryInSharedFolder}
                   />
 
                   {/* Usage Warning Banner */}
@@ -910,6 +945,14 @@ export function EditorWorkspace({
           onCancel={handleVersionHistoryWarningCancel}
           onContinueWithoutSaving={handleVersionHistoryContinueWithoutSaving}
           onSaveAndContinue={() => void handleVersionHistorySaveAndContinue()}
+        />
+
+        <StaleWarningDialog
+          open={staleConflict !== null}
+          conflictingUserName={staleConflict?.conflictingUserName ?? null}
+          onOverwrite={handleStaleOverwrite}
+          onReload={handleStaleReload}
+          onCancel={handleStaleCancel}
         />
       </div>
     </Tooltip.Provider>

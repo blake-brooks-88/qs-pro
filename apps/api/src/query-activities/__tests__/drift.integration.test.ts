@@ -242,7 +242,7 @@ describe('GET /query-activities/drift/:savedQueryId (integration)', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('pro');
+    await setTenantTier('enterprise');
 
     for (const id of [...createdSavedQueryIds]) {
       try {

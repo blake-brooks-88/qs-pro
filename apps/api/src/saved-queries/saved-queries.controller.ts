@@ -66,6 +66,7 @@ export class SavedQueriesController {
       linkedQaCustomerKey: q.linkedQaCustomerKey,
       linkedQaName: q.linkedQaName,
       linkedAt: q.linkedAt?.toISOString() ?? null,
+      updatedByUserName: q.updatedByUserName ?? null,
     }));
   }
 
@@ -140,6 +141,8 @@ export class SavedQueriesController {
       linkedQaCustomerKey: query.linkedQaCustomerKey,
       linkedQaName: query.linkedQaName,
       linkedAt: query.linkedAt?.toISOString() ?? null,
+      latestVersionHash: query.latestVersionHash ?? null,
+      updatedByUserName: query.updatedByUserName ?? null,
     };
   }
 }

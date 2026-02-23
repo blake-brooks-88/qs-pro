@@ -15,6 +15,7 @@ export interface UpdateSavedQueryParams {
   name?: string;
   sqlTextEncrypted?: string;
   folderId?: string | null;
+  updatedByUserId?: string;
 }
 
 export interface LinkToQAParams {
@@ -31,6 +32,7 @@ export interface SavedQueryListItem {
   linkedQaCustomerKey: string | null;
   linkedQaName: string | null;
   linkedAt: Date | null;
+  updatedByUserName: string | null;
 }
 
 export interface SavedQueriesRepository {

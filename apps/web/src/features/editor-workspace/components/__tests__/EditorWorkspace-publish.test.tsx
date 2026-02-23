@@ -34,6 +34,7 @@ const {
   mockPublishMutateAsync: vi.fn(),
   mockState: {
     deployFeatureEnabled: true,
+    teamCollabEnabled: true,
     publishIsPending: false,
     driftData: null as {
       hasDrift: boolean;
@@ -129,6 +130,9 @@ vi.mock("@/hooks/use-feature", () => ({
   useFeature: (key: string) => {
     if (key === "deployToAutomation") {
       return { enabled: mockState.deployFeatureEnabled, isLoading: false };
+    }
+    if (key === "teamCollaboration") {
+      return { enabled: mockState.teamCollabEnabled, isLoading: false };
     }
     return { enabled: true, isLoading: false };
   },
@@ -247,6 +251,28 @@ vi.mock("@/features/editor-workspace/hooks/use-query-execution", () => ({
   useQueryExecution: () => defaultMockQueryExecution,
 }));
 
+vi.mock("@/features/editor-workspace/hooks/use-folders", () => ({
+  useFolders: () => ({
+    data: [
+      {
+        id: "shared-folder-1",
+        name: "Shared Queries",
+        parentId: null,
+        visibility: "shared",
+        userId: "u1",
+        creatorName: null,
+        createdAt: "2026-02-10T00:00:00.000Z",
+        updatedAt: "2026-02-10T00:00:00.000Z",
+      },
+    ],
+    isLoading: false,
+  }),
+  useCreateFolder: () => ({ mutate: vi.fn() }),
+  useUpdateFolder: () => ({ mutate: vi.fn() }),
+  useDeleteFolder: () => ({ mutate: vi.fn() }),
+  useShareFolder: () => ({ mutate: vi.fn() }),
+}));
+
 vi.mock("@/features/editor-workspace/hooks/use-saved-queries", () => ({
   useUpdateSavedQuery: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ id: "q1", name: "Query" }),
@@ -321,6 +347,24 @@ function createDefaultProps(): Parameters<typeof EditorWorkspace>[0] {
   };
 }
 
+function createLinkedProps(): Parameters<typeof EditorWorkspace>[0] {
+  return {
+    ...createDefaultProps(),
+    savedQueries: [
+      {
+        id: "sq-linked",
+        name: "Linked Query",
+        folderId: "shared-folder-1",
+        content: "SELECT 1",
+        updatedAt: "2026-02-10T00:00:00.000Z",
+        linkedQaCustomerKey: "qa-key-1",
+        linkedQaName: "My QA",
+        linkedAt: "2026-02-10T00:00:00.000Z",
+      },
+    ] satisfies SavedQuery[],
+  };
+}
+
 function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -361,7 +405,9 @@ const linkedTab: QueryTab = {
 };
 
 function renderLinkedWorkspace() {
+  const linkedProps = createLinkedProps();
   const result = renderWorkspace({
+    ...linkedProps,
     initialTabs: [linkedTab],
   });
 
@@ -380,6 +426,7 @@ describe("EditorWorkspace - Publish Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockState.deployFeatureEnabled = true;
+    mockState.teamCollabEnabled = true;
     mockState.publishIsPending = false;
     mockState.driftData = null;
     mockDriftRefetch.mockResolvedValue({ data: { hasDrift: false } });
@@ -423,8 +470,8 @@ describe("EditorWorkspace - Publish Integration", () => {
       expect(screen.queryByText("Publish")).not.toBeInTheDocument();
     });
 
-    it("does NOT show publish button when deployToAutomation is disabled", async () => {
-      mockState.deployFeatureEnabled = false;
+    it("does NOT show publish button when teamCollaboration is disabled", async () => {
+      mockState.teamCollabEnabled = false;
       renderLinkedWorkspace();
 
       await waitFor(() => {

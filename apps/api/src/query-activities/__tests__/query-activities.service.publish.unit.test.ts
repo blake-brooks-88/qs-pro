@@ -41,6 +41,8 @@ describe('QueryActivitiesService (publish)', () => {
     linkedQaCustomerKey: 'qa-key-100',
     linkedQaName: 'QA One',
     linkedAt: new Date('2026-02-01'),
+    latestVersionHash: null,
+    updatedByUserName: null,
   };
 
   const mockSavedQueryUnlinked = {

@@ -24,6 +24,7 @@ export const FeatureKeySchema = z.enum([
   "runToTargetDE",
   "executionHistory",
   "versionHistory",
+  "teamCollaboration",
 ]);
 export type FeatureKey = z.infer<typeof FeatureKeySchema>;
 
@@ -67,6 +68,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, readonly FeatureKey[]> = {
     "runToTargetDE",
     "executionHistory",
     "versionHistory",
+    "teamCollaboration",
   ],
 } as const;
 

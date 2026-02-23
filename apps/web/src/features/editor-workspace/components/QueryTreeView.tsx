@@ -19,30 +19,38 @@ import {
   Folder as FolderIcon,
   History,
   LinkBrokenMinimalistic,
-  LinkMinimalistic,
   Pen,
   TrashBinMinimalistic,
 } from "@solar-icons/react";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 
+import { useFeature } from "@/hooks/use-feature";
 import { cn } from "@/lib/utils";
+import api from "@/services/api";
 
 import {
   useCreateFolder,
   useDeleteFolder,
   useFolders,
+  useShareFolder,
   useUpdateFolder,
 } from "../hooks/use-folders";
 import {
+  useCreateSavedQuery,
   useDeleteSavedQuery,
   useSavedQueries,
   useUpdateSavedQuery,
 } from "../hooks/use-saved-queries";
 import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 import { InlineRenameInput } from "./InlineRenameInput";
 import { LinkedBadge } from "./LinkedBadge";
+import { ShareConfirmationDialog } from "./ShareConfirmationDialog";
+import { SharedQuerySection } from "./SharedQuerySection";
 
 const ROOT_DROPPABLE_ID = "__root__";
+const SHARED_DROP_ZONE_ID = "__shared__";
 
 function isOptimisticFolderId(folderId: string) {
   return folderId.startsWith("temp-");
@@ -99,6 +107,7 @@ interface FolderNodeProps {
   onFinishCreate: (name: string | null) => void;
   allFolders: FolderResponse[];
   onMoveQueryToFolder: (queryId: string, folderId: string | null) => void;
+  folderVisibilityMap: Map<string, "personal" | "shared">;
 }
 
 interface QueryNodeProps {
@@ -116,6 +125,7 @@ interface QueryNodeProps {
   onUnlinkQuery?: () => void;
   allFolders: FolderResponse[];
   onMoveToFolder: (folderId: string | null) => void;
+  isInSharedFolder: boolean;
 }
 
 function DraggableQueryNode(props: QueryNodeProps) {
@@ -154,6 +164,23 @@ function RootDropZone({ children }: { children: ReactNode }) {
   );
 }
 
+function SharedDropZone({ children }: { children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: SHARED_DROP_ZONE_ID });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded transition-colors",
+        isOver && "bg-primary/5 ring-1 ring-primary/50",
+      )}
+      aria-label="Shared drop zone"
+    >
+      {children}
+    </div>
+  );
+}
+
 function QueryNode({
   query,
   depth,
@@ -165,10 +192,11 @@ function QueryNode({
   onDelete,
   onViewHistory,
   onViewVersionHistory,
-  onLinkQuery,
+  onLinkQuery: _onLinkQuery,
   onUnlinkQuery,
   allFolders,
   onMoveToFolder,
+  isInSharedFolder,
 }: QueryNodeProps) {
   if (isRenaming) {
     return (
@@ -185,6 +213,10 @@ function QueryNode({
       </div>
     );
   }
+
+  const personalFolders = allFolders.filter(
+    (f) => (f.visibility ?? "personal") === "personal",
+  );
 
   return (
     <ContextMenu.Root>
@@ -234,16 +266,7 @@ function QueryNode({
               Version History
             </ContextMenu.Item>
           ) : null}
-          {onLinkQuery && !query.linkedQaCustomerKey ? (
-            <ContextMenu.Item
-              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
-              onSelect={onLinkQuery}
-            >
-              <LinkMinimalistic size={14} />
-              Link to Query Activity
-            </ContextMenu.Item>
-          ) : null}
-          {onUnlinkQuery && query.linkedQaCustomerKey ? (
+          {!isInSharedFolder && onUnlinkQuery && query.linkedQaCustomerKey ? (
             <ContextMenu.Item
               className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
               onSelect={onUnlinkQuery}
@@ -265,7 +288,7 @@ function QueryNode({
                   No Folder (Root)
                 </ContextMenu.Item>
                 <ContextMenu.Separator className="h-px bg-border my-1" />
-                {allFolders.map((folder) => (
+                {personalFolders.map((folder) => (
                   <ContextMenu.Item
                     key={folder.id}
                     className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
@@ -273,7 +296,7 @@ function QueryNode({
                     onSelect={() => onMoveToFolder(folder.id)}
                   >
                     <FolderIcon size={14} />{" "}
-                    {getFolderPath(allFolders, folder.id) || folder.name}
+                    {getFolderPath(personalFolders, folder.id) || folder.name}
                   </ContextMenu.Item>
                 ))}
               </ContextMenu.SubContent>
@@ -329,6 +352,7 @@ function FolderNode({
   onFinishCreate,
   allFolders,
   onMoveQueryToFolder,
+  folderVisibilityMap,
 }: FolderNodeProps) {
   const isOptimistic = isOptimisticFolderId(folder.id);
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -497,6 +521,7 @@ function FolderNode({
                 onFinishCreate={onFinishCreate}
                 allFolders={allFolders}
                 onMoveQueryToFolder={onMoveQueryToFolder}
+                folderVisibilityMap={folderVisibilityMap}
               />
             );
           })}
@@ -521,9 +546,7 @@ function FolderNode({
                   ? () => onViewVersionHistory(query.id)
                   : undefined
               }
-              onLinkQuery={
-                onLinkQuery ? () => onLinkQuery(query.id) : undefined
-              }
+              onLinkQuery={undefined}
               onUnlinkQuery={
                 onUnlinkQuery ? () => onUnlinkQuery(query.id) : undefined
               }
@@ -531,6 +554,7 @@ function FolderNode({
               onMoveToFolder={(folderId) =>
                 onMoveQueryToFolder(query.id, folderId)
               }
+              isInSharedFolder={false}
             />
           ))}
         </div>
@@ -549,11 +573,14 @@ export function QueryTreeView({
 }: QueryTreeViewProps) {
   const { data: folders = [] } = useFolders();
   const { data: queries = [] } = useSavedQueries();
+  const { enabled: isTeamCollabEnabled } = useFeature("teamCollaboration");
   const createFolder = useCreateFolder();
   const updateFolder = useUpdateFolder();
   const deleteFolder = useDeleteFolder();
+  const shareFolder = useShareFolder();
   const updateQuery = useUpdateSavedQuery();
   const deleteQuery = useDeleteSavedQuery();
+  const createSavedQuery = useCreateSavedQuery();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -568,26 +595,94 @@ export function QueryTreeView({
   >({});
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [creatingIn, setCreatingIn] = useState<string | null>(null);
+  const [sharedCreatingIn, setSharedCreatingIn] = useState<string | null>(null);
 
-  const filteredFolders = useMemo(() => {
+  const [shareConfirm, setShareConfirm] = useState<{
+    itemName: string;
+    itemType: "folder" | "query";
+    itemId: string;
+    targetFolderId: string | null;
+  } | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    itemId: string;
+    itemType: "folder" | "query";
+    isShared: boolean;
+  } | null>(null);
+
+  const folderVisibilityMap = useMemo(() => {
+    const map = new Map<string, "personal" | "shared">();
+    for (const folder of folders) {
+      map.set(folder.id, folder.visibility ?? "personal");
+    }
+    return map;
+  }, [folders]);
+
+  const personalFolders = useMemo(
+    () => folders.filter((f) => (f.visibility ?? "personal") === "personal"),
+    [folders],
+  );
+
+  const sharedFolders = useMemo(
+    () => folders.filter((f) => f.visibility === "shared"),
+    [folders],
+  );
+
+  const getQueryVisibility = useCallback(
+    (query: SavedQueryListItem): "personal" | "shared" => {
+      if (!query.folderId) {
+        return "personal";
+      }
+      return folderVisibilityMap.get(query.folderId) ?? "personal";
+    },
+    [folderVisibilityMap],
+  );
+
+  const personalQueries = useMemo(
+    () => queries.filter((q) => getQueryVisibility(q) === "personal"),
+    [queries, getQueryVisibility],
+  );
+
+  const sharedQueries = useMemo(
+    () => queries.filter((q) => getQueryVisibility(q) === "shared"),
+    [queries, getQueryVisibility],
+  );
+
+  const filteredPersonalFolders = useMemo(() => {
     if (!searchQuery.trim()) {
-      return folders;
+      return personalFolders;
     }
     const query = searchQuery.toLowerCase();
-    return folders.filter((f) => f.name.toLowerCase().includes(query));
-  }, [folders, searchQuery]);
+    return personalFolders.filter((f) => f.name.toLowerCase().includes(query));
+  }, [personalFolders, searchQuery]);
 
-  const filteredQueries = useMemo(() => {
+  const filteredPersonalQueries = useMemo(() => {
     if (!searchQuery.trim()) {
-      return queries;
+      return personalQueries;
     }
     const query = searchQuery.toLowerCase();
-    return queries.filter((q) => q.name.toLowerCase().includes(query));
-  }, [queries, searchQuery]);
+    return personalQueries.filter((q) => q.name.toLowerCase().includes(query));
+  }, [personalQueries, searchQuery]);
 
-  const foldersByParent = useMemo(() => {
+  const filteredSharedFolders = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return sharedFolders;
+    }
+    const query = searchQuery.toLowerCase();
+    return sharedFolders.filter((f) => f.name.toLowerCase().includes(query));
+  }, [sharedFolders, searchQuery]);
+
+  const filteredSharedQueries = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return sharedQueries;
+    }
+    const query = searchQuery.toLowerCase();
+    return sharedQueries.filter((q) => q.name.toLowerCase().includes(query));
+  }, [sharedQueries, searchQuery]);
+
+  const personalFoldersByParent = useMemo(() => {
     const map = new Map<string | null, FolderResponse[]>();
-    filteredFolders.forEach((folder) => {
+    filteredPersonalFolders.forEach((folder) => {
       const key = folder.parentId;
       const existing = map.get(key) ?? [];
       existing.push(folder);
@@ -599,11 +694,11 @@ export function QueryTreeView({
       ),
     );
     return map;
-  }, [filteredFolders]);
+  }, [filteredPersonalFolders]);
 
-  const queriesByFolder = useMemo(() => {
+  const personalQueriesByFolder = useMemo(() => {
     const map = new Map<string | null, SavedQueryListItem[]>();
-    filteredQueries.forEach((query) => {
+    filteredPersonalQueries.forEach((query) => {
       const key = query.folderId;
       const existing = map.get(key) ?? [];
       existing.push(query);
@@ -615,7 +710,47 @@ export function QueryTreeView({
       ),
     );
     return map;
-  }, [filteredQueries]);
+  }, [filteredPersonalQueries]);
+
+  const sharedFoldersByParent = useMemo(() => {
+    const map = new Map<string | null, FolderResponse[]>();
+    filteredSharedFolders.forEach((folder) => {
+      const key = folder.parentId;
+      if (key && folderVisibilityMap.get(key) === "shared") {
+        const existing = map.get(key) ?? [];
+        existing.push(folder);
+        map.set(key, existing);
+      } else {
+        const existing = map.get(null) ?? [];
+        existing.push(folder);
+        map.set(null, existing);
+      }
+    });
+    map.forEach((entries) =>
+      entries.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    );
+    return map;
+  }, [filteredSharedFolders, folderVisibilityMap]);
+
+  const sharedQueriesByFolder = useMemo(() => {
+    const map = new Map<string | null, SavedQueryListItem[]>();
+    filteredSharedQueries.forEach((query) => {
+      const key = query.folderId;
+      const existing = map.get(key) ?? [];
+      existing.push(query);
+      map.set(key, existing);
+    });
+    map.forEach((entries) =>
+      entries.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    );
+    return map;
+  }, [filteredSharedQueries]);
+
+  const [isPersonalExpanded, setIsPersonalExpanded] = useState(true);
 
   const handleExpandFolder = useCallback((id: string) => {
     setExpandedFolders((prev) => ({ ...prev, [id]: true }));
@@ -642,9 +777,14 @@ export function QueryTreeView({
       if (isOptimisticFolderId(id)) {
         return;
       }
+      const isShared = folderVisibilityMap.get(id) === "shared";
+      if (isShared) {
+        setDeleteConfirm({ itemId: id, itemType: "folder", isShared: true });
+        return;
+      }
       deleteFolder.mutate(id);
     },
-    [deleteFolder],
+    [deleteFolder, folderVisibilityMap],
   );
 
   const handleRenameQuery = useCallback(
@@ -657,10 +797,30 @@ export function QueryTreeView({
 
   const handleDeleteQuery = useCallback(
     (id: string) => {
+      const query = queries.find((q) => q.id === id);
+      const isShared = query?.folderId
+        ? folderVisibilityMap.get(query.folderId) === "shared"
+        : false;
+      if (isShared) {
+        setDeleteConfirm({ itemId: id, itemType: "query", isShared: true });
+        return;
+      }
       deleteQuery.mutate(id);
     },
-    [deleteQuery],
+    [deleteQuery, queries, folderVisibilityMap],
   );
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (!deleteConfirm) {
+      return;
+    }
+    if (deleteConfirm.itemType === "folder") {
+      deleteFolder.mutate(deleteConfirm.itemId);
+    } else {
+      deleteQuery.mutate(deleteConfirm.itemId);
+    }
+    setDeleteConfirm(null);
+  }, [deleteConfirm, deleteFolder, deleteQuery]);
 
   const handleStartCreate = useCallback(
     (parentId: string | null) => {
@@ -688,6 +848,33 @@ export function QueryTreeView({
     [createFolder, creatingIn],
   );
 
+  const handleStartSharedCreate = useCallback(
+    (parentId: string | null) => {
+      if (parentId && isOptimisticFolderId(parentId)) {
+        return;
+      }
+      setSharedCreatingIn(parentId ?? "");
+      if (parentId) {
+        handleExpandFolder(parentId);
+      }
+    },
+    [handleExpandFolder],
+  );
+
+  const handleFinishSharedCreate = useCallback(
+    (name: string | null) => {
+      if (name) {
+        createFolder.mutate({
+          name,
+          parentId: sharedCreatingIn === "" ? null : sharedCreatingIn,
+          visibility: "shared",
+        });
+      }
+      setSharedCreatingIn(null);
+    },
+    [createFolder, sharedCreatingIn],
+  );
+
   const handleMoveQuery = useCallback(
     (queryId: string, folderId: string | null) => {
       updateQuery.mutate({ id: queryId, data: { folderId } });
@@ -695,10 +882,57 @@ export function QueryTreeView({
     [updateQuery],
   );
 
+  const handleDuplicateToPersonal = useCallback(
+    async (queryId: string) => {
+      const query = queries.find((q) => q.id === queryId);
+      if (!query) {
+        return;
+      }
+
+      try {
+        const response = await api.get<{ sqlText: string }>(
+          `/saved-queries/${queryId}`,
+        );
+        createSavedQuery.mutate({
+          name: `${query.name} (copy)`,
+          sqlText: response.data.sqlText,
+          folderId: null,
+        });
+        toast.success("Query duplicated to My Queries");
+      } catch {
+        createSavedQuery.mutate({
+          name: `${query.name} (copy)`,
+          sqlText: "",
+          folderId: null,
+        });
+        toast.success("Query duplicated to My Queries (without content)");
+      }
+    },
+    [queries, createSavedQuery],
+  );
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const parsed = parseDraggableId(String(event.active.id));
     setDraggedItem(parsed);
   }, []);
+
+  const handleShareConfirm = useCallback(() => {
+    if (!shareConfirm) {
+      return;
+    }
+
+    if (shareConfirm.itemType === "folder") {
+      shareFolder.mutate(shareConfirm.itemId);
+    } else {
+      if (shareConfirm.targetFolderId) {
+        updateQuery.mutate({
+          id: shareConfirm.itemId,
+          data: { folderId: shareConfirm.targetFolderId },
+        });
+      }
+    }
+    setShareConfirm(null);
+  }, [shareConfirm, shareFolder, updateQuery]);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -710,20 +944,58 @@ export function QueryTreeView({
       }
 
       const parsed = parseDraggableId(String(active.id));
-      const targetFolderId =
-        over.id === ROOT_DROPPABLE_ID ? null : String(over.id);
+      const targetId = String(over.id);
 
       if (parsed.type === "query") {
-        if (targetFolderId && isOptimisticFolderId(targetFolderId)) {
-          return;
-        }
-
         const query = queries.find((q) => q.id === parsed.id);
         if (!query) {
           return;
         }
 
+        const sourceVisibility = getQueryVisibility(query);
+
+        if (targetId === SHARED_DROP_ZONE_ID) {
+          if (sourceVisibility === "shared") {
+            return;
+          }
+          toast.error(
+            "Drag a folder to share it. Individual queries inherit visibility from their folder.",
+          );
+          return;
+        }
+
+        const targetFolderId = targetId === ROOT_DROPPABLE_ID ? null : targetId;
+
+        if (targetFolderId && isOptimisticFolderId(targetFolderId)) {
+          return;
+        }
+
         if (query.folderId === targetFolderId) {
+          return;
+        }
+
+        const targetVisibility = targetFolderId
+          ? (folderVisibilityMap.get(targetFolderId) ?? "personal")
+          : "personal";
+
+        if (sourceVisibility === "shared" && targetVisibility === "personal") {
+          toast.info(
+            "Shared items cannot be moved to personal. Use 'Duplicate to Personal' from the context menu instead.",
+          );
+          return;
+        }
+
+        if (sourceVisibility === "personal" && targetVisibility === "shared") {
+          if (!isTeamCollabEnabled) {
+            toast.info("Sharing requires an Enterprise subscription.");
+            return;
+          }
+          setShareConfirm({
+            itemName: query.name,
+            itemType: "query",
+            itemId: parsed.id,
+            targetFolderId,
+          });
           return;
         }
 
@@ -739,16 +1011,38 @@ export function QueryTreeView({
           return;
         }
 
+        const draggedFolder = folders.find((f) => f.id === parsed.id);
+        if (!draggedFolder) {
+          return;
+        }
+
+        const sourceVisibility =
+          folderVisibilityMap.get(parsed.id) ?? "personal";
+
+        if (targetId === SHARED_DROP_ZONE_ID) {
+          if (sourceVisibility === "shared") {
+            return;
+          }
+          if (!isTeamCollabEnabled) {
+            toast.info("Sharing requires an Enterprise subscription.");
+            return;
+          }
+          setShareConfirm({
+            itemName: draggedFolder.name,
+            itemType: "folder",
+            itemId: parsed.id,
+            targetFolderId: null,
+          });
+          return;
+        }
+
+        const targetFolderId = targetId === ROOT_DROPPABLE_ID ? null : targetId;
+
         if (targetFolderId && isOptimisticFolderId(targetFolderId)) {
           return;
         }
 
         if (targetFolderId === parsed.id) {
-          return;
-        }
-
-        const draggedFolder = folders.find((f) => f.id === parsed.id);
-        if (!draggedFolder) {
           return;
         }
 
@@ -764,17 +1058,48 @@ export function QueryTreeView({
           }
         }
 
+        const targetVisibility = targetFolderId
+          ? (folderVisibilityMap.get(targetFolderId) ?? "personal")
+          : "personal";
+
+        if (sourceVisibility === "shared" && targetVisibility === "personal") {
+          toast.info("Shared folders cannot be moved to personal.");
+          return;
+        }
+
+        if (sourceVisibility === "personal" && targetVisibility === "shared") {
+          if (!isTeamCollabEnabled) {
+            toast.info("Sharing requires an Enterprise subscription.");
+            return;
+          }
+          setShareConfirm({
+            itemName: draggedFolder.name,
+            itemType: "folder",
+            itemId: parsed.id,
+            targetFolderId,
+          });
+          return;
+        }
+
         updateFolder.mutate({
           id: parsed.id,
           data: { parentId: targetFolderId },
         });
       }
     },
-    [folders, queries, updateFolder, updateQuery],
+    [
+      folders,
+      queries,
+      updateFolder,
+      updateQuery,
+      folderVisibilityMap,
+      getQueryVisibility,
+      isTeamCollabEnabled,
+    ],
   );
 
-  const rootFolders = foldersByParent.get(null) ?? [];
-  const rootQueries = queriesByFolder.get(null) ?? [];
+  const rootPersonalFolders = personalFoldersByParent.get(null) ?? [];
+  const rootPersonalQueries = personalQueriesByFolder.get(null) ?? [];
 
   const draggedQuery =
     draggedItem?.type === "query"
@@ -787,137 +1112,184 @@ export function QueryTreeView({
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between px-2 py-1 mb-2">
-        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          Query Library
-        </span>
-        <button
-          type="button"
-          onClick={() => handleStartCreate(null)}
-          className="p-1 text-muted-foreground hover:text-primary rounded hover:bg-surface-hover"
-          title="New Folder"
-        >
-          <AddFolder size={16} />
-        </button>
-      </div>
-
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        {creatingIn === "" && (
-          <div
-            className="flex items-center gap-2 px-2 py-1 text-xs"
-            style={{ paddingLeft: "8px" }}
-          >
-            <FolderIcon
-              size={16}
-              className="text-muted-foreground/60 shrink-0"
-            />
-            <InlineRenameInput
-              initialValue=""
-              onSave={(name) => handleFinishCreate(name)}
-              onCancel={() => handleFinishCreate(null)}
-            />
+        {/* My Queries Section */}
+        <div>
+          <div className="flex items-center justify-between px-2 py-1 mb-2">
+            <button
+              type="button"
+              onClick={() => setIsPersonalExpanded((prev) => !prev)}
+              className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+            >
+              <AltArrowRight
+                size={12}
+                className={cn(
+                  "transition-transform",
+                  isPersonalExpanded && "rotate-90",
+                )}
+              />
+              My Queries
+            </button>
+            <button
+              type="button"
+              onClick={() => handleStartCreate(null)}
+              className="p-1 text-muted-foreground hover:text-primary rounded hover:bg-surface-hover"
+              title="New Folder"
+            >
+              <AddFolder size={16} />
+            </button>
           </div>
-        )}
 
-        {rootFolders.length === 0 &&
-        rootQueries.length === 0 &&
-        creatingIn === null ? (
-          <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-            No saved queries yet.
-            <br />
-            <span className="text-muted-foreground/70">
-              Press Ctrl+S to save your first query.
-            </span>
-          </div>
-        ) : (
-          <>
-            {rootFolders.map((folder) => {
-              const childFolders = foldersByParent.get(folder.id) ?? [];
-              const childQueries = queriesByFolder.get(folder.id) ?? [];
-              return (
-                <FolderNode
-                  key={folder.id}
-                  folder={folder}
-                  depth={0}
-                  isExpanded={Boolean(expandedFolders[folder.id])}
-                  onToggle={() =>
-                    expandedFolders[folder.id]
-                      ? handleCollapseFolder(folder.id)
-                      : handleExpandFolder(folder.id)
-                  }
-                  childFolders={childFolders}
-                  childQueries={childQueries}
-                  expandedFolders={expandedFolders}
-                  onExpandFolder={handleExpandFolder}
-                  onCollapseFolder={handleCollapseFolder}
-                  foldersByParent={foldersByParent}
-                  queriesByFolder={queriesByFolder}
-                  onSelectQuery={onSelectQuery}
-                  renamingId={renamingId}
-                  onStartRename={setRenamingId}
-                  onFinishRename={() => setRenamingId(null)}
-                  onRenameFolder={handleRenameFolder}
-                  onDeleteFolder={handleDeleteFolder}
-                  onRenameQuery={handleRenameQuery}
-                  onDeleteQuery={handleDeleteQuery}
-                  onViewQueryHistory={onViewQueryHistory}
-                  onViewVersionHistory={onViewVersionHistory}
-                  onLinkQuery={onLinkQuery}
-                  onUnlinkQuery={onUnlinkQuery}
-                  creatingIn={creatingIn}
-                  onStartCreate={handleStartCreate}
-                  onFinishCreate={handleFinishCreate}
-                  allFolders={folders}
-                  onMoveQueryToFolder={handleMoveQuery}
-                />
-              );
-            })}
-            <RootDropZone>
-              {draggedItem && rootQueries.length === 0 ? (
-                <div className="px-2 py-1 text-[11px] text-muted-foreground/70">
-                  Drop here to move to root
+          {isPersonalExpanded ? (
+            <>
+              {creatingIn === "" && (
+                <div
+                  className="flex items-center gap-2 px-2 py-1 text-xs"
+                  style={{ paddingLeft: "8px" }}
+                >
+                  <FolderIcon
+                    size={16}
+                    className="text-muted-foreground/60 shrink-0"
+                  />
+                  <InlineRenameInput
+                    initialValue=""
+                    onSave={(name) => handleFinishCreate(name)}
+                    onCancel={() => handleFinishCreate(null)}
+                  />
                 </div>
-              ) : null}
-              {rootQueries.map((query) => (
-                <DraggableQueryNode
-                  key={query.id}
-                  query={query}
-                  depth={0}
-                  onSelect={() => onSelectQuery(query.id)}
-                  isRenaming={renamingId === `query-${query.id}`}
-                  onStartRename={() => setRenamingId(`query-${query.id}`)}
-                  onFinishRename={() => setRenamingId(null)}
-                  onRename={(name) => handleRenameQuery(query.id, name)}
-                  onDelete={() => handleDeleteQuery(query.id)}
-                  onViewHistory={
-                    onViewQueryHistory
-                      ? () => onViewQueryHistory(query.id)
-                      : undefined
-                  }
-                  onViewVersionHistory={
-                    onViewVersionHistory
-                      ? () => onViewVersionHistory(query.id)
-                      : undefined
-                  }
-                  onLinkQuery={
-                    onLinkQuery ? () => onLinkQuery(query.id) : undefined
-                  }
-                  onUnlinkQuery={
-                    onUnlinkQuery ? () => onUnlinkQuery(query.id) : undefined
-                  }
-                  allFolders={folders}
-                  onMoveToFolder={(folderId) =>
-                    handleMoveQuery(query.id, folderId)
-                  }
-                />
-              ))}
-            </RootDropZone>
-          </>
-        )}
+              )}
+
+              {rootPersonalFolders.length === 0 &&
+              rootPersonalQueries.length === 0 &&
+              creatingIn === null ? (
+                <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                  No saved queries yet.
+                  <br />
+                  <span className="text-muted-foreground/70">
+                    Press Ctrl+S to save your first query.
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {rootPersonalFolders.map((folder) => {
+                    const childFolders =
+                      personalFoldersByParent.get(folder.id) ?? [];
+                    const childQueries =
+                      personalQueriesByFolder.get(folder.id) ?? [];
+                    return (
+                      <FolderNode
+                        key={folder.id}
+                        folder={folder}
+                        depth={0}
+                        isExpanded={Boolean(expandedFolders[folder.id])}
+                        onToggle={() =>
+                          expandedFolders[folder.id]
+                            ? handleCollapseFolder(folder.id)
+                            : handleExpandFolder(folder.id)
+                        }
+                        childFolders={childFolders}
+                        childQueries={childQueries}
+                        expandedFolders={expandedFolders}
+                        onExpandFolder={handleExpandFolder}
+                        onCollapseFolder={handleCollapseFolder}
+                        foldersByParent={personalFoldersByParent}
+                        queriesByFolder={personalQueriesByFolder}
+                        onSelectQuery={onSelectQuery}
+                        renamingId={renamingId}
+                        onStartRename={setRenamingId}
+                        onFinishRename={() => setRenamingId(null)}
+                        onRenameFolder={handleRenameFolder}
+                        onDeleteFolder={handleDeleteFolder}
+                        onRenameQuery={handleRenameQuery}
+                        onDeleteQuery={handleDeleteQuery}
+                        onViewQueryHistory={onViewQueryHistory}
+                        onViewVersionHistory={onViewVersionHistory}
+                        onLinkQuery={undefined}
+                        onUnlinkQuery={onUnlinkQuery}
+                        creatingIn={creatingIn}
+                        onStartCreate={handleStartCreate}
+                        onFinishCreate={handleFinishCreate}
+                        allFolders={personalFolders}
+                        onMoveQueryToFolder={handleMoveQuery}
+                        folderVisibilityMap={folderVisibilityMap}
+                      />
+                    );
+                  })}
+                  <RootDropZone>
+                    {draggedItem && rootPersonalQueries.length === 0 ? (
+                      <div className="px-2 py-1 text-[11px] text-muted-foreground/70">
+                        Drop here to move to root
+                      </div>
+                    ) : null}
+                    {rootPersonalQueries.map((query) => (
+                      <DraggableQueryNode
+                        key={query.id}
+                        query={query}
+                        depth={0}
+                        onSelect={() => onSelectQuery(query.id)}
+                        isRenaming={renamingId === `query-${query.id}`}
+                        onStartRename={() => setRenamingId(`query-${query.id}`)}
+                        onFinishRename={() => setRenamingId(null)}
+                        onRename={(name) => handleRenameQuery(query.id, name)}
+                        onDelete={() => handleDeleteQuery(query.id)}
+                        onViewHistory={
+                          onViewQueryHistory
+                            ? () => onViewQueryHistory(query.id)
+                            : undefined
+                        }
+                        onViewVersionHistory={
+                          onViewVersionHistory
+                            ? () => onViewVersionHistory(query.id)
+                            : undefined
+                        }
+                        onLinkQuery={undefined}
+                        onUnlinkQuery={
+                          onUnlinkQuery
+                            ? () => onUnlinkQuery(query.id)
+                            : undefined
+                        }
+                        allFolders={personalFolders}
+                        onMoveToFolder={(folderId) =>
+                          handleMoveQuery(query.id, folderId)
+                        }
+                        isInSharedFolder={false}
+                      />
+                    ))}
+                  </RootDropZone>
+                </>
+              )}
+            </>
+          ) : null}
+        </div>
+
+        {/* Shared Queries Section */}
+        <SharedDropZone>
+          <SharedQuerySection
+            folders={filteredSharedFolders}
+            queries={filteredSharedQueries}
+            foldersByParent={sharedFoldersByParent}
+            queriesByFolder={sharedQueriesByFolder}
+            onSelectQuery={onSelectQuery}
+            onRenameFolder={handleRenameFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onRenameQuery={handleRenameQuery}
+            onDeleteQuery={handleDeleteQuery}
+            onViewQueryHistory={onViewQueryHistory}
+            onViewVersionHistory={onViewVersionHistory}
+            onLinkQuery={onLinkQuery}
+            onUnlinkQuery={onUnlinkQuery}
+            onCreateFolder={handleStartSharedCreate}
+            onFinishCreate={handleFinishSharedCreate}
+            creatingIn={sharedCreatingIn}
+            onMoveQueryToFolder={handleMoveQuery}
+            onDuplicateToPersonal={handleDuplicateToPersonal}
+            allSharedFolders={sharedFolders}
+          />
+        </SharedDropZone>
 
         <DragOverlay>
           {draggedQuery ? (
@@ -933,6 +1305,32 @@ export function QueryTreeView({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <ShareConfirmationDialog
+        open={shareConfirm !== null}
+        onConfirm={handleShareConfirm}
+        onCancel={() => setShareConfirm(null)}
+        itemName={shareConfirm?.itemName ?? ""}
+        itemType={shareConfirm?.itemType ?? "query"}
+      />
+
+      <ConfirmationDialog
+        isOpen={deleteConfirm !== null}
+        title={
+          deleteConfirm?.itemType === "folder"
+            ? "Delete shared folder?"
+            : "Delete shared query?"
+        }
+        description={
+          deleteConfirm?.itemType === "folder"
+            ? "This shared folder and its contents are visible to your team. Deleting it will remove it for everyone. This action cannot be undone."
+            : "This shared query is visible to your team. Deleting it will remove it for everyone. This action cannot be undone."
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

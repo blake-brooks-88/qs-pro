@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
 
 import { CsrfGuard } from '../auth/csrf.guard';
+import { FeaturesModule } from '../features/features.module';
 import { DrizzleFoldersRepository } from './drizzle-folders.repository';
 import { FoldersController } from './folders.controller';
 import { FoldersService } from './folders.service';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, FeaturesModule],
   controllers: [FoldersController],
   providers: [
     FoldersService,

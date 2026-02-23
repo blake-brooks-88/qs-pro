@@ -50,6 +50,17 @@ export class QueryActivitiesController {
     }
   }
 
+  private async requireTeamCollaboration(tenantId: string): Promise<void> {
+    const { features } = await this.featuresService.getTenantFeatures(tenantId);
+    if (!features.teamCollaboration) {
+      throw new AppError(ErrorCode.FEATURE_NOT_ENABLED, undefined, {
+        operation: 'queryActivities',
+        reason:
+          'Link, publish, and drift operations require Enterprise subscription',
+      });
+    }
+  }
+
   @Post()
   @UseGuards(CsrfGuard)
   @Audited('query_activity.created')
@@ -89,7 +100,7 @@ export class QueryActivitiesController {
     @Body(new ZodValidationPipe(LinkQueryRequestSchema))
     dto: LinkQueryRequest,
   ) {
-    await this.requireDeployFeature(user.tenantId);
+    await this.requireTeamCollaboration(user.tenantId);
 
     return this.queryActivitiesService.linkQuery(
       user.tenantId,
@@ -110,7 +121,7 @@ export class QueryActivitiesController {
     savedQueryId: string,
     @Body() body: unknown,
   ) {
-    await this.requireDeployFeature(user.tenantId);
+    await this.requireTeamCollaboration(user.tenantId);
 
     const parsed = UnlinkRequestSchema.safeParse(body ?? {});
     const options = parsed.success
@@ -136,7 +147,7 @@ export class QueryActivitiesController {
     @Body(new ZodValidationPipe(PublishQueryRequestSchema))
     dto: PublishQueryRequest,
   ) {
-    await this.requireDeployFeature(user.tenantId);
+    await this.requireTeamCollaboration(user.tenantId);
 
     return this.queryActivitiesService.publish(
       user.tenantId,
@@ -153,7 +164,7 @@ export class QueryActivitiesController {
     @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
     savedQueryId: string,
   ) {
-    await this.requireDeployFeature(user.tenantId);
+    await this.requireTeamCollaboration(user.tenantId);
 
     return this.queryActivitiesService.checkDrift(
       user.tenantId,
@@ -169,7 +180,7 @@ export class QueryActivitiesController {
     @Param('savedQueryId', new ParseUUIDPipe({ version: '4' }))
     savedQueryId: string,
   ) {
-    await this.requireDeployFeature(user.tenantId);
+    await this.requireTeamCollaboration(user.tenantId);
 
     return this.queryActivitiesService.getBlastRadius(
       user.tenantId,
