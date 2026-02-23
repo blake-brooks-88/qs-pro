@@ -47,7 +47,7 @@ export class WebhookHandlerService {
   }
 
   async process(event: Stripe.Event): Promise<void> {
-    this.logger.log(`[DIAG] Processing event: ${event.type} (${event.id})`);
+    this.logger.debug(`Processing event: ${event.type} (${event.id})`);
 
     const isNew = await this.webhookEventRepo.markProcessing(
       event.id,
@@ -108,11 +108,11 @@ export class WebhookHandlerService {
     const stripeCustomerId = session.customer as string | null;
     const stripeSubscriptionId = session.subscription as string | null;
 
-    this.logger.log(
-      `[DIAG] checkout.session.completed — customerId: ${stripeCustomerId}, subscriptionId: ${stripeSubscriptionId}`,
+    this.logger.debug(
+      `checkout.session.completed — customerId: ${stripeCustomerId}, subscriptionId: ${stripeSubscriptionId}`,
     );
-    this.logger.log(
-      `[DIAG] checkout.session.completed — metadata: ${JSON.stringify(session.metadata)}`,
+    this.logger.debug(
+      `checkout.session.completed — metadata keys: ${Object.keys(session.metadata ?? {}).join(', ')}`,
     );
 
     if (!stripeCustomerId || !stripeSubscriptionId) {
@@ -133,8 +133,8 @@ export class WebhookHandlerService {
     }
 
     const tenant = await this.tenantRepo.findByEid(eid);
-    this.logger.log(
-      `[DIAG] checkout.session.completed — eid: ${eid}, tenant found: ${!!tenant}, tenantId: ${tenant?.id}`,
+    this.logger.debug(
+      `checkout.session.completed — eid: ${eid}, tenant found: ${!!tenant}, tenantId: ${tenant?.id}`,
     );
     if (!tenant) {
       throw new Error(`Tenant not found for eid: ${eid}`);
@@ -144,17 +144,15 @@ export class WebhookHandlerService {
       tenant.id,
       'system',
       async () => {
-        this.logger.log(
-          `[DIAG] checkout.session.completed — updating subscription: tier=${tier}, tenantId=${tenant.id}`,
+        this.logger.debug(
+          `checkout.session.completed — updating subscription: tier=${tier}, tenantId=${tenant.id}`,
         );
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
           stripeCustomerId,
           stripeSubscriptionId,
           tier,
         });
-        this.logger.log(
-          `[DIAG] checkout.session.completed — DB update complete`,
-        );
+        this.logger.debug(`checkout.session.completed — DB update complete`);
       },
     );
 
@@ -172,8 +170,8 @@ export class WebhookHandlerService {
   private async handleSubscriptionChange(
     subscription: Stripe.Subscription,
   ): Promise<void> {
-    this.logger.log(
-      `[DIAG] subscription change — status: ${subscription.status}, metadata: ${JSON.stringify(subscription.metadata)}`,
+    this.logger.debug(
+      `subscription change — status: ${subscription.status}, metadata keys: ${Object.keys(subscription.metadata ?? {}).join(', ')}`,
     );
 
     if (!subscription.items.data[0]) {
@@ -189,8 +187,8 @@ export class WebhookHandlerService {
     const eid = this.resolveEid(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
-    this.logger.log(
-      `[DIAG] subscription change — eid: ${eid}, tenant found: ${!!tenant}`,
+    this.logger.debug(
+      `subscription change — eid: ${eid}, tenant found: ${!!tenant}`,
     );
     if (!tenant) {
       this.logger.warn(
@@ -200,11 +198,11 @@ export class WebhookHandlerService {
     }
 
     const productId = subscription.items.data[0].price.product as string;
-    this.logger.log(
-      `[DIAG] subscription change — resolving tier from product: ${productId}`,
+    this.logger.debug(
+      `subscription change — resolving tier from product: ${productId}`,
     );
     const tier = await this.resolveTierFromProduct(productId);
-    this.logger.log(`[DIAG] subscription change — resolved tier: ${tier}`);
+    this.logger.debug(`subscription change — resolved tier: ${tier}`);
 
     const isPastDueOrUnpaid =
       subscription.status === 'past_due' || subscription.status === 'unpaid';
@@ -399,8 +397,8 @@ export class WebhookHandlerService {
       throw new Error('Stripe client not configured');
     }
     const product = await this.stripe.products.retrieve(productId);
-    this.logger.log(
-      `[DIAG] resolveTierFromProduct — product: ${productId}, metadata: ${JSON.stringify(product.metadata)}`,
+    this.logger.debug(
+      `resolveTierFromProduct — product: ${productId}, metadata keys: ${Object.keys(product.metadata ?? {}).join(', ')}`,
     );
     const tier = product.metadata?.tier;
     if (!isValidPaidTier(tier)) {

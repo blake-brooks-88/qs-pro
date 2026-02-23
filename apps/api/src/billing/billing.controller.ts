@@ -26,7 +26,6 @@ import { STRIPE_CLIENT } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';
 
 @Controller('billing')
-@SkipThrottle()
 export class BillingController {
   private readonly logger = new Logger(BillingController.name);
 
@@ -69,6 +68,7 @@ export class BillingController {
     return { token };
   }
 
+  @SkipThrottle()
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
@@ -95,8 +95,8 @@ export class BillingController {
       'STRIPE_WEBHOOK_SECRET',
     );
 
-    this.logger.log(
-      `[DIAG] Webhook received — signature present: ${!!signature}, rawBody length: ${req.rawBody.length}`,
+    this.logger.debug(
+      `Webhook received — signature present: ${!!signature}, rawBody length: ${req.rawBody.length}`,
     );
 
     let event: Stripe.Event;
@@ -115,12 +115,12 @@ export class BillingController {
       });
     }
 
-    this.logger.log(
-      `[DIAG] Webhook verified — event.type: ${event.type}, event.id: ${event.id}`,
+    this.logger.debug(
+      `Webhook verified — event.type: ${event.type}, event.id: ${event.id}`,
     );
 
     await this.webhookHandler.process(event);
-    this.logger.log(`[DIAG] Webhook processed successfully — ${event.type}`);
+    this.logger.debug(`Webhook processed successfully — ${event.type}`);
     return { received: true };
   }
 }

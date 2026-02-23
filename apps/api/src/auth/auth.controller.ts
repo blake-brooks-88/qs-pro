@@ -107,10 +107,17 @@ export class AuthController {
     try {
       const { user, tenant, mid } = await this.authService.handleJwtLogin(jwt);
 
-      await this.trialService.activateTrial(tenant.id, {
-        actorId: user.id,
-        mid,
-      });
+      try {
+        await this.trialService.activateTrial(tenant.id, {
+          actorId: user.id,
+          mid,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Trial activation failed for tenant=${tenant.id}`,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
 
       req.session.regenerate();
       this.ensureCsrfToken(req.session);
@@ -235,10 +242,17 @@ export class AuthController {
         ]);
 
         if (existingUser && existingTenant) {
-          await this.trialService.activateTrial(tenantId, {
-            actorId: userId,
-            mid,
-          });
+          try {
+            await this.trialService.activateTrial(tenantId, {
+              actorId: userId,
+              mid,
+            });
+          } catch (err) {
+            this.logger.warn(
+              `Trial activation failed for tenant=${tenantId}`,
+              err instanceof Error ? err.message : String(err),
+            );
+          }
           return { url: '/', statusCode: 302 };
         }
 
@@ -252,10 +266,17 @@ export class AuthController {
           mid: resolvedMid,
         } = await this.authService.handleJwtLogin(jwt);
 
-        await this.trialService.activateTrial(tenant.id, {
-          actorId: user.id,
-          mid: resolvedMid,
-        });
+        try {
+          await this.trialService.activateTrial(tenant.id, {
+            actorId: user.id,
+            mid: resolvedMid,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Trial activation failed for tenant=${tenant.id}`,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
 
         session.regenerate();
         this.ensureCsrfToken(session);
@@ -359,10 +380,17 @@ export class AuthController {
       `OAuth callback AuthService completed durationMs=${Date.now() - authServiceStartedAt}`,
     );
 
-    await this.trialService.activateTrial(result.tenant.id, {
-      actorId: result.user.id,
-      mid: result.mid,
-    });
+    try {
+      await this.trialService.activateTrial(result.tenant.id, {
+        actorId: result.user.id,
+        mid: result.mid,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Trial activation failed for tenant=${result.tenant.id}`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
 
     req.session.regenerate();
     this.ensureCsrfToken(req.session);
