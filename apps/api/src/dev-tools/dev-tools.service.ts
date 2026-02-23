@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EncryptionService } from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
   ITenantRepository,
@@ -25,6 +26,7 @@ export class DevToolsService {
     private readonly stripe: Stripe | null,
     private readonly configService: ConfigService,
     private readonly featuresService: FeaturesService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   async setTrialDays(tenantId: string, days: number | null) {
@@ -71,11 +73,18 @@ export class DevToolsService {
       throw new BadRequestException('Tenant not found');
     }
 
+    const token = this.encryptionService.encrypt(tenant.eid);
+    if (!token) {
+      throw new InternalServerErrorException(
+        'Failed to generate encrypted tenant token',
+      );
+    }
+
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { eid: tenant.eid, tier },
-      subscription_data: { metadata: { eid: tenant.eid, tier } },
+      metadata: { eid: token, tier },
+      subscription_data: { metadata: { eid: token, tier } },
       success_url: `${returnUrl}?checkout=success`,
       cancel_url: `${returnUrl}?checkout=cancel`,
     });

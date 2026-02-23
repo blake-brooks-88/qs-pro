@@ -12,6 +12,7 @@ import type { FeaturesService } from '../../features/features.service';
 import { DevToolsService } from '../dev-tools.service';
 
 const TENANT_ID = 'tenant-1';
+const TENANT_EID_TOKEN = 'enc_eid-org-1';
 
 const mockFeatures = {
   tier: 'pro' as const,
@@ -66,6 +67,13 @@ function createFeaturesServiceStub(): {
   };
 }
 
+function createEncryptionServiceStub() {
+  return {
+    encrypt: vi.fn().mockReturnValue(TENANT_EID_TOKEN),
+    decrypt: vi.fn(),
+  };
+}
+
 function createStripeMock() {
   return {
     checkout: {
@@ -88,6 +96,7 @@ describe('DevToolsService', () => {
   let configMock: ReturnType<typeof createConfigMock>;
   let featuresStub: ReturnType<typeof createFeaturesServiceStub>;
   let stripeMock: ReturnType<typeof createStripeMock>;
+  let encryptionStub: ReturnType<typeof createEncryptionServiceStub>;
 
   beforeEach(() => {
     orgSubRepo = createOrgSubscriptionRepoStub();
@@ -98,6 +107,7 @@ describe('DevToolsService', () => {
     });
     featuresStub = createFeaturesServiceStub();
     stripeMock = createStripeMock();
+    encryptionStub = createEncryptionServiceStub();
 
     service = new DevToolsService(
       orgSubRepo as unknown as IOrgSubscriptionRepository,
@@ -105,6 +115,7 @@ describe('DevToolsService', () => {
       stripeMock as any,
       configMock as any,
       featuresStub as unknown as FeaturesService,
+      encryptionStub as any,
     );
   });
 
@@ -174,6 +185,7 @@ describe('DevToolsService', () => {
         stripeMock as any,
         emptyConfigMock as any,
         featuresStub as unknown as FeaturesService,
+        encryptionStub as any,
       );
 
       await expect(
@@ -207,11 +219,12 @@ describe('DevToolsService', () => {
         'https://app.test',
       );
 
+      expect(encryptionStub.encrypt).toHaveBeenCalledWith('eid-org-1');
       expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith({
         mode: 'subscription',
         line_items: [{ price: 'price_pro_123', quantity: 1 }],
-        metadata: { eid: 'eid-org-1', tier: 'pro' },
-        subscription_data: { metadata: { eid: 'eid-org-1', tier: 'pro' } },
+        metadata: { eid: TENANT_EID_TOKEN, tier: 'pro' },
+        subscription_data: { metadata: { eid: TENANT_EID_TOKEN, tier: 'pro' } },
         success_url: 'https://app.test?checkout=success',
         cancel_url: 'https://app.test?checkout=cancel',
       });
@@ -229,6 +242,7 @@ describe('DevToolsService', () => {
         null,
         configMock as any,
         featuresStub as unknown as FeaturesService,
+        encryptionStub as any,
       );
 
       await expect(

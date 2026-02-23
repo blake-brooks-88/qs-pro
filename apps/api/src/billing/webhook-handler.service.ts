@@ -34,16 +34,19 @@ export class WebhookHandlerService {
     private readonly encryptionService: EncryptionService,
   ) {}
 
-  private resolveEid(rawEid: string): string {
+  private decryptEidToken(token: string): string {
     try {
-      const decrypted = this.encryptionService.decrypt(rawEid);
-      if (decrypted && typeof decrypted === 'string') {
+      const decrypted = this.encryptionService.decrypt(token);
+      if (typeof decrypted === 'string' && decrypted.trim()) {
         return decrypted;
       }
-      return rawEid;
     } catch {
-      return rawEid;
+      // fall through
     }
+
+    throw new Error(
+      'Invalid metadata.eid token — must be an encrypted token issued by GET /api/billing/pricing-token',
+    );
   }
 
   async process(event: Stripe.Event): Promise<void> {
@@ -123,14 +126,19 @@ export class WebhookHandlerService {
     if (!rawEid) {
       throw new Error('Checkout session missing metadata.eid');
     }
-    const eid = this.resolveEid(rawEid);
+    const eid = this.decryptEidToken(rawEid);
 
-    const tier = session.metadata?.tier;
-    if (!isValidPaidTier(tier)) {
-      throw new Error(
-        `Checkout session missing valid metadata.tier (got: ${tier})`,
-      );
+    if (!this.stripe) {
+      throw new Error('Stripe client not configured');
     }
+
+    const subscription =
+      await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    if (!subscription.items.data[0]) {
+      throw new Error('Stripe subscription missing line items');
+    }
+    const productId = subscription.items.data[0].price.product as string;
+    const tier = await this.resolveTierFromProduct(productId);
 
     const tenant = await this.tenantRepo.findByEid(eid);
     this.logger.debug(
@@ -184,7 +192,7 @@ export class WebhookHandlerService {
         'Subscription missing metadata.eid — external pricing site must set subscription_data.metadata.eid at Checkout creation',
       );
     }
-    const eid = this.resolveEid(rawEid);
+    const eid = this.decryptEidToken(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
     this.logger.debug(
@@ -207,9 +215,7 @@ export class WebhookHandlerService {
     const isPastDueOrUnpaid =
       subscription.status === 'past_due' || subscription.status === 'unpaid';
 
-    const currentPeriodEnds = new Date(
-      subscription.items.data[0].current_period_end * 1000,
-    );
+    const currentPeriodEnds = new Date(subscription.current_period_end * 1000);
     const seatLimit = subscription.items.data[0].quantity ?? null;
 
     await this.rlsContext.runWithTenantContext(
@@ -247,7 +253,7 @@ export class WebhookHandlerService {
     if (!rawEid) {
       throw new Error('Subscription missing metadata.eid');
     }
-    const eid = this.resolveEid(rawEid);
+    const eid = this.decryptEidToken(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
     if (!tenant) {
@@ -306,7 +312,7 @@ export class WebhookHandlerService {
       );
       return;
     }
-    const eid = this.resolveEid(rawEid);
+    const eid = this.decryptEidToken(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
     if (!tenant) {
@@ -365,7 +371,7 @@ export class WebhookHandlerService {
         );
         return;
       }
-      const eid = this.resolveEid(rawEid);
+      const eid = this.decryptEidToken(rawEid);
 
       const tenant = await this.tenantRepo.findByEid(eid);
       if (!tenant) {

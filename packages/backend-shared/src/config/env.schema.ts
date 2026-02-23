@@ -88,6 +88,7 @@ export const adminSchema = z.object({
  */
 export const stripeSchema = z.object({
   STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
+  STRIPE_API_VERSION: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
   STRIPE_PRO_PRICE_ID: z.string().startsWith("price_").optional(),
   STRIPE_ENTERPRISE_PRICE_ID: z.string().startsWith("price_").optional(),
@@ -173,6 +174,14 @@ export const apiEnvSchema = infrastructureSchema
           message: "In production, COOKIE_DOMAIN must be unset (host-only)",
         });
       }
+    }
+
+    if (data.STRIPE_SECRET_KEY && !data.STRIPE_API_VERSION) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "STRIPE_API_VERSION is required when STRIPE_SECRET_KEY is configured",
+      });
     }
   })
   .transform((data) => ({

@@ -144,12 +144,18 @@ describe("env.schema", () => {
 
     it("validates STRIPE_SECRET_KEY prefix when provided", () => {
       const valid = apiEnvSchema.safeParse(
-        makeApiEnv({ STRIPE_SECRET_KEY: "sk_test_abc123" }),
+        makeApiEnv({
+          STRIPE_SECRET_KEY: "sk_test_abc123",
+          STRIPE_API_VERSION: "2024-06-20",
+        }),
       );
       expect(valid.success).toBe(true);
 
       const invalid = apiEnvSchema.safeParse(
-        makeApiEnv({ STRIPE_SECRET_KEY: "pk_test_abc123" }),
+        makeApiEnv({
+          STRIPE_SECRET_KEY: "pk_test_abc123",
+          STRIPE_API_VERSION: "2024-06-20",
+        }),
       );
       expect(invalid.success).toBe(false);
     });

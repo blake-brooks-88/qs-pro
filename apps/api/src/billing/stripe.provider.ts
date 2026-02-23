@@ -10,7 +10,15 @@ export const StripeProvider = {
     if (!secretKey) {
       return null;
     }
-    return new Stripe(secretKey);
+    const apiVersion = configService.get<string>('STRIPE_API_VERSION');
+    if (!apiVersion) {
+      throw new Error(
+        'STRIPE_API_VERSION must be set when STRIPE_SECRET_KEY is configured',
+      );
+    }
+    return new Stripe(secretKey, {
+      apiVersion: apiVersion as Stripe.StripeConfig['apiVersion'],
+    });
   },
   inject: [ConfigService],
 };

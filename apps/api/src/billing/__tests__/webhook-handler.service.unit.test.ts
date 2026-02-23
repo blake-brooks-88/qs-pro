@@ -13,6 +13,7 @@ import { WebhookHandlerService } from '../webhook-handler.service';
 
 const TENANT_ID = 'tenant-abc-123';
 const TENANT_EID = 'eid-org-456';
+const TENANT_EID_TOKEN = `enc_${TENANT_EID}`;
 
 const mockTenant = { id: TENANT_ID, eid: TENANT_EID } as any;
 
@@ -80,7 +81,16 @@ function createStripeStub() {
     },
     subscriptions: {
       retrieve: vi.fn().mockResolvedValue({
-        metadata: { eid: TENANT_EID },
+        metadata: { eid: TENANT_EID_TOKEN },
+        current_period_end: 1700000000,
+        items: {
+          data: [
+            {
+              price: { product: 'prod_123' },
+              quantity: 10,
+            },
+          ],
+        },
       }),
     },
   };
@@ -110,9 +120,7 @@ function makeCheckoutSessionEvent(
     subscription:
       'subscription' in overrides ? overrides.subscription : 'sub_xyz',
     metadata:
-      'metadata' in overrides
-        ? overrides.metadata
-        : { eid: TENANT_EID, tier: 'pro' },
+      'metadata' in overrides ? overrides.metadata : { eid: TENANT_EID_TOKEN },
   });
 }
 
@@ -122,17 +130,21 @@ function makeSubscriptionEvent(
     metadata: Record<string, string>;
     status: string;
     items: { data: unknown[] };
+    current_period_end: number;
   }> = {},
 ): Stripe.Event {
   return makeEvent(type, {
     customer: 'cus_abc',
-    metadata: overrides.metadata ?? { eid: TENANT_EID },
+    metadata: overrides.metadata ?? { eid: TENANT_EID_TOKEN },
     status: overrides.status ?? 'active',
+    current_period_end:
+      'current_period_end' in overrides
+        ? overrides.current_period_end
+        : 1700000000,
     items: overrides.items ?? {
       data: [
         {
           price: { product: 'prod_123' },
-          current_period_end: 1700000000,
           quantity: 10,
         },
       ],
@@ -277,15 +289,13 @@ describe('WebhookHandlerService', () => {
       );
     });
 
-    it('throws when tier is missing from session metadata', async () => {
-      const event = makeCheckoutSessionEvent({
-        metadata: { eid: TENANT_EID },
-      });
+    it('resolves tier from Stripe subscription product metadata', async () => {
+      const event = makeCheckoutSessionEvent();
 
-      await expect(service.process(event)).rejects.toThrow(
-        'Checkout session missing valid metadata.tier',
-      );
-      expect(webhookEventRepo.markFailed).toHaveBeenCalled();
+      await service.process(event);
+
+      expect(stripeStub.subscriptions.retrieve).toHaveBeenCalledWith('sub_xyz');
+      expect(stripeStub.products.retrieve).toHaveBeenCalledWith('prod_123');
     });
 
     it('throws when customer is null', async () => {
@@ -341,7 +351,7 @@ describe('WebhookHandlerService', () => {
       expect(stripeStub.products.retrieve).toHaveBeenCalledWith('prod_123');
     });
 
-    it('updates currentPeriodEnds from subscription item current_period_end', async () => {
+    it('updates currentPeriodEnds from subscription current_period_end', async () => {
       const event = makeSubscriptionEvent('customer.subscription.created');
 
       await service.process(event);
@@ -680,7 +690,16 @@ describe('WebhookHandlerService', () => {
           metadata: { tier: 'pro' },
         });
         stripeStub.subscriptions.retrieve.mockResolvedValue({
-          metadata: { eid: TENANT_EID },
+          metadata: { eid: TENANT_EID_TOKEN },
+          current_period_end: 1700000000,
+          items: {
+            data: [
+              {
+                price: { product: 'prod_123' },
+                quantity: 10,
+              },
+            ],
+          },
         });
         auditStub.log.mockResolvedValue(undefined);
         webhookEventRepo.markCompleted.mockResolvedValue(undefined);
@@ -715,7 +734,16 @@ describe('WebhookHandlerService', () => {
           metadata: { tier: 'pro' },
         });
         stripeStub.subscriptions.retrieve.mockResolvedValue({
-          metadata: { eid: TENANT_EID },
+          metadata: { eid: TENANT_EID_TOKEN },
+          current_period_end: 1700000000,
+          items: {
+            data: [
+              {
+                price: { product: 'prod_123' },
+                quantity: 10,
+              },
+            ],
+          },
         });
         auditStub.log.mockResolvedValue(undefined);
         webhookEventRepo.markCompleted.mockResolvedValue(undefined);
