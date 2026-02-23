@@ -19,6 +19,7 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { SessionThrottlerGuard } from './common/guards/session-throttler.guard';
+import { DevToolsModule } from './dev-tools/dev-tools.module';
 import { FeaturesModule } from './features/features.module';
 import { FoldersModule } from './folders/folders.module';
 import { MceModule } from './mce/mce.module';
@@ -89,6 +90,7 @@ import { UsageModule } from './usage/usage.module';
     QueryVersionsModule,
     TrialModule,
     UsageModule,
+    DevToolsModule,
     ObservabilityModule,
   ],
   providers: [
