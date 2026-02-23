@@ -22,4 +22,3 @@ export class MetricsGuard implements CanActivate {
     return scheme === "Bearer" && token === apiKey;
   }
 }
-

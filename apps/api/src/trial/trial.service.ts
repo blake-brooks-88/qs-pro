@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { RlsContextService } from '@qpp/backend-shared';
 import type { IOrgSubscriptionRepository } from '@qpp/database';
 import type { TrialState } from '@qpp/shared-types';
 
@@ -14,6 +15,7 @@ export class TrialService {
     @Inject('ORG_SUBSCRIPTION_REPOSITORY')
     private orgSubscriptionRepo: IOrgSubscriptionRepository,
     private readonly auditService: AuditService,
+    private readonly rlsContext: RlsContextService,
   ) {}
 
   async activateTrial(
@@ -22,12 +24,17 @@ export class TrialService {
   ): Promise<void> {
     const trialEndsAt = new Date(Date.now() + TRIAL_DURATION_MS);
 
-    const inserted = await this.orgSubscriptionRepo.insertIfNotExists({
+    const inserted = await this.rlsContext.runWithTenantContext(
       tenantId,
-      tier: 'pro',
-      trialEndsAt,
-      seatLimit: null,
-    });
+      auditContext.mid,
+      () =>
+        this.orgSubscriptionRepo.insertIfNotExists({
+          tenantId,
+          tier: 'pro',
+          trialEndsAt,
+          seatLimit: null,
+        }),
+    );
 
     if (inserted) {
       this.logger.log(`Trial activated for tenant=${tenantId}`);

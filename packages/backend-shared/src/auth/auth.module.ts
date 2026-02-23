@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import {
   DrizzleCredentialsRepository,
+  DrizzleOrgSubscriptionRepository,
   DrizzleTenantRepository,
   DrizzleUserRepository,
 } from "@qpp/database";
@@ -30,6 +31,12 @@ import { SeatLimitService } from "./seat-limit.service";
       provide: "CREDENTIALS_REPOSITORY",
       useFactory: (db: PostgresJsDatabase) =>
         new DrizzleCredentialsRepository(db),
+      inject: ["DATABASE"],
+    },
+    {
+      provide: "ORG_SUBSCRIPTION_REPOSITORY",
+      useFactory: (db: PostgresJsDatabase) =>
+        new DrizzleOrgSubscriptionRepository(db),
       inject: ["DATABASE"],
     },
   ],

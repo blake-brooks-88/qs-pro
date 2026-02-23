@@ -64,7 +64,7 @@ async function bootstrap() {
     const rawBodyModule = await import('fastify-raw-body');
     await app.register(rawBodyModule.default, {
       field: 'rawBody',
-      global: false,
+      global: true,
       encoding: 'utf8',
       runFirst: true,
     });
@@ -94,15 +94,6 @@ async function bootstrap() {
         },
       },
       rls: true,
-    });
-
-    adapter.getInstance().addHook('onRoute', (routeOptions) => {
-      if (routeOptions.url === '/api/billing/webhook') {
-        routeOptions.config = {
-          ...(routeOptions.config as Record<string, unknown>),
-          rawBody: true,
-        };
-      }
     });
 
     adapter

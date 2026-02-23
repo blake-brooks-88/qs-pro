@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { RlsContextService } from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
   OrgSubscription,
@@ -28,6 +29,18 @@ function createMockAuditService() {
   };
 }
 
+function createMockRlsContextService() {
+  type RunWithTenantContext = RlsContextService['runWithTenantContext'];
+
+  const runWithTenantContext = vi.fn(
+    async <T>(_tenantId: string, _mid: string, fn: () => Promise<T>) => fn(),
+  ) as unknown as RunWithTenantContext;
+
+  return {
+    runWithTenantContext,
+  };
+}
+
 const TENANT_ID = 'tenant-123';
 const AUDIT_CONTEXT = { actorId: 'user-456', mid: 'mid-789' };
 
@@ -35,11 +48,13 @@ describe('TrialService', () => {
   let service: TrialService;
   let orgSubscriptionRepo: ReturnType<typeof createMockOrgSubscriptionRepo>;
   let auditService: ReturnType<typeof createMockAuditService>;
+  let rlsContext: ReturnType<typeof createMockRlsContextService>;
   let originalDateNow: () => number;
 
   beforeEach(async () => {
     orgSubscriptionRepo = createMockOrgSubscriptionRepo();
     auditService = createMockAuditService();
+    rlsContext = createMockRlsContextService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -49,6 +64,7 @@ describe('TrialService', () => {
           useValue: orgSubscriptionRepo,
         },
         { provide: AuditService, useValue: auditService },
+        { provide: RlsContextService, useValue: rlsContext },
       ],
     }).compile();
 
@@ -71,6 +87,12 @@ describe('TrialService', () => {
       await service.activateTrial(TENANT_ID, AUDIT_CONTEXT);
 
       // Assert
+      expect(rlsContext.runWithTenantContext).toHaveBeenCalledTimes(1);
+      expect(rlsContext.runWithTenantContext).toHaveBeenCalledWith(
+        TENANT_ID,
+        AUDIT_CONTEXT.mid,
+        expect.any(Function),
+      );
       expect(orgSubscriptionRepo.insertIfNotExists).toHaveBeenCalledWith({
         tenantId: TENANT_ID,
         tier: 'pro',
