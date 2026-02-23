@@ -20,6 +20,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import {
   credentials,
   DrizzleCredentialsRepository,
+  DrizzleOrgSubscriptionRepository,
   DrizzleTenantRepository,
   DrizzleUserRepository,
   tenants,
@@ -235,6 +236,10 @@ describe("AuthService Integration", () => {
         {
           provide: "CREDENTIALS_REPOSITORY",
           useFactory: () => new DrizzleCredentialsRepository(dbProxy),
+        },
+        {
+          provide: "ORG_SUBSCRIPTION_REPOSITORY",
+          useFactory: () => new DrizzleOrgSubscriptionRepository(dbProxy),
         },
       ],
     }).compile();
