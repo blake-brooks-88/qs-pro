@@ -21,6 +21,10 @@ import { EncryptionService } from '@qpp/backend-shared';
 import type { Sql } from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { FoldersService } from '../../folders/folders.service';
@@ -53,14 +57,6 @@ describe('SavedQueriesService (integration)', () => {
   // Track created resources for cleanup
   const createdSavedQueryIds: string[] = [];
   const createdFolderIds: string[] = [];
-
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      INSERT INTO org_subscriptions (tenant_id, tier)
-      VALUES (${testTenantId}::uuid, ${tier})
-      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
-    `;
-  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -120,7 +116,7 @@ describe('SavedQueriesService (integration)', () => {
     testUserId = userRow.id;
 
     // Default to free tier for this suite; individual tests can override.
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     // Clean up any leftover saved queries/folders from previous runs
     const reserved = await sqlClient.reserve();
@@ -175,6 +171,7 @@ describe('SavedQueriesService (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -183,7 +180,7 @@ describe('SavedQueriesService (integration)', () => {
 
   beforeEach(async () => {
     // Default each test to free tier; tests can override as needed.
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     // Clean up resources before each test
     for (const id of [...createdSavedQueryIds]) {
@@ -360,7 +357,7 @@ describe('SavedQueriesService (integration)', () => {
     });
 
     it('should allow BU sharing when querySharing is enabled (pro tier)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const created = await savedQueriesService.create(
         testTenantId,

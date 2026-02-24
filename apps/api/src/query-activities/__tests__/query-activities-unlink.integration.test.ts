@@ -38,6 +38,10 @@ import {
   vi,
 } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { CsrfGuard } from '../../auth/csrf.guard';
 import { configureApp } from '../../configure-app';
@@ -99,17 +103,6 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
     mid: TEST_MID,
   };
 
-  const setTenantTier = async (
-    tenantId: string,
-    tier: 'free' | 'pro' | 'enterprise',
-  ) => {
-    await sqlClient`
-      INSERT INTO org_subscriptions (tenant_id, tier)
-      VALUES (${tenantId}::uuid, ${tier})
-      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
-    `;
-  };
-
   async function withRls(
     tenantId: string,
     mid: string,
@@ -145,11 +138,11 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
     if (!row) {
       throw new Error('Failed to insert test tenant');
     }
-    await sqlClient`
-      INSERT INTO org_subscriptions (tenant_id, tier)
-      VALUES (${row.id}::uuid, ${tier})
-      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
-    `;
+    await setTestTenantTier(
+      sqlClient,
+      row.id,
+      tier as 'free' | 'pro' | 'enterprise',
+    );
     return row.id;
   }
 
@@ -294,9 +287,11 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId2}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
     if (testTenantId2) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId2);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId2}::uuid`;
     }
 
@@ -434,7 +429,7 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
 
   it('returns 403 when deploy feature is disabled (free tier)', async () => {
     // Arrange
-    await setTenantTier(testTenantId, 'free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     // Act
     const res = await request(app.getHttpServer()).delete(
@@ -446,7 +441,7 @@ describe('DELETE /query-activities/link/:savedQueryId (integration)', () => {
     expect(res.body.code).toBe('FEATURE_NOT_ENABLED');
 
     // Cleanup — restore enterprise tier
-    await setTenantTier(testTenantId, 'enterprise');
+    await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
   });
 
   it('RLS isolation: cross-tenant session cannot unlink another tenant query', async () => {

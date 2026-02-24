@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
 import {
-  DrizzleOrgSubscriptionRepository,
   DrizzleStripeWebhookEventRepository,
   DrizzleTenantRepository,
 } from '@qpp/database';
 
 import { AuditModule } from '../audit/audit.module';
 import { BillingController } from './billing.controller';
+import { createContextAwareOrgSubscriptionRepository } from './context-aware-org-subscription.repository';
 import { StripeProvider } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';
 
@@ -19,7 +19,7 @@ import { WebhookHandlerService } from './webhook-handler.service';
     WebhookHandlerService,
     {
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
-      useFactory: (db: any) => new DrizzleOrgSubscriptionRepository(db),
+      useFactory: (db: any) => createContextAwareOrgSubscriptionRepository(db),
       inject: ['DATABASE'],
     },
     {

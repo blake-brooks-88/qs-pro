@@ -3,7 +3,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
-import { SessionGuard } from '@qpp/backend-shared';
+import { RlsContextService, SessionGuard } from '@qpp/backend-shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { configureApp } from '../src/configure-app';
@@ -47,6 +47,13 @@ describe('FeaturesController missing org_subscriptions row (integration)', () =>
           provide: TrialService,
           useValue: {
             getTrialState: vi.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: RlsContextService,
+          useValue: {
+            runWithTenantContext: (_t: string, _m: string, fn: () => unknown) =>
+              fn(),
           },
         },
       ],

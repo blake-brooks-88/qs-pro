@@ -16,13 +16,14 @@
  * - No internal mocking
  */
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppError } from '@qpp/backend-shared';
+import { AppError, RlsContextService } from '@qpp/backend-shared';
 import { tenants } from '@qpp/database';
 import { eq } from 'drizzle-orm';
 import { drizzle, PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { TrialService } from '../../trial/trial.service';
 import { FeaturesService } from '../features.service';
 
 function getRequiredEnv(key: string): string {
@@ -83,6 +84,37 @@ describe('Features Remaining Gaps (integration)', () => {
             },
           },
         },
+        {
+          provide: 'ORG_SUBSCRIPTION_REPOSITORY',
+          useValue: {
+            findByTenantId: async (tenantId: string) => {
+              return client.begin(async (tx) => {
+                await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+                const [row] = await tx`
+                  SELECT id, tenant_id as "tenantId", tier, seat_limit as "seatLimit",
+                         trial_ends_at as "trialEndsAt", stripe_subscription_id as "stripeSubscriptionId",
+                         current_period_ends as "currentPeriodEnds"
+                  FROM org_subscriptions WHERE tenant_id = ${tenantId}
+                `;
+                return row ?? undefined;
+              });
+            },
+          },
+        },
+        {
+          provide: TrialService,
+          useValue: {
+            activateTrial: async () => {},
+            getTrialState: async () => null,
+          },
+        },
+        {
+          provide: RlsContextService,
+          useValue: {
+            runWithTenantContext: (_t: string, _m: string, fn: () => unknown) =>
+              fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -103,6 +135,10 @@ describe('Features Remaining Gaps (integration)', () => {
             'DELETE FROM tenant_feature_overrides WHERE tenant_id = $1',
             [tenant.id],
           );
+          await client.begin(async (tx) => {
+            await tx`SELECT set_config('app.tenant_id', ${tenant.id}, true)`;
+            await tx`DELETE FROM org_subscriptions WHERE tenant_id = ${tenant.id}::uuid`;
+          });
         }
         await client.unsafe('DELETE FROM tenants WHERE eid = $1', [eid]);
       } catch {

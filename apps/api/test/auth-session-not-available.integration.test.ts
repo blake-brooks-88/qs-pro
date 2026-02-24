@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditService } from '../src/audit/audit.service';
 import { AuthController } from '../src/auth/auth.controller';
 import { configureApp } from '../src/configure-app';
+import { TrialService } from '../src/trial/trial.service';
 
 describe('AuthController session infrastructure errors (integration)', () => {
   let app: NestFastifyApplication;
@@ -21,6 +22,10 @@ describe('AuthController session infrastructure errors (integration)', () => {
         { provide: AuthService, useValue: { handleJwtLogin: vi.fn() } },
         { provide: ConfigService, useValue: { get: vi.fn() } },
         { provide: AuditService, useValue: { log: vi.fn() } },
+        {
+          provide: TrialService,
+          useValue: { activateTrial: vi.fn(), getTrialState: vi.fn() },
+        },
       ],
     }).compile();
 

@@ -34,6 +34,10 @@ import {
   it,
 } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { FoldersService } from '../folders.service';
@@ -110,14 +114,6 @@ describe('Shared Folders (integration)', () => {
     }
   }
 
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
-    `;
-  };
-
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
@@ -149,9 +145,9 @@ describe('Shared Folders (integration)', () => {
 
     // Create test tenant (enterprise tier for most tests)
     const tenantResult = await sqlClient`
-      INSERT INTO tenants (eid, tssd, subscription_tier)
-      VALUES (${TEST_EID}, ${TEST_TSSD}, 'enterprise')
-      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}, subscription_tier = 'enterprise'
+      INSERT INTO tenants (eid, tssd)
+      VALUES (${TEST_EID}, ${TEST_TSSD})
+      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}
       RETURNING id
     `;
     const tenantRow = tenantResult[0];
@@ -159,6 +155,8 @@ describe('Shared Folders (integration)', () => {
       throw new Error('Failed to insert test tenant');
     }
     testTenantId = tenantRow.id;
+
+    await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
     // Create User A
     const userAResult = await sqlClient`
@@ -209,6 +207,7 @@ describe('Shared Folders (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserIdB}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -233,12 +232,12 @@ describe('Shared Folders (integration)', () => {
     createdFolderIds.length = 0;
 
     // Reset to enterprise tier for next test
-    await setTenantTier('enterprise');
+    await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
   });
 
   describe('feature gating', () => {
     it('rejects shared folder creation for free-tier tenant', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       await expect(
         service.create(testTenantId, TEST_MID, testUserIdA, {
@@ -251,7 +250,7 @@ describe('Shared Folders (integration)', () => {
     });
 
     it('rejects shared folder creation for pro-tier tenant', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       await expect(
         service.create(testTenantId, TEST_MID, testUserIdA, {
@@ -264,7 +263,7 @@ describe('Shared Folders (integration)', () => {
     });
 
     it('allows shared folder creation for enterprise-tier tenant', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const folder = await service.create(testTenantId, TEST_MID, testUserIdA, {
         name: 'Enterprise Shared',
@@ -283,7 +282,7 @@ describe('Shared Folders (integration)', () => {
       });
       createdFolderIds.push(folder.id);
 
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       await expect(
         service.shareFolder(testTenantId, TEST_MID, testUserIdA, folder.id),
@@ -493,7 +492,7 @@ describe('Shared Folders (integration)', () => {
 
   describe('personal folder creation', () => {
     it('allows personal folder creation for free-tier tenant', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const folder = await service.create(testTenantId, TEST_MID, testUserIdA, {
         name: 'Free Personal Folder',
@@ -504,7 +503,7 @@ describe('Shared Folders (integration)', () => {
     });
 
     it('allows personal folder creation for pro-tier tenant', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const folder = await service.create(testTenantId, TEST_MID, testUserIdA, {
         name: 'Pro Personal Folder',

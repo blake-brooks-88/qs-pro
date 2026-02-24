@@ -35,6 +35,10 @@ import {
   it,
 } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { SavedQueriesService } from '../saved-queries.service';
@@ -143,9 +147,9 @@ describe('Stale Detection (integration)', () => {
 
     // Create enterprise tenant (stale detection relevant for shared queries)
     const tenantResult = await sqlClient`
-      INSERT INTO tenants (eid, tssd, subscription_tier)
-      VALUES (${TEST_EID}, ${TEST_TSSD}, 'enterprise')
-      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}, subscription_tier = 'enterprise'
+      INSERT INTO tenants (eid, tssd)
+      VALUES (${TEST_EID}, ${TEST_TSSD})
+      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}
       RETURNING id
     `;
     const tenantRow = tenantResult[0];
@@ -153,6 +157,8 @@ describe('Stale Detection (integration)', () => {
       throw new Error('Failed to insert test tenant');
     }
     testTenantId = tenantRow.id;
+
+    await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
     // Create User A
     const userAResult = await sqlClient`
@@ -228,6 +234,7 @@ describe('Stale Detection (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserIdB}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 

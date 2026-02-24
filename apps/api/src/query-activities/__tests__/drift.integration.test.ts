@@ -38,6 +38,10 @@ import {
   vi,
 } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { CsrfGuard } from '../../auth/csrf.guard';
 import { configureApp } from '../../configure-app';
@@ -89,14 +93,6 @@ describe('GET /query-activities/drift/:savedQueryId (integration)', () => {
     userId: '',
     tenantId: '',
     mid: TEST_MID,
-  };
-
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      INSERT INTO org_subscriptions (tenant_id, tier)
-      VALUES (${testTenantId}::uuid, ${tier})
-      ON CONFLICT (tenant_id) DO UPDATE SET tier = ${tier}
-    `;
   };
 
   async function withRls(fn: (reserved: Sql) => Promise<void>) {
@@ -194,11 +190,7 @@ describe('GET /query-activities/drift/:savedQueryId (integration)', () => {
     }
     testTenantId = tenantRow.id;
 
-    await sqlClient`
-      INSERT INTO org_subscriptions (tenant_id, tier)
-      VALUES (${testTenantId}::uuid, 'pro')
-      ON CONFLICT (tenant_id) DO UPDATE SET tier = 'pro'
-    `;
+    await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
     const userResult = await sqlClient`
       INSERT INTO users (sf_user_id, tenant_id, email, name)
@@ -235,6 +227,7 @@ describe('GET /query-activities/drift/:savedQueryId (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -242,7 +235,7 @@ describe('GET /query-activities/drift/:savedQueryId (integration)', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('enterprise');
+    await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
     for (const id of [...createdSavedQueryIds]) {
       try {
@@ -313,7 +306,7 @@ describe('GET /query-activities/drift/:savedQueryId (integration)', () => {
 
   describe('feature gating', () => {
     it('returns 403 when deployToAutomation is disabled (free tier)', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const res = await request(app.getHttpServer()).get(
         '/query-activities/drift/00000000-0000-4000-8000-000000000000',

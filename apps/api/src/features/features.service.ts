@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AppError, ErrorCode } from '@qpp/backend-shared';
+import { AppError, ErrorCode, RlsContextService } from '@qpp/backend-shared';
 import type {
   IFeatureOverrideRepository,
   IOrgSubscriptionRepository,
@@ -24,50 +24,53 @@ export class FeaturesService {
     @Inject('ORG_SUBSCRIPTION_REPOSITORY')
     private orgSubscriptionRepo: IOrgSubscriptionRepository,
     private readonly trialService: TrialService,
+    private readonly rlsContext: RlsContextService,
   ) {}
 
   async getTenantFeatures(tenantId: string): Promise<TenantFeaturesResponse> {
-    const tenant = await this.tenantRepo.findById(tenantId);
-    if (!tenant) {
-      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-        operation: 'getTenantFeatures',
-      });
-    }
+    return this.rlsContext.runWithTenantContext(tenantId, '', async () => {
+      const tenant = await this.tenantRepo.findById(tenantId);
+      if (!tenant) {
+        throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+          operation: 'getTenantFeatures',
+        });
+      }
 
-    const subscription =
-      await this.orgSubscriptionRepo.findByTenantId(tenantId);
+      const subscription =
+        await this.orgSubscriptionRepo.findByTenantId(tenantId);
 
-    let effectiveTier: SubscriptionTier;
-    if (subscription) {
-      if (subscription.stripeSubscriptionId) {
-        effectiveTier = subscription.tier;
-      } else if (
-        subscription.trialEndsAt &&
-        new Date(subscription.trialEndsAt) > new Date()
-      ) {
-        effectiveTier = subscription.tier;
+      let effectiveTier: SubscriptionTier;
+      if (subscription) {
+        if (subscription.stripeSubscriptionId) {
+          effectiveTier = subscription.tier;
+        } else if (
+          subscription.trialEndsAt &&
+          new Date(subscription.trialEndsAt) > new Date()
+        ) {
+          effectiveTier = subscription.tier;
+        } else {
+          effectiveTier = 'free';
+        }
       } else {
         effectiveTier = 'free';
       }
-    } else {
-      effectiveTier = 'free';
-    }
 
-    const features = getTierFeatures(effectiveTier);
+      const features = getTierFeatures(effectiveTier);
 
-    const overrides = await this.featureOverrideRepo.findByTenantId(tenantId);
+      const overrides = await this.featureOverrideRepo.findByTenantId(tenantId);
 
-    for (const override of overrides) {
-      const key = override.featureKey as FeatureKey;
-      if (ALL_FEATURE_KEYS.includes(key)) {
-        // eslint-disable-next-line security/detect-object-injection -- `key` is validated against ALL_FEATURE_KEYS allowlist
-        features[key] = override.enabled;
+      for (const override of overrides) {
+        const key = override.featureKey as FeatureKey;
+        if (ALL_FEATURE_KEYS.includes(key)) {
+          // eslint-disable-next-line security/detect-object-injection -- `key` is validated against ALL_FEATURE_KEYS allowlist
+          features[key] = override.enabled;
+        }
       }
-    }
 
-    const trial = await this.trialService.getTrialState(tenantId);
+      const trial = await this.trialService.getTrialState(tenantId);
 
-    return { tier: effectiveTier, features, trial };
+      return { tier: effectiveTier, features, trial };
+    });
   }
 
   async updateTier(

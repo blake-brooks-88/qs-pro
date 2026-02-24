@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
-import { DrizzleOrgSubscriptionRepository } from '@qpp/database';
 
+import { createContextAwareOrgSubscriptionRepository } from '../billing/context-aware-org-subscription.repository';
 import { TrialService } from './trial.service';
 
 @Module({
@@ -10,7 +10,7 @@ import { TrialService } from './trial.service';
     TrialService,
     {
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
-      useFactory: (db: any) => new DrizzleOrgSubscriptionRepository(db),
+      useFactory: (db: any) => createContextAwareOrgSubscriptionRepository(db),
       inject: ['DATABASE'],
     },
   ],

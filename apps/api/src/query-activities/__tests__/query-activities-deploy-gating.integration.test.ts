@@ -40,6 +40,10 @@ import {
   vi,
 } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { CsrfGuard } from '../../auth/csrf.guard';
 import { configureApp } from '../../configure-app';
@@ -67,14 +71,6 @@ describe('QueryActivities deploy gating (integration)', () => {
   let testUserId: string;
 
   const createdSavedQueryIds: string[] = [];
-
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
-    `;
-  };
 
   const mockQDService = {
     retrieveAll: vi.fn(),
@@ -161,9 +157,9 @@ describe('QueryActivities deploy gating (integration)', () => {
     savedQueriesService = app.get(SavedQueriesService);
 
     const tenantResult = await sqlClient`
-      INSERT INTO tenants (eid, tssd, subscription_tier)
-      VALUES (${TEST_EID}, ${TEST_TSSD}, 'free')
-      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}, subscription_tier = 'free'
+      INSERT INTO tenants (eid, tssd)
+      VALUES (${TEST_EID}, ${TEST_TSSD})
+      ON CONFLICT (eid) DO UPDATE SET tssd = ${TEST_TSSD}
       RETURNING id
     `;
     const tenantRow = tenantResult[0];
@@ -171,6 +167,8 @@ describe('QueryActivities deploy gating (integration)', () => {
       throw new Error('Failed to insert test tenant');
     }
     testTenantId = tenantRow.id;
+
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     const userResult = await sqlClient`
       INSERT INTO users (sf_user_id, tenant_id, email, name)
@@ -203,6 +201,7 @@ describe('QueryActivities deploy gating (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -210,7 +209,7 @@ describe('QueryActivities deploy gating (integration)', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     for (const id of [...createdSavedQueryIds]) {
       try {
@@ -291,7 +290,7 @@ describe('QueryActivities deploy gating (integration)', () => {
 
   describe('pro-tier (deployToAutomation=true, teamCollaboration=false)', () => {
     it('GET /query-activities succeeds for pro-tier', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       mockQDService.retrieveAll.mockResolvedValue([]);
 
@@ -301,7 +300,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('POST /query-activities succeeds for pro-tier', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       mockDEService.retrieveByCustomerKey.mockResolvedValue({
         objectId: 'de-obj-1',
@@ -330,7 +329,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('POST /query-activities/link/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const res = await request(app.getHttpServer())
         .post(`/query-activities/link/${FAKE_UUID}`)
@@ -341,7 +340,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('DELETE /query-activities/link/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const res = await request(app.getHttpServer()).delete(
         `/query-activities/link/${FAKE_UUID}`,
@@ -352,7 +351,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('POST /query-activities/publish/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const res = await request(app.getHttpServer())
         .post(`/query-activities/publish/${FAKE_UUID}`)
@@ -363,7 +362,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('GET /query-activities/drift/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const res = await request(app.getHttpServer()).get(
         `/query-activities/drift/${FAKE_UUID}`,
@@ -374,7 +373,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('GET /query-activities/blast-radius/:savedQueryId returns 403 for pro-tier (requires Enterprise)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const res = await request(app.getHttpServer()).get(
         `/query-activities/blast-radius/${FAKE_UUID}`,
@@ -387,7 +386,7 @@ describe('QueryActivities deploy gating (integration)', () => {
 
   describe('enterprise-tier (deployToAutomation=true, teamCollaboration=true) succeeds', () => {
     it('POST /query-activities/link/:savedQueryId succeeds for enterprise-tier', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const query = await savedQueriesService.create(
         testTenantId,
@@ -412,7 +411,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('POST /query-activities/publish/:savedQueryId succeeds for enterprise-tier (not gated by feature)', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const query = await savedQueriesService.create(
         testTenantId,
@@ -431,7 +430,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('GET /query-activities/drift/:savedQueryId succeeds for enterprise-tier (not gated by feature)', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const query = await savedQueriesService.create(
         testTenantId,
@@ -450,7 +449,7 @@ describe('QueryActivities deploy gating (integration)', () => {
     });
 
     it('GET /query-activities/blast-radius/:savedQueryId succeeds for enterprise-tier (not gated by feature)', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const query = await savedQueriesService.create(
         testTenantId,

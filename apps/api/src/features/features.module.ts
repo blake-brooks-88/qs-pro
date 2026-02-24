@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
 import {
   DrizzleFeatureOverrideRepository,
-  DrizzleOrgSubscriptionRepository,
   DrizzleTenantRepository,
 } from '@qpp/database';
 
+import { createContextAwareOrgSubscriptionRepository } from '../billing/context-aware-org-subscription.repository';
 import { TrialModule } from '../trial/trial.module';
 import { FeaturesController } from './features.controller';
 import { FeaturesService } from './features.service';
@@ -27,7 +27,7 @@ import { FeaturesService } from './features.service';
     },
     {
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
-      useFactory: (db: any) => new DrizzleOrgSubscriptionRepository(db),
+      useFactory: (db: any) => createContextAwareOrgSubscriptionRepository(db),
       inject: ['DATABASE'],
     },
   ],
