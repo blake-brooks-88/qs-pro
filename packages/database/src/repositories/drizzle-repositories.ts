@@ -1,5 +1,5 @@
 import { ErrorCode } from "@qpp/shared-types";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, or, sql } from "drizzle-orm";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { DatabaseError } from "../errors";
@@ -279,7 +279,13 @@ export class DrizzleStripeWebhookEventRepository implements IStripeWebhookEventR
           processedAt: sql`NOW()`,
           errorMessage: null,
         },
-        setWhere: eq(stripeWebhookEvents.status, "failed"),
+        setWhere: or(
+          eq(stripeWebhookEvents.status, "failed"),
+          and(
+            eq(stripeWebhookEvents.status, "processing"),
+            sql`${stripeWebhookEvents.processedAt} < NOW() - INTERVAL '5 minutes'`,
+          ),
+        ),
       })
       .returning({ id: stripeWebhookEvents.id });
     return result.length > 0;
