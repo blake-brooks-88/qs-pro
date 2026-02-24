@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { RlsContextService } from '@qpp/backend-shared';
 import type {
   IFeatureOverrideRepository,
   IOrgSubscriptionRepository,
@@ -10,6 +11,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TrialService } from '../../trial/trial.service';
 import { FeaturesService } from '../features.service';
+
+function createMockRlsContextService() {
+  type RunWithTenantContext = RlsContextService['runWithTenantContext'];
+
+  const runWithTenantContext = vi.fn(
+    async <T>(_tenantId: string, _mid: string, fn: () => Promise<T>) => fn(),
+  ) as unknown as RunWithTenantContext;
+
+  return { runWithTenantContext };
+}
 
 function createMockOrgSubscriptionRepo() {
   return {
@@ -84,6 +95,7 @@ describe('FeaturesService', () => {
           useValue: orgSubscriptionRepo,
         },
         { provide: TrialService, useValue: trialService },
+        { provide: RlsContextService, useValue: createMockRlsContextService() },
       ],
     }).compile();
 
