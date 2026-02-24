@@ -1,27 +1,31 @@
-import type { TenantFeatures } from "@qpp/shared-types";
+import type { TenantFeaturesResponse } from "@qpp/shared-types";
 import { http, HttpResponse } from "msw";
 
-export const defaultFeatures: TenantFeatures = {
-  basicLinting: true,
-  syntaxHighlighting: true,
-  quickFixes: false,
-  minimap: false,
-  advancedAutocomplete: false,
-  querySharing: false,
-  teamSnippets: false,
-  auditLogs: false,
-  createDataExtension: false,
-  deployToAutomation: false,
-  systemDataViews: true,
-  runToTargetDE: false,
-  executionHistory: false,
-  versionHistory: false,
-  teamCollaboration: false,
+export const defaultFeaturesResponse: TenantFeaturesResponse = {
+  tier: "free",
+  features: {
+    basicLinting: true,
+    syntaxHighlighting: true,
+    quickFixes: false,
+    minimap: false,
+    advancedAutocomplete: false,
+    querySharing: false,
+    teamSnippets: false,
+    auditLogs: false,
+    createDataExtension: false,
+    deployToAutomation: false,
+    systemDataViews: true,
+    runToTargetDE: false,
+    executionHistory: false,
+    versionHistory: false,
+    teamCollaboration: false,
+  },
+  trial: null,
 };
 
 export const handlers = [
   http.get("/api/features", () => {
-    return HttpResponse.json(defaultFeatures);
+    return HttpResponse.json(defaultFeaturesResponse);
   }),
 
   http.get("/api/metadata/folders", () => {
