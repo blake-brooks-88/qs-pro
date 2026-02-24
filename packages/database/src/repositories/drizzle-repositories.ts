@@ -261,29 +261,28 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
   }
 }
 
-const UNIQUE_VIOLATION = "23505";
-
 export class DrizzleStripeWebhookEventRepository implements IStripeWebhookEventRepository {
   constructor(private db: PostgresJsDatabase) {}
 
   async markProcessing(eventId: string, eventType: string): Promise<boolean> {
-    try {
-      await this.db.insert(stripeWebhookEvents).values({
+    const result = await this.db
+      .insert(stripeWebhookEvents)
+      .values({
         id: eventId,
         eventType,
         status: "processing",
-      });
-      return true;
-    } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        (error as { code: string }).code === UNIQUE_VIOLATION
-      ) {
-        return false;
-      }
-      throw error;
-    }
+      })
+      .onConflictDoUpdate({
+        target: stripeWebhookEvents.id,
+        set: {
+          status: "processing" as const,
+          processedAt: sql`NOW()`,
+          errorMessage: null,
+        },
+        setWhere: eq(stripeWebhookEvents.status, "failed"),
+      })
+      .returning({ id: stripeWebhookEvents.id });
+    return result.length > 0;
   }
 
   async markCompleted(eventId: string): Promise<void> {

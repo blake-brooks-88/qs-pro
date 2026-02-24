@@ -52,12 +52,14 @@ export class WebhookHandlerService {
   async process(event: Stripe.Event): Promise<void> {
     this.logger.debug(`Processing event: ${event.type} (${event.id})`);
 
-    const isNew = await this.webhookEventRepo.markProcessing(
+    const shouldProcess = await this.webhookEventRepo.markProcessing(
       event.id,
       event.type,
     );
-    if (!isNew) {
-      this.logger.warn(`[DIAG] Duplicate event skipped: ${event.id}`);
+    if (!shouldProcess) {
+      this.logger.warn(
+        `[DIAG] Event already completed or in progress, skipped: ${event.id}`,
+      );
       return;
     }
 

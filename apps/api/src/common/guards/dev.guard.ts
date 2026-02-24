@@ -6,8 +6,10 @@ export class DevGuard implements CanActivate {
   constructor(private readonly configService: ConfigService) {}
 
   canActivate(): boolean {
-    if (this.configService.get<string>('NODE_ENV') === 'production') {
-      throw new ForbiddenException('Dev tools are not available in production');
+    if (this.configService.get<string>('NODE_ENV') !== 'development') {
+      throw new ForbiddenException(
+        'Dev tools are only available in development',
+      );
     }
     return true;
   }

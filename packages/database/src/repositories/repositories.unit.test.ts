@@ -2,9 +2,12 @@ import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DatabaseError } from "../errors";
+import type { OrgSubscription } from "../interfaces";
 import {
   DrizzleCredentialsRepository,
   DrizzleFeatureOverrideRepository,
+  DrizzleOrgSubscriptionRepository,
+  DrizzleStripeWebhookEventRepository,
   DrizzleTenantRepository,
   DrizzleUserRepository,
 } from "./drizzle-repositories";
@@ -44,10 +47,15 @@ function createMockDrizzleDb() {
     returning: mockReturning,
   });
 
+  const mockOnConflictDoNothing = vi.fn().mockReturnValue({
+    returning: mockReturning,
+  });
+
   const mockValues = vi.fn().mockImplementation((values: unknown) => {
     capturedInsertValues.push(values);
     return {
       onConflictDoUpdate: mockOnConflictDoUpdate,
+      onConflictDoNothing: mockOnConflictDoNothing,
       returning: mockReturning,
     };
   });
@@ -61,10 +69,21 @@ function createMockDrizzleDb() {
     where: mockDeleteWhere,
   });
 
+  const mockUpdateWhere = vi.fn().mockResolvedValue(undefined);
+  const capturedSetArgs: unknown[] = [];
+  const mockSet = vi.fn().mockImplementation((data: unknown) => {
+    capturedSetArgs.push(data);
+    return { where: mockUpdateWhere };
+  });
+  const mockUpdate = vi.fn().mockReturnValue({
+    set: mockSet,
+  });
+
   return {
     select: mockSelect,
     insert: mockInsert,
     delete: mockDelete,
+    update: mockUpdate,
     // Helpers for test configuration
     setSelectResult: (result: unknown[]) => {
       selectResult = result;
@@ -77,9 +96,11 @@ function createMockDrizzleDb() {
     },
     getCapturedWhereArgs: () => capturedWhereArgs,
     getCapturedInsertValues: () => capturedInsertValues,
+    getCapturedSetArgs: () => capturedSetArgs,
     resetCaptures: () => {
       capturedWhereArgs.length = 0;
       capturedInsertValues.length = 0;
+      capturedSetArgs.length = 0;
       insertError = null;
     },
     // Access to mocks for assertions
@@ -90,7 +111,11 @@ function createMockDrizzleDb() {
       where: mockWhere,
       values: mockValues,
       onConflictDoUpdate: mockOnConflictDoUpdate,
+      onConflictDoNothing: mockOnConflictDoNothing,
       returning: mockReturning,
+      update: mockUpdate,
+      set: mockSet,
+      updateWhere: mockUpdateWhere,
     },
   };
 }
@@ -485,6 +510,316 @@ describe("DrizzleFeatureOverrideRepository", () => {
       expect(mockDb.mocks.where).toHaveBeenCalled();
       const whereArgs = mockDb.getCapturedWhereArgs();
       expect(whereArgs.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe("DrizzleOrgSubscriptionRepository", () => {
+  let mockDb: MockDrizzleDb;
+  let repository: DrizzleOrgSubscriptionRepository;
+
+  beforeEach(() => {
+    mockDb = createMockDrizzleDb();
+    repository = new DrizzleOrgSubscriptionRepository(
+      mockDb as unknown as PostgresJsDatabase,
+    );
+    mockDb.resetCaptures();
+  });
+
+  describe("findByTenantId()", () => {
+    it("returns subscription when found", async () => {
+      // Arrange
+      const subscription = {
+        id: "sub-1",
+        tenantId: "tenant-1",
+        tier: "pro",
+      };
+      mockDb.setSelectResult([subscription]);
+
+      // Act
+      const result = await repository.findByTenantId("tenant-1");
+
+      // Assert
+      expect(result).toEqual(subscription);
+      expect(mockDb.mocks.select).toHaveBeenCalled();
+    });
+
+    it("returns undefined when not found", async () => {
+      // Arrange
+      mockDb.setSelectResult([]);
+
+      // Act
+      const result = await repository.findByTenantId("non-existent");
+
+      // Assert
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("findByStripeCustomerId()", () => {
+    it("returns subscription when found", async () => {
+      // Arrange
+      const subscription = {
+        id: "sub-1",
+        tenantId: "tenant-1",
+        stripeCustomerId: "cus_abc",
+      };
+      mockDb.setSelectResult([subscription]);
+
+      // Act
+      const result = await repository.findByStripeCustomerId("cus_abc");
+
+      // Assert
+      expect(result).toEqual(subscription);
+      expect(mockDb.mocks.where).toHaveBeenCalled();
+    });
+
+    it("returns undefined when not found", async () => {
+      // Arrange
+      mockDb.setSelectResult([]);
+
+      // Act
+      const result = await repository.findByStripeCustomerId("cus_nonexistent");
+
+      // Assert
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("upsert()", () => {
+    it("returns the upserted subscription", async () => {
+      // Arrange
+      const subscription = {
+        id: "sub-1",
+        tenantId: "tenant-1",
+        tier: "pro" as const,
+        seatLimit: 10,
+      };
+      mockDb.setInsertResult([subscription]);
+
+      // Act
+      const result = await repository.upsert({
+        tenantId: "tenant-1",
+        tier: "pro",
+        seatLimit: 10,
+      });
+
+      // Assert
+      expect(result).toEqual(subscription);
+      expect(mockDb.mocks.onConflictDoUpdate).toHaveBeenCalled();
+    });
+
+    it("throws DatabaseError when upsert returns no result", async () => {
+      // Arrange
+      mockDb.setInsertResult([]);
+
+      // Act & Assert
+      await expect(
+        repository.upsert({ tenantId: "tenant-1", tier: "pro" }),
+      ).rejects.toThrow(DatabaseError);
+    });
+  });
+
+  describe("insertIfNotExists()", () => {
+    it("returns true when row was inserted", async () => {
+      // Arrange
+      mockDb.setInsertResult([{ id: "sub-new" }]);
+
+      // Act
+      const result = await repository.insertIfNotExists({
+        tenantId: "tenant-new",
+        tier: "pro",
+      });
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockDb.mocks.onConflictDoNothing).toHaveBeenCalled();
+    });
+
+    it("returns false when row already exists", async () => {
+      // Arrange
+      mockDb.setInsertResult([]);
+
+      // Act
+      const result = await repository.insertIfNotExists({
+        tenantId: "tenant-existing",
+        tier: "pro",
+      });
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("updateTierByTenantId()", () => {
+    it("calls update with correct tier and updatedAt", async () => {
+      // Act
+      await repository.updateTierByTenantId("tenant-1", "enterprise");
+
+      // Assert
+      expect(mockDb.mocks.update).toHaveBeenCalled();
+      expect(mockDb.mocks.set).toHaveBeenCalled();
+      const setArgs = mockDb.getCapturedSetArgs();
+      expect(setArgs.length).toBeGreaterThan(0);
+      const setData = setArgs[0] as { tier: string; updatedAt: Date };
+      expect(setData.tier).toBe("enterprise");
+      expect(setData.updatedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe("updateFromWebhook()", () => {
+    it("strips id, tenantId, and createdAt from update data", async () => {
+      // Act
+      await repository.updateFromWebhook("tenant-1", {
+        id: "should-be-stripped",
+        tenantId: "should-be-stripped",
+        createdAt: new Date(),
+        tier: "enterprise",
+        seatLimit: 50,
+      } satisfies Partial<OrgSubscription>);
+
+      // Assert
+      expect(mockDb.mocks.set).toHaveBeenCalled();
+      const setArgs = mockDb.getCapturedSetArgs();
+      const setData = setArgs[0] as Record<string, unknown>;
+      expect(setData).not.toHaveProperty("id");
+      expect(setData).not.toHaveProperty("tenantId");
+      expect(setData).not.toHaveProperty("createdAt");
+      expect(setData.tier).toBe("enterprise");
+      expect(setData.seatLimit).toBe(50);
+      expect(setData.updatedAt).toBeInstanceOf(Date);
+    });
+
+    it("includes updatedAt timestamp", async () => {
+      // Act
+      await repository.updateFromWebhook("tenant-1", { tier: "pro" });
+
+      // Assert
+      const setArgs = mockDb.getCapturedSetArgs();
+      const setData = setArgs[0] as { updatedAt: Date };
+      expect(setData.updatedAt).toBeInstanceOf(Date);
+    });
+  });
+});
+
+describe("DrizzleStripeWebhookEventRepository", () => {
+  let mockDb: MockDrizzleDb;
+  let repository: DrizzleStripeWebhookEventRepository;
+
+  beforeEach(() => {
+    mockDb = createMockDrizzleDb();
+    repository = new DrizzleStripeWebhookEventRepository(
+      mockDb as unknown as PostgresJsDatabase,
+    );
+    mockDb.resetCaptures();
+  });
+
+  describe("markProcessing()", () => {
+    it("returns true when event is new (INSERT succeeds)", async () => {
+      // Arrange
+      mockDb.setInsertResult([{ id: "evt_new" }]);
+
+      // Act
+      const result = await repository.markProcessing(
+        "evt_new",
+        "checkout.session.completed",
+      );
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockDb.mocks.values).toHaveBeenCalled();
+      expect(mockDb.mocks.onConflictDoUpdate).toHaveBeenCalled();
+    });
+
+    it("returns true when retrying a previously failed event", async () => {
+      // Arrange — onConflictDoUpdate with setWhere matching 'failed' status
+      mockDb.setInsertResult([{ id: "evt_retry" }]);
+
+      // Act
+      const result = await repository.markProcessing(
+        "evt_retry",
+        "checkout.session.completed",
+      );
+
+      // Assert
+      expect(result).toBe(true);
+    });
+
+    it("returns false when event is already completed or processing", async () => {
+      // Arrange — RETURNING yields no rows when setWhere doesn't match
+      mockDb.setInsertResult([]);
+
+      // Act
+      const result = await repository.markProcessing(
+        "evt_completed",
+        "checkout.session.completed",
+      );
+
+      // Assert
+      expect(result).toBe(false);
+    });
+
+    it("passes setWhere condition to onConflictDoUpdate", async () => {
+      // Arrange
+      mockDb.setInsertResult([{ id: "evt_test" }]);
+
+      // Act
+      await repository.markProcessing("evt_test", "invoice.paid");
+
+      // Assert
+      const firstCall = mockDb.mocks.onConflictDoUpdate.mock
+        .calls[0] as unknown[];
+      const callArgs = firstCall[0];
+      expect(callArgs).toHaveProperty("setWhere");
+    });
+
+    it("inserts with correct event data", async () => {
+      // Arrange
+      mockDb.setInsertResult([{ id: "evt_abc" }]);
+
+      // Act
+      await repository.markProcessing("evt_abc", "invoice.paid");
+
+      // Assert
+      const capturedValues = mockDb.getCapturedInsertValues();
+      const inserted = capturedValues[0] as {
+        id: string;
+        eventType: string;
+        status: string;
+      };
+      expect(inserted.id).toBe("evt_abc");
+      expect(inserted.eventType).toBe("invoice.paid");
+      expect(inserted.status).toBe("processing");
+    });
+  });
+
+  describe("markCompleted()", () => {
+    it("updates status to completed with completedAt", async () => {
+      // Act
+      await repository.markCompleted("evt_done");
+
+      // Assert
+      expect(mockDb.mocks.update).toHaveBeenCalled();
+      expect(mockDb.mocks.set).toHaveBeenCalled();
+      const setArgs = mockDb.getCapturedSetArgs();
+      const setData = setArgs[0] as { status: string };
+      expect(setData.status).toBe("completed");
+      expect(setData).toHaveProperty("completedAt");
+    });
+  });
+
+  describe("markFailed()", () => {
+    it("updates status to failed with error message", async () => {
+      // Act
+      await repository.markFailed("evt_err", "DB connection lost");
+
+      // Assert
+      expect(mockDb.mocks.update).toHaveBeenCalled();
+      expect(mockDb.mocks.set).toHaveBeenCalled();
+      const setArgs = mockDb.getCapturedSetArgs();
+      const setData = setArgs[0] as { status: string; errorMessage: string };
+      expect(setData.status).toBe("failed");
+      expect(setData.errorMessage).toBe("DB connection lost");
     });
   });
 });
