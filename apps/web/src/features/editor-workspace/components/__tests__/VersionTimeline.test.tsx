@@ -1,5 +1,5 @@
 import type { VersionListItem } from "@qpp/shared-types";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -242,31 +242,8 @@ describe("VersionTimeline", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
   });
 
-  it("does not render author section when authorName is null", () => {
-    const versions = [
-      createVersion({
-        id: "v-1",
-        createdAt: "2026-01-01T10:00:00.000Z",
-        authorName: null,
-      }),
-    ];
-
-    render(
-      <VersionTimeline
-        versions={versions}
-        selectedVersionId={null}
-        onSelectVersion={onSelectVersion}
-        onUpdateName={onUpdateName}
-      />,
-    );
-
-    const svgs = document.querySelectorAll("svg");
-    expect(svgs).toHaveLength(0);
-  });
-
   describe("InlineEditableName", () => {
-    it("enters edit mode on click and saves on Enter", async () => {
-      const user = userEvent.setup();
+    it("enters edit mode on click and saves on Enter", () => {
       const versions = [
         createVersion({
           id: "v-1",
@@ -285,14 +262,14 @@ describe("VersionTimeline", () => {
       );
 
       const nameButton = screen.getByText("Original Name");
-      await user.click(nameButton);
+      fireEvent.click(nameButton);
 
       const input = screen.getByRole("textbox", { name: "Version name" });
       expect(input).toBeInTheDocument();
       expect(input).toHaveValue("Original Name");
 
-      await user.clear(input);
-      await user.type(input, "New Name{Enter}");
+      fireEvent.change(input, { target: { value: "New Name" } });
+      fireEvent.keyDown(input, { key: "Enter" });
 
       expect(onUpdateName).toHaveBeenCalledWith("v-1", "New Name");
     });

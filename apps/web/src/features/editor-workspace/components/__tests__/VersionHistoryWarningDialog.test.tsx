@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { VersionHistoryWarningDialog } from "../VersionHistoryWarningDialog";
@@ -31,8 +30,7 @@ describe("VersionHistoryWarningDialog", () => {
     expect(screen.queryByText("Unsaved Changes")).not.toBeInTheDocument();
   });
 
-  it("calls onContinueWithoutSaving when Continue Without Saving is clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onContinueWithoutSaving when Continue Without Saving is clicked", () => {
     const onContinueWithoutSaving = vi.fn();
 
     render(
@@ -42,15 +40,14 @@ describe("VersionHistoryWarningDialog", () => {
       />,
     );
 
-    await user.click(
+    fireEvent.click(
       screen.getByRole("button", { name: /continue without saving/i }),
     );
 
     expect(onContinueWithoutSaving).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onSaveAndContinue when Save & Continue is clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onSaveAndContinue when Save & Continue is clicked", () => {
     const onSaveAndContinue = vi.fn();
 
     render(
@@ -60,26 +57,24 @@ describe("VersionHistoryWarningDialog", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /save & continue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save & continue/i }));
 
     expect(onSaveAndContinue).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onCancel when Cancel button is clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onCancel when Cancel button is clicked", () => {
     const onCancel = vi.fn();
 
     render(
       <VersionHistoryWarningDialog {...defaultProps} onCancel={onCancel} />,
     );
 
-    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onCancel when dialog is dismissed via close button", async () => {
-    const user = userEvent.setup();
+  it("calls onCancel when dialog is dismissed via close button", () => {
     const onCancel = vi.fn();
 
     render(
@@ -87,7 +82,7 @@ describe("VersionHistoryWarningDialog", () => {
     );
 
     const closeButton = screen.getByRole("button", { name: /close/i });
-    await user.click(closeButton);
+    fireEvent.click(closeButton);
 
     expect(onCancel).toHaveBeenCalledTimes(1);
   });

@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DriftDetectionDialog } from "../DriftDetectionDialog";
@@ -56,32 +55,29 @@ describe("DriftDetectionDialog", () => {
     );
   });
 
-  it('calls onKeepMine when "Keep Mine" button is clicked', async () => {
-    const user = userEvent.setup();
+  it('calls onKeepMine when "Keep Mine" button is clicked', () => {
     const props = createDefaultProps();
     render(<DriftDetectionDialog {...props} />);
 
-    await user.click(screen.getByRole("button", { name: /keep mine/i }));
+    fireEvent.click(screen.getByRole("button", { name: /keep mine/i }));
 
     expect(props.onKeepMine).toHaveBeenCalled();
   });
 
-  it('calls onAcceptTheirs when "Accept Theirs" button is clicked', async () => {
-    const user = userEvent.setup();
+  it('calls onAcceptTheirs when "Accept Theirs" button is clicked', () => {
     const props = createDefaultProps();
     render(<DriftDetectionDialog {...props} />);
 
-    await user.click(screen.getByRole("button", { name: /accept theirs/i }));
+    fireEvent.click(screen.getByRole("button", { name: /accept theirs/i }));
 
     expect(props.onAcceptTheirs).toHaveBeenCalled();
   });
 
-  it("calls onClose when Cancel is clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onClose when Cancel is clicked", () => {
     const props = createDefaultProps();
     render(<DriftDetectionDialog {...props} />);
 
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(props.onClose).toHaveBeenCalled();
   });

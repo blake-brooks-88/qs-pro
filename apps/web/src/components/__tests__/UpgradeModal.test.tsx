@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UpgradeModal } from "@/components/UpgradeModal";
@@ -66,9 +65,7 @@ describe("UpgradeModal", () => {
     );
   });
 
-  it("calls onClose when Maybe later is clicked", async () => {
-    const user = userEvent.setup();
-
+  it("calls onClose when Maybe later is clicked", () => {
     render(
       <UpgradeModal
         isOpen={true}
@@ -77,7 +74,7 @@ describe("UpgradeModal", () => {
       />,
     );
 
-    await user.click(screen.getByText("Maybe later"));
+    fireEvent.click(screen.getByText("Maybe later"));
 
     expect(mockOnClose).toHaveBeenCalledOnce();
   });

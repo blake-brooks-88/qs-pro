@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ConfirmationDialog } from "../ConfirmationDialog";
@@ -40,9 +39,8 @@ describe("ConfirmationDialog", () => {
     expect(confirmButton).toHaveClass("bg-primary");
   });
 
-  it("ConfirmationDialog_OnConfirmClick_CallsBothOnConfirmAndOnClose", async () => {
+  it("ConfirmationDialog_OnConfirmClick_CallsBothOnConfirmAndOnClose", () => {
     // Arrange
-    const user = userEvent.setup();
     const onConfirm = vi.fn();
     const onClose = vi.fn();
     render(
@@ -54,16 +52,15 @@ describe("ConfirmationDialog", () => {
     );
 
     // Act
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
 
     // Assert
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("ConfirmationDialog_OnCancelClick_CallsOnClose", async () => {
+  it("ConfirmationDialog_OnCancelClick_CallsOnClose", () => {
     // Arrange
-    const user = userEvent.setup();
     const onConfirm = vi.fn();
     const onClose = vi.fn();
     render(
@@ -75,7 +72,7 @@ describe("ConfirmationDialog", () => {
     );
 
     // Act
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     // Assert
     expect(onClose).toHaveBeenCalledTimes(1);

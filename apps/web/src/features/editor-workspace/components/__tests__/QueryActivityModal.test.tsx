@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -157,28 +157,29 @@ describe("QueryActivityModal", () => {
       expect(screen.getByText("subscribers_key")).toBeInTheDocument();
     });
 
-    it("QueryActivityModal_TargetSelected_DisplaysSelectedTargetCard", async () => {
+    it("QueryActivityModal_TargetSelected_DisplaysSelectedTargetCard", () => {
       // Arrange
-      const user = userEvent.setup();
       render(<QueryActivityModal {...defaultProps} />);
       const searchInput = screen.getByPlaceholderText(
         /search by name or customer key/i,
       );
 
       // Act - Select a target
-      await user.click(searchInput);
-      await user.click(screen.getByRole("option", { name: /products/i }));
+      fireEvent.focus(searchInput);
+      const results = screen.getByRole("listbox", {
+        name: "Data Extension results",
+      });
+      fireEvent.click(
+        within(results).getByRole("option", { name: /products/i }),
+      );
 
       // Assert - Verify the selected target card structure
       expect(screen.getByText("Products")).toBeInTheDocument();
       expect(screen.getByText("products_key")).toBeInTheDocument();
       // A clear/remove button should be available to deselect
-      const clearButtons = screen.getAllByRole("button");
-      const closeButton = clearButtons.find(
-        (btn) =>
-          btn.querySelector("svg") && !btn.textContent?.includes("Create"),
-      );
-      expect(closeButton).toBeDefined();
+      expect(
+        screen.getByRole("button", { name: "Clear selected target" }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -280,63 +281,72 @@ describe("QueryActivityModal", () => {
   });
 
   describe("keyboard navigation", () => {
-    it("QueryActivityModal_ArrowDown_MovesHighlightToNextItem", async () => {
+    it("QueryActivityModal_ArrowDown_MovesHighlightToNextItem", () => {
       // Arrange
-      const user = userEvent.setup();
       render(<QueryActivityModal {...defaultProps} />);
       const searchInput = screen.getByPlaceholderText(
         /search by name or customer key/i,
       );
 
       // Act - Focus search to show dropdown, then press ArrowDown
-      await user.click(searchInput);
-      await user.keyboard("{ArrowDown}");
+      fireEvent.focus(searchInput);
+      const listbox = screen.getByRole("listbox", {
+        name: "Data Extension results",
+      });
+      fireEvent.keyDown(searchInput, { key: "ArrowDown" });
 
       // Assert - First item should be highlighted
-      const firstOption = screen.getByRole("option", { name: /subscribers/i });
+      const firstOption = within(listbox).getByRole("option", {
+        name: /subscribers/i,
+      });
       expect(firstOption).toHaveAttribute("aria-selected", "true");
 
       // Act - Press ArrowDown again
-      await user.keyboard("{ArrowDown}");
+      fireEvent.keyDown(searchInput, { key: "ArrowDown" });
 
       // Assert - Second item should be highlighted
-      const secondOption = screen.getByRole("option", { name: /products/i });
+      const secondOption = within(listbox).getByRole("option", {
+        name: /products/i,
+      });
       expect(secondOption).toHaveAttribute("aria-selected", "true");
       expect(firstOption).toHaveAttribute("aria-selected", "false");
     });
 
-    it("QueryActivityModal_ArrowUp_MovesHighlightToPreviousItem", async () => {
+    it("QueryActivityModal_ArrowUp_MovesHighlightToPreviousItem", () => {
       // Arrange
-      const user = userEvent.setup();
       render(<QueryActivityModal {...defaultProps} />);
       const searchInput = screen.getByPlaceholderText(
         /search by name or customer key/i,
       );
 
       // Act - Focus search, move down twice, then up once
-      await user.click(searchInput);
-      await user.keyboard("{ArrowDown}");
-      await user.keyboard("{ArrowDown}");
-      await user.keyboard("{ArrowUp}");
+      fireEvent.focus(searchInput);
+      const listbox = screen.getByRole("listbox", {
+        name: "Data Extension results",
+      });
+      fireEvent.keyDown(searchInput, { key: "ArrowDown" });
+      fireEvent.keyDown(searchInput, { key: "ArrowDown" });
+      fireEvent.keyDown(searchInput, { key: "ArrowUp" });
 
       // Assert - First item should be highlighted again
-      const firstOption = screen.getByRole("option", { name: /subscribers/i });
+      const firstOption = within(listbox).getByRole("option", {
+        name: /subscribers/i,
+      });
       expect(firstOption).toHaveAttribute("aria-selected", "true");
     });
 
-    it("QueryActivityModal_Enter_SelectsHighlightedItem", async () => {
+    it("QueryActivityModal_Enter_SelectsHighlightedItem", () => {
       // Arrange
-      const user = userEvent.setup();
       render(<QueryActivityModal {...defaultProps} />);
       const searchInput = screen.getByPlaceholderText(
         /search by name or customer key/i,
       );
 
       // Act - Focus search, navigate to second item, press Enter
-      await user.click(searchInput);
-      await user.keyboard("{ArrowDown}");
-      await user.keyboard("{ArrowDown}");
-      await user.keyboard("{Enter}");
+      fireEvent.focus(searchInput);
+      fireEvent.keyDown(searchInput, { key: "ArrowDown" });
+      fireEvent.keyDown(searchInput, { key: "ArrowDown" });
+      fireEvent.keyDown(searchInput, { key: "Enter" });
 
       // Assert - Products should be selected (dropdown closed, card shown)
       expect(
@@ -346,22 +356,23 @@ describe("QueryActivityModal", () => {
       expect(screen.getByText("products_key")).toBeInTheDocument();
     });
 
-    it("QueryActivityModal_Escape_ClosesDropdown", async () => {
+    it("QueryActivityModal_Escape_ClosesDropdown", () => {
       // Arrange
-      const user = userEvent.setup();
       render(<QueryActivityModal {...defaultProps} />);
       const searchInput = screen.getByPlaceholderText(
         /search by name or customer key/i,
       );
 
       // Act - Focus search to show dropdown
-      await user.click(searchInput);
+      fireEvent.focus(searchInput);
 
       // Assert - Dropdown should be visible
-      expect(screen.getByRole("listbox")).toBeInTheDocument();
+      expect(
+        screen.getByRole("listbox", { name: "Data Extension results" }),
+      ).toBeInTheDocument();
 
       // Act - Press Escape
-      await user.keyboard("{Escape}");
+      fireEvent.keyDown(searchInput, { key: "Escape" });
 
       // Assert - Dropdown should be closed
       expect(screen.queryByRole("listbox")).not.toBeInTheDocument();

@@ -17,6 +17,10 @@ export default mergeConfig(
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
+        '@solar-icons/react': path.resolve(
+          __dirname,
+          './src/test/stubs/solar-icons.tsx',
+        ),
       },
     },
   })
