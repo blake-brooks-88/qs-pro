@@ -64,7 +64,8 @@ async function bootstrap() {
     const rawBodyModule = await import('fastify-raw-body');
     await app.register(rawBodyModule.default, {
       field: 'rawBody',
-      global: true,
+      global: false,
+      routes: ['/api/billing/webhook'],
       encoding: 'utf8',
       runFirst: true,
     });
