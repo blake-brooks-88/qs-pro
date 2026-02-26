@@ -147,6 +147,7 @@ describe("env.schema", () => {
         makeApiEnv({
           STRIPE_SECRET_KEY: "sk_test_abc123",
           STRIPE_API_VERSION: "2024-06-20",
+          STRIPE_WEBHOOK_SECRET: "whsec_test123",
         }),
       );
       expect(valid.success).toBe(true);
@@ -155,6 +156,7 @@ describe("env.schema", () => {
         makeApiEnv({
           STRIPE_SECRET_KEY: "pk_test_abc123",
           STRIPE_API_VERSION: "2024-06-20",
+          STRIPE_WEBHOOK_SECRET: "whsec_test123",
         }),
       );
       expect(invalid.success).toBe(false);
