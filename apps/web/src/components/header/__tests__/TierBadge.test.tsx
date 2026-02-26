@@ -24,12 +24,12 @@ describe("TierBadge", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders nothing for free tier", () => {
+  it('renders "Free" badge for free tier', () => {
     mockTier("free");
 
-    const { container } = render(<TierBadge />);
+    render(<TierBadge />);
 
-    expect(container.innerHTML).toBe("");
+    expect(screen.getByText("Free")).toBeInTheDocument();
   });
 
   it('renders "Pro" badge for pro tier', () => {

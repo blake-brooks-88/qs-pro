@@ -8,7 +8,11 @@ export function TierBadge() {
   const tier = data?.tier ?? "free";
 
   if (tier === "free") {
-    return null;
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-muted text-muted-foreground">
+        Free
+      </span>
+    );
   }
 
   const isPro = tier === "pro";
