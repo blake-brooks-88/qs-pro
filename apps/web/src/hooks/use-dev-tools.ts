@@ -31,7 +31,7 @@ export function useCreateCheckout() {
 
   return useMutation({
     mutationFn: ({ tier }: { tier: "pro" | "enterprise" }) =>
-      createCheckout(tier, window.location.origin),
+      createCheckout(tier),
     onSuccess: (data) => {
       window.open(data.url, "_blank");
       void queryClient.invalidateQueries({

@@ -13,11 +13,9 @@ export async function setTrialDays(
 
 export async function createCheckout(
   tier: "pro" | "enterprise",
-  returnUrl: string,
 ): Promise<{ url: string }> {
   const { data } = await api.post<{ url: string }>("/dev-tools/checkout", {
     tier,
-    returnUrl,
   });
   return data;
 }
