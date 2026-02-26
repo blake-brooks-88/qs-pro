@@ -11,7 +11,7 @@ class ContextAwareOrgSubscriptionRepository implements IOrgSubscriptionRepositor
   constructor(private readonly defaultDb: PostgresJsDatabase) {}
 
   private getRepo(): DrizzleOrgSubscriptionRepository {
-    const contextDb = getDbFromContext();
+    const contextDb = getDbFromContext() as PostgresJsDatabase | undefined;
     return new DrizzleOrgSubscriptionRepository(contextDb ?? this.defaultDb);
   }
 
