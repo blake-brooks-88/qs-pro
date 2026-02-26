@@ -1,5 +1,11 @@
 import type { SubscriptionTier } from "@qpp/shared-types";
-import { CloseSquare, LetterOpened } from "@solar-icons/react";
+import {
+  CheckCircle,
+  ClockCircle,
+  CloseSquare,
+  LetterOpened,
+  ShieldCheck,
+} from "@solar-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
 
@@ -98,6 +104,27 @@ export function PricingOverlay() {
                   />
                 ))}
               </div>
+
+              {/* Trust signals */}
+              <div className="mb-12 flex items-center justify-center gap-8 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle size={14} />
+                  Cancel anytime
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck size={14} />
+                  Secure checkout by Stripe
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <ClockCircle size={14} />
+                  14-day free trial
+                </span>
+              </div>
+
+              {/* Social proof */}
+              <p className="mb-12 text-center text-xs text-muted-foreground">
+                Built for Marketing Cloud teams
+              </p>
 
               {/* Feature comparison */}
               <section className="mb-16">
