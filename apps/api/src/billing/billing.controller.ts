@@ -95,10 +95,6 @@ export class BillingController {
       'STRIPE_WEBHOOK_SECRET',
     );
 
-    this.logger.debug(
-      `Webhook received — signature present: ${!!signature}, rawBody length: ${req.rawBody.length}`,
-    );
-
     let event: Stripe.Event;
     try {
       event = this.stripe.webhooks.constructEvent(
@@ -115,12 +111,7 @@ export class BillingController {
       });
     }
 
-    this.logger.debug(
-      `Webhook verified — event.type: ${event.type}, event.id: ${event.id}`,
-    );
-
     await this.webhookHandler.process(event);
-    this.logger.debug(`Webhook processed successfully — ${event.type}`);
     return { received: true };
   }
 }

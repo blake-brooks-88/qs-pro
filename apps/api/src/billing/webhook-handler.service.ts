@@ -162,8 +162,6 @@ export class WebhookHandlerService {
   }
 
   async process(event: Stripe.Event): Promise<void> {
-    this.logger.debug(`Processing event: ${event.type} (${event.id})`);
-
     const shouldProcess = await this.webhookEventRepo.markProcessing(
       event.id,
       event.type,
@@ -203,7 +201,6 @@ export class WebhookHandlerService {
           );
           break;
         default:
-          this.logger.debug(`Unhandled event type: ${eventType}`);
           break;
       }
       await this.webhookEventRepo.markCompleted(event.id);
@@ -224,13 +221,6 @@ export class WebhookHandlerService {
   ): Promise<void> {
     const stripeCustomerId = getStripeId(session.customer);
     const stripeSubscriptionId = getStripeId(session.subscription);
-
-    this.logger.debug(
-      `checkout.session.completed — customerId: ${stripeCustomerId}, subscriptionId: ${stripeSubscriptionId}`,
-    );
-    this.logger.debug(
-      `checkout.session.completed — metadata keys: ${Object.keys(session.metadata ?? {}).join(', ')}`,
-    );
 
     if (!stripeCustomerId || !stripeSubscriptionId) {
       throw new Error('Checkout session missing customer or subscription ID');
@@ -255,9 +245,6 @@ export class WebhookHandlerService {
     const tier = await this.resolveTierFromProduct(productId);
 
     const tenant = await this.tenantRepo.findByEid(eid);
-    this.logger.debug(
-      `checkout.session.completed — tenant found: ${!!tenant}, tenantId: ${tenant?.id}`,
-    );
     if (!tenant) {
       throw new Error(`Tenant not found for pricing token`);
     }
@@ -325,10 +312,6 @@ export class WebhookHandlerService {
   private async handleSubscriptionChange(
     subscription: Stripe.Subscription,
   ): Promise<void> {
-    this.logger.debug(
-      `subscription change — status: ${subscription.status}, metadata keys: ${Object.keys(subscription.metadata ?? {}).join(', ')}`,
-    );
-
     if (!subscription.items.data[0]) {
       throw new Error('Subscription event missing line items');
     }
@@ -342,7 +325,6 @@ export class WebhookHandlerService {
     const eid = this.decryptEidToken(rawEid);
 
     const tenant = await this.tenantRepo.findByEid(eid);
-    this.logger.debug(`subscription change — tenant found: ${!!tenant}`);
     if (!tenant) {
       this.logger.warn(
         `Tenant not found for pricing token — tenant may have been deleted`,
@@ -351,11 +333,7 @@ export class WebhookHandlerService {
     }
 
     const productId = subscription.items.data[0].price.product as string;
-    this.logger.debug(
-      `subscription change — resolving tier from product: ${productId}`,
-    );
     const tier = await this.resolveTierFromProduct(productId);
-    this.logger.debug(`subscription change — resolved tier: ${tier}`);
 
     const isPastDueOrUnpaid =
       subscription.status === 'past_due' || subscription.status === 'unpaid';
@@ -700,9 +678,6 @@ export class WebhookHandlerService {
       throw new Error('Stripe client not configured');
     }
     const product = await this.stripe.products.retrieve(productId);
-    this.logger.debug(
-      `resolveTierFromProduct — product: ${productId}, metadata keys: ${Object.keys(product.metadata ?? {}).join(', ')}`,
-    );
     const tier = product.metadata?.tier;
     if (!isValidPaidTier(tier)) {
       throw new Error(
