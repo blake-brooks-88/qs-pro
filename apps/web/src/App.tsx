@@ -1,5 +1,7 @@
 import * as Sentry from "@sentry/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
 import { DevSubscriptionPanel } from "@/components/dev/DevSubscriptionPanel";
@@ -10,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { LaunchInstructionsPage } from "@/features/auth/launch-instructions-page";
 import { EditorWorkspacePage } from "@/features/editor-workspace/EditorWorkspacePage";
+import { featuresQueryKeys } from "@/hooks/use-tenant-features";
 import { useTrial } from "@/hooks/use-trial";
 import { track } from "@/lib/analytics";
 import { getMe, loginWithJwt } from "@/services/auth";
@@ -45,6 +48,7 @@ function getHttpData(error: unknown): unknown {
 }
 
 function App() {
+  const queryClient = useQueryClient();
   const { isAuthenticated, setAuth, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -188,7 +192,11 @@ function App() {
     const checkout = params.get("checkout");
     if (checkout === "success") {
       track("checkout_completed");
-    } else if (checkout === "canceled") {
+      toast.success("Welcome to Pro!", {
+        description: "All Pro features are now unlocked.",
+      });
+      void queryClient.invalidateQueries({ queryKey: featuresQueryKeys.all });
+    } else if (checkout === "cancel") {
       track("checkout_canceled");
     }
     if (checkout) {
@@ -200,7 +208,7 @@ function App() {
         window.location.hash;
       window.history.replaceState({}, "", newUrl);
     }
-  }, []);
+  }, [queryClient]);
 
   if (isLoading) {
     return (
