@@ -38,6 +38,7 @@ setIfMissing('PORT', '3000');
 // Session security (>= 32 chars for secret, >= 16 chars for salt)
 setIfMissing('SESSION_SECRET', 'test-session-secret-at-least-32-chars');
 setIfMissing('SESSION_SALT', '1234567890123456');
+setIfMissing('APP_WEB_ORIGIN', 'http://localhost:5173');
 
 // Encryption (64 hex chars = 32 bytes)
 setIfMissing(

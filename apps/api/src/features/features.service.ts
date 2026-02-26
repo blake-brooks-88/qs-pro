@@ -72,12 +72,4 @@ export class FeaturesService {
       return { tier: effectiveTier, features, trial };
     });
   }
-
-  async updateTier(
-    tenantId: string,
-    tier: SubscriptionTier,
-  ): Promise<TenantFeaturesResponse> {
-    await this.orgSubscriptionRepo.updateTierByTenantId(tenantId, tier);
-    return this.getTenantFeatures(tenantId);
-  }
 }

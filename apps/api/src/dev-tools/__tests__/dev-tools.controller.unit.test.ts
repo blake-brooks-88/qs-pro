@@ -58,16 +58,14 @@ describe('DevToolsController', () => {
   });
 
   describe('createCheckout', () => {
-    it('delegates to devToolsService.createCheckout with tenantId, tier and returnUrl', async () => {
+    it('delegates to devToolsService.createCheckout with tenantId and tier', async () => {
       const result = await controller.createCheckout(mockUser, {
         tier: 'pro',
-        returnUrl: 'https://app.test',
       });
 
       expect(serviceMock.createCheckout).toHaveBeenCalledWith(
         'tenant-1',
         'pro',
-        'https://app.test',
       );
       expect(result).toEqual({
         url: 'https://checkout.stripe.com/session_123',

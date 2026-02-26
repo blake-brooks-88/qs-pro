@@ -14,8 +14,7 @@ const SetTrialBodySchema = z.object({
 });
 
 const CheckoutBodySchema = z.object({
-  tier: z.enum(['pro', 'enterprise']),
-  returnUrl: z.string().url(),
+  tier: z.literal('pro'),
 });
 
 @Controller('dev-tools')
@@ -40,11 +39,7 @@ export class DevToolsController {
     @Body(new ZodValidationPipe(CheckoutBodySchema))
     body: z.infer<typeof CheckoutBodySchema>,
   ) {
-    return this.devToolsService.createCheckout(
-      user.tenantId,
-      body.tier,
-      body.returnUrl,
-    );
+    return this.devToolsService.createCheckout(user.tenantId, body.tier);
   }
 
   @Post('cancel')

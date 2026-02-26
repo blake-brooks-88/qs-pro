@@ -8,6 +8,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { AuditModule } from '../audit/audit.module';
 import { BillingController } from './billing.controller';
+import { BillingService } from './billing.service';
 import { createContextAwareOrgSubscriptionRepository } from './context-aware-org-subscription.repository';
 import { StripeProvider } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';
@@ -18,6 +19,7 @@ import { WebhookHandlerService } from './webhook-handler.service';
   providers: [
     StripeProvider,
     WebhookHandlerService,
+    BillingService,
     {
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
       useFactory: (db: PostgresJsDatabase) =>
@@ -36,5 +38,6 @@ import { WebhookHandlerService } from './webhook-handler.service';
       inject: ['DATABASE'],
     },
   ],
+  exports: [BillingService],
 })
 export class BillingModule {}

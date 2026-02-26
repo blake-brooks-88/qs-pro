@@ -2,20 +2,15 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import { EncryptionService } from '@qpp/backend-shared';
-import type {
-  IOrgSubscriptionRepository,
-  ITenantRepository,
-} from '@qpp/database';
+import type { IOrgSubscriptionRepository } from '@qpp/database';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { BillingService } from '../../billing/billing.service';
 import type { FeaturesService } from '../../features/features.service';
 import { DevToolsService } from '../dev-tools.service';
 
 const TENANT_ID = 'tenant-1';
-const TENANT_EID_TOKEN = 'enc_eid-org-1';
 
 const mockFeatures = {
   tier: 'pro' as const,
@@ -45,48 +40,25 @@ function createOrgSubscriptionRepoStub(): {
   };
 }
 
-function createTenantRepoStub(): {
-  [K in keyof ITenantRepository]: ReturnType<typeof vi.fn>;
-} {
-  return {
-    findById: vi.fn(),
-    findByEid: vi.fn(),
-    upsert: vi.fn(),
-    countUsersByTenantId: vi.fn(),
-  };
-}
-
-function createConfigMock(overrides: Record<string, string> = {}) {
-  return {
-    get: vi.fn().mockImplementation((key: string) => overrides[key]),
-  };
-}
-
 function createFeaturesServiceStub(): {
-  [K in keyof FeaturesService]: ReturnType<typeof vi.fn>;
+  getTenantFeatures: ReturnType<typeof vi.fn>;
 } {
   return {
     getTenantFeatures: vi.fn().mockResolvedValue(mockFeatures),
-    updateTier: vi.fn(),
   };
 }
 
-function createEncryptionServiceStub() {
+function createBillingServiceStub() {
   return {
-    encrypt: vi.fn().mockReturnValue(TENANT_EID_TOKEN),
-    decrypt: vi.fn(),
+    createCheckoutSession: vi
+      .fn()
+      .mockResolvedValue({ url: 'https://checkout.stripe.com/session_123' }),
+    createPortalSession: vi.fn(),
   };
 }
 
 function createStripeMock() {
   return {
-    checkout: {
-      sessions: {
-        create: vi.fn().mockResolvedValue({
-          url: 'https://checkout.stripe.com/session_123',
-        }),
-      },
-    },
     subscriptions: {
       cancel: vi.fn().mockResolvedValue({ id: 'sub_123', status: 'canceled' }),
     },
@@ -96,30 +68,21 @@ function createStripeMock() {
 describe('DevToolsService', () => {
   let service: DevToolsService;
   let orgSubRepo: ReturnType<typeof createOrgSubscriptionRepoStub>;
-  let tenantRepo: ReturnType<typeof createTenantRepoStub>;
-  let configMock: ReturnType<typeof createConfigMock>;
   let featuresStub: ReturnType<typeof createFeaturesServiceStub>;
+  let billingStub: ReturnType<typeof createBillingServiceStub>;
   let stripeMock: ReturnType<typeof createStripeMock>;
-  let encryptionStub: ReturnType<typeof createEncryptionServiceStub>;
 
   beforeEach(() => {
     orgSubRepo = createOrgSubscriptionRepoStub();
-    tenantRepo = createTenantRepoStub();
-    configMock = createConfigMock({
-      STRIPE_PRO_PRICE_ID: 'price_pro_123',
-      STRIPE_ENTERPRISE_PRICE_ID: 'price_ent_456',
-    });
     featuresStub = createFeaturesServiceStub();
+    billingStub = createBillingServiceStub();
     stripeMock = createStripeMock();
-    encryptionStub = createEncryptionServiceStub();
 
     service = new DevToolsService(
       orgSubRepo as unknown as IOrgSubscriptionRepository,
-      tenantRepo as unknown as ITenantRepository,
       stripeMock as unknown as Stripe,
-      configMock as unknown as ConfigService,
       featuresStub as unknown as FeaturesService,
-      encryptionStub as unknown as EncryptionService,
+      billingStub as unknown as BillingService,
     );
   });
 
@@ -164,75 +127,14 @@ describe('DevToolsService', () => {
   });
 
   describe('createCheckout', () => {
-    it('throws InternalServerErrorException when Stripe is null', async () => {
-      const nullStripeService = new DevToolsService(
-        orgSubRepo as unknown as IOrgSubscriptionRepository,
-        tenantRepo as unknown as ITenantRepository,
-        null,
-        configMock as unknown as ConfigService,
-        featuresStub as unknown as FeaturesService,
-        encryptionStub as unknown as EncryptionService,
-      );
+    it('delegates to billingService.createCheckoutSession with monthly interval', async () => {
+      const result = await service.createCheckout(TENANT_ID, 'pro');
 
-      await expect(
-        nullStripeService.createCheckout(TENANT_ID, 'pro', 'https://app.test'),
-      ).rejects.toThrow(InternalServerErrorException);
-      await expect(
-        nullStripeService.createCheckout(TENANT_ID, 'pro', 'https://app.test'),
-      ).rejects.toThrow('Stripe is not configured');
-    });
-
-    it('throws InternalServerErrorException when price ID is not configured', async () => {
-      const emptyConfigMock = createConfigMock({});
-      const svc = new DevToolsService(
-        orgSubRepo as unknown as IOrgSubscriptionRepository,
-        tenantRepo as unknown as ITenantRepository,
-        stripeMock as unknown as Stripe,
-        emptyConfigMock as unknown as ConfigService,
-        featuresStub as unknown as FeaturesService,
-        encryptionStub as unknown as EncryptionService,
-      );
-
-      await expect(
-        svc.createCheckout(TENANT_ID, 'pro', 'https://app.test'),
-      ).rejects.toThrow(InternalServerErrorException);
-      await expect(
-        svc.createCheckout(TENANT_ID, 'pro', 'https://app.test'),
-      ).rejects.toThrow('Price ID not configured for tier: pro');
-    });
-
-    it('throws BadRequestException when tenant not found', async () => {
-      tenantRepo.findById.mockResolvedValue(undefined);
-
-      await expect(
-        service.createCheckout(TENANT_ID, 'pro', 'https://app.test'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.createCheckout(TENANT_ID, 'pro', 'https://app.test'),
-      ).rejects.toThrow('Tenant not found');
-    });
-
-    it('creates checkout session with correct metadata and returns url', async () => {
-      tenantRepo.findById.mockResolvedValue({
-        id: TENANT_ID,
-        eid: 'eid-org-1',
-      });
-
-      const result = await service.createCheckout(
+      expect(billingStub.createCheckoutSession).toHaveBeenCalledWith(
         TENANT_ID,
         'pro',
-        'https://app.test',
+        'monthly',
       );
-
-      expect(encryptionStub.encrypt).toHaveBeenCalledWith('eid-org-1');
-      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith({
-        mode: 'subscription',
-        line_items: [{ price: 'price_pro_123', quantity: 1 }],
-        metadata: { eid: TENANT_EID_TOKEN, tier: 'pro' },
-        subscription_data: { metadata: { eid: TENANT_EID_TOKEN, tier: 'pro' } },
-        success_url: 'https://app.test?checkout=success',
-        cancel_url: 'https://app.test?checkout=cancel',
-      });
       expect(result).toEqual({
         url: 'https://checkout.stripe.com/session_123',
       });
@@ -243,11 +145,9 @@ describe('DevToolsService', () => {
     it('throws InternalServerErrorException when Stripe is null', async () => {
       const nullStripeService = new DevToolsService(
         orgSubRepo as unknown as IOrgSubscriptionRepository,
-        tenantRepo as unknown as ITenantRepository,
         null,
-        configMock as unknown as ConfigService,
         featuresStub as unknown as FeaturesService,
-        encryptionStub as unknown as EncryptionService,
+        billingStub as unknown as BillingService,
       );
 
       await expect(

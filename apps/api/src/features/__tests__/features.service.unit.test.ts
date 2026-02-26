@@ -242,28 +242,6 @@ describe('FeaturesService', () => {
     });
   });
 
-  describe('updateTier()', () => {
-    it('calls orgSubscriptionRepo.updateTierByTenantId', async () => {
-      // Arrange
-      orgSubscriptionRepo.updateTierByTenantId.mockResolvedValue(undefined);
-      orgSubscriptionRepo.findByTenantId.mockResolvedValue({
-        ...baseSubscription,
-        tier: 'enterprise',
-        stripeSubscriptionId: 'sub_123',
-      });
-
-      // Act
-      const result = await service.updateTier('tenant-1', 'enterprise');
-
-      // Assert
-      expect(orgSubscriptionRepo.updateTierByTenantId).toHaveBeenCalledWith(
-        'tenant-1',
-        'enterprise',
-      );
-      expect(result.tier).toBe('enterprise');
-    });
-  });
-
   describe('backward compatibility', () => {
     it('resolves free tier features correctly', async () => {
       // Arrange

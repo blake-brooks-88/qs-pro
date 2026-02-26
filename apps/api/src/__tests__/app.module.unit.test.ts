@@ -67,6 +67,7 @@ function seedApiEnv(): void {
 
   process.env.SESSION_SECRET = 's'.repeat(32);
   process.env.SESSION_SALT = 't'.repeat(16);
+  process.env.APP_WEB_ORIGIN = 'http://localhost:5173';
   process.env.COOKIE_SECURE = 'true';
   process.env.COOKIE_SAMESITE = 'none';
 }
