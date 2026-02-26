@@ -1,4 +1,3 @@
-import type { SubscriptionTier } from "@qpp/shared-types";
 import * as Popover from "@radix-ui/react-popover";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -11,13 +10,6 @@ import {
   useSetTrialDays,
 } from "@/hooks/use-dev-tools";
 import { useTenantFeatures } from "@/hooks/use-tenant-features";
-import { useUpdateTier } from "@/hooks/use-update-tier";
-
-const TIERS: Array<{ value: SubscriptionTier; label: string }> = [
-  { value: "free", label: "Free" },
-  { value: "pro", label: "Pro" },
-  { value: "enterprise", label: "Enterprise" },
-];
 
 function formatTrialStatus(
   trial: { active: boolean; daysRemaining: number | null } | null | undefined,
@@ -36,7 +28,6 @@ function formatTrialStatus(
 
 export function DevSubscriptionPanel() {
   const { data } = useTenantFeatures();
-  const updateTier = useUpdateTier();
   const setTrialDays = useSetTrialDays();
   const checkout = useCreateCheckout();
   const cancel = useCancelSubscription();
@@ -45,21 +36,12 @@ export function DevSubscriptionPanel() {
   const [trialDaysInput, setTrialDaysInput] = useState(14);
 
   const anyPending =
-    updateTier.isPending ||
     setTrialDays.isPending ||
     checkout.isPending ||
     cancel.isPending ||
     reset.isPending;
 
   const hasStripe = data?.tier !== "free" && !data?.trial?.active;
-
-  function handleTierChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    updateTier.mutate(e.target.value as SubscriptionTier, {
-      onSuccess: () => toast.success(`Tier updated to ${e.target.value}`),
-      onError: (err) =>
-        toast.error(err instanceof Error ? err.message : "Operation failed"),
-    });
-  }
 
   function handleSetTrial() {
     setTrialDays.mutate(trialDaysInput, {
@@ -139,24 +121,6 @@ export function DevSubscriptionPanel() {
           </div>
 
           <div className="border-t border-border" />
-
-          <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Tier
-            </p>
-            <select
-              value={data?.tier ?? "free"}
-              onChange={handleTierChange}
-              disabled={anyPending}
-              className="h-7 w-full px-2 text-xs rounded border border-border bg-muted/50 text-muted-foreground cursor-pointer hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-            >
-              {TIERS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
 
           <div className="space-y-1.5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">

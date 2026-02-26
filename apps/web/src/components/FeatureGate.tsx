@@ -6,6 +6,7 @@ import {
   type LockedOverlayProps,
 } from "@/components/ui/locked-overlay";
 import { useFeature } from "@/hooks/use-feature";
+import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 
 const FEATURE_CONFIG: Record<
   string,
@@ -75,6 +76,7 @@ export function FeatureGate({
   onUpgradeClick,
 }: FeatureGateProps) {
   const { enabled: isEnabled } = useFeature(feature);
+  const openPricing = usePricingOverlayStore((s) => s.open);
   /**
    * ESLINT-DISABLE JUSTIFICATION:
    * This eslint-disable is an exception to project standards, not a pattern to follow.
@@ -105,7 +107,7 @@ export function FeatureGate({
       title={config.title}
       description={config.description}
       ctaLabel={`Upgrade to ${config.tier === "enterprise" ? "Enterprise" : "Pro"}`}
-      onCtaClick={onUpgradeClick}
+      onCtaClick={onUpgradeClick ?? (() => openPricing("feature_gate"))}
       badgeSize={badgeSize}
       badgePosition={badgePosition}
     >

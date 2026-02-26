@@ -180,8 +180,4 @@ export const handlers = [
       totalCount: 0,
     });
   }),
-
-  http.get("/api/billing/pricing-token", () => {
-    return HttpResponse.json({ token: "test-encrypted-token" });
-  }),
 ];

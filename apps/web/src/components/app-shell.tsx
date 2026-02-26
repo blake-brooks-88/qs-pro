@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+import { BillingLink } from "@/components/header/BillingLink";
+import { TierBadge } from "@/components/header/TierBadge";
+import { UpgradeButton } from "@/components/header/UpgradeButton";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 interface AppShellProps {
@@ -25,9 +28,12 @@ export function AppShell({
           <span className="font-display font-bold text-base tracking-tight">
             Query<span className="text-primary">++</span>
           </span>
+          <TierBadge />
           {brandingExtra}
         </div>
         <div className="flex items-center gap-2">
+          <UpgradeButton />
+          <BillingLink />
           <ThemeToggle />
         </div>
       </header>

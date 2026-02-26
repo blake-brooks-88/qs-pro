@@ -65,6 +65,7 @@ export const Play = createIcon("Play");
 export const RefreshCircle = createIcon("RefreshCircle");
 export const RestartCircle = createIcon("RestartCircle");
 export const Rocket = createIcon("Rocket");
+export const Settings = createIcon("Settings");
 export const SortVertical = createIcon("SortVertical");
 export const Sun = createIcon("Sun");
 export const TrashBinMinimalistic = createIcon("TrashBinMinimalistic");

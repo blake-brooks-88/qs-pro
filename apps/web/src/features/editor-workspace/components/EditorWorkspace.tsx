@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ActivityBar } from "@/components/ActivityBar";
-import { UpgradeModal } from "@/components/UpgradeModal";
 import { UsageWarningBanner } from "@/components/UsageWarningBanner";
 import { useBeforeUnloadDirtyTabs } from "@/features/editor-workspace/hooks/use-before-unload-dirty-tabs";
 import { useBlastRadius } from "@/features/editor-workspace/hooks/use-blast-radius";
@@ -49,10 +48,10 @@ import {
 } from "@/features/editor-workspace/utils/sql-lint";
 import { useSqlDiagnostics } from "@/features/editor-workspace/utils/sql-lint/use-sql-diagnostics";
 import { useFeature } from "@/hooks/use-feature";
-import { usePricingUrl } from "@/hooks/use-pricing-url";
 import { useRunUsage } from "@/hooks/use-run-usage";
 import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { copyToClipboard } from "@/lib/clipboard";
+import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 import { useTabsStore } from "@/store/tabs-store";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
@@ -104,8 +103,7 @@ export function EditorWorkspace({
   const [tabToClose, setTabToClose] = useState<string | null>(null);
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
   const [isTargetDEModalOpen, setIsTargetDEModalOpen] = useState(false);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const upgradePricingUrl = usePricingUrl();
+  const openPricing = usePricingOverlayStore((s) => s.open);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkTargetQueryId, setLinkTargetQueryId] = useState<string | null>(
@@ -568,7 +566,7 @@ export function EditorWorkspace({
     },
     execute,
     onOpenRunBlockedDialog: () => setIsRunBlockedOpen(true),
-    onOpenUpgradeModal: () => setIsUpgradeModalOpen(true),
+    onOpenUpgradeModal: () => openPricing("run_limit"),
   });
 
   const handleCancel = useCallback(() => {
@@ -652,7 +650,7 @@ export function EditorWorkspace({
               queryIdFilter={historyQueryIdFilter}
               onRerun={handleHistoryRerun}
               onCopySql={handleHistoryCopySql}
-              onUpgradeClick={() => setIsUpgradeModalOpen(true)}
+              onUpgradeClick={() => openPricing("feature_gate")}
             />
           </div>
         ) : (
@@ -704,7 +702,7 @@ export function EditorWorkspace({
                   }
                   onClose={closeVersionHistory}
                   onRestore={handleVersionRestore}
-                  onUpgradeClick={() => setIsUpgradeModalOpen(true)}
+                  onUpgradeClick={() => openPricing("feature_gate")}
                   onPublishVersion={
                     isTeamCollabEnabled && safeActiveTab.linkedQaCustomerKey
                       ? handleVersionPublish
@@ -932,12 +930,6 @@ export function EditorWorkspace({
               handleCloseTab(tabToClose);
             }
           }}
-        />
-
-        <UpgradeModal
-          isOpen={isUpgradeModalOpen}
-          onClose={() => setIsUpgradeModalOpen(false)}
-          pricingUrl={upgradePricingUrl}
         />
 
         <VersionHistoryWarningDialog

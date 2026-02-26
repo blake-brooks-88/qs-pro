@@ -3,17 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { DevSubscriptionPanel } from "@/components/dev/DevSubscriptionPanel";
+import { PricingOverlay } from "@/components/pricing-overlay";
 import { TrialBanner } from "@/components/TrialBanner";
 import { TrialExpiredBanner } from "@/components/TrialExpiredBanner";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { LaunchInstructionsPage } from "@/features/auth/launch-instructions-page";
 import { EditorWorkspacePage } from "@/features/editor-workspace/EditorWorkspacePage";
-import { usePricingUrl } from "@/hooks/use-pricing-url";
 import { useTrial } from "@/hooks/use-trial";
+import { track } from "@/lib/analytics";
 import { getMe, loginWithJwt } from "@/services/auth";
 import { consumeEmbeddedJwt } from "@/services/embedded-jwt";
 import { useAuthStore } from "@/store/auth-store";
+import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -50,7 +52,7 @@ function App() {
   const [oauthRedirectAttempted, setOauthRedirectAttempted] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const { showCountdown, isTrialExpired, daysRemaining } = useTrial();
-  const pricingUrl = usePricingUrl();
+  const openPricing = usePricingOverlayStore((s) => s.open);
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") {
       return false;
@@ -181,6 +183,25 @@ function App() {
     };
   }, [isEmbedded, isAuthenticated, setAuth]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (checkout === "success") {
+      track("checkout_completed");
+    } else if (checkout === "canceled") {
+      track("checkout_canceled");
+    }
+    if (checkout) {
+      params.delete("checkout");
+      const cleaned = params.toString();
+      const newUrl =
+        window.location.pathname +
+        (cleaned ? `?${cleaned}` : "") +
+        window.location.hash;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -279,7 +300,7 @@ function App() {
             return (
               <TrialBanner
                 daysRemaining={daysRemaining}
-                pricingUrl={pricingUrl}
+                onViewPlans={() => openPricing("trial_banner")}
                 onDismiss={() => setBannerDismissed(true)}
               />
             );
@@ -287,7 +308,7 @@ function App() {
           if (isTrialExpired) {
             return (
               <TrialExpiredBanner
-                pricingUrl={pricingUrl}
+                onViewPlans={() => openPricing("trial_banner")}
                 onDismiss={() => setBannerDismissed(true)}
               />
             );
@@ -301,6 +322,7 @@ function App() {
         <EditorWorkspacePage />
         <Toaster />
       </AppShell>
+      <PricingOverlay />
     </Sentry.ErrorBoundary>
   );
 }

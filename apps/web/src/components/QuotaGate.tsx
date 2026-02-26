@@ -1,9 +1,8 @@
 import { LockKeyhole, Rocket } from "@solar-icons/react";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
-import { UpgradeModal } from "@/components/UpgradeModal";
-import { usePricingUrl } from "@/hooks/use-pricing-url";
 import { cn } from "@/lib/utils";
+import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 
 interface QuotaGateProps {
   /** Current usage count */
@@ -76,8 +75,7 @@ function QuotaBlockedDefault({
   resourceName,
   limit,
 }: QuotaBlockedDefaultProps) {
-  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
-  const pricingUrl = usePricingUrl();
+  const openPricing = usePricingOverlayStore((s) => s.open);
 
   return (
     <div className="p-4 border border-border rounded-lg bg-card text-center">
@@ -92,16 +90,11 @@ function QuotaBlockedDefault({
       <button
         type="button"
         className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        onClick={() => setIsUpgradeOpen(true)}
+        onClick={() => openPricing("quota_limit")}
       >
         <Rocket size={16} />
         Upgrade to Pro
       </button>
-      <UpgradeModal
-        isOpen={isUpgradeOpen}
-        onClose={() => setIsUpgradeOpen(false)}
-        pricingUrl={pricingUrl}
-      />
     </div>
   );
 }

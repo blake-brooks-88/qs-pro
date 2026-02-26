@@ -20,10 +20,6 @@ vi.mock("@/hooks/use-tenant-features", () => ({
   featuresQueryKeys: { all: ["features"] },
 }));
 
-vi.mock("@/hooks/use-update-tier", () => ({
-  useUpdateTier: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-
 const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
@@ -62,17 +58,6 @@ describe("DevSubscriptionPanel", () => {
     await user.click(screen.getByText("DEV"));
 
     expect(screen.getByText("Tier: free")).toBeInTheDocument();
-  });
-
-  it("has tier selector dropdown", async () => {
-    const user = userEvent.setup();
-    render(<DevSubscriptionPanel />, { wrapper: Wrapper });
-
-    await user.click(screen.getByText("DEV"));
-
-    const select = screen.getByRole("combobox");
-    expect(select).toBeInTheDocument();
-    expect(select).toHaveValue("free");
   });
 
   it("has trial controls", async () => {

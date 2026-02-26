@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 
 import {
   PremiumBadgeIcon,
@@ -67,6 +68,8 @@ const LockedOverlay = React.forwardRef<HTMLDivElement, LockedOverlayProps>(
     },
     ref,
   ) => {
+    const openPricing = usePricingOverlayStore((s) => s.open);
+    const resolvedCtaClick = onCtaClick ?? (() => openPricing("feature_gate"));
     const [isOpen, setIsOpen] = React.useState(false);
 
     if (!locked) {
@@ -99,7 +102,7 @@ const LockedOverlay = React.forwardRef<HTMLDivElement, LockedOverlayProps>(
             title={title ?? "Premium Feature"}
             description={description ?? "Upgrade to unlock this feature."}
             ctaLabel={ctaLabel}
-            onCtaClick={onCtaClick}
+            onCtaClick={resolvedCtaClick}
             isOpen={isOpen}
           />
         </Popover.Portal>
