@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { PublishConfirmationDialog } from "../PublishConfirmationDialog";
@@ -154,22 +153,20 @@ describe("PublishConfirmationDialog", () => {
     expect(screen.getByText("Loading automations...")).toBeInTheDocument();
   });
 
-  it('calls onConfirm when "Publish" button is clicked', async () => {
-    const user = userEvent.setup();
+  it('calls onConfirm when "Publish" button is clicked', () => {
     const props = createDefaultProps();
     render(<PublishConfirmationDialog {...props} />);
 
-    await user.click(screen.getByRole("button", { name: /publish/i }));
+    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
 
     expect(props.onConfirm).toHaveBeenCalled();
   });
 
-  it('calls onClose when "Cancel" button is clicked', async () => {
-    const user = userEvent.setup();
+  it('calls onClose when "Cancel" button is clicked', () => {
     const props = createDefaultProps();
     render(<PublishConfirmationDialog {...props} />);
 
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(props.onClose).toHaveBeenCalled();
   });

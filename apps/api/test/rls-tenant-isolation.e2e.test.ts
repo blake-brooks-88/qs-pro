@@ -197,11 +197,27 @@ describe('RLS Tenant Isolation (e2e)', () => {
       }
     }
 
-    // 5. Users and tenants are NOT RLS-protected, delete directly
+    // 5. Users are NOT RLS-protected, delete directly
     if (createdUserIds.length > 0) {
       await sqlClient`DELETE FROM users WHERE id = ANY(${createdUserIds}::uuid[])`;
     }
 
+    // 6. Delete child org_subscriptions before tenants (FK constraint, FORCE RLS)
+    for (const tid of createdTenantIds) {
+      try {
+        const reserved = await sqlClient.reserve();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${tid}, false)`;
+          await reserved`DELETE FROM org_subscriptions WHERE tenant_id = ${tid}::uuid`;
+        } finally {
+          reserved.release();
+        }
+      } catch {
+        // Best effort - RLS context may not match
+      }
+    }
+
+    // 7. Delete tenants (not RLS-protected)
     if (createdTenantIds.length > 0) {
       await sqlClient`DELETE FROM tenants WHERE id = ANY(${createdTenantIds}::uuid[])`;
     }

@@ -1,3 +1,4 @@
+import type { ExecutionContext } from '@nestjs/common';
 import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionGuard } from '@qpp/backend-shared';
@@ -64,7 +65,7 @@ describe('FeaturesController', () => {
         switchToHttp: () => ({
           getRequest: () => ({}),
         }),
-      } as any;
+      } as unknown as ExecutionContext;
       guard.canActivate(mockContext);
     }).toThrow(UnauthorizedException);
   });
@@ -88,6 +89,7 @@ describe('FeaturesController', () => {
         teamSnippets: false,
         auditLogs: false,
       },
+      trial: null,
     };
 
     vi.mocked(featuresService.getTenantFeatures).mockResolvedValue(

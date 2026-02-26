@@ -20,11 +20,6 @@ export const tenants = pgTable("tenants", {
   id: uuid("id").defaultRandom().primaryKey(),
   eid: varchar("eid").notNull().unique(), // Enterprise ID
   tssd: varchar("tssd").notNull(), // Tenant Specific Subdomain
-  subscriptionTier: varchar("subscription_tier")
-    .$type<"free" | "pro" | "enterprise">()
-    .default("free")
-    .notNull(),
-  seatLimit: integer("seat_limit"), // null = unlimited
   auditRetentionDays: integer("audit_retention_days").default(365),
   installedAt: timestamp("installed_at").defaultNow(),
 });
@@ -52,6 +47,45 @@ export const users = pgTable("users", {
   tenantId: uuid("tenant_id").references(() => tenants.id),
   email: varchar("email"),
   name: varchar("name"),
+});
+
+// 2. Org Subscriptions (Org-level billing / subscription state)
+export const orgSubscriptions = pgTable(
+  "org_subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull()
+      .unique(),
+    stripeCustomerId: varchar("stripe_customer_id"),
+    stripeSubscriptionId: varchar("stripe_subscription_id"),
+    tier: varchar("tier")
+      .$type<"free" | "pro" | "enterprise">()
+      .default("free")
+      .notNull(),
+    seatLimit: integer("seat_limit"),
+    trialEndsAt: timestamp("trial_ends_at"),
+    currentPeriodEnds: timestamp("current_period_ends"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    tenantIdIdx: index("org_subscriptions_tenant_id_idx").on(t.tenantId),
+  }),
+);
+
+// 2b. Stripe Webhook Events (Idempotent webhook processing, system-level)
+export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
+  id: varchar("id").primaryKey(),
+  eventType: varchar("event_type").notNull(),
+  status: varchar("status")
+    .$type<"processing" | "completed" | "failed">()
+    .default("processing")
+    .notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  errorMessage: text("error_message"),
 });
 
 // 3. Credentials (The "Token Wallet" Layer)
@@ -336,3 +370,11 @@ export const insertQueryPublishEventSchema =
 
 export const selectAuditLogSchema = createSelectSchema(auditLogs);
 export const insertAuditLogSchema = createInsertSchema(auditLogs);
+
+export const selectOrgSubscriptionSchema = createSelectSchema(orgSubscriptions);
+export const insertOrgSubscriptionSchema = createInsertSchema(orgSubscriptions);
+
+export const selectStripeWebhookEventSchema =
+  createSelectSchema(stripeWebhookEvents);
+export const insertStripeWebhookEventSchema =
+  createInsertSchema(stripeWebhookEvents);

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -232,9 +233,9 @@ export function QueryActivityModal({
               <DialogTitle className="font-display text-2xl font-bold tracking-tight">
                 Create Query Activity
               </DialogTitle>
-              <p className="text-sm text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 Create a new query activity in Automation Studio
-              </p>
+              </DialogDescription>
             </div>
           </div>
         </div>
@@ -357,7 +358,9 @@ export function QueryActivityModal({
                         </p>
                       </div>
                       <button
+                        type="button"
                         onClick={() => setSelectedTargetId(null)}
+                        aria-label="Clear selected target"
                         className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all"
                       >
                         <CloseCircle size={18} />

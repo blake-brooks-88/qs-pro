@@ -21,6 +21,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { Sql } from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { SavedQueriesService } from '../saved-queries.service';
@@ -47,14 +51,6 @@ describe('SavedQueriesService linking integration', () => {
   let testUserId: string;
 
   const createdSavedQueryIds: string[] = [];
-
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
-    `;
-  };
 
   async function countVersions(savedQueryId: string): Promise<number> {
     const reserved = await sqlClient.reserve();
@@ -140,7 +136,7 @@ describe('SavedQueriesService linking integration', () => {
     }
     testUserId = userRow.id;
 
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     const reserved = await sqlClient.reserve();
     await reserved`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
@@ -174,6 +170,7 @@ describe('SavedQueriesService linking integration', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -181,7 +178,7 @@ describe('SavedQueriesService linking integration', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     for (const id of [...createdSavedQueryIds]) {
       try {
@@ -596,7 +593,7 @@ describe('SavedQueriesService linking integration', () => {
     });
 
     it('returns linked QA keys with names for all users (pro tier)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const query = await savedQueriesService.create(
         testTenantId,

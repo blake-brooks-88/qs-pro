@@ -82,6 +82,19 @@ export const adminSchema = z.object({
 });
 
 /**
+ * Stripe schema - optional env vars for Stripe billing integration.
+ * All fields are optional so existing dev environments work without Stripe keys.
+ * The BillingModule validates presence at runtime in production.
+ */
+export const stripeSchema = z.object({
+  STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
+  STRIPE_API_VERSION: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
+  STRIPE_PRO_PRICE_ID: z.string().startsWith("price_").optional(),
+  STRIPE_ENTERPRISE_PRICE_ID: z.string().startsWith("price_").optional(),
+});
+
+/**
  * Observability schema - optional env vars for error tracking and log aggregation.
  * All fields are optional so existing dev environments work without configuration.
  */
@@ -100,12 +113,13 @@ export const observabilitySchema = z.object({
 
 /**
  * API application environment schema.
- * Composes: infrastructure + mceAuth + mceJwt + session + observability
+ * Composes: infrastructure + mceAuth + mceJwt + session + stripe + observability
  */
 export const apiEnvSchema = infrastructureSchema
   .merge(mceAuthSchema)
   .merge(mceJwtSchema)
   .merge(sessionSchema)
+  .merge(stripeSchema)
   .merge(observabilitySchema)
   .extend({
     PORT: z.coerce.number().default(3000),
@@ -160,6 +174,22 @@ export const apiEnvSchema = infrastructureSchema
           message: "In production, COOKIE_DOMAIN must be unset (host-only)",
         });
       }
+    }
+
+    if (data.STRIPE_SECRET_KEY && !data.STRIPE_API_VERSION) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "STRIPE_API_VERSION is required when STRIPE_SECRET_KEY is configured",
+      });
+    }
+
+    if (data.STRIPE_SECRET_KEY && !data.STRIPE_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is configured",
+      });
     }
   })
   .transform((data) => ({

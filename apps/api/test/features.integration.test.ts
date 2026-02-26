@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
+import { deleteTestTenantSubscription } from './helpers/set-test-tenant-tier';
 
 function getRequiredEnv(key: string): string {
   // eslint-disable-next-line security/detect-object-injection -- `key` is a trusted string
@@ -92,6 +93,7 @@ describe('FeaturesController (integration)', () => {
           reserved.release();
         }
 
+        await deleteTestTenantSubscription(sqlClient, tenantId);
         await sqlClient`DELETE FROM tenants WHERE id = ${tenantId}::uuid`;
       } catch {
         // Best-effort cleanup
@@ -122,7 +124,7 @@ describe('FeaturesController (integration)', () => {
     const tssd = 'features-int-tssd';
 
     const tenantRows =
-      await sqlClient`INSERT INTO tenants (eid, tssd, subscription_tier) VALUES (${eid}, ${tssd}, ${'free'}) RETURNING id`;
+      await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, ${tssd}) RETURNING id`;
     const tenantRow = tenantRows[0];
     if (!tenantRow) {
       throw new Error('Failed to insert test tenant');

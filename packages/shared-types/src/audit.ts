@@ -29,6 +29,14 @@ export type AuditEventType =
   // Versions
   | "version.restored"
   | "version.renamed"
+  // Subscription
+  | "subscription.trial_activated"
+  | "subscription.trial_expired"
+  | "subscription.created"
+  | "subscription.updated"
+  | "subscription.canceled"
+  | "subscription.payment_failed"
+  | "subscription.webhook_conflict"
   // System
   | "system.sweeper_run"
   | "system.retention_purge";
@@ -56,6 +64,13 @@ export const AUDIT_EVENT_TYPES: AuditEventType[] = [
   "query_activity.published",
   "version.restored",
   "version.renamed",
+  "subscription.trial_activated",
+  "subscription.trial_expired",
+  "subscription.created",
+  "subscription.updated",
+  "subscription.canceled",
+  "subscription.payment_failed",
+  "subscription.webhook_conflict",
   "system.sweeper_run",
   "system.retention_purge",
 ] as const;

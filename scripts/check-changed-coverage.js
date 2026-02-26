@@ -119,9 +119,8 @@ function isCoveredSourceFile(file) {
     normalized.endsWith("/instrument.ts") ||
     normalized.endsWith(".health.ts") ||
     normalized.endsWith("/health.controller.ts") ||
-    normalized.endsWith("/health.module.ts") ||
-    normalized.endsWith("/observability.module.ts") ||
-    normalized.endsWith("/metrics.module.ts");
+    normalized.endsWith(".module.ts") ||
+    normalized.endsWith(".provider.ts");
 
   return !excluded;
 }

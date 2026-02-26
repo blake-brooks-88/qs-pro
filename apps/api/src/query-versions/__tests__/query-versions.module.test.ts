@@ -4,11 +4,13 @@ import { Test } from '@nestjs/testing';
 import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
 import { describe, expect, it, vi } from 'vitest';
 
+import { AuditService } from '../../audit/audit.service';
 import { QueryVersionsController } from '../query-versions.controller';
 import { QueryVersionsModule } from '../query-versions.module';
 import { QueryVersionsService } from '../query-versions.service';
 
 const encryptionStub = { encrypt: vi.fn(), decrypt: vi.fn() };
+const auditStub = { log: vi.fn() };
 
 @Global()
 @Module({
@@ -17,10 +19,17 @@ const encryptionStub = { encrypt: vi.fn(), decrypt: vi.fn() };
 })
 class StubEncryptionModule {}
 
+@Global()
+@Module({
+  providers: [{ provide: AuditService, useValue: auditStub }],
+  exports: [AuditService],
+})
+class StubAuditModule {}
+
 describe('QueryVersionsModule', () => {
   it('compiles with all providers wired correctly', async () => {
     const module = await Test.createTestingModule({
-      imports: [StubEncryptionModule, QueryVersionsModule],
+      imports: [StubEncryptionModule, StubAuditModule, QueryVersionsModule],
     })
       .overrideProvider(ConfigService)
       .useValue({ get: vi.fn() })

@@ -18,6 +18,8 @@ import type { Sql } from 'postgres';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { deleteTestTenantSubscription } from './helpers/set-test-tenant-tier';
+
 function getRequiredEnv(key: string): string {
   // eslint-disable-next-line security/detect-object-injection -- key is a trusted string literal
   const value = process.env[key];
@@ -231,6 +233,8 @@ describe('RLS Isolation Regression Suite', () => {
       // + immutability trigger). The global-setup purge (privileged connection)
       // handles orphans, so swallow errors here.
       await sql`DELETE FROM users WHERE id = ANY(${[userA1Id, userA2Id, userB1Id]}::uuid[])`;
+      await deleteTestTenantSubscription(sql, tenantAId);
+      await deleteTestTenantSubscription(sql, tenantBId);
       try {
         await sql`DELETE FROM tenants WHERE id = ANY(${[tenantAId, tenantBId]}::uuid[])`;
       } catch {

@@ -21,6 +21,10 @@ import {
   vi,
 } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { CsrfGuard } from '../../auth/csrf.guard';
 import { configureApp } from '../../configure-app';
@@ -47,14 +51,6 @@ describe('QueryActivitiesController (integration)', () => {
   let testUserId: string;
 
   const createdSavedQueryIds: string[] = [];
-
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
-    `;
-  };
 
   const mockQDService = {
     retrieveAll: vi.fn(),
@@ -150,7 +146,7 @@ describe('QueryActivitiesController (integration)', () => {
     mockSessionUser.userId = testUserId;
     mockSessionUser.tenantId = testTenantId;
 
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     const reserved = await sqlClient.reserve();
     await reserved`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
@@ -184,6 +180,7 @@ describe('QueryActivitiesController (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -191,7 +188,7 @@ describe('QueryActivitiesController (integration)', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     for (const id of [...createdSavedQueryIds]) {
       try {
@@ -215,7 +212,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('feature gating', () => {
     it('POST / returns 403 when deploy feature is disabled (free tier)', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const res = await request(app.getHttpServer())
         .post('/query-activities')
@@ -231,7 +228,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('GET / returns 403 when deploy feature is disabled (free tier)', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const res = await request(app.getHttpServer()).get('/query-activities');
 
@@ -240,7 +237,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('POST /link/:savedQueryId returns 403 when deploy feature is disabled (free tier)', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const res = await request(app.getHttpServer())
         .post('/query-activities/link/00000000-0000-4000-8000-000000000000')
@@ -251,7 +248,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('DELETE /link/:savedQueryId returns 403 when deploy feature is disabled (free tier)', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const res = await request(app.getHttpServer()).delete(
         '/query-activities/link/00000000-0000-4000-8000-000000000000',
@@ -262,7 +259,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('GET /:customerKey returns 403 when deploy feature is disabled (free tier)', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const res = await request(app.getHttpServer()).get(
         '/query-activities/qa-key-1',
@@ -273,7 +270,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('endpoints work when deploy feature is enabled (pro tier)', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       mockQDService.retrieveAll.mockResolvedValue([]);
 
@@ -285,7 +282,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('POST /api/query-activities', () => {
     it('creates query activity and returns objectId and customerKey', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       mockDEService.retrieveByCustomerKey.mockResolvedValue({
         objectId: 'de-obj-1',
@@ -327,7 +324,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('returns 400 when body is invalid', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const res = await request(app.getHttpServer())
         .post('/query-activities')
@@ -339,7 +336,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('GET /api/query-activities', () => {
     it('returns list with link status', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       mockQDService.retrieveAll.mockResolvedValue([
         {
@@ -414,7 +411,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('POST /api/query-activities/link/:savedQueryId', () => {
     it('links saved query to query activity', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const savedQuery = await savedQueriesService.create(
         testTenantId,
@@ -459,7 +456,7 @@ describe('QueryActivitiesController (integration)', () => {
     });
 
     it('returns 400 when body is missing qaCustomerKey', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const res = await request(app.getHttpServer())
         .post('/query-activities/link/00000000-0000-4000-8000-000000000000')
@@ -471,7 +468,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('DELETE /api/query-activities/link/:savedQueryId', () => {
     it('unlinks saved query from query activity', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const savedQuery = await savedQueriesService.create(
         testTenantId,
@@ -504,7 +501,7 @@ describe('QueryActivitiesController (integration)', () => {
 
   describe('GET /api/query-activities/:customerKey', () => {
     it('returns query activity detail with link status', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       mockQDService.retrieveDetail.mockResolvedValue({
         objectId: 'qa-obj-1',

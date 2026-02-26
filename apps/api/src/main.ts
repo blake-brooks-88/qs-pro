@@ -61,6 +61,15 @@ async function bootstrap() {
 
     await app.register(formBody);
 
+    const rawBodyModule = await import('fastify-raw-body');
+    await app.register(rawBodyModule.default, {
+      field: 'rawBody',
+      global: false,
+      routes: ['/api/billing/webhook'],
+      encoding: 'utf8',
+      runFirst: true,
+    });
+
     const configService = app.get(ConfigService);
 
     const sessionSecret = configService.get('SESSION_SECRET', { infer: true });

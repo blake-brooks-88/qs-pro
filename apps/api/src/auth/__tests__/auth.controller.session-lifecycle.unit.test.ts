@@ -6,6 +6,7 @@ import type { FastifyReply } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuditService } from '../../audit/audit.service';
+import { TrialService } from '../../trial/trial.service';
 import { AuthController } from '../auth.controller';
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -100,6 +101,10 @@ describe('AuthController session lifecycle', () => {
         { provide: AuthService, useValue: authService },
         { provide: ConfigService, useValue: { get: vi.fn() } },
         { provide: AuditService, useValue: { log: vi.fn() } },
+        {
+          provide: TrialService,
+          useValue: { activateTrial: vi.fn().mockResolvedValue(undefined) },
+        },
       ],
     })
       .overrideGuard(SessionGuard)

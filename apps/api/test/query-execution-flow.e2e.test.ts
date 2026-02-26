@@ -495,6 +495,17 @@ async function cleanupTestPollution(): Promise<void> {
         OR sf_user_id LIKE 'mce-%'
     `;
 
+    // Delete child org_subscriptions before tenants (FK constraint, FORCE RLS)
+    for (const row of testTenants) {
+      try {
+        await tempSql`SELECT set_config('app.tenant_id', ${row.tenant_id}::text, false)`;
+        await tempSql`DELETE FROM org_subscriptions WHERE tenant_id = ${row.tenant_id}::uuid`;
+        await tempSql`RESET app.tenant_id`;
+      } catch {
+        // Best effort - RLS context may not match
+      }
+    }
+
     // Delete test tenants (no RLS)
     await tempSql`
       DELETE FROM tenants
@@ -950,10 +961,27 @@ describe('Query Execution Flow (e2e)', () => {
       }
     }
 
-    // 4. Delete users and tenants (not RLS-protected)
+    // 4. Delete users (not RLS-protected)
     if (createdUserIds.length > 0) {
       await sqlClient`DELETE FROM users WHERE id = ANY(${createdUserIds}::uuid[])`;
     }
+
+    // 5. Delete child org_subscriptions before tenants (FK constraint, FORCE RLS)
+    for (const tid of createdTenantIds) {
+      try {
+        const reserved = await sqlClient.reserve();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${tid}, false)`;
+          await reserved`DELETE FROM org_subscriptions WHERE tenant_id = ${tid}::uuid`;
+        } finally {
+          reserved.release();
+        }
+      } catch {
+        // Best effort - RLS context may not match
+      }
+    }
+
+    // 6. Delete tenants (not RLS-protected)
     if (createdTenantIds.length > 0) {
       await sqlClient`DELETE FROM tenants WHERE id = ANY(${createdTenantIds}::uuid[])`;
     }

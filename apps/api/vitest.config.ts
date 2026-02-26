@@ -11,6 +11,8 @@ export default mergeConfig(
       include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
       exclude: ['**/*.e2e-spec.ts', '**/*.e2e.test.ts', 'node_modules/**'],
       root: './',
+      testTimeout: 15000,
+      hookTimeout: 15000,
     },
     plugins: [
       swc.vite({

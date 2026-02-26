@@ -2,6 +2,7 @@ import { LockKeyhole, Rocket } from "@solar-icons/react";
 import { type ReactNode, useState } from "react";
 
 import { UpgradeModal } from "@/components/UpgradeModal";
+import { usePricingUrl } from "@/hooks/use-pricing-url";
 import { cn } from "@/lib/utils";
 
 interface QuotaGateProps {
@@ -76,6 +77,7 @@ function QuotaBlockedDefault({
   limit,
 }: QuotaBlockedDefaultProps) {
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
+  const pricingUrl = usePricingUrl();
 
   return (
     <div className="p-4 border border-border rounded-lg bg-card text-center">
@@ -98,6 +100,7 @@ function QuotaBlockedDefault({
       <UpgradeModal
         isOpen={isUpgradeOpen}
         onClose={() => setIsUpgradeOpen(false)}
+        pricingUrl={pricingUrl}
       />
     </div>
   );

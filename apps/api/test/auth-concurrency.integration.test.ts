@@ -30,6 +30,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/configure-app';
+import { deleteTestTenantSubscription } from './helpers/set-test-tenant-tier';
 
 function getRequiredEnv(key: string): string {
   // eslint-disable-next-line security/detect-object-injection -- `key` is a trusted string
@@ -167,6 +168,10 @@ describe('Auth Concurrency (integration)', () => {
       }
 
       for (const eid of createdTenantEids) {
+        const ctx = createdAuthContexts.find((c) => c.tenantEid === eid);
+        if (ctx) {
+          await deleteTestTenantSubscription(client, ctx.tenantId);
+        }
         await client`DELETE FROM tenants WHERE eid = ${eid}`;
       }
     } catch (cleanupError) {

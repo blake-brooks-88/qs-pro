@@ -17,16 +17,19 @@ export type {
   SubscriptionTier,
   TenantFeatures,
   TenantFeaturesResponse,
+  TrialState,
 } from "./features.js";
 export {
   ALL_FEATURE_KEYS,
   FeatureKeySchema,
   getTierFeatures,
   isTierFeature,
+  SUBSCRIPTION_AUDIT_EVENTS,
   SubscriptionTierSchema,
   TenantFeaturesResponseSchema,
   TenantFeaturesSchema,
   TIER_FEATURES,
+  TrialStateSchema,
 } from "./features.js";
 
 // Shell query types

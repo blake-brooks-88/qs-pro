@@ -130,12 +130,35 @@ export function getTierFeatures(tier: SubscriptionTier): TenantFeatures {
 }
 
 /**
- * Response type for tenant features API including tier
+ * Trial state for the current tenant subscription
+ */
+export const TrialStateSchema = z.object({
+  active: z.boolean(),
+  daysRemaining: z.number().int().nullable(),
+  endsAt: z.string().datetime().nullable(),
+});
+export type TrialState = z.infer<typeof TrialStateSchema>;
+
+/**
+ * Response type for tenant features API including tier and trial state
  */
 export const TenantFeaturesResponseSchema = z.object({
   tier: SubscriptionTierSchema,
   features: TenantFeaturesSchema,
+  trial: TrialStateSchema.nullable(),
 });
 export type TenantFeaturesResponse = z.infer<
   typeof TenantFeaturesResponseSchema
 >;
+
+/**
+ * Subscription audit event types for the audit logging system
+ */
+export const SUBSCRIPTION_AUDIT_EVENTS = [
+  "subscription.trial_activated",
+  "subscription.trial_expired",
+  "subscription.created",
+  "subscription.updated",
+  "subscription.canceled",
+  "subscription.payment_failed",
+] as const;

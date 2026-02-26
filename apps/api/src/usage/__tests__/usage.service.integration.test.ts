@@ -29,6 +29,7 @@ import {
   vi,
 } from 'vitest';
 
+import { setTestTenantTier } from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { SavedQueriesService } from '../../saved-queries/saved-queries.service';
@@ -64,14 +65,6 @@ describe('UsageService (integration)', () => {
 
   const createdSavedQueryIds: string[] = [];
   const createdShellRunIds: string[] = [];
-
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
-    `;
-  };
 
   const seedShellQueryRun = async (): Promise<string> => {
     const id = crypto.randomUUID();
@@ -140,7 +133,7 @@ describe('UsageService (integration)', () => {
     }
     testUserId = userRow.id;
 
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     const reserved = await sqlClient.reserve();
     await reserved`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
@@ -191,6 +184,10 @@ describe('UsageService (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await sqlClient.begin(async (tx) => {
+        await tx`SELECT set_config('app.tenant_id', ${testTenantId}, true)`;
+        await tx`DELETE FROM org_subscriptions WHERE tenant_id = ${testTenantId}::uuid`;
+      });
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -202,7 +199,7 @@ describe('UsageService (integration)', () => {
   });
 
   beforeEach(async () => {
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     for (const id of [...createdShellRunIds]) {
       try {
@@ -251,7 +248,7 @@ describe('UsageService (integration)', () => {
 
   describe('getUsage()', () => {
     it('free tier with seeded data', async () => {
-      await setTenantTier('free');
+      await setTestTenantTier(sqlClient, testTenantId, 'free');
 
       const run1 = await seedShellQueryRun();
       createdShellRunIds.push(run1);
@@ -289,7 +286,7 @@ describe('UsageService (integration)', () => {
     });
 
     it('pro tier', async () => {
-      await setTenantTier('pro');
+      await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
       const run1 = await seedShellQueryRun();
       createdShellRunIds.push(run1);
@@ -315,7 +312,7 @@ describe('UsageService (integration)', () => {
     });
 
     it('enterprise tier', async () => {
-      await setTenantTier('enterprise');
+      await setTestTenantTier(sqlClient, testTenantId, 'enterprise');
 
       const result = await usageService.getUsage(
         testTenantId,

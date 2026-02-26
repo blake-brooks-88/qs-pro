@@ -97,6 +97,11 @@ function createWrapper(queryClient: QueryClient) {
   };
 }
 
+function renderApp() {
+  const queryClient = createTestQueryClient();
+  return render(<App />, { wrapper: createWrapper(queryClient) });
+}
+
 describe("App", () => {
   // Store original window properties
   const originalSelf = window.self;
@@ -210,7 +215,7 @@ describe("App", () => {
       mockGetMe.mockImplementation(() => new Promise(() => {}));
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: Loading UI is shown with spinner and text
       expect(screen.getByText("Initializing Query++...")).toBeInTheDocument();
@@ -230,7 +235,7 @@ describe("App", () => {
       mockGetMe.mockImplementation(() => new Promise(() => {})); // Hang to keep in loading
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: JWT login was attempted
       await waitFor(() => {
@@ -243,14 +248,13 @@ describe("App", () => {
       setEmbeddedMode(true);
       const testJwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature";
       const meResponse = createMockMeResponse();
-      const queryClient = createTestQueryClient();
 
       mockConsumeEmbeddedJwt.mockReturnValue(testJwt);
       mockLoginWithJwt.mockResolvedValue(undefined);
       mockGetMe.mockResolvedValue(meResponse);
 
       // Act
-      render(<App />, { wrapper: createWrapper(queryClient) });
+      renderApp();
 
       // Assert: Authenticated UI is shown (AppShell with Query++ branding)
       await waitFor(() => {
@@ -270,7 +274,7 @@ describe("App", () => {
       mockGetMe.mockRejectedValue(create401Error());
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: No crash, shows retry option (embedded unauthenticated state)
       await waitFor(() => {
@@ -289,7 +293,7 @@ describe("App", () => {
       mockLoginWithJwt.mockResolvedValue(undefined);
       mockGetMe.mockImplementation(() => new Promise(() => {}));
 
-      render(<App />);
+      renderApp();
 
       window.dispatchEvent(new MessageEvent("message", { data: {} }));
 
@@ -306,7 +310,7 @@ describe("App", () => {
       mockGetMe.mockRejectedValue(create401Error());
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: OAuth redirect was triggered
       await waitFor(() => {
@@ -318,11 +322,10 @@ describe("App", () => {
       // Arrange: Not embedded, getMe succeeds (post-OAuth callback)
       setEmbeddedMode(false);
       const meResponse = createMockMeResponse();
-      const queryClient = createTestQueryClient();
       mockGetMe.mockResolvedValue(meResponse);
 
       // Act
-      render(<App />, { wrapper: createWrapper(queryClient) });
+      renderApp();
 
       // Assert: Session established and authenticated UI shown
       await waitFor(() => {
@@ -347,7 +350,7 @@ describe("App", () => {
       mockGetMe.mockRejectedValue(create401Error());
 
       // Act
-      render(<App />);
+      renderApp();
 
       // First call happens immediately and triggers redirect
       await act(async () => {
@@ -367,7 +370,7 @@ describe("App", () => {
       mockGetMe.mockRejectedValue(create401Error());
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: OAuth redirect was triggered initially
       await waitFor(() => {
@@ -394,7 +397,7 @@ describe("App", () => {
       mockGetMe.mockRejectedValue(create401Error());
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: After initial redirect attempt, shows the retry UI
       await waitFor(() => {
@@ -430,7 +433,7 @@ describe("App", () => {
       });
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: Logout was called and LaunchInstructionsPage shown
       await waitFor(() => {
@@ -447,7 +450,7 @@ describe("App", () => {
       mockGetMe.mockRejectedValue(create401Error("reauth_required"));
 
       // Act
-      render(<App />);
+      renderApp();
 
       // Assert: LaunchInstructionsPage is rendered
       await waitFor(() => {
@@ -465,7 +468,7 @@ describe("App", () => {
       setEmbeddedMode(true);
       mockGetMe.mockRejectedValue(create401Error("reauth_required"));
 
-      render(<App />);
+      renderApp();
 
       await waitFor(() => {
         expect(screen.getByText("Launch Query++")).toBeInTheDocument();
@@ -477,11 +480,10 @@ describe("App", () => {
     it("renders main app content when authenticated", async () => {
       // Arrange
       const meResponse = createMockMeResponse();
-      const queryClient = createTestQueryClient();
       mockGetMe.mockResolvedValue(meResponse);
 
       // Act
-      render(<App />, { wrapper: createWrapper(queryClient) });
+      renderApp();
 
       // Assert: AppShell with main content is rendered
       await waitFor(() => {
@@ -503,11 +505,14 @@ describe("App", () => {
     it("shows Connection Error UI when a non-401 error occurs", async () => {
       mockGetMe.mockRejectedValue(new Error("Backend down"));
 
-      render(<App />);
+      renderApp();
 
-      await waitFor(() => {
-        expect(screen.getByText("Connection Error")).toBeInTheDocument();
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByText("Connection Error")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
       expect(screen.getByText("Backend down")).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: "Retry Connection" }));

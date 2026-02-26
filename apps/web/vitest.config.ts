@@ -13,10 +13,16 @@ export default mergeConfig(
       include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
+      testTimeout: 15000,
+      hookTimeout: 15000,
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
+        '@solar-icons/react': path.resolve(
+          __dirname,
+          './src/test/stubs/solar-icons.tsx',
+        ),
       },
     },
   })

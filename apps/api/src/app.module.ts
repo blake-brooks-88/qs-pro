@@ -17,7 +17,9 @@ import Redis from 'ioredis';
 
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
 import { SessionThrottlerGuard } from './common/guards/session-throttler.guard';
+import { DevToolsModule } from './dev-tools/dev-tools.module';
 import { FeaturesModule } from './features/features.module';
 import { FoldersModule } from './folders/folders.module';
 import { MceModule } from './mce/mce.module';
@@ -27,6 +29,7 @@ import { QueryVersionsModule } from './query-versions/query-versions.module';
 import { RedisModule } from './redis/redis.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { ShellQueryModule } from './shell-query/shell-query.module';
+import { TrialModule } from './trial/trial.module';
 import { UsageModule } from './usage/usage.module';
 
 @Module({
@@ -79,12 +82,15 @@ import { UsageModule } from './usage/usage.module';
     MceModule,
     RedisModule,
     ShellQueryModule,
+    BillingModule,
     FeaturesModule,
     FoldersModule,
     SavedQueriesModule,
     QueryActivitiesModule,
     QueryVersionsModule,
+    TrialModule,
     UsageModule,
+    DevToolsModule,
     ObservabilityModule,
   ],
   providers: [

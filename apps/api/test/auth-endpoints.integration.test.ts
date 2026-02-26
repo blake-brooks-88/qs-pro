@@ -51,6 +51,7 @@ import {
 
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/configure-app';
+import { deleteTestTenantSubscription } from './helpers/set-test-tenant-tier';
 
 function getRequiredEnv(key: string): string {
   // eslint-disable-next-line security/detect-object-injection -- `key` is a trusted string
@@ -237,6 +238,10 @@ describe('Auth endpoints (integration)', () => {
 
     for (const eid of createdTenantEids) {
       try {
+        const [t] = await db.select().from(tenants).where(eq(tenants.eid, eid));
+        if (t) {
+          await deleteTestTenantSubscription(client, t.id);
+        }
         await client.unsafe('DELETE FROM tenants WHERE eid = $1', [eid]);
       } catch {
         // ignore cleanup errors

@@ -1,9 +1,9 @@
+import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { beforeEach, describe, expect, it, Mock, vi } from "vitest";
 
 import { MetricsController } from "../metrics.controller";
 import { MetricsGuard } from "../metrics.guard";
-import { ConfigService } from "@nestjs/config";
 
 vi.mock("prom-client", () => ({
   register: {

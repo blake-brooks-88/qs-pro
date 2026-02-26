@@ -29,6 +29,9 @@ declare -a DANGEROUS_PATTERNS=(
   'git\s+push.*--force'
   'git\s+push.*-f\s'
   'git\s+push\s+-f$'
+  'git\s+add\s+--force'
+  'git\s+add\s+-f\s'
+  'git\s+add\s+-[a-zA-Z]*f'
 
   # Database destructive operations
   'DROP\s+TABLE'

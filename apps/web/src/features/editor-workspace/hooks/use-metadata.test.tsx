@@ -4,7 +4,7 @@ import { http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { defaultFeatures } from "@/test/mocks/handlers";
+import { defaultFeaturesResponse } from "@/test/mocks/handlers";
 import { server } from "@/test/mocks/server";
 
 import {
@@ -34,8 +34,11 @@ describe("use-metadata hooks", () => {
     server.use(
       http.get("/api/features", () => {
         return HttpResponse.json({
-          ...defaultFeatures,
-          systemDataViews: false,
+          ...defaultFeaturesResponse,
+          features: {
+            ...defaultFeaturesResponse.features,
+            systemDataViews: false,
+          },
         });
       }),
     );

@@ -23,6 +23,10 @@ import { ErrorCode } from '@qpp/backend-shared';
 import type { Sql } from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { FeaturesService } from '../../features/features.service';
@@ -85,15 +89,20 @@ describe('QueryActivitiesService link integration', () => {
     tier: string,
   ): Promise<string> {
     const result = await sqlClient`
-      INSERT INTO tenants (eid, tssd, subscription_tier)
-      VALUES (${eid}, ${tssd}, ${tier})
-      ON CONFLICT (eid) DO UPDATE SET tssd = ${tssd}, subscription_tier = ${tier}
+      INSERT INTO tenants (eid, tssd)
+      VALUES (${eid}, ${tssd})
+      ON CONFLICT (eid) DO UPDATE SET tssd = ${tssd}
       RETURNING id
     `;
     const row = result[0];
     if (!row) {
       throw new Error('Failed to insert test tenant');
     }
+    await setTestTenantTier(
+      sqlClient,
+      row.id,
+      tier as 'free' | 'pro' | 'enterprise',
+    );
     return row.id;
   }
 
@@ -210,9 +219,11 @@ describe('QueryActivitiesService link integration', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId2}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
     if (testTenantId2) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId2);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId2}::uuid`;
     }
 

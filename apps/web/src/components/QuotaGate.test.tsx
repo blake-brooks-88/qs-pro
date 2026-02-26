@@ -1,7 +1,20 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { QuotaCountBadge, QuotaGate } from "./QuotaGate";
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
 
 describe("QuotaGate", () => {
   it("renders children when under quota", () => {
@@ -21,6 +34,7 @@ describe("QuotaGate", () => {
       <QuotaGate current={5} limit={5} resourceName="Saved Queries">
         <button>Save Query</button>
       </QuotaGate>,
+      { wrapper: createWrapper() },
     );
 
     expect(

@@ -363,6 +363,9 @@ describe('Shell query endpoints (integration)', () => {
       try {
         await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
         await reserved`
+          UPDATE org_subscriptions SET tier = 'pro' WHERE tenant_id = ${tenantId}::uuid
+        `;
+        await reserved`
           INSERT INTO tenant_feature_overrides (tenant_id, feature_key, enabled)
           VALUES (${tenantId}::uuid, ${'runToTargetDE'}, ${true})
           ON CONFLICT (tenant_id, feature_key) DO UPDATE SET enabled = ${true}
@@ -380,6 +383,11 @@ describe('Shell query endpoints (integration)', () => {
         await reserved`
           DELETE FROM tenant_feature_overrides
           WHERE tenant_id = ${tenantId}::uuid AND feature_key = ${'runToTargetDE'}
+        `;
+        await reserved`
+          UPDATE org_subscriptions
+          SET tier = 'free', trial_ends_at = NULL
+          WHERE tenant_id = ${tenantId}::uuid
         `;
         await reserved`RESET app.tenant_id`;
       } finally {

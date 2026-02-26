@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { LinkConflictDialog } from "../LinkConflictDialog";
@@ -56,34 +55,31 @@ describe("LinkConflictDialog", () => {
     );
   });
 
-  it("calls onResolve with keep-remote when AS button clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onResolve with keep-remote when AS button clicked", () => {
     const props = createDefaultProps();
     render(<LinkConflictDialog {...props} />);
 
-    await user.click(screen.getByRole("button", { name: /keep as version/i }));
+    fireEvent.click(screen.getByRole("button", { name: /keep as version/i }));
 
     expect(props.onResolve).toHaveBeenCalledWith("keep-remote");
   });
 
-  it("calls onResolve with keep-local when Q++ button clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onResolve with keep-local when Q++ button clicked", () => {
     const props = createDefaultProps();
     render(<LinkConflictDialog {...props} />);
 
-    await user.click(
+    fireEvent.click(
       screen.getByRole("button", { name: /keep q\+\+ version/i }),
     );
 
     expect(props.onResolve).toHaveBeenCalledWith("keep-local");
   });
 
-  it("calls onClose when Cancel clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onClose when Cancel clicked", () => {
     const props = createDefaultProps();
     render(<LinkConflictDialog {...props} />);
 
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(props.onClose).toHaveBeenCalled();
   });

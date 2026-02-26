@@ -902,7 +902,6 @@ describe('AuthService (integration)', () => {
         .values({
           eid: uniqueEid,
           tssd: TEST_TSSD,
-          subscriptionTier: 'free',
         })
         .returning();
       if (!tenant) {

@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AppError, ErrorCode } from '@qpp/backend-shared';
+import { AppError, ErrorCode, RlsContextService } from '@qpp/backend-shared';
 import type {
   IFeatureOverrideRepository,
+  IOrgSubscriptionRepository,
   ITenantRepository,
 } from '@qpp/database';
 import type {
@@ -11,6 +12,8 @@ import type {
 } from '@qpp/shared-types';
 import { ALL_FEATURE_KEYS, getTierFeatures } from '@qpp/shared-types';
 
+import { TrialService } from '../trial/trial.service';
+
 @Injectable()
 export class FeaturesService {
   constructor(
@@ -18,49 +21,63 @@ export class FeaturesService {
     private featureOverrideRepo: IFeatureOverrideRepository,
     @Inject('TENANT_REPOSITORY')
     private tenantRepo: ITenantRepository,
+    @Inject('ORG_SUBSCRIPTION_REPOSITORY')
+    private orgSubscriptionRepo: IOrgSubscriptionRepository,
+    private readonly trialService: TrialService,
+    private readonly rlsContext: RlsContextService,
   ) {}
 
-  /**
-   * Gets the effective features for a tenant, including tier-based features and overrides
-   */
   async getTenantFeatures(tenantId: string): Promise<TenantFeaturesResponse> {
-    const tenant = await this.tenantRepo.findById(tenantId);
-    if (!tenant) {
-      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-        operation: 'getTenantFeatures',
-      });
-    }
-
-    if (!tenant.subscriptionTier) {
-      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
-        reason: 'Tenant subscription tier not set',
-      });
-    }
-
-    const tier = tenant.subscriptionTier;
-
-    // Start with base tier features
-    const features = getTierFeatures(tier);
-
-    // Apply overrides
-    const overrides = await this.featureOverrideRepo.findByTenantId(tenantId);
-
-    for (const override of overrides) {
-      const key = override.featureKey as FeatureKey;
-      if (ALL_FEATURE_KEYS.includes(key)) {
-        // eslint-disable-next-line security/detect-object-injection -- `key` is validated against ALL_FEATURE_KEYS allowlist
-        features[key] = override.enabled;
+    return this.rlsContext.runWithTenantContext(tenantId, '', async () => {
+      const tenant = await this.tenantRepo.findById(tenantId);
+      if (!tenant) {
+        throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+          operation: 'getTenantFeatures',
+        });
       }
-    }
 
-    return { tier, features };
+      const subscription =
+        await this.orgSubscriptionRepo.findByTenantId(tenantId);
+
+      let effectiveTier: SubscriptionTier;
+      if (subscription) {
+        if (subscription.stripeSubscriptionId) {
+          effectiveTier = subscription.tier;
+        } else if (
+          subscription.trialEndsAt &&
+          new Date(subscription.trialEndsAt) > new Date()
+        ) {
+          effectiveTier = subscription.tier;
+        } else {
+          effectiveTier = 'free';
+        }
+      } else {
+        effectiveTier = 'free';
+      }
+
+      const features = getTierFeatures(effectiveTier);
+
+      const overrides = await this.featureOverrideRepo.findByTenantId(tenantId);
+
+      for (const override of overrides) {
+        const key = override.featureKey as FeatureKey;
+        if (ALL_FEATURE_KEYS.includes(key)) {
+          // eslint-disable-next-line security/detect-object-injection -- `key` is validated against ALL_FEATURE_KEYS allowlist
+          features[key] = override.enabled;
+        }
+      }
+
+      const trial = await this.trialService.getTrialState(tenantId);
+
+      return { tier: effectiveTier, features, trial };
+    });
   }
 
   async updateTier(
     tenantId: string,
     tier: SubscriptionTier,
   ): Promise<TenantFeaturesResponse> {
-    await this.tenantRepo.updateTier(tenantId, tier);
+    await this.orgSubscriptionRepo.updateTierByTenantId(tenantId, tier);
     return this.getTenantFeatures(tenantId);
   }
 }

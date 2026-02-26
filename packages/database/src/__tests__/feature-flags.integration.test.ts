@@ -35,43 +35,24 @@ describe("Feature Flags Schema", () => {
     await client.end();
   });
 
-  it("tenant subscription_tier column accepts valid enum values", async () => {
-    const [freeTenant] = await db
+  it("tenants table has expected columns after schema migration", async () => {
+    const [created] = await db
       .insert(tenants)
       .values({
         eid: TEST_EID,
         tssd: "test-subdomain",
-        subscriptionTier: "free",
       })
       .returning();
-    if (!freeTenant) {
+    if (!created) {
       throw new Error("Insert failed");
     }
-    tenantId = freeTenant.id;
+    tenantId = created.id;
 
-    expect(freeTenant.subscriptionTier).toBe("free");
-
-    const [updated] = await db
-      .update(tenants)
-      .set({ subscriptionTier: "pro" })
-      .where(eq(tenants.id, tenantId))
-      .returning();
-    if (!updated) {
-      throw new Error("Update failed");
-    }
-
-    expect(updated.subscriptionTier).toBe("pro");
-
-    const [enterprise] = await db
-      .update(tenants)
-      .set({ subscriptionTier: "enterprise" })
-      .where(eq(tenants.id, tenantId))
-      .returning();
-    if (!enterprise) {
-      throw new Error("Update failed");
-    }
-
-    expect(enterprise.subscriptionTier).toBe("enterprise");
+    expect(created.id).toBeDefined();
+    expect(created.eid).toBe(TEST_EID);
+    expect(created.tssd).toBe("test-subdomain");
+    expect(created.auditRetentionDays).toBe(365);
+    expect(created.installedAt).toBeDefined();
   });
 
   it("tenant_feature_overrides table stores override with FK constraint", async () => {
@@ -112,29 +93,5 @@ describe("Feature Flags Schema", () => {
         enabled: false,
       }),
     ).rejects.toThrow();
-  });
-
-  it("seat_limit nullable column works (null = unlimited)", async () => {
-    const [withLimit] = await db
-      .update(tenants)
-      .set({ seatLimit: 10 })
-      .where(eq(tenants.id, tenantId))
-      .returning();
-    if (!withLimit) {
-      throw new Error("Update failed");
-    }
-
-    expect(withLimit.seatLimit).toBe(10);
-
-    const [unlimited] = await db
-      .update(tenants)
-      .set({ seatLimit: null })
-      .where(eq(tenants.id, tenantId))
-      .returning();
-    if (!unlimited) {
-      throw new Error("Update failed");
-    }
-
-    expect(unlimited.seatLimit).toBeNull();
   });
 });

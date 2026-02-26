@@ -21,6 +21,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { Sql } from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  deleteTestTenantSubscription,
+  setTestTenantTier,
+} from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { SavedQueriesService } from '../saved-queries.service';
@@ -48,14 +52,6 @@ describe('SavedQueriesService cross-user sharing integration', () => {
   let otherUserId: string;
 
   const createdSavedQueryIds: string[] = [];
-
-  const setTenantTier = async (tier: 'free' | 'pro' | 'enterprise') => {
-    await sqlClient`
-      UPDATE tenants
-      SET subscription_tier = ${tier}
-      WHERE id = ${testTenantId}::uuid
-    `;
-  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -121,7 +117,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
     }
     otherUserId = userBRow.id;
 
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     const reserved = await sqlClient.reserve();
     await reserved`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
@@ -158,6 +154,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 
@@ -165,7 +162,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await setTenantTier('free');
+    await setTestTenantTier(sqlClient, testTenantId, 'free');
 
     for (const id of [...createdSavedQueryIds]) {
       try {
@@ -188,7 +185,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
   describe('Cross-user sharing (querySharing=true)', () => {
     describe('findById', () => {
       it('User B can read User A query when querySharing enabled', async () => {
-        await setTenantTier('pro');
+        await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
         const query = await savedQueriesService.create(
           testTenantId,
@@ -213,7 +210,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
 
     describe('update', () => {
       it('User B can update User A query name and SQL when querySharing enabled', async () => {
-        await setTenantTier('pro');
+        await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
         const query = await savedQueriesService.create(
           testTenantId,
@@ -239,7 +236,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
 
     describe('delete', () => {
       it('User B can delete User A query when querySharing enabled', async () => {
-        await setTenantTier('pro');
+        await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
         const query = await savedQueriesService.create(
           testTenantId,
@@ -271,7 +268,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
 
     describe('linkToQA', () => {
       it('User B can link User A query to QA when querySharing enabled', async () => {
-        await setTenantTier('pro');
+        await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
         const query = await savedQueriesService.create(
           testTenantId,
@@ -303,7 +300,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
 
     describe('unlinkFromQA', () => {
       it('User B can unlink User A query from QA when querySharing enabled', async () => {
-        await setTenantTier('pro');
+        await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
         const query = await savedQueriesService.create(
           testTenantId,
@@ -342,7 +339,7 @@ describe('SavedQueriesService cross-user sharing integration', () => {
 
     describe('updateSqlAndLink', () => {
       it('User B can update SQL and link User A query when querySharing enabled', async () => {
-        await setTenantTier('pro');
+        await setTestTenantTier(sqlClient, testTenantId, 'pro');
 
         const query = await savedQueriesService.create(
           testTenantId,

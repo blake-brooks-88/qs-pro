@@ -166,6 +166,17 @@ export async function purgeTestData(): Promise<number> {
           SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
 
+      // org_subscriptions: FORCE RLS blocks the table owner (qs_migrate).
+      // Temporarily lift it so orphaned rows can be cleaned up before
+      // deleting the parent tenants row (FK ON DELETE no action).
+      await tx`ALTER TABLE org_subscriptions NO FORCE ROW LEVEL SECURITY`;
+      await tx`
+        DELETE FROM org_subscriptions
+        WHERE tenant_id IN (
+          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        )`;
+      await tx`ALTER TABLE org_subscriptions FORCE ROW LEVEL SECURITY`;
+
       // audit_logs: FORCE RLS blocks the table owner (qs_migrate), and an
       // immutability trigger prevents direct DELETE. Temporarily lift both
       // within this transaction so orphaned audit rows can be cleaned up

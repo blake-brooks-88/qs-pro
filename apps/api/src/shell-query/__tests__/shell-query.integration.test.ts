@@ -37,6 +37,7 @@ import {
   it,
 } from 'vitest';
 
+import { deleteTestTenantSubscription } from '../../../test/helpers/set-test-tenant-tier';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../configure-app';
 import { ShellQueryService } from '../shell-query.service';
@@ -240,6 +241,7 @@ describe('ShellQueryService (integration)', () => {
       await sqlClient`DELETE FROM users WHERE id = ${testUserId}::uuid`;
     }
     if (testTenantId) {
+      await deleteTestTenantSubscription(sqlClient, testTenantId);
       await sqlClient`DELETE FROM tenants WHERE id = ${testTenantId}::uuid`;
     }
 

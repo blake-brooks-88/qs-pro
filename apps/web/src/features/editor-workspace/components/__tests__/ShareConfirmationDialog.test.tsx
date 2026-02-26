@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ShareConfirmationDialog } from "../ShareConfirmationDialog";
@@ -39,22 +38,20 @@ describe("ShareConfirmationDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("Share button calls onConfirm", async () => {
-    const user = userEvent.setup();
+  it("Share button calls onConfirm", () => {
     const onConfirm = vi.fn();
     render(<ShareConfirmationDialog {...defaultProps} onConfirm={onConfirm} />);
 
-    await user.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("Cancel button calls onCancel", async () => {
-    const user = userEvent.setup();
+  it("Cancel button calls onCancel", () => {
     const onCancel = vi.fn();
     render(<ShareConfirmationDialog {...defaultProps} onCancel={onCancel} />);
 
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
   });

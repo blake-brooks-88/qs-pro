@@ -1,5 +1,4 @@
 import { CheckCircle, CrownStar, Rocket } from "@solar-icons/react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +13,7 @@ import {
 interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  pricingUrl: string;
 }
 
 const PRO_BENEFITS = [
@@ -26,7 +26,11 @@ const PRO_BENEFITS = [
   "Code minimap and quick fixes",
 ] as const;
 
-export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
+export function UpgradeModal({
+  isOpen,
+  onClose,
+  pricingUrl,
+}: UpgradeModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -57,7 +61,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
           <Button
             className="w-full gap-2"
             onClick={() => {
-              toast.info("Coming soon -- Pro subscription launching soon!");
+              window.open(pricingUrl, "_blank", "noopener,noreferrer");
             }}
           >
             <Rocket size={16} />
