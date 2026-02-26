@@ -1,5 +1,9 @@
 import { ServiceUnavailableException } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import type { EncryptionService } from '@qpp/backend-shared';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
+import type { ITenantRepository } from '@qpp/database';
+import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -47,7 +51,7 @@ function createTenantRepoMock() {
 }
 
 function createReq(rawBody?: string) {
-  return { rawBody } as any;
+  return { rawBody } as unknown as FastifyRequest & { rawBody?: string };
 }
 
 describe('BillingController', () => {
@@ -62,11 +66,11 @@ describe('BillingController', () => {
     handlerMock = createWebhookHandlerMock();
 
     controller = new BillingController(
-      stripeMock as any,
-      configMock as any,
+      stripeMock as unknown as Stripe,
+      configMock as unknown as ConfigService,
       handlerMock as unknown as WebhookHandlerService,
-      createEncryptionServiceMock() as any,
-      createTenantRepoMock() as any,
+      createEncryptionServiceMock() as unknown as EncryptionService,
+      createTenantRepoMock() as unknown as ITenantRepository,
     );
   });
 
@@ -74,10 +78,10 @@ describe('BillingController', () => {
     it('returns 503 when Stripe client is null', async () => {
       const nullStripeController = new BillingController(
         null,
-        configMock as any,
+        configMock as unknown as ConfigService,
         handlerMock as unknown as WebhookHandlerService,
-        createEncryptionServiceMock() as any,
-        createTenantRepoMock() as any,
+        createEncryptionServiceMock() as unknown as EncryptionService,
+        createTenantRepoMock() as unknown as ITenantRepository,
       );
 
       await expect(

@@ -39,6 +39,7 @@ function createOrgSubscriptionRepoStub(): {
     findByStripeCustomerId: vi.fn(),
     upsert: vi.fn().mockResolvedValue(undefined),
     insertIfNotExists: vi.fn(),
+    startTrialIfEligible: vi.fn(),
     updateTierByTenantId: vi.fn(),
     updateFromWebhook: vi.fn().mockResolvedValue(undefined),
   };

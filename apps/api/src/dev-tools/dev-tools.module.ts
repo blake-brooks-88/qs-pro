@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
 import { DrizzleTenantRepository } from '@qpp/database';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { createContextAwareOrgSubscriptionRepository } from '../billing/context-aware-org-subscription.repository';
 import { StripeProvider } from '../billing/stripe.provider';
@@ -16,12 +17,13 @@ import { DevToolsService } from './dev-tools.service';
     DevToolsService,
     {
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
-      useFactory: (db: any) => createContextAwareOrgSubscriptionRepository(db),
+      useFactory: (db: PostgresJsDatabase) =>
+        createContextAwareOrgSubscriptionRepository(db),
       inject: ['DATABASE'],
     },
     {
       provide: 'TENANT_REPOSITORY',
-      useFactory: (db: any) => new DrizzleTenantRepository(db),
+      useFactory: (db: PostgresJsDatabase) => new DrizzleTenantRepository(db),
       inject: ['DATABASE'],
     },
   ],

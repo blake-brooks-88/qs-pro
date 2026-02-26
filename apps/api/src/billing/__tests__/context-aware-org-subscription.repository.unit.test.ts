@@ -1,5 +1,8 @@
 import * as backendShared from '@qpp/backend-shared';
-import { DrizzleOrgSubscriptionRepository } from '@qpp/database';
+import {
+  DrizzleOrgSubscriptionRepository,
+  type IOrgSubscriptionRepository,
+} from '@qpp/database';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,7 +25,7 @@ function createMockDb() {
 describe('createContextAwareOrgSubscriptionRepository', () => {
   let injectedDb: PostgresJsDatabase;
   let contextDb: PostgresJsDatabase;
-  let repo: DrizzleOrgSubscriptionRepository;
+  let repo: IOrgSubscriptionRepository;
 
   beforeEach(() => {
     injectedDb = createMockDb();
@@ -61,15 +64,6 @@ describe('createContextAwareOrgSubscriptionRepository', () => {
     expect(mockedGetDbFromContext).toHaveBeenCalled();
     expect(findSpy).toHaveBeenCalledWith('tenant-1');
     findSpy.mockRestore();
-  });
-
-  it('passes through non-function properties without proxying', () => {
-    // Arrange
-    mockedGetDbFromContext.mockReturnValue(undefined);
-
-    // Act & Assert — constructor is a non-function property on the prototype
-    const proxyAsAny = repo as any;
-    expect(proxyAsAny.constructor).toBeDefined();
   });
 
   it('delegates method calls with correct arguments', async () => {

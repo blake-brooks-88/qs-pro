@@ -1,5 +1,5 @@
 import { ErrorCode } from "@qpp/shared-types";
-import { and, count, eq, or, sql } from "drizzle-orm";
+import { and, count, eq, isNull, or, sql } from "drizzle-orm";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { DatabaseError } from "../errors";
@@ -230,6 +230,29 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
       .insert(orgSubscriptions)
       .values(subscription)
       .onConflictDoNothing({ target: orgSubscriptions.tenantId })
+      .returning({ id: orgSubscriptions.id });
+    return result.length > 0;
+  }
+
+  async startTrialIfEligible(
+    tenantId: string,
+    trialEndsAt: Date,
+  ): Promise<boolean> {
+    const result = await this.db
+      .update(orgSubscriptions)
+      .set({
+        tier: "pro",
+        trialEndsAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(orgSubscriptions.tenantId, tenantId),
+          eq(orgSubscriptions.tier, "free"),
+          isNull(orgSubscriptions.trialEndsAt),
+          isNull(orgSubscriptions.stripeSubscriptionId),
+        ),
+      )
       .returning({ id: orgSubscriptions.id });
     return result.length > 0;
   }

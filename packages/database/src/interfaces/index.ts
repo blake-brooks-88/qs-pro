@@ -59,6 +59,7 @@ export interface IOrgSubscriptionRepository {
   ): Promise<OrgSubscription | undefined>;
   upsert(subscription: NewOrgSubscription): Promise<OrgSubscription>;
   insertIfNotExists(subscription: NewOrgSubscription): Promise<boolean>;
+  startTrialIfEligible(tenantId: string, trialEndsAt: Date): Promise<boolean>;
   updateTierByTenantId(
     tenantId: string,
     tier: "free" | "pro" | "enterprise",

@@ -28,6 +28,7 @@ function createMockOrgSubscriptionRepo() {
     findByStripeCustomerId: vi.fn(),
     upsert: vi.fn(),
     insertIfNotExists: vi.fn(),
+    startTrialIfEligible: vi.fn(),
     updateTierByTenantId: vi.fn(),
     updateFromWebhook: vi.fn(),
   } satisfies Record<

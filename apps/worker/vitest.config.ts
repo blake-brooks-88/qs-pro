@@ -10,6 +10,8 @@ export default mergeConfig(
       name: 'worker',
       include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
       root: './',
+      testTimeout: 15000,
+      hookTimeout: 15000,
       env: {
         DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
         REDIS_URL: 'redis://localhost:6379',

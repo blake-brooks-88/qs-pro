@@ -36,6 +36,7 @@ export type AuditEventType =
   | "subscription.updated"
   | "subscription.canceled"
   | "subscription.payment_failed"
+  | "subscription.webhook_conflict"
   // System
   | "system.sweeper_run"
   | "system.retention_purge";
@@ -69,6 +70,7 @@ export const AUDIT_EVENT_TYPES: AuditEventType[] = [
   "subscription.updated",
   "subscription.canceled",
   "subscription.payment_failed",
+  "subscription.webhook_conflict",
   "system.sweeper_run",
   "system.retention_purge",
 ] as const;

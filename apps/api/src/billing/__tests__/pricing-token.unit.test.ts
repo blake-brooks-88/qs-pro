@@ -1,4 +1,9 @@
+import type { ConfigService } from '@nestjs/config';
+import type { EncryptionService } from '@qpp/backend-shared';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
+import type { ITenantRepository } from '@qpp/database';
+import type { FastifyRequest } from 'fastify';
+import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BillingController } from '../billing.controller';
@@ -51,7 +56,7 @@ function createReqWithSession(tenantId?: string) {
         return undefined;
       }),
     },
-  } as any;
+  } as unknown as FastifyRequest;
 }
 
 describe('BillingController.getPricingToken', () => {
@@ -64,11 +69,11 @@ describe('BillingController.getPricingToken', () => {
     tenantRepoMock = createTenantRepoMock();
 
     controller = new BillingController(
-      createStripeMock() as any,
-      createConfigMock() as any,
+      createStripeMock() as unknown as Stripe,
+      createConfigMock() as unknown as ConfigService,
       createWebhookHandlerMock() as unknown as WebhookHandlerService,
-      encryptionMock as any,
-      tenantRepoMock as any,
+      encryptionMock as unknown as EncryptionService,
+      tenantRepoMock as unknown as ITenantRepository,
     );
   });
 

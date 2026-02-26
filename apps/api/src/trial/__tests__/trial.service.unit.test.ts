@@ -15,6 +15,7 @@ function createMockOrgSubscriptionRepo() {
     findByStripeCustomerId: vi.fn(),
     upsert: vi.fn(),
     insertIfNotExists: vi.fn(),
+    startTrialIfEligible: vi.fn(),
     updateTierByTenantId: vi.fn(),
     updateFromWebhook: vi.fn(),
   } satisfies Record<
@@ -122,6 +123,7 @@ describe('TrialService', () => {
     it('does not log audit event when subscription already exists', async () => {
       // Arrange
       orgSubscriptionRepo.insertIfNotExists.mockResolvedValue(false);
+      orgSubscriptionRepo.startTrialIfEligible.mockResolvedValue(false);
 
       // Act
       await service.activateTrial(TENANT_ID, AUDIT_CONTEXT);
@@ -130,11 +132,25 @@ describe('TrialService', () => {
       expect(auditService.log).not.toHaveBeenCalled();
     });
 
+    it('starts trial for existing free tenant that has not been trialed', async () => {
+      // Arrange
+      orgSubscriptionRepo.insertIfNotExists.mockResolvedValue(false);
+      orgSubscriptionRepo.startTrialIfEligible.mockResolvedValue(true);
+
+      // Act
+      await service.activateTrial(TENANT_ID, AUDIT_CONTEXT);
+
+      // Assert
+      expect(orgSubscriptionRepo.startTrialIfEligible).toHaveBeenCalledTimes(1);
+      expect(auditService.log).toHaveBeenCalledTimes(1);
+    });
+
     it('handles race condition safely — concurrent calls both succeed', async () => {
       // Arrange: first call inserts, second is a no-op
       orgSubscriptionRepo.insertIfNotExists
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false);
+      orgSubscriptionRepo.startTrialIfEligible.mockResolvedValue(false);
 
       // Act
       const [result1, result2] = await Promise.all([
@@ -146,6 +162,7 @@ describe('TrialService', () => {
       expect(result1).toBeUndefined();
       expect(result2).toBeUndefined();
       expect(orgSubscriptionRepo.insertIfNotExists).toHaveBeenCalledTimes(2);
+      expect(orgSubscriptionRepo.startTrialIfEligible).toHaveBeenCalledTimes(1);
       expect(auditService.log).toHaveBeenCalledTimes(1);
     });
   });

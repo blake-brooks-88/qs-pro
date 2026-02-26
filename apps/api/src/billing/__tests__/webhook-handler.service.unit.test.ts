@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import type { EncryptionService, RlsContextService } from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
   IStripeWebhookEventRepository,
@@ -15,7 +16,10 @@ const TENANT_ID = 'tenant-abc-123';
 const TENANT_EID = 'eid-org-456';
 const TENANT_EID_TOKEN = `enc_${TENANT_EID}`;
 
-const mockTenant = { id: TENANT_ID, eid: TENANT_EID } as any;
+const mockTenant = { id: TENANT_ID, eid: TENANT_EID } as {
+  id: string;
+  eid: string;
+};
 
 function createOrgSubscriptionRepoStub(): {
   [K in keyof IOrgSubscriptionRepository]: ReturnType<typeof vi.fn>;
@@ -25,6 +29,7 @@ function createOrgSubscriptionRepoStub(): {
     findByStripeCustomerId: vi.fn(),
     upsert: vi.fn(),
     insertIfNotExists: vi.fn(),
+    startTrialIfEligible: vi.fn(),
     updateTierByTenantId: vi.fn(),
     updateFromWebhook: vi.fn().mockResolvedValue(undefined),
   };
@@ -81,6 +86,8 @@ function createStripeStub() {
     },
     subscriptions: {
       retrieve: vi.fn().mockResolvedValue({
+        id: 'sub_xyz',
+        customer: 'cus_abc',
         metadata: { eid: TENANT_EID_TOKEN },
         items: {
           data: [
@@ -127,13 +134,16 @@ function makeCheckoutSessionEvent(
 function makeSubscriptionEvent(
   type: string,
   overrides: Partial<{
+    id: string;
+    customer: string;
     metadata: Record<string, string>;
     status: string;
     items: { data: unknown[] };
   }> = {},
 ): Stripe.Event {
   return makeEvent(type, {
-    customer: 'cus_abc',
+    id: overrides.id ?? 'sub_xyz',
+    customer: overrides.customer ?? 'cus_abc',
     metadata: overrides.metadata ?? { eid: TENANT_EID_TOKEN },
     status: overrides.status ?? 'active',
     items: overrides.items ?? {
@@ -186,14 +196,19 @@ describe('WebhookHandlerService', () => {
     auditStub = createAuditServiceStub();
     encryptionStub = createEncryptionServiceStub();
 
+    orgSubRepo.findByTenantId.mockResolvedValue({
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+    });
+
     service = new WebhookHandlerService(
-      stripeStub as any,
+      stripeStub as unknown as Stripe,
       orgSubRepo as unknown as IOrgSubscriptionRepository,
       webhookEventRepo as unknown as IStripeWebhookEventRepository,
       tenantRepo as unknown as ITenantRepository,
-      rlsStub as any,
+      rlsStub as unknown as RlsContextService,
       auditStub as unknown as AuditService,
-      encryptionStub as any,
+      encryptionStub as unknown as EncryptionService,
     );
 
     loggerWarnSpy = vi
@@ -232,6 +247,7 @@ describe('WebhookHandlerService', () => {
         stripeCustomerId: 'cus_abc',
         stripeSubscriptionId: 'sub_xyz',
         tier: 'pro',
+        trialEndsAt: null,
       });
     });
 
@@ -315,7 +331,7 @@ describe('WebhookHandlerService', () => {
       const event = makeCheckoutSessionEvent();
 
       await expect(service.process(event)).rejects.toThrow(
-        `Tenant not found for eid: ${TENANT_EID}`,
+        'Tenant not found for pricing token',
       );
       expect(webhookEventRepo.markFailed).toHaveBeenCalled();
     });
@@ -461,6 +477,10 @@ describe('WebhookHandlerService', () => {
 
   describe('customer.subscription.deleted', () => {
     it('resolves tenant via eid and downgrades to free', async () => {
+      orgSubRepo.findByTenantId.mockResolvedValueOnce({
+        stripeCustomerId: 'cus_abc',
+        stripeSubscriptionId: 'sub_xyz',
+      });
       const event = makeSubscriptionEvent('customer.subscription.deleted');
 
       await service.process(event);
@@ -470,6 +490,7 @@ describe('WebhookHandlerService', () => {
         tier: 'free',
         stripeSubscriptionId: null,
         currentPeriodEnds: null,
+        seatLimit: null,
       });
     });
 
@@ -520,6 +541,13 @@ describe('WebhookHandlerService', () => {
   });
 
   describe('invoice.paid', () => {
+    beforeEach(() => {
+      orgSubRepo.findByTenantId.mockResolvedValue({
+        stripeCustomerId: 'cus_abc',
+        stripeSubscriptionId: 'sub_xyz',
+      });
+    });
+
     it('retrieves subscription via Stripe API and resolves tenant via eid', async () => {
       const event = makeInvoiceEvent('invoice.paid');
 
@@ -590,6 +618,13 @@ describe('WebhookHandlerService', () => {
   });
 
   describe('invoice.payment_failed', () => {
+    beforeEach(() => {
+      orgSubRepo.findByTenantId.mockResolvedValue({
+        stripeCustomerId: 'cus_abc',
+        stripeSubscriptionId: 'sub_xyz',
+      });
+    });
+
     it('does NOT downgrade tier (graceful degradation)', async () => {
       const event = makeInvoiceEvent('invoice.payment_failed');
 

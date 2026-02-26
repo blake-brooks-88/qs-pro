@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { createContextAwareOrgSubscriptionRepository } from '../billing/context-aware-org-subscription.repository';
 import { TrialService } from './trial.service';
@@ -10,7 +11,8 @@ import { TrialService } from './trial.service';
     TrialService,
     {
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
-      useFactory: (db: any) => createContextAwareOrgSubscriptionRepository(db),
+      useFactory: (db: PostgresJsDatabase) =>
+        createContextAwareOrgSubscriptionRepository(db),
       inject: ['DATABASE'],
     },
   ],

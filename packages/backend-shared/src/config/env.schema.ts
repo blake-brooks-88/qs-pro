@@ -183,6 +183,14 @@ export const apiEnvSchema = infrastructureSchema
           "STRIPE_API_VERSION is required when STRIPE_SECRET_KEY is configured",
       });
     }
+
+    if (data.STRIPE_SECRET_KEY && !data.STRIPE_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is configured",
+      });
+    }
   })
   .transform((data) => ({
     ...data,

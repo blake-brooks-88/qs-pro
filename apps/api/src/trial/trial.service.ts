@@ -24,19 +24,27 @@ export class TrialService {
   ): Promise<void> {
     const trialEndsAt = new Date(Date.now() + TRIAL_DURATION_MS);
 
-    const inserted = await this.rlsContext.runWithTenantContext(
+    const activated = await this.rlsContext.runWithTenantContext(
       tenantId,
       auditContext.mid,
-      () =>
-        this.orgSubscriptionRepo.insertIfNotExists({
+      async () => {
+        const inserted = await this.orgSubscriptionRepo.insertIfNotExists({
           tenantId,
           tier: 'pro',
           trialEndsAt,
           seatLimit: null,
-        }),
+        });
+        if (inserted) {
+          return true;
+        }
+        return this.orgSubscriptionRepo.startTrialIfEligible(
+          tenantId,
+          trialEndsAt,
+        );
+      },
     );
 
-    if (inserted) {
+    if (activated) {
       this.logger.log(`Trial activated for tenant=${tenantId}`);
       void this.auditService.log({
         eventType: 'subscription.trial_activated',
