@@ -36,7 +36,12 @@ export type AuditEventType =
   | "subscription.updated"
   | "subscription.canceled"
   | "subscription.payment_failed"
+  | "subscription.refunded"
+  | "subscription.dispute_opened"
+  | "subscription.dispute_closed"
   | "subscription.webhook_conflict"
+  // Checkout
+  | "checkout.expired"
   // System
   | "system.sweeper_run"
   | "system.retention_purge";
@@ -70,7 +75,11 @@ export const AUDIT_EVENT_TYPES: AuditEventType[] = [
   "subscription.updated",
   "subscription.canceled",
   "subscription.payment_failed",
+  "subscription.refunded",
+  "subscription.dispute_opened",
+  "subscription.dispute_closed",
   "subscription.webhook_conflict",
+  "checkout.expired",
   "system.sweeper_run",
   "system.retention_purge",
 ] as const;

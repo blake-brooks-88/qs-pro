@@ -100,6 +100,9 @@ function createStripeStub() {
         },
       }),
     },
+    charges: {
+      retrieve: vi.fn(),
+    },
   };
 }
 
@@ -172,6 +175,48 @@ function makeInvoiceEvent(
         ? overrides.parent
         : { subscription_details: { subscription: 'sub_xyz' } },
     period_end: 'period_end' in overrides ? overrides.period_end : 1700000000,
+  });
+}
+
+function makeChargeEvent(
+  overrides: Partial<{
+    customer: string | null;
+    amount_refunded: number;
+    id: string;
+  }> = {},
+): Stripe.Event {
+  return makeEvent('charge.refunded', {
+    id: overrides.id ?? 'ch_test_123',
+    customer: 'customer' in overrides ? overrides.customer : 'cus_abc',
+    amount_refunded: overrides.amount_refunded ?? 1000,
+  });
+}
+
+function makeDisputeEvent(
+  type: 'charge.dispute.created' | 'charge.dispute.closed',
+  overrides: Partial<{
+    id: string;
+    charge: string | null;
+    reason: string;
+    status: string;
+  }> = {},
+): Stripe.Event {
+  return makeEvent(type, {
+    id: overrides.id ?? 'dp_test_123',
+    charge: 'charge' in overrides ? overrides.charge : 'ch_test_123',
+    reason: overrides.reason ?? 'fraudulent',
+    status: overrides.status ?? 'needs_response',
+  });
+}
+
+function makeExpiredCheckoutEvent(
+  overrides: Partial<{
+    metadata: Record<string, string>;
+  }> = {},
+): Stripe.Event {
+  return makeEvent('checkout.session.expired', {
+    metadata:
+      'metadata' in overrides ? overrides.metadata : { eid: TENANT_EID_TOKEN },
   });
 }
 
@@ -666,6 +711,226 @@ describe('WebhookHandlerService', () => {
       await service.process(event);
 
       expect(webhookEventRepo.markCompleted).toHaveBeenCalled();
+    });
+  });
+
+  describe('charge.refunded', () => {
+    beforeEach(() => {
+      orgSubRepo.findByStripeCustomerId.mockResolvedValue({
+        tenantId: TENANT_ID,
+        stripeCustomerId: 'cus_abc',
+      });
+    });
+
+    it('logs subscription.refunded audit event with chargeId and amountRefunded', async () => {
+      const event = makeChargeEvent();
+
+      await service.process(event);
+
+      expect(auditStub.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'subscription.refunded',
+          actorType: 'system',
+          actorId: null,
+          tenantId: TENANT_ID,
+          mid: 'system',
+          targetId: TENANT_ID,
+          metadata: { chargeId: 'ch_test_123', amountRefunded: 1000 },
+        }),
+      );
+    });
+
+    it('warns and skips when customer is missing', async () => {
+      const event = makeChargeEvent({ customer: null });
+
+      await service.process(event);
+
+      expect(auditStub.log).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalled();
+    });
+
+    it('warns and skips when no subscription found for customer', async () => {
+      orgSubRepo.findByStripeCustomerId.mockResolvedValue(null);
+      const event = makeChargeEvent();
+
+      await service.process(event);
+
+      expect(auditStub.log).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalled();
+    });
+
+    it('marks event as completed on success', async () => {
+      const event = makeChargeEvent();
+
+      await service.process(event);
+
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
+    });
+  });
+
+  describe('charge.dispute.created', () => {
+    beforeEach(() => {
+      stripeStub.charges.retrieve.mockResolvedValue({ customer: 'cus_abc' });
+      orgSubRepo.findByStripeCustomerId.mockResolvedValue({
+        tenantId: TENANT_ID,
+        stripeCustomerId: 'cus_abc',
+      });
+    });
+
+    it('resolves customer from dispute via charges.retrieve and logs subscription.dispute_opened', async () => {
+      const event = makeDisputeEvent('charge.dispute.created');
+
+      await service.process(event);
+
+      expect(stripeStub.charges.retrieve).toHaveBeenCalledWith('ch_test_123');
+      expect(auditStub.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'subscription.dispute_opened',
+          actorType: 'system',
+          actorId: null,
+          tenantId: TENANT_ID,
+          mid: 'system',
+          targetId: TENANT_ID,
+          metadata: {
+            disputeId: 'dp_test_123',
+            reason: 'fraudulent',
+            status: 'needs_response',
+          },
+        }),
+      );
+    });
+
+    it('warns and skips when charge is missing', async () => {
+      const event = makeDisputeEvent('charge.dispute.created', {
+        charge: null,
+      });
+
+      await service.process(event);
+
+      expect(auditStub.log).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalled();
+    });
+
+    it('warns and skips when no subscription found for customer', async () => {
+      orgSubRepo.findByStripeCustomerId.mockResolvedValue(null);
+      const event = makeDisputeEvent('charge.dispute.created');
+
+      await service.process(event);
+
+      expect(auditStub.log).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalled();
+    });
+
+    it('marks event as completed on success', async () => {
+      const event = makeDisputeEvent('charge.dispute.created');
+
+      await service.process(event);
+
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
+    });
+  });
+
+  describe('charge.dispute.closed', () => {
+    beforeEach(() => {
+      stripeStub.charges.retrieve.mockResolvedValue({ customer: 'cus_abc' });
+      orgSubRepo.findByStripeCustomerId.mockResolvedValue({
+        tenantId: TENANT_ID,
+        stripeCustomerId: 'cus_abc',
+      });
+    });
+
+    it('logs subscription.dispute_closed audit event', async () => {
+      const event = makeDisputeEvent('charge.dispute.closed');
+
+      await service.process(event);
+
+      expect(auditStub.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'subscription.dispute_closed',
+          actorType: 'system',
+          actorId: null,
+          tenantId: TENANT_ID,
+          mid: 'system',
+          targetId: TENANT_ID,
+          metadata: {
+            disputeId: 'dp_test_123',
+            reason: 'fraudulent',
+            status: 'needs_response',
+          },
+        }),
+      );
+    });
+
+    it('marks event as completed on success', async () => {
+      const event = makeDisputeEvent('charge.dispute.closed');
+
+      await service.process(event);
+
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
+    });
+  });
+
+  describe('checkout.session.expired', () => {
+    it('decrypts EID, finds tenant, and logs checkout.expired audit event', async () => {
+      const event = makeExpiredCheckoutEvent();
+
+      await service.process(event);
+
+      expect(encryptionStub.decrypt).toHaveBeenCalledWith(TENANT_EID_TOKEN);
+      expect(tenantRepo.findByEid).toHaveBeenCalledWith(TENANT_EID);
+      expect(auditStub.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'checkout.expired',
+          actorType: 'system',
+          actorId: null,
+          tenantId: TENANT_ID,
+          mid: 'system',
+          targetId: TENANT_ID,
+          metadata: {},
+        }),
+      );
+    });
+
+    it('warns and skips when metadata.eid is missing (does NOT throw)', async () => {
+      const event = makeExpiredCheckoutEvent({ metadata: {} });
+
+      await service.process(event);
+
+      expect(auditStub.log).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalled();
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
+    });
+
+    it('warns and skips when eid token is invalid (does NOT throw)', async () => {
+      encryptionStub.decrypt.mockImplementation(() => {
+        throw new Error('bad token');
+      });
+      const event = makeExpiredCheckoutEvent();
+
+      await service.process(event);
+
+      expect(auditStub.log).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalled();
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
+    });
+
+    it('warns and skips when tenant not found', async () => {
+      tenantRepo.findByEid.mockResolvedValue(undefined);
+      const event = makeExpiredCheckoutEvent();
+
+      await service.process(event);
+
+      expect(auditStub.log).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalled();
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
+    });
+
+    it('marks event as completed on success', async () => {
+      const event = makeExpiredCheckoutEvent();
+
+      await service.process(event);
+
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
     });
   });
 
