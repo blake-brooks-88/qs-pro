@@ -5,6 +5,7 @@ import {
   cancelSubscription,
   createCheckout,
   resetToFree,
+  setSubscriptionState,
   setTrialDays,
 } from "@/services/dev-tools";
 
@@ -30,8 +31,13 @@ export function useCreateCheckout() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ tier }: { tier: "pro" | "enterprise" }) =>
-      createCheckout(tier),
+    mutationFn: ({
+      tier,
+      interval = "monthly",
+    }: {
+      tier: "pro" | "enterprise";
+      interval?: "monthly" | "annual";
+    }) => createCheckout(tier, interval),
     onSuccess: (data) => {
       window.open(data.url, "_blank");
       void queryClient.invalidateQueries({
@@ -65,6 +71,24 @@ export function useResetToFree() {
 
   return useMutation({
     mutationFn: () => resetToFree(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: featuresQueryKeys.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: usageQueryKeys.all,
+      });
+    },
+  });
+}
+
+export function useSetSubscriptionState() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      payload: import("@/services/dev-tools").SubscriptionStatePayload,
+    ) => setSubscriptionState(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: featuresQueryKeys.all,

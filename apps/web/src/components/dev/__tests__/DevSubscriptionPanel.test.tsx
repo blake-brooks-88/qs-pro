@@ -11,6 +11,7 @@ vi.mock("@/hooks/use-dev-tools", () => ({
   useCreateCheckout: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelSubscription: () => ({ mutate: vi.fn(), isPending: false }),
   useResetToFree: () => ({ mutate: vi.fn(), isPending: false }),
+  useSetSubscriptionState: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/use-tenant-features", () => ({
@@ -111,5 +112,27 @@ describe("DevSubscriptionPanel", () => {
     await user.click(screen.getByText("DEV"));
 
     expect(screen.getByText("Stripe: Not connected")).toBeInTheDocument();
+  });
+
+  it("has interval selector in stripe controls", async () => {
+    const user = userEvent.setup();
+    render(<DevSubscriptionPanel />, { wrapper: Wrapper });
+
+    await user.click(screen.getByText("DEV"));
+
+    const intervalSelect = screen.getByDisplayValue("Monthly");
+    expect(intervalSelect).toBeInTheDocument();
+  });
+
+  it("has subscription state section with tier selector and Set State button", async () => {
+    const user = userEvent.setup();
+    render(<DevSubscriptionPanel />, { wrapper: Wrapper });
+
+    await user.click(screen.getByText("DEV"));
+
+    expect(screen.getByText("Subscription State")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Set State" }),
+    ).toBeInTheDocument();
   });
 });

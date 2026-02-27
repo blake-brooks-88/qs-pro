@@ -14,7 +14,41 @@ const SetTrialBodySchema = z.object({
 });
 
 const CheckoutBodySchema = z.object({
-  tier: z.literal('pro'),
+  tier: z.enum(['pro', 'enterprise']),
+  interval: z.enum(['monthly', 'annual']).default('monthly'),
+});
+
+const SubscriptionStateBodySchema = z.object({
+  tier: z.enum(['free', 'pro', 'enterprise']),
+  stripeCustomerId: z
+    .string()
+    .nullish()
+    .transform((v) => v ?? null),
+  stripeSubscriptionId: z
+    .string()
+    .nullish()
+    .transform((v) => v ?? null),
+  currentPeriodEnds: z
+    .string()
+    .datetime()
+    .nullish()
+    .transform((v) => (v ? new Date(v) : null)),
+  trialEndsAt: z
+    .string()
+    .datetime()
+    .nullish()
+    .transform((v) => (v ? new Date(v) : null)),
+  seatLimit: z
+    .number()
+    .int()
+    .nullish()
+    .transform((v) => v ?? null),
+});
+
+const SimulateWebhookBodySchema = z.object({
+  eventType: z.string(),
+  data: z.record(z.unknown()),
+  eventId: z.string().optional(),
 });
 
 @Controller('dev-tools')
@@ -39,7 +73,11 @@ export class DevToolsController {
     @Body(new ZodValidationPipe(CheckoutBodySchema))
     body: z.infer<typeof CheckoutBodySchema>,
   ) {
-    return this.devToolsService.createCheckout(user.tenantId, body.tier);
+    return this.devToolsService.createCheckout(
+      user.tenantId,
+      body.tier,
+      body.interval,
+    );
   }
 
   @Post('cancel')
@@ -52,5 +90,29 @@ export class DevToolsController {
   @UseGuards(CsrfGuard)
   async resetToFree(@CurrentUser() user: UserSession) {
     return this.devToolsService.resetToFree(user.tenantId);
+  }
+
+  @Post('subscription-state')
+  @UseGuards(CsrfGuard)
+  async setSubscriptionState(
+    @CurrentUser() user: UserSession,
+    @Body(new ZodValidationPipe(SubscriptionStateBodySchema))
+    body: z.infer<typeof SubscriptionStateBodySchema>,
+  ) {
+    return this.devToolsService.setSubscriptionState(user.tenantId, body);
+  }
+
+  @Post('simulate-webhook')
+  @UseGuards(CsrfGuard)
+  async simulateWebhook(
+    @CurrentUser() _user: UserSession,
+    @Body(new ZodValidationPipe(SimulateWebhookBodySchema))
+    body: z.infer<typeof SimulateWebhookBodySchema>,
+  ) {
+    return this.devToolsService.simulateWebhook(
+      body.eventType,
+      body.data,
+      body.eventId,
+    );
   }
 }

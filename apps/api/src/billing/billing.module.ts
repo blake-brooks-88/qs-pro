@@ -38,6 +38,6 @@ import { WebhookHandlerService } from './webhook-handler.service';
       inject: ['DATABASE'],
     },
   ],
-  exports: [BillingService],
+  exports: [BillingService, WebhookHandlerService],
 })
 export class BillingModule {}

@@ -7,6 +7,7 @@ import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BillingService } from '../../billing/billing.service';
+import type { WebhookHandlerService } from '../../billing/webhook-handler.service';
 import type { FeaturesService } from '../../features/features.service';
 import { DevToolsService } from '../dev-tools.service';
 
@@ -65,24 +66,33 @@ function createStripeMock() {
   };
 }
 
+function createWebhookHandlerStub() {
+  return {
+    process: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('DevToolsService', () => {
   let service: DevToolsService;
   let orgSubRepo: ReturnType<typeof createOrgSubscriptionRepoStub>;
   let featuresStub: ReturnType<typeof createFeaturesServiceStub>;
   let billingStub: ReturnType<typeof createBillingServiceStub>;
   let stripeMock: ReturnType<typeof createStripeMock>;
+  let webhookHandlerStub: ReturnType<typeof createWebhookHandlerStub>;
 
   beforeEach(() => {
     orgSubRepo = createOrgSubscriptionRepoStub();
     featuresStub = createFeaturesServiceStub();
     billingStub = createBillingServiceStub();
     stripeMock = createStripeMock();
+    webhookHandlerStub = createWebhookHandlerStub();
 
     service = new DevToolsService(
       orgSubRepo as unknown as IOrgSubscriptionRepository,
       stripeMock as unknown as Stripe,
       featuresStub as unknown as FeaturesService,
       billingStub as unknown as BillingService,
+      webhookHandlerStub as unknown as WebhookHandlerService,
     );
   });
 
@@ -139,6 +149,27 @@ describe('DevToolsService', () => {
         url: 'https://checkout.stripe.com/session_123',
       });
     });
+
+    it('passes interval through to billingService', async () => {
+      const result = await service.createCheckout(TENANT_ID, 'pro', 'annual');
+      expect(billingStub.createCheckoutSession).toHaveBeenCalledWith(
+        TENANT_ID,
+        'pro',
+        'annual',
+      );
+      expect(result).toEqual({
+        url: 'https://checkout.stripe.com/session_123',
+      });
+    });
+
+    it('accepts enterprise tier', async () => {
+      await service.createCheckout(TENANT_ID, 'enterprise', 'monthly');
+      expect(billingStub.createCheckoutSession).toHaveBeenCalledWith(
+        TENANT_ID,
+        'enterprise',
+        'monthly',
+      );
+    });
   });
 
   describe('cancelSubscription', () => {
@@ -148,6 +179,7 @@ describe('DevToolsService', () => {
         null,
         featuresStub as unknown as FeaturesService,
         billingStub as unknown as BillingService,
+        webhookHandlerStub as unknown as WebhookHandlerService,
       );
 
       await expect(
@@ -211,6 +243,52 @@ describe('DevToolsService', () => {
       });
       expect(featuresStub.getTenantFeatures).toHaveBeenCalledWith(TENANT_ID);
       expect(result).toEqual(mockFeatures);
+    });
+  });
+
+  describe('setSubscriptionState', () => {
+    it('calls upsert with all provided fields and returns features', async () => {
+      const state = {
+        tier: 'pro' as const,
+        stripeCustomerId: 'cus_test',
+        stripeSubscriptionId: 'sub_test',
+        currentPeriodEnds: new Date('2026-03-01T00:00:00Z'),
+        trialEndsAt: null,
+        seatLimit: 5,
+      };
+      const result = await service.setSubscriptionState(TENANT_ID, state);
+      expect(orgSubRepo.upsert).toHaveBeenCalledWith({
+        tenantId: TENANT_ID,
+        ...state,
+      });
+      expect(featuresStub.getTenantFeatures).toHaveBeenCalledWith(TENANT_ID);
+      expect(result).toEqual(mockFeatures);
+    });
+  });
+
+  describe('simulateWebhook', () => {
+    it('constructs event and calls webhookHandler.process', async () => {
+      const result = await service.simulateWebhook(
+        'checkout.session.completed',
+        { customer: 'cus_abc' },
+        'evt_custom_123',
+      );
+      expect(webhookHandlerStub.process).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'evt_custom_123',
+          type: 'checkout.session.completed',
+          data: { object: { customer: 'cus_abc' } },
+        }),
+      );
+      expect(result).toEqual({ processed: true, eventId: 'evt_custom_123' });
+    });
+
+    it('generates unique event ID when not provided', async () => {
+      const result = await service.simulateWebhook('invoice.paid', {
+        amount: 100,
+      });
+      expect(result.eventId).toMatch(/^evt_sim_/);
+      expect(webhookHandlerStub.process).toHaveBeenCalled();
     });
   });
 });

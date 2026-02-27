@@ -5,10 +5,12 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import type { IOrgSubscriptionRepository } from '@qpp/database';
+import { randomUUID } from 'crypto';
 import type Stripe from 'stripe';
 
 import { BillingService } from '../billing/billing.service';
 import { STRIPE_CLIENT } from '../billing/stripe.provider';
+import { WebhookHandlerService } from '../billing/webhook-handler.service';
 import { FeaturesService } from '../features/features.service';
 
 @Injectable()
@@ -20,6 +22,7 @@ export class DevToolsService {
     private readonly stripe: Stripe | null,
     private readonly featuresService: FeaturesService,
     private readonly billingService: BillingService,
+    private readonly webhookHandler: WebhookHandlerService,
   ) {}
 
   async setTrialDays(tenantId: string, days: number | null) {
@@ -42,8 +45,12 @@ export class DevToolsService {
     return this.featuresService.getTenantFeatures(tenantId);
   }
 
-  async createCheckout(tenantId: string, tier: 'pro') {
-    return this.billingService.createCheckoutSession(tenantId, tier, 'monthly');
+  async createCheckout(
+    tenantId: string,
+    tier: 'pro' | 'enterprise',
+    interval: 'monthly' | 'annual' = 'monthly',
+  ) {
+    return this.billingService.createCheckoutSession(tenantId, tier, interval);
   }
 
   async cancelSubscription(tenantId: string) {
@@ -78,5 +85,44 @@ export class DevToolsService {
     });
 
     return this.featuresService.getTenantFeatures(tenantId);
+  }
+
+  async setSubscriptionState(
+    tenantId: string,
+    state: {
+      tier: 'free' | 'pro' | 'enterprise';
+      stripeCustomerId: string | null;
+      stripeSubscriptionId: string | null;
+      currentPeriodEnds: Date | null;
+      trialEndsAt: Date | null;
+      seatLimit: number | null;
+    },
+  ) {
+    await this.orgSubscriptionRepo.upsert({
+      tenantId,
+      tier: state.tier,
+      stripeCustomerId: state.stripeCustomerId,
+      stripeSubscriptionId: state.stripeSubscriptionId,
+      currentPeriodEnds: state.currentPeriodEnds,
+      trialEndsAt: state.trialEndsAt,
+      seatLimit: state.seatLimit,
+    });
+
+    return this.featuresService.getTenantFeatures(tenantId);
+  }
+
+  async simulateWebhook(
+    eventType: string,
+    data: Record<string, unknown>,
+    eventId?: string,
+  ) {
+    const event = {
+      id: eventId ?? `evt_sim_${randomUUID()}`,
+      type: eventType,
+      data: { object: data },
+    } as unknown as Stripe.Event;
+
+    await this.webhookHandler.process(event);
+    return { processed: true, eventId: event.id };
   }
 }

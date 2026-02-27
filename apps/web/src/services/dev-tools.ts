@@ -13,10 +13,31 @@ export async function setTrialDays(
 
 export async function createCheckout(
   tier: "pro" | "enterprise",
+  interval: "monthly" | "annual" = "monthly",
 ): Promise<{ url: string }> {
   const { data } = await api.post<{ url: string }>("/dev-tools/checkout", {
     tier,
+    interval,
   });
+  return data;
+}
+
+export interface SubscriptionStatePayload {
+  tier: "free" | "pro" | "enterprise";
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  currentPeriodEnds?: string | null;
+  trialEndsAt?: string | null;
+  seatLimit?: number | null;
+}
+
+export async function setSubscriptionState(
+  payload: SubscriptionStatePayload,
+): Promise<TenantFeaturesResponse> {
+  const { data } = await api.post<TenantFeaturesResponse>(
+    "/dev-tools/subscription-state",
+    payload,
+  );
   return data;
 }
 
