@@ -106,6 +106,15 @@ describe('BillingService', () => {
           metadata: { eid: 'encrypted-eid', tier: 'pro' },
           success_url: 'http://localhost:5173/?checkout=success',
           cancel_url: 'http://localhost:5173/?checkout=cancel',
+          allow_promotion_codes: true,
+          custom_fields: [
+            {
+              key: 'purchase_order',
+              label: { type: 'custom', custom: 'Purchase Order Number' },
+              type: 'text',
+              optional: true,
+            },
+          ],
         }),
       );
       expect(result).toEqual({ url: 'https://checkout.stripe.com/session-1' });
@@ -135,6 +144,27 @@ describe('BillingService', () => {
           line_items: [{ price: 'price_annual_456', quantity: 1 }],
         }),
       );
+    });
+
+    it('creates session with enterprise_monthly lookup key for enterprise tier', async () => {
+      stripe.prices.list.mockResolvedValue({
+        data: [{ id: 'price_enterprise_monthly_789' }],
+      });
+      vi.mocked(tenantRepo.findById).mockResolvedValue({
+        id: 'tenant-1',
+        eid: 'eid-123',
+      } as never);
+      stripe.checkout.sessions.create.mockResolvedValue({
+        url: 'https://checkout.stripe.com/session-3',
+      });
+
+      await service.createCheckoutSession('tenant-1', 'enterprise', 'monthly');
+
+      expect(stripe.prices.list).toHaveBeenCalledWith({
+        lookup_keys: ['enterprise_monthly'],
+        active: true,
+        limit: 1,
+      });
     });
 
     it('throws ServiceUnavailableException when stripe is null', async () => {

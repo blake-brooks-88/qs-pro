@@ -17,6 +17,8 @@ import { STRIPE_CLIENT } from './stripe.provider';
 const PRICE_LOOKUP_KEYS = {
   pro_monthly: 'pro_monthly',
   pro_annual: 'pro_annual',
+  enterprise_monthly: 'enterprise_monthly',
+  enterprise_annual: 'enterprise_annual',
 } as const;
 
 type PriceLookupKey =
@@ -41,7 +43,7 @@ export class BillingService {
 
   async createCheckoutSession(
     tenantId: string,
-    tier: 'pro',
+    tier: 'pro' | 'enterprise',
     interval: 'monthly' | 'annual',
   ): Promise<{ url: string }> {
     if (!this.stripe) {
@@ -76,6 +78,15 @@ export class BillingService {
       subscription_data: { metadata: { eid, tier } },
       success_url: successUrl,
       cancel_url: cancelUrl,
+      allow_promotion_codes: true,
+      custom_fields: [
+        {
+          key: 'purchase_order',
+          label: { type: 'custom' as const, custom: 'Purchase Order Number' },
+          type: 'text' as const,
+          optional: true,
+        },
+      ],
     });
 
     if (!session.url) {

@@ -26,7 +26,7 @@ import { STRIPE_CLIENT } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';
 
 const CheckoutBodySchema = z.object({
-  tier: z.literal('pro'),
+  tier: z.enum(['pro', 'enterprise']),
   interval: z.enum(['monthly', 'annual']),
 });
 
