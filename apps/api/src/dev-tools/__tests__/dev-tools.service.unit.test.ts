@@ -237,7 +237,7 @@ describe('DevToolsService', () => {
         tier: 'free',
         stripeCustomerId: null,
         stripeSubscriptionId: null,
-        trialEndsAt: null,
+        trialEndsAt: new Date(0),
         currentPeriodEnds: null,
         seatLimit: null,
       });
