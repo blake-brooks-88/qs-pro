@@ -146,6 +146,7 @@ export const TenantFeaturesResponseSchema = z.object({
   tier: SubscriptionTierSchema,
   features: TenantFeaturesSchema,
   trial: TrialStateSchema.nullable(),
+  currentPeriodEnds: z.string().datetime().nullable(),
 });
 export type TenantFeaturesResponse = z.infer<
   typeof TenantFeaturesResponseSchema

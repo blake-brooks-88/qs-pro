@@ -90,6 +90,7 @@ describe('FeaturesController', () => {
         auditLogs: false,
       },
       trial: null,
+      currentPeriodEnds: null,
     };
 
     vi.mocked(featuresService.getTenantFeatures).mockResolvedValue(

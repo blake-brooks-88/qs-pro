@@ -69,7 +69,11 @@ export class FeaturesService {
 
       const trial = await this.trialService.getTrialState(tenantId);
 
-      return { tier: effectiveTier, features, trial };
+      const currentPeriodEnds = subscription?.currentPeriodEnds
+        ? subscription.currentPeriodEnds.toISOString()
+        : null;
+
+      return { tier: effectiveTier, features, trial, currentPeriodEnds };
     });
   }
 }

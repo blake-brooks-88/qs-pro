@@ -136,6 +136,12 @@ export function DevSubscriptionPanel() {
                 Trial: {formatTrialStatus(data?.trial)}
               </p>
               <p className="text-xs font-mono">
+                Period ends:{" "}
+                {data?.currentPeriodEnds
+                  ? new Date(data.currentPeriodEnds).toLocaleDateString()
+                  : "N/A"}
+              </p>
+              <p className="text-xs font-mono">
                 Stripe: {hasStripe ? "Managed" : "Not connected"}
               </p>
             </div>
