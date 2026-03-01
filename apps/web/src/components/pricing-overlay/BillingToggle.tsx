@@ -5,9 +5,14 @@ import type { BillingInterval } from "./pricing-data";
 interface BillingToggleProps {
   interval: BillingInterval;
   onChange: (interval: BillingInterval) => void;
+  savingsPercent?: number;
 }
 
-export function BillingToggle({ interval, onChange }: BillingToggleProps) {
+export function BillingToggle({
+  interval,
+  onChange,
+  savingsPercent = 17,
+}: BillingToggleProps) {
   return (
     <div className="inline-flex items-center rounded-full border border-border bg-muted p-0.5">
       <button
@@ -33,7 +38,9 @@ export function BillingToggle({ interval, onChange }: BillingToggleProps) {
         )}
       >
         Annual
-        <span className="ml-1.5 text-xs font-semibold text-success">−17%</span>
+        <span className="ml-1.5 text-xs font-semibold text-success">
+          &minus;{savingsPercent}%
+        </span>
       </button>
     </div>
   );

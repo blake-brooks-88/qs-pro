@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   Inject,
@@ -21,6 +22,7 @@ import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import type { PricesResponse } from './billing.service';
 import { BillingService } from './billing.service';
 import { STRIPE_CLIENT } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';
@@ -40,6 +42,11 @@ export class BillingController {
     private readonly webhookHandler: WebhookHandlerService,
     private readonly billingService: BillingService,
   ) {}
+
+  @Get('prices')
+  async getPrices(): Promise<PricesResponse> {
+    return this.billingService.getPrices();
+  }
 
   @Post('checkout')
   @UseGuards(SessionGuard, CsrfGuard)

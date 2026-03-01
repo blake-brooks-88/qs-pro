@@ -7,9 +7,10 @@ import {
   ShieldCheck,
 } from "@solar-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useCheckout } from "@/hooks/use-checkout";
+import { usePrices } from "@/hooks/use-prices";
 import { useTenantFeatures } from "@/hooks/use-tenant-features";
 import { track } from "@/lib/analytics";
 import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
@@ -28,8 +29,28 @@ export function PricingOverlay() {
   const [interval, setInterval] = useState<BillingInterval>("annual");
   const { data: featuresData } = useTenantFeatures();
   const checkout = useCheckout();
+  const { data: prices } = usePrices();
 
   const currentTier: SubscriptionTier = featuresData?.tier ?? "free";
+
+  const tiers = useMemo(() => {
+    if (!prices) return TIERS;
+
+    return TIERS.map((tier) => {
+      if (tier.id !== "pro") return tier;
+      return {
+        ...tier,
+        monthlyPrice: prices.pro.monthly,
+        annualPrice: prices.pro.annual,
+      };
+    });
+  }, [prices]);
+
+  const savingsPercent = useMemo(() => {
+    if (!prices) return undefined;
+    if (prices.pro.monthly === 0) return undefined;
+    return Math.round((1 - prices.pro.annual / prices.pro.monthly) * 100);
+  }, [prices]);
 
   const handleIntervalChange = useCallback(
     (next: BillingInterval) => {
@@ -88,12 +109,13 @@ export function PricingOverlay() {
                 <BillingToggle
                   interval={interval}
                   onChange={handleIntervalChange}
+                  savingsPercent={savingsPercent}
                 />
               </div>
 
               {/* Tier cards */}
               <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
-                {TIERS.map((tier) => (
+                {tiers.map((tier) => (
                   <TierCard
                     key={tier.id}
                     tier={tier}

@@ -24,12 +24,20 @@ const PRICE_LOOKUP_KEYS = {
 type PriceLookupKey =
   (typeof PRICE_LOOKUP_KEYS)[keyof typeof PRICE_LOOKUP_KEYS];
 
+export interface PricesResponse {
+  pro: { monthly: number; annual: number };
+}
+
 @Injectable()
 export class BillingService {
   private readonly priceCache = new Map<
     string,
     { priceId: string; expiresAt: number }
   >();
+  private pricesResponseCache: {
+    data: PricesResponse;
+    expiresAt: number;
+  } | null = null;
   private static readonly CACHE_TTL_MS = 15 * 60 * 1000;
 
   constructor(
@@ -40,6 +48,61 @@ export class BillingService {
     private readonly orgSubscriptionRepo: IOrgSubscriptionRepository,
     private readonly encryptionService: EncryptionService,
   ) {}
+
+  async getPrices(): Promise<PricesResponse> {
+    if (!this.stripe) {
+      throw new ServiceUnavailableException('Stripe is not configured');
+    }
+
+    if (
+      this.pricesResponseCache &&
+      this.pricesResponseCache.expiresAt > Date.now()
+    ) {
+      return this.pricesResponseCache.data;
+    }
+
+    const result = await this.stripe.prices.list({
+      lookup_keys: ['pro_monthly', 'pro_annual'],
+      active: true,
+    });
+
+    const pricesByKey = new Map<string, Stripe.Price>();
+    for (const price of result.data) {
+      if (price.lookup_key) {
+        pricesByKey.set(price.lookup_key, price);
+      }
+    }
+
+    const monthlyPrice = pricesByKey.get('pro_monthly');
+    const annualPrice = pricesByKey.get('pro_annual');
+
+    if (!monthlyPrice?.unit_amount || !annualPrice?.unit_amount) {
+      throw new ServiceUnavailableException(
+        'Required Pro prices not found in Stripe',
+      );
+    }
+
+    const monthlyDollars = monthlyPrice.unit_amount / 100;
+    let annualDollars = annualPrice.unit_amount / 100;
+
+    // Normalize yearly price to monthly equivalent
+    if (annualPrice.recurring?.interval === 'year') {
+      annualDollars = annualDollars / 12;
+    }
+
+    annualDollars = Math.round(annualDollars * 100) / 100;
+
+    const data: PricesResponse = {
+      pro: { monthly: monthlyDollars, annual: annualDollars },
+    };
+
+    this.pricesResponseCache = {
+      data,
+      expiresAt: Date.now() + BillingService.CACHE_TTL_MS,
+    };
+
+    return data;
+  }
 
   async createCheckoutSession(
     tenantId: string,
