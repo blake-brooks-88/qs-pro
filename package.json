@@ -18,7 +18,7 @@
     "test:web": "pnpm -r --filter \"./packages/**\" build && pnpm --filter @qpp/web test",
     "test:worker": "pnpm -r --filter \"./packages/**\" build && pnpm --filter worker test",
     "test:e2e": "pnpm -r test:e2e",
-    "test:integration": "pnpm -r --filter api --filter worker --filter @qpp/database test:integration",
+    "test:integration": "pnpm -r --filter api --filter worker --filter @qpp/database --filter @qpp/backend-shared test:integration",
     "test:coverage": "bash scripts/test-coverage.sh",
     "test:coverage:all": "COVERAGE_VARIANTS=unit,integration,e2e bash scripts/test-coverage.sh",
     "lint": "pnpm -r lint",

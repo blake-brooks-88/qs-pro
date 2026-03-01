@@ -146,6 +146,13 @@ SELECT id, eid FROM tenants LIMIT 5;
 
 3. **UX: Post-checkout redirect** — After Stripe Checkout completes, user is redirected to `/?checkout=success` (the app). Instead, a dedicated success page should inform the user: "Payment successful — you can close this tab and return to the app." This avoids confusion and provides a clear UX signal. **Tracked in backlog.**
 
+**Test Audit (2026-02-28):**
+- Existing unit tests: 4 files, 70+ tests, all mock-based (no real DB)
+- **Added:** `apps/api/test/billing-webhook.integration.test.ts` — 8 integration tests (real NestJS + real PostgreSQL, mock only Stripe SDK)
+- Covers: checkout.session.completed, customer.subscription.created, concurrent processing, invoice.paid, subscription.deleted, idempotency
+- Mutation tested: broke tier assignment → tests caught it ✅
+- **Finding:** Race condition test PASSED at DB level — PostgreSQL `ON CONFLICT DO UPDATE` handles concurrent upserts correctly. Production 500s may be caused by Stripe API timing or RLS context issues, not the DB upsert.
+
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
