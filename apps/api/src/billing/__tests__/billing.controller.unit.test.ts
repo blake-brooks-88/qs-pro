@@ -81,29 +81,21 @@ describe('BillingController', () => {
     });
 
     it('throws validation error when rawBody is missing', async () => {
-      await expect(
-        controller.handleWebhook(createReq(undefined), 'sig_test'),
-      ).rejects.toThrow(AppError);
+      const error = await controller
+        .handleWebhook(createReq(undefined), 'sig_test')
+        .catch((e: unknown) => e);
 
-      try {
-        await controller.handleWebhook(createReq(undefined), 'sig_test');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).code).toBe(ErrorCode.VALIDATION_ERROR);
-      }
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe(ErrorCode.VALIDATION_ERROR);
     });
 
     it('throws unauthorized error when signature is empty', async () => {
-      await expect(
-        controller.handleWebhook(createReq('body'), ''),
-      ).rejects.toThrow(AppError);
+      const error = await controller
+        .handleWebhook(createReq('body'), '')
+        .catch((e: unknown) => e);
 
-      try {
-        await controller.handleWebhook(createReq('body'), '');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
-      }
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
     });
 
     it('throws unauthorized when signature verification fails', async () => {
@@ -111,16 +103,12 @@ describe('BillingController', () => {
         throw new Error('Signature verification failed');
       });
 
-      await expect(
-        controller.handleWebhook(createReq('body'), 'bad_sig'),
-      ).rejects.toThrow(AppError);
+      const error = await controller
+        .handleWebhook(createReq('body'), 'bad_sig')
+        .catch((e: unknown) => e);
 
-      try {
-        await controller.handleWebhook(createReq('body'), 'bad_sig');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
-      }
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
     });
 
     it('returns { received: true } on successful processing', async () => {
