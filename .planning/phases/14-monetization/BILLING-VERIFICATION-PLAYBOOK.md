@@ -157,22 +157,26 @@ SELECT id, eid FROM tenants LIMIT 5;
 
 ---
 
-### Scenario A2: Free → Pro Annual
+### Scenario A2: Free → Pro Annual — PASS (2026-03-03)
 
 **Setup:**
-- [ ] DevSubscriptionPanel → "Reset to Free"
-- [ ] Tier badge shows "Free"
+- [x] DevSubscriptionPanel → "Reset to Free"
+- [x] Tier badge shows "Free"
 
 **Walkthrough:**
-- [ ] Click **"Upgrade"** in header → PricingOverlay opens
-- [ ] Toggle billing to **"Annual"**
-- [ ] Pro card shows annual pricing with savings badge
-- [ ] Click CTA on Pro tier card
-- [ ] Stripe Checkout opens with annual amount
-- [ ] Enter test card `4242 4242 4242 4242`, complete checkout
-- [ ] Stripe CLI shows `checkout.session.completed`, `subscription.created`, `invoice.paid`
-- [ ] Return to app: tier badge shows "Pro"
-- [ ] DevSubscriptionPanel shows currentPeriodEnds ~1 year from now
+- [x] Click **"Upgrade"** in header → PricingOverlay opens
+- [x] Toggle billing to **"Annual"** (defaults to Annual)
+- [x] Pro card shows annual pricing with 20% savings badge ($20/mo billed annually)
+- [x] Click CTA on Pro tier card
+- [x] Stripe Checkout opens with annual amount
+- [x] Enter test card `4242 4242 4242 4242`, complete checkout
+- [x] Stripe CLI shows `checkout.session.completed`, `subscription.created`, `invoice.paid` — all 200 OK (no race condition 500s)
+- [x] Return to app: tier badge shows "Pro" (no refresh needed)
+- [x] DevSubscriptionPanel shows currentPeriodEnds ~1 year from now
+
+**Findings:**
+- **A1 Bug #1 RESOLVED:** Webhook race condition no longer reproduces — all webhooks returned 200.
+- **A1 Bug #2 RESOLVED:** Pricing mismatch fixed — in-app now shows $20/mo annual (matches Stripe). Monthly shows $25/mo. Savings badge shows 20%.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
