@@ -5,12 +5,14 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { getTierCta } from "./get-tier-cta";
 import type { BillingInterval, TierDefinition } from "./pricing-data";
 
 interface TierCardProps {
   tier: TierDefinition;
   interval: BillingInterval;
   currentTier: SubscriptionTier;
+  isTrialActive: boolean;
   onSelect: (tierId: SubscriptionTier) => void;
   isCheckoutPending: boolean;
 }
@@ -29,13 +31,14 @@ export function TierCard({
   tier,
   interval,
   currentTier,
+  isTrialActive,
   onSelect,
   isCheckoutPending,
 }: TierCardProps) {
-  const isCurrent = currentTier === tier.id;
+  const cta = getTierCta(tier.id, currentTier, isTrialActive, tier.cta);
+  const isPro = tier.id === "pro";
   const price = interval === "annual" ? tier.annualPrice : tier.monthlyPrice;
   const isEnterprise = tier.id === "enterprise";
-  const isPro = tier.id === "pro";
   const annualTotal =
     tier.annualPrice !== null ? String(tier.annualPrice * 12) : null;
 
@@ -115,11 +118,11 @@ export function TierCard({
             ? "bg-enterprise-badge-bg text-enterprise-badge-foreground hover:bg-enterprise-badge-bg/90"
             : undefined,
         )}
-        variant={isCurrent ? "outline" : "default"}
-        disabled={isCurrent || (isPro && isCheckoutPending)}
+        variant={cta.disabled ? "outline" : "default"}
+        disabled={cta.disabled || (isPro && isCheckoutPending)}
         onClick={() => onSelect(tier.id)}
       >
-        {isCurrent ? "Current Plan" : tier.cta}
+        {cta.text}
       </Button>
     </motion.div>
   );

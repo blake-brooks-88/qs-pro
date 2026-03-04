@@ -32,6 +32,7 @@ export function PricingOverlay() {
   const { data: prices } = usePrices();
 
   const currentTier: SubscriptionTier = featuresData?.tier ?? "free";
+  const isTrialActive = featuresData?.trial?.active ?? false;
 
   const tiers = useMemo(() => {
     if (!prices) return TIERS;
@@ -121,6 +122,7 @@ export function PricingOverlay() {
                     tier={tier}
                     interval={interval}
                     currentTier={currentTier}
+                    isTrialActive={isTrialActive}
                     onSelect={handleTierSelect}
                     isCheckoutPending={checkout.isPending}
                   />
