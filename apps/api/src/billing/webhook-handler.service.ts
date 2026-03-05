@@ -581,12 +581,22 @@ export class WebhookHandlerService {
           return;
         }
 
-        await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-          currentPeriodEnds: new Date(invoice.period_end * 1000),
-        });
+        const item = subscription.items.data[0];
+        if (item) {
+          const currentPeriodEnds = new Date(
+            item.current_period_end * 1000,
+          );
+          await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
+            currentPeriodEnds,
+          });
+        }
       },
     );
 
+    const item = subscription.items.data[0];
+    const currentPeriodEnds = item
+      ? new Date(item.current_period_end * 1000)
+      : null;
     await this.auditService.log({
       eventType: 'subscription.updated',
       actorType: 'system',
@@ -596,7 +606,7 @@ export class WebhookHandlerService {
       targetId: tenant.id,
       metadata: {
         invoiceId: invoice.id,
-        currentPeriodEnds: new Date(invoice.period_end * 1000).toISOString(),
+        currentPeriodEnds: currentPeriodEnds?.toISOString() ?? null,
       },
     });
   }
