@@ -265,8 +265,34 @@ describe('Billing Webhook (integration)', () => {
     } as unknown as Stripe.Event;
   }
 
-  // Fixed epoch for invoice.paid tests — avoids drift from module-load-time constants
-  const INVOICE_PERIOD_END = 1900000000; // ~2030-03-17, a stable future epoch
+  function makeSubscriptionUpdatedEvent(
+    encryptedEid: string,
+    overrides?: { currentPeriodEnd?: number },
+    eventId?: string,
+  ): Stripe.Event {
+    return {
+      id: eventId ?? nextEventId(),
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: STRIPE_SUBSCRIPTION_ID,
+          customer: STRIPE_CUSTOMER_ID,
+          status: 'active',
+          metadata: { eid: encryptedEid },
+          items: {
+            data: [
+              {
+                price: { product: STRIPE_PRODUCT_ID },
+                quantity: 1,
+                current_period_end:
+                  overrides?.currentPeriodEnd ?? PERIOD_END_EPOCH,
+              },
+            ],
+          },
+        },
+      },
+    } as unknown as Stripe.Event;
+  }
 
   function makeInvoicePaidEvent(eventId?: string): Stripe.Event {
     return {
@@ -280,7 +306,6 @@ describe('Billing Webhook (integration)', () => {
               subscription: STRIPE_SUBSCRIPTION_ID,
             },
           },
-          period_end: INVOICE_PERIOD_END,
         },
       },
     } as unknown as Stripe.Event;
@@ -483,6 +508,44 @@ describe('Billing Webhook (integration)', () => {
     });
   });
 
+  // ─── customer.subscription.updated (plan switch) ───────────────
+
+  describe('customer.subscription.updated', () => {
+    it('updates currentPeriodEnds and preserves tier on interval change', async () => {
+      const tenant = await createTestTenant('sub-updated-interval');
+      const annualPeriodEnd = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: STRIPE_CUSTOMER_ID,
+        stripeSubscriptionId: STRIPE_SUBSCRIPTION_ID,
+        currentPeriodEnds: new Date(annualPeriodEnd * 1000),
+      });
+
+      const monthlyPeriodEnd =
+        Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
+      await webhookHandler.process(
+        makeSubscriptionUpdatedEvent(tenant.encryptedEid, {
+          currentPeriodEnd: monthlyPeriodEnd,
+        }),
+      );
+
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeCustomerId).toBe(STRIPE_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(STRIPE_SUBSCRIPTION_ID);
+      expect(sub.trialEndsAt).toBeNull();
+      const periodEnds = new Date(sub.currentPeriodEnds as string);
+      const expectedPeriodEnds = new Date(monthlyPeriodEnd * 1000);
+      expect(periodEnds.getFullYear()).toBe(expectedPeriodEnds.getFullYear());
+      expect(periodEnds.getMonth()).toBe(expectedPeriodEnds.getMonth());
+    });
+  });
+
   // ─── Concurrent webhook processing (race condition) ─────────────
 
   describe('checkout + subscription concurrent processing', () => {
@@ -577,18 +640,18 @@ describe('Billing Webhook (integration)', () => {
 
       const sub = await getSubscription(tenant.id);
       expect(sub).toBeDefined();
-      // currentPeriodEnds must have changed from the initial value
       const periodEnds = new Date(sub.currentPeriodEnds as string);
       expect(periodEnds.getTime()).not.toBe(initialPeriodEnds.getTime());
-      // The updated value should be in the future (from INVOICE_PERIOD_END ~2030)
-      expect(periodEnds.getFullYear()).toBeGreaterThanOrEqual(2030);
+      const expectedPeriodEnds = new Date(PERIOD_END_EPOCH * 1000);
+      expect(periodEnds.getFullYear()).toBe(expectedPeriodEnds.getFullYear());
+      expect(periodEnds.getMonth()).toBe(expectedPeriodEnds.getMonth());
     });
   });
 
   // ─── customer.subscription.deleted ──────────────────────────────
 
   describe('customer.subscription.deleted', () => {
-    it('downgrades tier to free and clears Stripe subscription ID', async () => {
+    it('downgrades tier to free and prevents trial re-provisioning', async () => {
       const tenant = await createTestTenant('sub-deleted');
 
       await setSubscriptionState(tenant.id, {
@@ -607,9 +670,353 @@ describe('Billing Webhook (integration)', () => {
         throw new Error('Expected subscription to exist');
       }
       expect(sub.tier).toBe('free');
+      expect(sub.stripeCustomerId).toBeNull();
       expect(sub.stripeSubscriptionId).toBeNull();
       expect(sub.currentPeriodEnds).toBeNull();
-      // stripeCustomerId is preserved (customer still exists in Stripe)
+      expect(sub.trialEndsAt).not.toBeNull();
+    });
+
+    it('allows re-subscription after cancellation', async () => {
+      const tenant = await createTestTenant('sub-deleted-resub');
+      const NEW_CUSTOMER_ID = 'cus_test_integ_resub';
+      const NEW_SUBSCRIPTION_ID = 'sub_test_integ_resub';
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: STRIPE_CUSTOMER_ID,
+        stripeSubscriptionId: STRIPE_SUBSCRIPTION_ID,
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      await webhookHandler.process(
+        makeSubscriptionDeletedEvent(tenant.encryptedEid),
+      );
+
+      stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+        id: NEW_SUBSCRIPTION_ID,
+        customer: NEW_CUSTOMER_ID,
+        status: 'active',
+        metadata: { eid: tenant.encryptedEid },
+        items: {
+          data: [
+            {
+              price: { product: STRIPE_PRODUCT_ID },
+              quantity: 1,
+              current_period_end: PERIOD_END_EPOCH,
+            },
+          ],
+        },
+      });
+
+      await webhookHandler.process({
+        id: nextEventId(),
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            customer: NEW_CUSTOMER_ID,
+            subscription: NEW_SUBSCRIPTION_ID,
+            metadata: { eid: tenant.encryptedEid },
+          },
+        },
+      } as unknown as Stripe.Event);
+
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeCustomerId).toBe(NEW_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(NEW_SUBSCRIPTION_ID);
+    });
+  });
+
+  // ─── Out-of-order re-subscription (stale binding) ──────────────
+
+  describe('re-subscription with stale bindings (out-of-order webhooks)', () => {
+    it('checkout.session.completed overrides stale old Stripe bindings', async () => {
+      const tenant = await createTestTenant('stale-binding-checkout');
+      const NEW_CUSTOMER_ID = 'cus_test_integ_stale_new';
+      const NEW_SUBSCRIPTION_ID = 'sub_test_integ_stale_new';
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: STRIPE_CUSTOMER_ID,
+        stripeSubscriptionId: STRIPE_SUBSCRIPTION_ID,
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+        id: NEW_SUBSCRIPTION_ID,
+        customer: NEW_CUSTOMER_ID,
+        status: 'active',
+        metadata: { eid: tenant.encryptedEid },
+        items: {
+          data: [
+            {
+              price: { product: STRIPE_PRODUCT_ID },
+              quantity: 1,
+              current_period_end: PERIOD_END_EPOCH,
+            },
+          ],
+        },
+      });
+
+      await webhookHandler.process({
+        id: nextEventId(),
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            customer: NEW_CUSTOMER_ID,
+            subscription: NEW_SUBSCRIPTION_ID,
+            metadata: { eid: tenant.encryptedEid },
+          },
+        },
+      } as unknown as Stripe.Event);
+
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeCustomerId).toBe(NEW_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(NEW_SUBSCRIPTION_ID);
+      expect(sub.trialEndsAt).toBeNull();
+    });
+
+    it('old subscription.deleted is rejected after new checkout binds', async () => {
+      const tenant = await createTestTenant('stale-deleted-after-rebind');
+      const NEW_CUSTOMER_ID = 'cus_test_integ_stale_del_new';
+      const NEW_SUBSCRIPTION_ID = 'sub_test_integ_stale_del_new';
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: NEW_CUSTOMER_ID,
+        stripeSubscriptionId: NEW_SUBSCRIPTION_ID,
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      await webhookHandler.process(
+        makeSubscriptionDeletedEvent(tenant.encryptedEid),
+      );
+
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeCustomerId).toBe(NEW_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(NEW_SUBSCRIPTION_ID);
+    });
+
+    it('subscription.created overrides stale old Stripe bindings', async () => {
+      const tenant = await createTestTenant('stale-binding-sub-created');
+      const NEW_CUSTOMER_ID = 'cus_test_integ_stale_sc_new';
+      const NEW_SUBSCRIPTION_ID = 'sub_test_integ_stale_sc_new';
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: STRIPE_CUSTOMER_ID,
+        stripeSubscriptionId: STRIPE_SUBSCRIPTION_ID,
+      });
+
+      await webhookHandler.process({
+        id: nextEventId(),
+        type: 'customer.subscription.created',
+        data: {
+          object: {
+            id: NEW_SUBSCRIPTION_ID,
+            customer: NEW_CUSTOMER_ID,
+            status: 'active',
+            metadata: { eid: tenant.encryptedEid },
+            items: {
+              data: [
+                {
+                  price: { product: STRIPE_PRODUCT_ID },
+                  quantity: 1,
+                  current_period_end: PERIOD_END_EPOCH,
+                },
+              ],
+            },
+          },
+        },
+      } as unknown as Stripe.Event);
+
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeCustomerId).toBe(NEW_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(NEW_SUBSCRIPTION_ID);
+    });
+  });
+
+  // ─── invoice.payment_failed ──────────────────────────────────
+
+  describe('invoice.payment_failed', () => {
+    it('logs audit event without changing subscription state', async () => {
+      const tenant = await createTestTenant('payment-failed');
+      const periodEnds = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: STRIPE_CUSTOMER_ID,
+        stripeSubscriptionId: STRIPE_SUBSCRIPTION_ID,
+        currentPeriodEnds: periodEnds,
+      });
+
+      stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+        id: STRIPE_SUBSCRIPTION_ID,
+        customer: STRIPE_CUSTOMER_ID,
+        status: 'past_due',
+        metadata: { eid: tenant.encryptedEid },
+        items: {
+          data: [
+            {
+              price: { product: STRIPE_PRODUCT_ID },
+              quantity: 1,
+              current_period_end: PERIOD_END_EPOCH,
+            },
+          ],
+        },
+      });
+
+      const event: Stripe.Event = {
+        id: nextEventId(),
+        type: 'invoice.payment_failed',
+        data: {
+          object: {
+            id: 'in_test_failed_001',
+            parent: {
+              subscription_details: {
+                subscription: STRIPE_SUBSCRIPTION_ID,
+              },
+            },
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await webhookHandler.process(event);
+
+      // Subscription state must be UNCHANGED — no tier downgrade, no binding changes
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeCustomerId).toBe(STRIPE_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(STRIPE_SUBSCRIPTION_ID);
+
+      // Audit log entry was written (RLS requires both tenant_id and mid)
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenant.id}, false)`;
+        await reserved`SELECT set_config('app.mid', 'system', false)`;
+        const [auditRow] = await reserved`
+          SELECT event_type, tenant_id, metadata
+          FROM audit_logs
+          WHERE tenant_id = ${tenant.id}::uuid
+            AND event_type = 'subscription.payment_failed'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        expect(auditRow).toBeDefined();
+        expect(auditRow.event_type).toBe('subscription.payment_failed');
+        expect((auditRow.metadata as Record<string, unknown>).invoiceId).toBe(
+          'in_test_failed_001',
+        );
+      } finally {
+        try {
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+        } catch {
+          // ignore
+        }
+        reserved.release();
+      }
+    });
+  });
+
+  // ─── Checkout Session Expired ──────────────────────────────────
+
+  describe('checkout.session.expired', () => {
+    it('logs audit event without changing subscription state', async () => {
+      const tenant = await createTestTenant('checkout-expired');
+
+      // Tenant is on free tier with no Stripe bindings — simulates
+      // a user who started checkout but never completed it
+      await setSubscriptionState(tenant.id, { tier: 'free' });
+
+      const event: Stripe.Event = {
+        id: nextEventId(),
+        type: 'checkout.session.expired',
+        data: {
+          object: {
+            id: 'cs_test_expired_001',
+            metadata: { eid: tenant.encryptedEid, tier: 'pro' },
+            customer: null,
+            subscription: null,
+            payment_status: 'unpaid',
+            status: 'expired',
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await webhookHandler.process(event);
+
+      // Subscription state must be UNCHANGED — still free, no Stripe bindings
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('free');
+      expect(sub.stripeCustomerId).toBeNull();
+      expect(sub.stripeSubscriptionId).toBeNull();
+
+      // Audit log entry was written
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenant.id}, false)`;
+        await reserved`SELECT set_config('app.mid', 'system', false)`;
+        const [auditRow] = await reserved`
+          SELECT event_type, tenant_id
+          FROM audit_logs
+          WHERE tenant_id = ${tenant.id}::uuid
+            AND event_type = 'checkout.expired'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        expect(auditRow).toBeDefined();
+        expect(auditRow.event_type).toBe('checkout.expired');
+      } finally {
+        try {
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+        } catch {
+          // ignore
+        }
+        reserved.release();
+      }
+    });
+
+    it('skips gracefully when metadata.eid is missing', async () => {
+      const event: Stripe.Event = {
+        id: nextEventId(),
+        type: 'checkout.session.expired',
+        data: {
+          object: {
+            id: 'cs_test_expired_no_eid',
+            metadata: {},
+            customer: null,
+            subscription: null,
+            payment_status: 'unpaid',
+            status: 'expired',
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      // Should not throw — handler logs warning and returns
+      await expect(webhookHandler.process(event)).resolves.not.toThrow();
     });
   });
 

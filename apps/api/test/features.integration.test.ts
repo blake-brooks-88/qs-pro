@@ -173,4 +173,45 @@ describe('FeaturesController (integration)', () => {
     // Other pro features remain disabled unless overridden
     expect(res.body.features.advancedAutocomplete).toBe(false);
   });
+
+  it('returns pro features even when currentPeriodEnds is in the past', async () => {
+    const eid = `features-pastdue-eid-${Date.now()}`;
+    const tssd = 'features-pastdue-tssd';
+
+    const tenantRows =
+      await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, ${tssd}) RETURNING id`;
+    const tenantRow = tenantRows[0];
+    if (!tenantRow) {
+      throw new Error('Failed to insert test tenant');
+    }
+    const tenantId = tenantRow.id;
+    createdTenantIds.push(tenantId);
+
+    // Set tier to pro with an expired currentPeriodEnds (5 days ago)
+    await sqlClient.begin(async (tx) => {
+      await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await tx`
+        INSERT INTO org_subscriptions (tenant_id, tier, stripe_customer_id, stripe_subscription_id, current_period_ends)
+        VALUES (
+          ${tenantId}::uuid, 'pro', 'cus_test_pastdue', 'sub_test_pastdue',
+          ${new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()}
+        )
+      `;
+    });
+
+    const testAgent: Agent = superagent(app.getHttpServer());
+    await testAgent
+      .get('/__test/session/set')
+      .query({ userId: 'user-1', tenantId, mid: 'mid-1' })
+      .expect(200);
+
+    const res = await testAgent.get('/features').expect(200);
+
+    // Tier column drives access, NOT currentPeriodEnds
+    expect(res.body.tier).toBe('pro');
+    expect(res.body.features.advancedAutocomplete).toBe(true);
+    expect(res.body.features.createDataExtension).toBe(true);
+    expect(res.body.features.deployToAutomation).toBe(true);
+    expect(res.body.features.executionHistory).toBe(true);
+  });
 });

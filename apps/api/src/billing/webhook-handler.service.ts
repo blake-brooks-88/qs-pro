@@ -182,9 +182,15 @@ export class WebhookHandlerService {
           );
           break;
         case 'customer.subscription.created':
+          await this.handleSubscriptionChange(
+            event.data.object as Stripe.Subscription,
+            'created',
+          );
+          break;
         case 'customer.subscription.updated':
           await this.handleSubscriptionChange(
             event.data.object as Stripe.Subscription,
+            'updated',
           );
           break;
         case 'customer.subscription.deleted':
@@ -294,17 +300,16 @@ export class WebhookHandlerService {
         );
         if (!binding.allowed) {
           this.logger.warn(
-            `checkout.session.completed — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
+            `checkout.session.completed — overriding stale Stripe binding (tenantId=${tenant.id}, reason=${binding.reason})`,
           );
           await this.auditWebhookConflict(tenant.id, {
-            reason: binding.reason,
+            reason: `OVERRIDDEN: ${binding.reason}`,
             eventType: 'checkout.session.completed',
             incomingStripeCustomerId: stripeCustomerId,
             incomingStripeSubscriptionId: stripeSubscriptionId,
             existingStripeCustomerId: existing.stripeCustomerId,
             existingStripeSubscriptionId: existing.stripeSubscriptionId,
           });
-          return;
         }
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
@@ -329,6 +334,7 @@ export class WebhookHandlerService {
 
   private async handleSubscriptionChange(
     subscription: Stripe.Subscription,
+    eventKind: 'created' | 'updated',
   ): Promise<void> {
     if (!subscription.items.data[0]) {
       throw new Error('Subscription event missing line items');
@@ -393,18 +399,32 @@ export class WebhookHandlerService {
           { allowBindWhenUnbound: true },
         );
         if (!binding.allowed) {
-          this.logger.warn(
-            `subscription change — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
-          );
-          await this.auditWebhookConflict(tenant.id, {
-            reason: binding.reason,
-            eventType: 'customer.subscription.created/updated',
-            incomingStripeCustomerId: stripeCustomerId,
-            incomingStripeSubscriptionId: stripeSubscriptionId,
-            existingStripeCustomerId: existing.stripeCustomerId,
-            existingStripeSubscriptionId: existing.stripeSubscriptionId,
-          });
-          return;
+          if (eventKind === 'created') {
+            this.logger.warn(
+              `subscription.created — overriding stale Stripe binding (tenantId=${tenant.id}, reason=${binding.reason})`,
+            );
+            await this.auditWebhookConflict(tenant.id, {
+              reason: `OVERRIDDEN: ${binding.reason}`,
+              eventType: 'customer.subscription.created',
+              incomingStripeCustomerId: stripeCustomerId,
+              incomingStripeSubscriptionId: stripeSubscriptionId,
+              existingStripeCustomerId: existing.stripeCustomerId,
+              existingStripeSubscriptionId: existing.stripeSubscriptionId,
+            });
+          } else {
+            this.logger.warn(
+              `subscription.updated — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
+            );
+            await this.auditWebhookConflict(tenant.id, {
+              reason: binding.reason,
+              eventType: 'customer.subscription.updated',
+              incomingStripeCustomerId: stripeCustomerId,
+              incomingStripeSubscriptionId: stripeSubscriptionId,
+              existingStripeCustomerId: existing.stripeCustomerId,
+              existingStripeSubscriptionId: existing.stripeSubscriptionId,
+            });
+            return;
+          }
         }
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
@@ -490,9 +510,11 @@ export class WebhookHandlerService {
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
           tier: 'free',
+          stripeCustomerId: null,
           stripeSubscriptionId: null,
           currentPeriodEnds: null,
           seatLimit: null,
+          trialEndsAt: new Date(0),
         });
       },
     );
