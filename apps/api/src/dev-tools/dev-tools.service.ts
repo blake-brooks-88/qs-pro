@@ -74,6 +74,16 @@ export class DevToolsService {
   }
 
   async resetToFree(tenantId: string) {
+    if (this.stripe) {
+      const subscription =
+        await this.orgSubscriptionRepo.findByTenantId(tenantId);
+      if (subscription?.stripeSubscriptionId) {
+        await this.stripe.subscriptions.cancel(
+          subscription.stripeSubscriptionId,
+        );
+      }
+    }
+
     await this.orgSubscriptionRepo.upsert({
       tenantId,
       tier: 'free',
