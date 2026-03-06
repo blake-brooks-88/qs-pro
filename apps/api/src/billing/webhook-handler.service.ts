@@ -152,8 +152,10 @@ export class WebhookHandlerService {
       if (typeof decrypted === 'string' && decrypted.trim()) {
         return decrypted;
       }
-    } catch {
-      // fall through
+    } catch (error) {
+      this.logger.warn(
+        `decryptEidToken failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     throw new Error(

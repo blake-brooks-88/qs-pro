@@ -544,6 +544,69 @@ describe('Billing Webhook (integration)', () => {
       expect(periodEnds.getFullYear()).toBe(expectedPeriodEnds.getFullYear());
       expect(periodEnds.getMonth()).toBe(expectedPeriodEnds.getMonth());
     });
+
+    it('preserves tier when subscription status is past_due (grace period)', async () => {
+      // Arrange — tenant on 'enterprise' tier, but the Stripe product
+      // resolves to 'pro'. Under past_due grace, the tier must NOT be
+      // overwritten; it must stay 'enterprise'.
+      const tenant = await createTestTenant('sub-updated-past-due');
+      const ENTERPRISE_PRODUCT_ID = 'prod_test_enterprise_pd';
+      const originalPeriodEnd =
+        Math.floor(Date.now() / 1000) + 60 * 24 * 60 * 60;
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'enterprise',
+        stripeCustomerId: STRIPE_CUSTOMER_ID,
+        stripeSubscriptionId: STRIPE_SUBSCRIPTION_ID,
+        currentPeriodEnds: new Date(originalPeriodEnd * 1000),
+      });
+
+      // Product resolves to 'pro' — different from existing 'enterprise'
+      stripeMock.products.retrieve.mockResolvedValueOnce({
+        id: ENTERPRISE_PRODUCT_ID,
+        metadata: { tier: 'pro' },
+      });
+
+      const newPeriodEnd =
+        Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
+      // Act — send subscription.updated with status='past_due'
+      await webhookHandler.process({
+        id: nextEventId(),
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: STRIPE_SUBSCRIPTION_ID,
+            customer: STRIPE_CUSTOMER_ID,
+            status: 'past_due',
+            metadata: { eid: tenant.encryptedEid },
+            items: {
+              data: [
+                {
+                  price: { product: ENTERPRISE_PRODUCT_ID },
+                  quantity: 1,
+                  current_period_end: newPeriodEnd,
+                },
+              ],
+            },
+          },
+        },
+      } as unknown as Stripe.Event);
+
+      // Assert — tier must remain 'enterprise' (NOT overwritten to 'pro')
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('enterprise');
+      expect(sub.stripeCustomerId).toBe(STRIPE_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(STRIPE_SUBSCRIPTION_ID);
+      expect(sub.trialEndsAt).toBeNull();
+      const periodEnds = new Date(sub.currentPeriodEnds as string);
+      const expectedPeriodEnds = new Date(newPeriodEnd * 1000);
+      expect(periodEnds.getFullYear()).toBe(expectedPeriodEnds.getFullYear());
+      expect(periodEnds.getMonth()).toBe(expectedPeriodEnds.getMonth());
+    });
   });
 
   // ─── Concurrent webhook processing (race condition) ─────────────
@@ -849,6 +912,82 @@ describe('Billing Webhook (integration)', () => {
       expect(sub.stripeCustomerId).toBe(NEW_CUSTOMER_ID);
       expect(sub.stripeSubscriptionId).toBe(NEW_SUBSCRIPTION_ID);
     });
+
+    it('subscription.updated with mismatched customer is rejected and audited', async () => {
+      // Arrange — tenant bound to STRIPE_CUSTOMER_ID
+      const tenant = await createTestTenant('stale-binding-updated-conflict');
+      const INTRUDER_CUSTOMER_ID = 'cus_intruder_999';
+      const INTRUDER_SUBSCRIPTION_ID = 'sub_intruder_999';
+      const periodEnds = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: STRIPE_CUSTOMER_ID,
+        stripeSubscriptionId: STRIPE_SUBSCRIPTION_ID,
+        currentPeriodEnds: periodEnds,
+      });
+
+      // Act — send subscription.updated with a DIFFERENT customer ID
+      await webhookHandler.process({
+        id: nextEventId(),
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: INTRUDER_SUBSCRIPTION_ID,
+            customer: INTRUDER_CUSTOMER_ID,
+            status: 'active',
+            metadata: { eid: tenant.encryptedEid },
+            items: {
+              data: [
+                {
+                  price: { product: STRIPE_PRODUCT_ID },
+                  quantity: 1,
+                  current_period_end: PERIOD_END_EPOCH,
+                },
+              ],
+            },
+          },
+        },
+      } as unknown as Stripe.Event);
+
+      // Assert — subscription state must be UNCHANGED
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeCustomerId).toBe(STRIPE_CUSTOMER_ID);
+      expect(sub.stripeSubscriptionId).toBe(STRIPE_SUBSCRIPTION_ID);
+
+      // Assert — audit log entry for the conflict
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenant.id}, false)`;
+        await reserved`SELECT set_config('app.mid', 'system', false)`;
+        const [auditRow] = await reserved`
+          SELECT event_type, tenant_id, metadata
+          FROM audit_logs
+          WHERE tenant_id = ${tenant.id}::uuid
+            AND event_type = 'subscription.webhook_conflict'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        expect(auditRow).toBeDefined();
+        expect(auditRow.event_type).toBe('subscription.webhook_conflict');
+        const meta = auditRow.metadata as Record<string, unknown>;
+        expect(meta.eventType).toBe('customer.subscription.updated');
+        expect(meta.incomingStripeCustomerId).toBe(INTRUDER_CUSTOMER_ID);
+        expect(meta.existingStripeCustomerId).toBe(STRIPE_CUSTOMER_ID);
+      } finally {
+        try {
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+        } catch {
+          // ignore
+        }
+        reserved.release();
+      }
+    });
   });
 
   // ─── invoice.payment_failed ──────────────────────────────────
@@ -1066,6 +1205,56 @@ describe('Billing Webhook (integration)', () => {
       }
       expect(subAfterSecond.tier).toBe('pro');
       expect(await countSubscriptions(tenant.id)).toBe(1);
+    });
+  });
+
+  // ─── Encrypted EID validation ──────────────────────────────────
+
+  describe('encrypted EID validation', () => {
+    it('rejects event with tampered/garbage EID and records failure', async () => {
+      // Arrange — fresh tenant with no subscription
+      const tenant = await createTestTenant('garbage-eid');
+      const eventId = nextEventId();
+
+      const event: Stripe.Event = {
+        id: eventId,
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: STRIPE_SUBSCRIPTION_ID,
+            customer: STRIPE_CUSTOMER_ID,
+            status: 'active',
+            metadata: { eid: 'GARBAGE_TAMPERED_TOKEN' },
+            items: {
+              data: [
+                {
+                  price: { product: STRIPE_PRODUCT_ID },
+                  quantity: 1,
+                  current_period_end: PERIOD_END_EPOCH,
+                },
+              ],
+            },
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      // Act — process() should throw because decryptEidToken rejects garbage
+      await expect(webhookHandler.process(event)).rejects.toThrow(
+        'Invalid metadata.eid token',
+      );
+
+      // Assert — no subscription was created for this tenant
+      const sub = await getSubscription(tenant.id);
+      expect(sub).toBeUndefined();
+
+      // Assert — webhook event recorded as 'failed' with error message
+      const [webhookRow] = await sqlClient`
+        SELECT status, error_message
+        FROM stripe_webhook_events
+        WHERE id = ${eventId}
+      `;
+      expect(webhookRow.status).toBe('failed');
+      expect(webhookRow.error_message).toContain('Invalid metadata.eid token');
     });
   });
 });
