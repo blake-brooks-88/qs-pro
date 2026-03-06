@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   BadRequestException,
   Inject,
@@ -5,14 +7,21 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
+import {
+  EncryptionService,
+  getReservedSqlFromContext,
+  RlsContextService,
+} from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
+  IStripeCheckoutSessionRepository,
   ITenantRepository,
 } from '@qpp/database';
 import type Stripe from 'stripe';
 
+import { hasPaidEntitlement } from './subscription-entitlements';
 import { STRIPE_CLIENT } from './stripe.provider';
+import { WebhookHandlerService } from './webhook-handler.service';
 
 const PRICE_LOOKUP_KEYS = {
   pro_monthly: 'pro_monthly',
@@ -26,6 +35,11 @@ type PriceLookupKey =
 
 export interface PricesResponse {
   pro: { monthly: number; annual: number };
+}
+
+export interface CheckoutConfirmationResponse {
+  status: 'fulfilled' | 'pending' | 'failed';
+  reason?: 'expired' | 'unpaid';
 }
 
 @Injectable()
@@ -46,8 +60,11 @@ export class BillingService {
     @Inject('TENANT_REPOSITORY') private readonly tenantRepo: ITenantRepository,
     @Inject('ORG_SUBSCRIPTION_REPOSITORY')
     private readonly orgSubscriptionRepo: IOrgSubscriptionRepository,
+    @Inject('STRIPE_CHECKOUT_SESSION_REPOSITORY')
+    private readonly stripeCheckoutSessionRepo: IStripeCheckoutSessionRepository,
     private readonly encryptionService: EncryptionService,
     private readonly rlsContext: RlsContextService,
+    private readonly webhookHandler: WebhookHandlerService,
   ) {}
 
   async getPrices(): Promise<PricesResponse> {
@@ -113,6 +130,7 @@ export class BillingService {
     if (!this.stripe) {
       throw new ServiceUnavailableException('Stripe is not configured');
     }
+    const stripe = this.stripe;
 
     const tenant = await this.tenantRepo.findById(tenantId);
     if (!tenant) {
@@ -124,51 +142,168 @@ export class BillingService {
       'system',
       () => this.orgSubscriptionRepo.findByTenantId(tenantId),
     );
-    if (existingSubscription?.stripeSubscriptionId) {
+    if (hasPaidEntitlement(existingSubscription)) {
       throw new BadRequestException(
         'An active paid subscription already exists for this tenant',
       );
     }
 
-    const lookupKey = PRICE_LOOKUP_KEYS[
-      `${tier}_${interval}`
-    ] as PriceLookupKey;
-    const priceId = await this.resolvePriceId(lookupKey);
+    return this.rlsContext.runWithIsolatedTenantContext(
+      tenantId,
+      'system',
+      async () => {
+        const reservedSql = getReservedSqlFromContext();
+        if (!reservedSql) {
+          throw new Error('Missing reserved SQL context for checkout creation');
+        }
 
-    const eid = this.encryptionService.encrypt(tenant.eid);
-    if (!eid) {
-      throw new BadRequestException('Failed to encrypt tenant identifier');
-    }
+        await reservedSql`SELECT pg_advisory_xact_lock(hashtext(${tenantId}))`;
 
-    const base = new URL(
-      this.configService.getOrThrow<string>('APP_WEB_ORIGIN'),
+        const lockedSubscription =
+          await this.orgSubscriptionRepo.findByTenantId(tenantId);
+        if (hasPaidEntitlement(lockedSubscription)) {
+          throw new BadRequestException(
+            'An active paid subscription already exists for this tenant',
+          );
+        }
+
+        const existingCheckout =
+          await this.stripeCheckoutSessionRepo.findByTenantId(tenantId);
+        const now = new Date();
+
+        if (
+          existingCheckout?.status === 'open' &&
+          existingCheckout.tier === tier &&
+          existingCheckout.interval === interval &&
+          existingCheckout.sessionId
+        ) {
+          const liveSession = await stripe.checkout.sessions.retrieve(
+            existingCheckout.sessionId,
+          );
+
+          await this.syncStoredCheckoutSession(liveSession);
+
+          if (liveSession.status === 'complete') {
+            if (liveSession.payment_status === 'paid') {
+              await this.processCheckoutCompletion(liveSession);
+
+              const reconciledSubscription =
+                await this.orgSubscriptionRepo.findByTenantId(tenantId);
+              if (hasPaidEntitlement(reconciledSubscription)) {
+                throw new BadRequestException(
+                  'An active paid subscription already exists for this tenant',
+                );
+              }
+            }
+          }
+
+          const liveExpiresAt = liveSession.expires_at
+            ? new Date(liveSession.expires_at * 1000)
+            : existingCheckout.expiresAt;
+
+          if (
+            liveSession.status === 'open' &&
+            liveExpiresAt !== null &&
+            liveExpiresAt > now &&
+            existingCheckout.sessionUrl
+          ) {
+            return { url: existingCheckout.sessionUrl };
+          }
+        }
+
+        const idempotencyKey =
+          existingCheckout &&
+          existingCheckout.tier === tier &&
+          existingCheckout.interval === interval &&
+          (existingCheckout.status === 'creating' ||
+            existingCheckout.status === 'failed')
+            ? existingCheckout.idempotencyKey
+            : `checkout:${tenantId}:${randomUUID()}`;
+
+        await this.stripeCheckoutSessionRepo.upsert({
+          tenantId,
+          idempotencyKey,
+          sessionId: null,
+          sessionUrl: null,
+          tier,
+          interval,
+          status: 'creating',
+          expiresAt: null,
+          lastError: null,
+        });
+
+        try {
+          const lookupKey = PRICE_LOOKUP_KEYS[
+            `${tier}_${interval}`
+          ] as PriceLookupKey;
+          const priceId = await this.resolvePriceId(lookupKey);
+
+          const eid = this.encryptionService.encrypt(tenant.eid);
+          if (!eid) {
+            throw new BadRequestException('Failed to encrypt tenant identifier');
+          }
+
+          const base = new URL(
+            this.configService.getOrThrow<string>('APP_WEB_ORIGIN'),
+          );
+          const successUrl = new URL(
+            '?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+            base,
+          ).toString();
+          const cancelUrl = new URL('?checkout=cancel', base).toString();
+
+          const session = await stripe.checkout.sessions.create(
+            {
+              mode: 'subscription',
+              line_items: [{ price: priceId, quantity: 1 }],
+              metadata: { eid, tier },
+              subscription_data: { metadata: { eid, tier } },
+              success_url: successUrl,
+              cancel_url: cancelUrl,
+              allow_promotion_codes: true,
+              custom_fields: [
+                {
+                  key: 'purchase_order',
+                  label: {
+                    type: 'custom' as const,
+                    custom: 'Purchase Order Number',
+                  },
+                  type: 'text' as const,
+                  optional: true,
+                },
+              ],
+            },
+            { idempotencyKey },
+          );
+
+          if (!session.url || !session.id || !session.expires_at) {
+            throw new BadRequestException(
+              'Stripe checkout session missing required fields',
+            );
+          }
+
+          await this.stripeCheckoutSessionRepo.upsert({
+            tenantId,
+            idempotencyKey,
+            sessionId: session.id,
+            sessionUrl: session.url,
+            tier,
+            interval,
+            status: 'open',
+            expiresAt: new Date(session.expires_at * 1000),
+            lastError: null,
+          });
+
+          return { url: session.url };
+        } catch (error) {
+          await this.stripeCheckoutSessionRepo.markFailed(
+            tenantId,
+            error instanceof Error ? error.message : String(error),
+          );
+          throw error;
+        }
+      },
     );
-    const successUrl = new URL('?checkout=success', base).toString();
-    const cancelUrl = new URL('?checkout=cancel', base).toString();
-
-    const session = await this.stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { eid, tier },
-      subscription_data: { metadata: { eid, tier } },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: true,
-      custom_fields: [
-        {
-          key: 'purchase_order',
-          label: { type: 'custom' as const, custom: 'Purchase Order Number' },
-          type: 'text' as const,
-          optional: true,
-        },
-      ],
-    });
-
-    if (!session.url) {
-      throw new BadRequestException('Stripe checkout session missing URL');
-    }
-
-    return { url: session.url };
   }
 
   async createPortalSession(tenantId: string): Promise<{ url: string }> {
@@ -192,6 +327,85 @@ export class BillingService {
     });
 
     return { url: session.url };
+  }
+
+  async confirmCheckoutSession(
+    tenantId: string,
+    sessionId: string,
+  ): Promise<CheckoutConfirmationResponse> {
+    if (!this.stripe) {
+      throw new ServiceUnavailableException('Stripe is not configured');
+    }
+
+    const tenant = await this.tenantRepo.findById(tenantId);
+    if (!tenant) {
+      throw new BadRequestException('Tenant not found');
+    }
+
+    const session = await this.stripe.checkout.sessions.retrieve(sessionId);
+    const encryptedEid = session.metadata?.eid;
+
+    if (!encryptedEid) {
+      throw new BadRequestException('Checkout session is missing tenant metadata');
+    }
+
+    const eid = this.encryptionService.decrypt(encryptedEid);
+    if (eid !== tenant.eid) {
+      throw new BadRequestException(
+        'Checkout session does not belong to this tenant',
+      );
+    }
+
+    await this.syncStoredCheckoutSession(session);
+
+    if (session.status === 'complete') {
+      if (session.payment_status === 'paid') {
+        await this.processCheckoutCompletion(session);
+        return { status: 'fulfilled' };
+      }
+
+      return { status: 'failed', reason: 'unpaid' };
+    }
+
+    if (
+      session.status === 'expired' ||
+      (session.expires_at !== null &&
+        session.expires_at !== undefined &&
+        session.expires_at * 1000 <= Date.now())
+    ) {
+      return { status: 'failed', reason: 'expired' };
+    }
+
+    return { status: 'pending' };
+  }
+
+  private async syncStoredCheckoutSession(
+    session: Stripe.Checkout.Session,
+  ): Promise<void> {
+    if (!session.id) {
+      return;
+    }
+
+    if (session.status === 'complete') {
+      await this.stripeCheckoutSessionRepo.markCompleted(session.id);
+      return;
+    }
+
+    if (session.status === 'expired') {
+      await this.stripeCheckoutSessionRepo.markExpired(session.id);
+    }
+  }
+
+  private async processCheckoutCompletion(
+    session: Stripe.Checkout.Session,
+  ): Promise<void> {
+    await this.webhookHandler.process({
+      id: `evt_reconcile_checkout_${session.id}`,
+      type: 'checkout.session.completed',
+      data: {
+        object: session,
+      },
+    } as unknown as Stripe.Event);
   }
 
   private async resolvePriceId(lookupKey: string): Promise<string> {

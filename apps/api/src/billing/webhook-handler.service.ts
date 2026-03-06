@@ -2,9 +2,12 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
+  IStripeBillingBindingRepository,
+  IStripeCheckoutSessionRepository,
   IStripeWebhookEventRepository,
   ITenantRepository,
-  OrgSubscription,
+  StripeSubscriptionStatus,
+  Tenant,
 } from '@qpp/database';
 import type Stripe from 'stripe';
 
@@ -32,6 +35,24 @@ function getStripeId(value: unknown): string | null {
   return null;
 }
 
+function normalizeSubscriptionStatus(
+  status: string | null | undefined,
+): StripeSubscriptionStatus {
+  switch (status) {
+    case 'trialing':
+    case 'active':
+    case 'past_due':
+    case 'unpaid':
+    case 'canceled':
+    case 'incomplete':
+    case 'incomplete_expired':
+    case 'paused':
+      return status;
+    default:
+      return 'inactive';
+  }
+}
+
 @Injectable()
 export class WebhookHandlerService {
   private readonly logger = new Logger(WebhookHandlerService.name);
@@ -40,6 +61,10 @@ export class WebhookHandlerService {
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null,
     @Inject('ORG_SUBSCRIPTION_REPOSITORY')
     private readonly orgSubscriptionRepo: IOrgSubscriptionRepository,
+    @Inject('STRIPE_BILLING_BINDING_REPOSITORY')
+    private readonly stripeBindingRepo: IStripeBillingBindingRepository,
+    @Inject('STRIPE_CHECKOUT_SESSION_REPOSITORY')
+    private readonly stripeCheckoutSessionRepo: IStripeCheckoutSessionRepository,
     @Inject('STRIPE_WEBHOOK_EVENT_REPOSITORY')
     private readonly webhookEventRepo: IStripeWebhookEventRepository,
     @Inject('TENANT_REPOSITORY')
@@ -71,81 +96,6 @@ export class WebhookHandlerService {
     }
   }
 
-  private checkStripeBinding(
-    existing: OrgSubscription,
-    incoming: {
-      stripeCustomerId: string | null;
-      stripeSubscriptionId: string | null;
-    },
-    options: {
-      allowBindWhenUnbound: boolean;
-      requireSubscriptionMatch?: boolean;
-    },
-  ): { allowed: true } | { allowed: false; reason: string } {
-    const { stripeCustomerId, stripeSubscriptionId } = incoming;
-
-    if (!options.allowBindWhenUnbound) {
-      const isBound =
-        Boolean(existing.stripeCustomerId) ||
-        Boolean(existing.stripeSubscriptionId);
-      if (!isBound) {
-        return {
-          allowed: false,
-          reason:
-            'Tenant is not bound to any Stripe identity (missing stripeCustomerId/stripeSubscriptionId)',
-        };
-      }
-    }
-
-    if (
-      existing.stripeCustomerId &&
-      stripeCustomerId &&
-      existing.stripeCustomerId !== stripeCustomerId
-    ) {
-      return {
-        allowed: false,
-        reason: 'Incoming Stripe customer does not match existing binding',
-      };
-    }
-
-    if (
-      existing.stripeSubscriptionId &&
-      stripeSubscriptionId &&
-      existing.stripeSubscriptionId !== stripeSubscriptionId
-    ) {
-      return {
-        allowed: false,
-        reason: 'Incoming Stripe subscription does not match existing binding',
-      };
-    }
-
-    if (options.requireSubscriptionMatch) {
-      if (!existing.stripeSubscriptionId) {
-        return {
-          allowed: false,
-          reason:
-            'Refusing to apply destructive update without existing stripeSubscriptionId binding',
-        };
-      }
-      if (!stripeSubscriptionId) {
-        return {
-          allowed: false,
-          reason:
-            'Missing incoming stripeSubscriptionId for destructive update',
-        };
-      }
-      if (existing.stripeSubscriptionId !== stripeSubscriptionId) {
-        return {
-          allowed: false,
-          reason:
-            'Incoming Stripe subscription does not match existing binding (destructive update)',
-        };
-      }
-    }
-
-    return { allowed: true };
-  }
-
   private decryptEidToken(token: string): string {
     try {
       const decrypted = this.encryptionService.decrypt(token);
@@ -159,7 +109,223 @@ export class WebhookHandlerService {
     }
 
     throw new Error(
-      'Invalid metadata.eid token — must be an encrypted token issued by GET /api/billing/pricing-token',
+      'Invalid metadata.eid token — must be an encrypted token issued by the application',
+    );
+  }
+
+  private getSubscriptionItem(subscription: Stripe.Subscription) {
+    const item = subscription.items.data[0];
+    if (!item) {
+      throw new Error('Subscription event missing line items');
+    }
+    return item;
+  }
+
+  private getSubscriptionCurrentPeriodEnds(
+    subscription: Stripe.Subscription,
+  ): Date | null {
+    const item = subscription.items.data[0];
+    if (!item?.current_period_end) {
+      return null;
+    }
+    return new Date(item.current_period_end * 1000);
+  }
+
+  private getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+    const sub = invoice.parent?.subscription_details?.subscription;
+    if (!sub) {
+      return null;
+    }
+    return typeof sub === 'string' ? sub : sub.id;
+  }
+
+  private async resolveTenant(
+    params: {
+      encryptedEid?: string | null;
+      stripeCustomerId?: string | null;
+      stripeSubscriptionId?: string | null;
+      eventType: string;
+    },
+  ): Promise<Tenant | null> {
+    if (params.encryptedEid) {
+      const eid = this.decryptEidToken(params.encryptedEid);
+      const tenant = await this.tenantRepo.findByEid(eid);
+      if (!tenant) {
+        throw new Error(`Tenant not found for pricing token`);
+      }
+      return tenant;
+    }
+
+    if (params.stripeSubscriptionId) {
+      const binding = await this.stripeBindingRepo.findByStripeSubscriptionId(
+        params.stripeSubscriptionId,
+      );
+      if (binding) {
+        return (await this.tenantRepo.findById(binding.tenantId)) ?? null;
+      }
+    }
+
+    if (params.stripeCustomerId) {
+      const binding = await this.stripeBindingRepo.findByStripeCustomerId(
+        params.stripeCustomerId,
+      );
+      if (binding) {
+        return (await this.tenantRepo.findById(binding.tenantId)) ?? null;
+      }
+    }
+
+    this.logger.warn(`${params.eventType}: could not resolve tenant`);
+    return null;
+  }
+
+  private async validateBindingOwnership(
+    tenantId: string,
+    params: {
+      stripeCustomerId: string | null;
+      stripeSubscriptionId: string | null;
+      eventType: string;
+      allowTenantRebind?: boolean;
+    },
+  ): Promise<boolean> {
+    if (params.stripeCustomerId) {
+      const customerBinding =
+        await this.stripeBindingRepo.findByStripeCustomerId(
+          params.stripeCustomerId,
+        );
+      if (customerBinding && customerBinding.tenantId !== tenantId) {
+        await this.auditWebhookConflict(tenantId, {
+          reason: 'Incoming Stripe customer is already bound to another tenant',
+          eventType: params.eventType,
+          incomingStripeCustomerId: params.stripeCustomerId,
+          boundTenantId: customerBinding.tenantId,
+        });
+        return false;
+      }
+    }
+
+    if (params.stripeSubscriptionId) {
+      const subscriptionBinding =
+        await this.stripeBindingRepo.findByStripeSubscriptionId(
+          params.stripeSubscriptionId,
+        );
+      if (subscriptionBinding && subscriptionBinding.tenantId !== tenantId) {
+        await this.auditWebhookConflict(tenantId, {
+          reason: 'Incoming Stripe subscription is already bound to another tenant',
+          eventType: params.eventType,
+          incomingStripeSubscriptionId: params.stripeSubscriptionId,
+          boundTenantId: subscriptionBinding.tenantId,
+        });
+        return false;
+      }
+    }
+
+    if (params.allowTenantRebind) {
+      return true;
+    }
+
+    const existing = await this.rlsContext.runWithTenantContext(
+      tenantId,
+      'system',
+      () => this.orgSubscriptionRepo.findByTenantId(tenantId),
+    );
+
+    if (!existing) {
+      return true;
+    }
+
+    if (
+      params.stripeCustomerId &&
+      existing.stripeCustomerId &&
+      existing.stripeCustomerId !== params.stripeCustomerId
+    ) {
+      await this.auditWebhookConflict(tenantId, {
+        reason:
+          'Incoming Stripe customer does not match the tenant subscription record',
+        eventType: params.eventType,
+        incomingStripeCustomerId: params.stripeCustomerId,
+        existingStripeCustomerId: existing.stripeCustomerId,
+        existingStripeSubscriptionId: existing.stripeSubscriptionId,
+      });
+      return false;
+    }
+
+    if (
+      params.stripeSubscriptionId &&
+      existing.stripeSubscriptionId &&
+      existing.stripeSubscriptionId !== params.stripeSubscriptionId
+    ) {
+      await this.auditWebhookConflict(tenantId, {
+        reason:
+          'Incoming Stripe subscription does not match the tenant subscription record',
+        eventType: params.eventType,
+        incomingStripeSubscriptionId: params.stripeSubscriptionId,
+        existingStripeSubscriptionId: existing.stripeSubscriptionId,
+        existingStripeCustomerId: existing.stripeCustomerId,
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  private async persistBinding(
+    tenantId: string,
+    stripeCustomerId: string | null,
+    stripeSubscriptionId: string | null,
+  ): Promise<void> {
+    await this.stripeBindingRepo.upsert({
+      tenantId,
+      stripeCustomerId,
+      stripeSubscriptionId,
+    });
+  }
+
+  private async upsertSubscriptionState(params: {
+    tenantId: string;
+    tier: PaidTier | 'free';
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+    stripeSubscriptionStatus: StripeSubscriptionStatus;
+    currentPeriodEnds: Date | null;
+    seatLimit: number | null;
+    lastInvoicePaidAt?: Date | null;
+    trialEndsAt?: Date | null;
+  }): Promise<void> {
+    await this.rlsContext.runWithTenantContext(
+      params.tenantId,
+      'system',
+      async () => {
+        const existing = await this.orgSubscriptionRepo.findByTenantId(
+          params.tenantId,
+        );
+
+        const payload = {
+          tier: params.tier,
+          stripeCustomerId: params.stripeCustomerId,
+          stripeSubscriptionId: params.stripeSubscriptionId,
+          stripeSubscriptionStatus: params.stripeSubscriptionStatus,
+          currentPeriodEnds: params.currentPeriodEnds,
+          seatLimit: params.seatLimit,
+          lastInvoicePaidAt:
+            params.lastInvoicePaidAt === undefined
+              ? existing?.lastInvoicePaidAt ?? null
+              : params.lastInvoicePaidAt,
+          trialEndsAt:
+            params.trialEndsAt === undefined
+              ? existing?.trialEndsAt ?? null
+              : params.trialEndsAt,
+        };
+
+        if (!existing) {
+          await this.orgSubscriptionRepo.upsert({
+            tenantId: params.tenantId,
+            ...payload,
+          });
+          return;
+        }
+
+        await this.orgSubscriptionRepo.updateFromWebhook(params.tenantId, payload);
+      },
     );
   }
 
@@ -176,23 +342,17 @@ export class WebhookHandlerService {
     }
 
     try {
-      const eventType: string = event.type;
-      switch (eventType) {
+      switch (event.type) {
         case 'checkout.session.completed':
           await this.handleCheckoutSessionCompleted(
             event.data.object as Stripe.Checkout.Session,
           );
           break;
         case 'customer.subscription.created':
-          await this.handleSubscriptionChange(
-            event.data.object as Stripe.Subscription,
-            'created',
-          );
-          break;
         case 'customer.subscription.updated':
           await this.handleSubscriptionChange(
             event.data.object as Stripe.Subscription,
-            'updated',
+            event.type,
           );
           break;
         case 'customer.subscription.deleted':
@@ -229,6 +389,7 @@ export class WebhookHandlerService {
         default:
           break;
       }
+
       await this.webhookEventRepo.markCompleted(event.id);
     } catch (error) {
       this.logger.error(
@@ -245,6 +406,16 @@ export class WebhookHandlerService {
   private async handleCheckoutSessionCompleted(
     session: Stripe.Checkout.Session,
   ): Promise<void> {
+    if (session.payment_status !== 'paid') {
+      if (session.id) {
+        await this.stripeCheckoutSessionRepo.markCompleted(session.id);
+      }
+      this.logger.warn(
+        `checkout.session.completed received without confirmed payment (payment_status=${session.payment_status ?? 'unknown'})`,
+      );
+      return;
+    }
+
     const stripeCustomerId = getStripeId(session.customer);
     const stripeSubscriptionId = getStripeId(session.subscription);
 
@@ -252,206 +423,127 @@ export class WebhookHandlerService {
       throw new Error('Checkout session missing customer or subscription ID');
     }
 
-    const rawEid = session.metadata?.eid;
-    if (!rawEid) {
-      throw new Error('Checkout session missing metadata.eid');
-    }
-    const eid = this.decryptEidToken(rawEid);
-
     if (!this.stripe) {
       throw new Error('Stripe client not configured');
     }
 
     const subscription =
       await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
-    if (!subscription.items.data[0]) {
-      throw new Error('Stripe subscription missing line items');
-    }
-    const productId = subscription.items.data[0].price.product as string;
-    const tier = await this.resolveTierFromProduct(productId);
-
-    const tenant = await this.tenantRepo.findByEid(eid);
-    if (!tenant) {
-      throw new Error(`Tenant not found for pricing token`);
-    }
-
-    await this.rlsContext.runWithTenantContext(
-      tenant.id,
-      'system',
-      async () => {
-        const existing = await this.orgSubscriptionRepo.findByTenantId(
-          tenant.id,
-        );
-        if (!existing) {
-          await this.orgSubscriptionRepo.upsert({
-            tenantId: tenant.id,
-            tier,
-            stripeCustomerId,
-            stripeSubscriptionId,
-            trialEndsAt: null,
-            currentPeriodEnds: null,
-            seatLimit: null,
-          });
-          return;
-        }
-
-        const binding = this.checkStripeBinding(
-          existing,
-          { stripeCustomerId, stripeSubscriptionId },
-          { allowBindWhenUnbound: true },
-        );
-        if (!binding.allowed) {
-          this.logger.warn(
-            `checkout.session.completed — overriding stale Stripe binding (tenantId=${tenant.id}, reason=${binding.reason})`,
-          );
-          await this.auditWebhookConflict(tenant.id, {
-            reason: `OVERRIDDEN: ${binding.reason}`,
-            eventType: 'checkout.session.completed',
-            incomingStripeCustomerId: stripeCustomerId,
-            incomingStripeSubscriptionId: stripeSubscriptionId,
-            existingStripeCustomerId: existing.stripeCustomerId,
-            existingStripeSubscriptionId: existing.stripeSubscriptionId,
-          });
-        }
-
-        await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-          stripeCustomerId,
-          stripeSubscriptionId,
-          tier,
-          trialEndsAt: null,
-        });
-      },
-    );
-
-    await this.auditService.log({
-      eventType: 'subscription.created',
-      actorType: 'system',
-      actorId: null,
-      tenantId: tenant.id,
-      mid: 'system',
-      targetId: tenant.id,
-      metadata: { tier, stripeCustomerId, stripeSubscriptionId },
+    const item = this.getSubscriptionItem(subscription);
+    const tier = await this.resolveTierFromProduct(item.price.product as string);
+    const tenant = await this.resolveTenant({
+      encryptedEid: session.metadata?.eid ?? null,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType: 'checkout.session.completed',
     });
+
+    if (!tenant) {
+      return;
+    }
+
+    const canApply = await this.validateBindingOwnership(tenant.id, {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType: 'checkout.session.completed',
+      allowTenantRebind: true,
+    });
+    if (!canApply) {
+      return;
+    }
+
+    await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+    await this.upsertSubscriptionState({
+      tenantId: tenant.id,
+      tier,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      stripeSubscriptionStatus: normalizeSubscriptionStatus(subscription.status),
+      currentPeriodEnds: this.getSubscriptionCurrentPeriodEnds(subscription),
+      seatLimit: item.quantity ?? null,
+      lastInvoicePaidAt: new Date(),
+      trialEndsAt: null,
+    });
+
+    if (session.id) {
+      await this.stripeCheckoutSessionRepo.markCompleted(session.id);
+    }
   }
 
   private async handleSubscriptionChange(
     subscription: Stripe.Subscription,
-    eventKind: 'created' | 'updated',
+    eventType: 'customer.subscription.created' | 'customer.subscription.updated',
   ): Promise<void> {
-    if (!subscription.items.data[0]) {
-      throw new Error('Subscription event missing line items');
-    }
-
-    const rawEid = subscription.metadata?.eid;
-    if (!rawEid) {
-      throw new Error(
-        'Subscription missing metadata.eid — external pricing site must set subscription_data.metadata.eid at Checkout creation',
-      );
-    }
-    const eid = this.decryptEidToken(rawEid);
-
-    const tenant = await this.tenantRepo.findByEid(eid);
-    if (!tenant) {
-      this.logger.warn(
-        `Tenant not found for pricing token — tenant may have been deleted`,
-      );
-      return;
-    }
-
-    const productId = subscription.items.data[0].price.product as string;
-    const tier = await this.resolveTierFromProduct(productId);
-
-    const isPastDueOrUnpaid =
-      subscription.status === 'past_due' || subscription.status === 'unpaid';
-
-    const currentPeriodEnds = new Date(
-      subscription.items.data[0].current_period_end * 1000,
-    );
-    const seatLimit = subscription.items.data[0].quantity ?? null;
+    const item = this.getSubscriptionItem(subscription);
     const stripeCustomerId = getStripeId(subscription.customer);
     const stripeSubscriptionId = subscription.id;
 
-    await this.rlsContext.runWithTenantContext(
+    const tenant = await this.resolveTenant({
+      encryptedEid: subscription.metadata?.eid ?? null,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType,
+    });
+    if (!tenant) {
+      return;
+    }
+
+    const canApply = await this.validateBindingOwnership(tenant.id, {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType,
+      allowTenantRebind: eventType === 'customer.subscription.created',
+    });
+    if (!canApply) {
+      return;
+    }
+
+    const stripeSubscriptionStatus = normalizeSubscriptionStatus(
+      subscription.status,
+    );
+    const existing = await this.rlsContext.runWithTenantContext(
       tenant.id,
       'system',
-      async () => {
-        const existing = await this.orgSubscriptionRepo.findByTenantId(
-          tenant.id,
-        );
-        if (!existing) {
-          await this.orgSubscriptionRepo.upsert({
-            tenantId: tenant.id,
-            // If the row doesn't exist yet, persist the resolved tier even if
-            // Stripe is reporting past_due/unpaid. The "graceful degradation"
-            // behavior applies to preserving an existing tier, not defaulting
-            // a brand-new row to free.
-            tier,
-            stripeCustomerId,
-            stripeSubscriptionId,
-            trialEndsAt: null,
-            currentPeriodEnds,
-            seatLimit,
-          });
-          return;
-        }
-
-        const binding = this.checkStripeBinding(
-          existing,
-          { stripeCustomerId, stripeSubscriptionId },
-          { allowBindWhenUnbound: true },
-        );
-        if (!binding.allowed) {
-          if (eventKind === 'created') {
-            this.logger.warn(
-              `subscription.created — overriding stale Stripe binding (tenantId=${tenant.id}, reason=${binding.reason})`,
-            );
-            await this.auditWebhookConflict(tenant.id, {
-              reason: `OVERRIDDEN: ${binding.reason}`,
-              eventType: 'customer.subscription.created',
-              incomingStripeCustomerId: stripeCustomerId,
-              incomingStripeSubscriptionId: stripeSubscriptionId,
-              existingStripeCustomerId: existing.stripeCustomerId,
-              existingStripeSubscriptionId: existing.stripeSubscriptionId,
-            });
-          } else {
-            this.logger.warn(
-              `subscription.updated — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
-            );
-            await this.auditWebhookConflict(tenant.id, {
-              reason: binding.reason,
-              eventType: 'customer.subscription.updated',
-              incomingStripeCustomerId: stripeCustomerId,
-              incomingStripeSubscriptionId: stripeSubscriptionId,
-              existingStripeCustomerId: existing.stripeCustomerId,
-              existingStripeSubscriptionId: existing.stripeSubscriptionId,
-            });
-            return;
-          }
-        }
-
-        await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-          ...(isPastDueOrUnpaid ? {} : { tier }),
-          stripeCustomerId,
-          stripeSubscriptionId,
-          currentPeriodEnds,
-          seatLimit,
-          trialEndsAt: null,
-        });
-      },
+      () => this.orgSubscriptionRepo.findByTenantId(tenant.id),
     );
+    const resolvedTier = await this.resolveTierFromProduct(
+      item.price.product as string,
+    );
+    const tier =
+      (stripeSubscriptionStatus === 'past_due' ||
+        stripeSubscriptionStatus === 'unpaid') &&
+      existing?.tier &&
+      existing.tier !== 'free'
+        ? existing.tier
+        : resolvedTier;
+
+    await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+    await this.upsertSubscriptionState({
+      tenantId: tenant.id,
+      tier,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      stripeSubscriptionStatus,
+      currentPeriodEnds: this.getSubscriptionCurrentPeriodEnds(subscription),
+      seatLimit: item.quantity ?? null,
+      trialEndsAt: null,
+    });
 
     await this.auditService.log({
-      eventType: 'subscription.updated',
+      eventType:
+        eventType === 'customer.subscription.created'
+          ? 'subscription.created'
+          : 'subscription.updated',
       actorType: 'system',
       actorId: null,
       tenantId: tenant.id,
       mid: 'system',
       targetId: tenant.id,
       metadata: {
-        tier: isPastDueOrUnpaid ? 'unchanged (graceful degradation)' : tier,
-        status: subscription.status,
-        currentPeriodEnds: currentPeriodEnds.toISOString(),
-        seatLimit,
+        tier,
+        status: stripeSubscriptionStatus,
+        currentPeriodEnds:
+          this.getSubscriptionCurrentPeriodEnds(subscription)?.toISOString() ?? null,
       },
     });
   }
@@ -459,67 +551,39 @@ export class WebhookHandlerService {
   private async handleSubscriptionDeleted(
     subscription: Stripe.Subscription,
   ): Promise<void> {
-    const rawEid = subscription.metadata?.eid;
-    if (!rawEid) {
-      throw new Error('Subscription missing metadata.eid');
-    }
-    const eid = this.decryptEidToken(rawEid);
-
-    const tenant = await this.tenantRepo.findByEid(eid);
-    if (!tenant) {
-      this.logger.warn(
-        `Tenant not found for pricing token on subscription.deleted`,
-      );
-      return;
-    }
-
     const stripeCustomerId = getStripeId(subscription.customer);
     const stripeSubscriptionId = subscription.id;
 
-    await this.rlsContext.runWithTenantContext(
-      tenant.id,
-      'system',
-      async () => {
-        const existing = await this.orgSubscriptionRepo.findByTenantId(
-          tenant.id,
-        );
-        if (!existing) {
-          this.logger.warn(
-            `subscription.deleted — ignored (org_subscriptions missing, tenantId=${tenant.id})`,
-          );
-          return;
-        }
+    const tenant = await this.resolveTenant({
+      encryptedEid: subscription.metadata?.eid ?? null,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType: 'customer.subscription.deleted',
+    });
+    if (!tenant) {
+      return;
+    }
 
-        const binding = this.checkStripeBinding(
-          existing,
-          { stripeCustomerId, stripeSubscriptionId },
-          { allowBindWhenUnbound: false, requireSubscriptionMatch: true },
-        );
-        if (!binding.allowed) {
-          this.logger.warn(
-            `subscription.deleted — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
-          );
-          await this.auditWebhookConflict(tenant.id, {
-            reason: binding.reason,
-            eventType: 'customer.subscription.deleted',
-            incomingStripeCustomerId: stripeCustomerId,
-            incomingStripeSubscriptionId: stripeSubscriptionId,
-            existingStripeCustomerId: existing.stripeCustomerId,
-            existingStripeSubscriptionId: existing.stripeSubscriptionId,
-          });
-          return;
-        }
+    const canApply = await this.validateBindingOwnership(tenant.id, {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType: 'customer.subscription.deleted',
+    });
+    if (!canApply) {
+      return;
+    }
 
-        await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-          tier: 'free',
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
-          currentPeriodEnds: null,
-          seatLimit: null,
-          trialEndsAt: new Date(0),
-        });
-      },
-    );
+    await this.stripeBindingRepo.clearSubscription(tenant.id);
+    await this.upsertSubscriptionState({
+      tenantId: tenant.id,
+      tier: 'free',
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      stripeSubscriptionStatus: 'canceled',
+      currentPeriodEnds: null,
+      seatLimit: null,
+      trialEndsAt: new Date(0),
+    });
 
     await this.auditService.log({
       eventType: 'subscription.canceled',
@@ -529,14 +593,6 @@ export class WebhookHandlerService {
       mid: 'system',
       targetId: tenant.id,
     });
-  }
-
-  private getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
-    const sub = invoice.parent?.subscription_details?.subscription;
-    if (!sub) {
-      return null;
-    }
-    return typeof sub === 'string' ? sub : sub.id;
   }
 
   private async handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
@@ -549,78 +605,46 @@ export class WebhookHandlerService {
       throw new Error('Stripe client not configured');
     }
 
-    const subscription =
-      await this.stripe.subscriptions.retrieve(subscriptionId);
-    const rawEid = subscription.metadata?.eid;
-    if (!rawEid) {
-      this.logger.warn(
-        'invoice.paid: subscription missing metadata.eid — skipping',
-      );
-      return;
-    }
-    const eid = this.decryptEidToken(rawEid);
-
-    const tenant = await this.tenantRepo.findByEid(eid);
-    if (!tenant) {
-      this.logger.warn(
-        `invoice.paid: tenant not found for pricing token — skipping`,
-      );
-      return;
-    }
-
+    const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const item = this.getSubscriptionItem(subscription);
     const stripeCustomerId = getStripeId(subscription.customer);
+    const stripeSubscriptionId = subscription.id;
 
-    await this.rlsContext.runWithTenantContext(
-      tenant.id,
-      'system',
-      async () => {
-        const existing = await this.orgSubscriptionRepo.findByTenantId(
-          tenant.id,
-        );
-        if (!existing) {
-          this.logger.warn(
-            `invoice.paid — ignored (org_subscriptions missing, tenantId=${tenant.id})`,
-          );
-          return;
-        }
+    const tenant = await this.resolveTenant({
+      encryptedEid: subscription.metadata?.eid ?? null,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType: 'invoice.paid',
+    });
+    if (!tenant) {
+      return;
+    }
 
-        const binding = this.checkStripeBinding(
-          existing,
-          { stripeCustomerId, stripeSubscriptionId: subscription.id },
-          { allowBindWhenUnbound: false, requireSubscriptionMatch: true },
-        );
-        if (!binding.allowed) {
-          this.logger.warn(
-            `invoice.paid — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
-          );
-          await this.auditWebhookConflict(tenant.id, {
-            reason: binding.reason,
-            eventType: 'invoice.paid',
-            invoiceId: invoice.id,
-            incomingStripeCustomerId: stripeCustomerId,
-            incomingStripeSubscriptionId: subscription.id,
-            existingStripeCustomerId: existing.stripeCustomerId,
-            existingStripeSubscriptionId: existing.stripeSubscriptionId,
-          });
-          return;
-        }
+    const canApply = await this.validateBindingOwnership(tenant.id, {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType: 'invoice.paid',
+    });
+    if (!canApply) {
+      return;
+    }
 
-        const item = subscription.items.data[0];
-        if (item) {
-          const currentPeriodEnds = new Date(
-            item.current_period_end * 1000,
-          );
-          await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-            currentPeriodEnds,
-          });
-        }
-      },
-    );
+    const tier = await this.resolveTierFromProduct(item.price.product as string);
+    const currentPeriodEnds = this.getSubscriptionCurrentPeriodEnds(subscription);
 
-    const item = subscription.items.data[0];
-    const currentPeriodEnds = item
-      ? new Date(item.current_period_end * 1000)
-      : null;
+    await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+    await this.upsertSubscriptionState({
+      tenantId: tenant.id,
+      tier,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      stripeSubscriptionStatus: normalizeSubscriptionStatus(subscription.status),
+      currentPeriodEnds,
+      seatLimit: item.quantity ?? null,
+      lastInvoicePaidAt: new Date(),
+      trialEndsAt: null,
+    });
+
     await this.auditService.log({
       eventType: 'subscription.updated',
       actorType: 'system',
@@ -639,74 +663,50 @@ export class WebhookHandlerService {
     invoice: Stripe.Invoice,
   ): Promise<void> {
     const subscriptionId = this.getInvoiceSubscriptionId(invoice);
-    if (!subscriptionId) {
-      return;
-    }
-
-    if (!this.stripe) {
-      this.logger.warn(
-        'invoice.payment_failed: Stripe client not configured — skipping audit',
-      );
+    if (!subscriptionId || !this.stripe) {
       return;
     }
 
     try {
-      const subscription =
-        await this.stripe.subscriptions.retrieve(subscriptionId);
-      const rawEid = subscription.metadata?.eid;
-      if (!rawEid) {
-        this.logger.warn(
-          'invoice.payment_failed: subscription missing metadata.eid — skipping',
-        );
-        return;
-      }
-      const eid = this.decryptEidToken(rawEid);
-
-      const tenant = await this.tenantRepo.findByEid(eid);
-      if (!tenant) {
-        this.logger.warn(
-          `invoice.payment_failed: tenant not found for pricing token — skipping`,
-        );
-        return;
-      }
-
+      const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const item = this.getSubscriptionItem(subscription);
       const stripeCustomerId = getStripeId(subscription.customer);
       const stripeSubscriptionId = subscription.id;
 
-      const canAudit = await this.rlsContext.runWithTenantContext(
-        tenant.id,
-        'system',
-        async () => {
-          const existing = await this.orgSubscriptionRepo.findByTenantId(
-            tenant.id,
-          );
-          if (!existing) {
-            return false;
-          }
-          const binding = this.checkStripeBinding(
-            existing,
-            { stripeCustomerId, stripeSubscriptionId },
-            { allowBindWhenUnbound: false, requireSubscriptionMatch: true },
-          );
-          if (!binding.allowed) {
-            await this.auditWebhookConflict(tenant.id, {
-              reason: binding.reason,
-              eventType: 'invoice.payment_failed',
-              invoiceId: invoice.id,
-              incomingStripeCustomerId: stripeCustomerId,
-              incomingStripeSubscriptionId: stripeSubscriptionId,
-              existingStripeCustomerId: existing.stripeCustomerId,
-              existingStripeSubscriptionId: existing.stripeSubscriptionId,
-            });
-            return false;
-          }
-          return true;
-        },
-      );
-
-      if (!canAudit) {
+      const tenant = await this.resolveTenant({
+        encryptedEid: subscription.metadata?.eid ?? null,
+        stripeCustomerId,
+        stripeSubscriptionId,
+        eventType: 'invoice.payment_failed',
+      });
+      if (!tenant) {
         return;
       }
+
+      const canApply = await this.validateBindingOwnership(tenant.id, {
+        stripeCustomerId,
+        stripeSubscriptionId,
+        eventType: 'invoice.payment_failed',
+      });
+      if (!canApply) {
+        return;
+      }
+
+      const tier = await this.resolveTierFromProduct(
+        item.price.product as string,
+      );
+
+      await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+      await this.upsertSubscriptionState({
+        tenantId: tenant.id,
+        tier,
+        stripeCustomerId,
+        stripeSubscriptionId,
+        stripeSubscriptionStatus: normalizeSubscriptionStatus(subscription.status),
+        currentPeriodEnds: this.getSubscriptionCurrentPeriodEnds(subscription),
+        seatLimit: item.quantity ?? null,
+        trialEndsAt: null,
+      });
 
       await this.auditService.log({
         eventType: 'subscription.payment_failed',
@@ -719,7 +719,7 @@ export class WebhookHandlerService {
       });
     } catch (error) {
       this.logger.warn(
-        'invoice.payment_failed: failed to resolve tenant for audit',
+        'invoice.payment_failed: failed to resolve tenant for update',
         error instanceof Error ? error.message : String(error),
       );
     }
@@ -732,12 +732,11 @@ export class WebhookHandlerService {
       return;
     }
 
-    const subscription =
-      await this.orgSubscriptionRepo.findByStripeCustomerId(stripeCustomerId);
-    if (!subscription) {
-      this.logger.warn(
-        'charge.refunded: no subscription for customer — skipping',
-      );
+    const binding = await this.stripeBindingRepo.findByStripeCustomerId(
+      stripeCustomerId,
+    );
+    if (!binding) {
+      this.logger.warn('charge.refunded: no binding for customer — skipping');
       return;
     }
 
@@ -745,9 +744,9 @@ export class WebhookHandlerService {
       eventType: 'subscription.refunded',
       actorType: 'system',
       actorId: null,
-      tenantId: subscription.tenantId,
+      tenantId: binding.tenantId,
       mid: 'system',
-      targetId: subscription.tenantId,
+      targetId: binding.tenantId,
       metadata: {
         chargeId: charge.id,
         amountRefunded: charge.amount_refunded,
@@ -762,10 +761,7 @@ export class WebhookHandlerService {
       typeof dispute.charge === 'string'
         ? dispute.charge
         : (dispute.charge?.id ?? null);
-    if (!chargeId) {
-      return null;
-    }
-    if (!this.stripe) {
+    if (!chargeId || !this.stripe) {
       return null;
     }
     const charge = await this.stripe.charges.retrieve(chargeId);
@@ -783,11 +779,12 @@ export class WebhookHandlerService {
       return;
     }
 
-    const subscription =
-      await this.orgSubscriptionRepo.findByStripeCustomerId(stripeCustomerId);
-    if (!subscription) {
+    const binding = await this.stripeBindingRepo.findByStripeCustomerId(
+      stripeCustomerId,
+    );
+    if (!binding) {
       this.logger.warn(
-        'charge.dispute.created: no subscription for customer — skipping',
+        'charge.dispute.created: no binding for customer — skipping',
       );
       return;
     }
@@ -796,9 +793,9 @@ export class WebhookHandlerService {
       eventType: 'subscription.dispute_opened',
       actorType: 'system',
       actorId: null,
-      tenantId: subscription.tenantId,
+      tenantId: binding.tenantId,
       mid: 'system',
-      targetId: subscription.tenantId,
+      targetId: binding.tenantId,
       metadata: {
         disputeId: dispute.id,
         reason: dispute.reason,
@@ -818,11 +815,12 @@ export class WebhookHandlerService {
       return;
     }
 
-    const subscription =
-      await this.orgSubscriptionRepo.findByStripeCustomerId(stripeCustomerId);
-    if (!subscription) {
+    const binding = await this.stripeBindingRepo.findByStripeCustomerId(
+      stripeCustomerId,
+    );
+    if (!binding) {
       this.logger.warn(
-        'charge.dispute.closed: no subscription for customer — skipping',
+        'charge.dispute.closed: no binding for customer — skipping',
       );
       return;
     }
@@ -831,9 +829,9 @@ export class WebhookHandlerService {
       eventType: 'subscription.dispute_closed',
       actorType: 'system',
       actorId: null,
-      tenantId: subscription.tenantId,
+      tenantId: binding.tenantId,
       mid: 'system',
-      targetId: subscription.tenantId,
+      targetId: binding.tenantId,
       metadata: {
         disputeId: dispute.id,
         reason: dispute.reason,
@@ -845,27 +843,20 @@ export class WebhookHandlerService {
   private async handleCheckoutSessionExpired(
     session: Stripe.Checkout.Session,
   ): Promise<void> {
-    const rawEid = session.metadata?.eid;
-    if (!rawEid) {
-      this.logger.warn(
-        'checkout.session.expired: missing metadata.eid — skipping',
-      );
-      return;
+    if (session.id) {
+      await this.stripeCheckoutSessionRepo.markExpired(session.id);
     }
 
-    let eid: string;
-    try {
-      eid = this.decryptEidToken(rawEid);
-    } catch {
-      this.logger.warn(
-        'checkout.session.expired: invalid eid token — skipping',
-      );
-      return;
-    }
+    const stripeCustomerId = getStripeId(session.customer);
+    const stripeSubscriptionId = getStripeId(session.subscription);
 
-    const tenant = await this.tenantRepo.findByEid(eid);
+    const tenant = await this.resolveTenant({
+      encryptedEid: session.metadata?.eid ?? null,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      eventType: 'checkout.session.expired',
+    });
     if (!tenant) {
-      this.logger.warn('checkout.session.expired: tenant not found — skipping');
       return;
     }
 

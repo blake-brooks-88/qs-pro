@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   Body,
   Controller,
@@ -6,6 +7,7 @@ import {
   HttpCode,
   Inject,
   Logger,
+  Param,
   Post,
   Req,
   ServiceUnavailableException,
@@ -14,6 +16,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import { Queue } from 'bullmq';
 import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { z } from 'zod';
@@ -22,10 +25,13 @@ import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import type { PricesResponse } from './billing.service';
+import { BILLING_WEBHOOK_JOB, BILLING_WEBHOOK_QUEUE } from './billing.queue';
+import type {
+  CheckoutConfirmationResponse,
+  PricesResponse,
+} from './billing.service';
 import { BillingService } from './billing.service';
 import { STRIPE_CLIENT } from './stripe.provider';
-import { WebhookHandlerService } from './webhook-handler.service';
 
 const CheckoutBodySchema = z.object({
   tier: z.enum(['pro', 'enterprise']),
@@ -38,8 +44,9 @@ export class BillingController {
 
   constructor(
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null,
+    @InjectQueue(BILLING_WEBHOOK_QUEUE)
+    private readonly billingWebhookQueue: Queue,
     private readonly configService: ConfigService,
-    private readonly webhookHandler: WebhookHandlerService,
     private readonly billingService: BillingService,
   ) {}
 
@@ -68,6 +75,15 @@ export class BillingController {
     @CurrentUser() user: UserSession,
   ): Promise<{ url: string }> {
     return this.billingService.createPortalSession(user.tenantId);
+  }
+
+  @Get('checkout-session/:sessionId')
+  @UseGuards(SessionGuard)
+  async confirmCheckoutSession(
+    @CurrentUser() user: UserSession,
+    @Param('sessionId') sessionId: string,
+  ): Promise<CheckoutConfirmationResponse> {
+    return this.billingService.confirmCheckoutSession(user.tenantId, sessionId);
   }
 
   @SkipThrottle()
@@ -113,7 +129,15 @@ export class BillingController {
       });
     }
 
-    await this.webhookHandler.process(event);
+    await this.billingWebhookQueue.add(
+      BILLING_WEBHOOK_JOB,
+      { event },
+      {
+        jobId: event.id,
+        removeOnComplete: 1000,
+        removeOnFail: 1000,
+      },
+    );
     return { received: true };
   }
 }
