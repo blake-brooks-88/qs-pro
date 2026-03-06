@@ -2,7 +2,11 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import type { IOrgSubscriptionRepository } from '@qpp/database';
+import type {
+  IOrgSubscriptionRepository,
+  IStripeBillingBindingRepository,
+  IStripeCheckoutSessionRepository,
+} from '@qpp/database';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,12 +36,37 @@ function createOrgSubscriptionRepoStub(): {
 } {
   return {
     findByTenantId: vi.fn(),
-    findByStripeCustomerId: vi.fn(),
     upsert: vi.fn().mockResolvedValue(undefined),
     insertIfNotExists: vi.fn(),
     startTrialIfEligible: vi.fn(),
     updateTierByTenantId: vi.fn(),
     updateFromWebhook: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createStripeBindingRepoStub(): {
+  [K in keyof IStripeBillingBindingRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    findByTenantId: vi.fn(),
+    findByStripeCustomerId: vi.fn(),
+    findByStripeSubscriptionId: vi.fn(),
+    upsert: vi.fn().mockResolvedValue(undefined),
+    clearSubscription: vi.fn().mockResolvedValue(undefined),
+    deleteByTenantId: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createStripeCheckoutSessionRepoStub(): {
+  [K in keyof IStripeCheckoutSessionRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    findByTenantId: vi.fn(),
+    upsert: vi.fn().mockResolvedValue(undefined),
+    markCompleted: vi.fn().mockResolvedValue(undefined),
+    markExpired: vi.fn().mockResolvedValue(undefined),
+    markFailed: vi.fn().mockResolvedValue(undefined),
+    deleteByTenantId: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -75,6 +104,10 @@ function createWebhookHandlerStub() {
 describe('DevToolsService', () => {
   let service: DevToolsService;
   let orgSubRepo: ReturnType<typeof createOrgSubscriptionRepoStub>;
+  let stripeBindingRepo: ReturnType<typeof createStripeBindingRepoStub>;
+  let stripeCheckoutSessionRepo: ReturnType<
+    typeof createStripeCheckoutSessionRepoStub
+  >;
   let featuresStub: ReturnType<typeof createFeaturesServiceStub>;
   let billingStub: ReturnType<typeof createBillingServiceStub>;
   let stripeMock: ReturnType<typeof createStripeMock>;
@@ -82,6 +115,8 @@ describe('DevToolsService', () => {
 
   beforeEach(() => {
     orgSubRepo = createOrgSubscriptionRepoStub();
+    stripeBindingRepo = createStripeBindingRepoStub();
+    stripeCheckoutSessionRepo = createStripeCheckoutSessionRepoStub();
     featuresStub = createFeaturesServiceStub();
     billingStub = createBillingServiceStub();
     stripeMock = createStripeMock();
@@ -89,6 +124,8 @@ describe('DevToolsService', () => {
 
     service = new DevToolsService(
       orgSubRepo as unknown as IOrgSubscriptionRepository,
+      stripeBindingRepo as unknown as IStripeBillingBindingRepository,
+      stripeCheckoutSessionRepo as unknown as IStripeCheckoutSessionRepository,
       stripeMock as unknown as Stripe,
       featuresStub as unknown as FeaturesService,
       billingStub as unknown as BillingService,
@@ -111,7 +148,9 @@ describe('DevToolsService', () => {
       expect(call.tier).toBe('pro');
       expect(call.stripeSubscriptionId).toBeNull();
       expect(call.stripeCustomerId).toBeNull();
+      expect(call.stripeSubscriptionStatus).toBe('inactive');
       expect(call.currentPeriodEnds).toBeNull();
+      expect(call.lastInvoicePaidAt).toBeNull();
       expect(call.seatLimit).toBeNull();
 
       const expectedMin = before + 14 * 24 * 60 * 60 * 1000;
@@ -176,6 +215,8 @@ describe('DevToolsService', () => {
     it('throws InternalServerErrorException when Stripe is null', async () => {
       const nullStripeService = new DevToolsService(
         orgSubRepo as unknown as IOrgSubscriptionRepository,
+        stripeBindingRepo as unknown as IStripeBillingBindingRepository,
+        stripeCheckoutSessionRepo as unknown as IStripeCheckoutSessionRepository,
         null,
         featuresStub as unknown as FeaturesService,
         billingStub as unknown as BillingService,
@@ -237,10 +278,16 @@ describe('DevToolsService', () => {
         tier: 'free',
         stripeCustomerId: null,
         stripeSubscriptionId: null,
+        stripeSubscriptionStatus: 'inactive',
         trialEndsAt: new Date(0),
         currentPeriodEnds: null,
+        lastInvoicePaidAt: null,
         seatLimit: null,
       });
+      expect(stripeBindingRepo.deleteByTenantId).toHaveBeenCalledWith(TENANT_ID);
+      expect(stripeCheckoutSessionRepo.deleteByTenantId).toHaveBeenCalledWith(
+        TENANT_ID,
+      );
       expect(featuresStub.getTenantFeatures).toHaveBeenCalledWith(TENANT_ID);
       expect(result).toEqual(mockFeatures);
     });
@@ -257,9 +304,18 @@ describe('DevToolsService', () => {
         seatLimit: 5,
       };
       const result = await service.setSubscriptionState(TENANT_ID, state);
-      expect(orgSubRepo.upsert).toHaveBeenCalledWith({
+      expect(orgSubRepo.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: TENANT_ID,
+          ...state,
+          stripeSubscriptionStatus: 'active',
+          lastInvoicePaidAt: expect.any(Date),
+        }),
+      );
+      expect(stripeBindingRepo.upsert).toHaveBeenCalledWith({
         tenantId: TENANT_ID,
-        ...state,
+        stripeCustomerId: 'cus_test',
+        stripeSubscriptionId: 'sub_test',
       });
       expect(featuresStub.getTenantFeatures).toHaveBeenCalledWith(TENANT_ID);
       expect(result).toEqual(mockFeatures);
@@ -275,17 +331,21 @@ describe('DevToolsService', () => {
         seatLimit: null,
       });
 
-      expect(orgSubRepo.upsert).toHaveBeenCalledWith({
-        tenantId: TENANT_ID,
-        tier: 'enterprise',
-        stripeCustomerId: expect.stringMatching(/^cus_devtools_enterprise_/),
-        stripeSubscriptionId: expect.stringMatching(
-          /^sub_devtools_enterprise_/,
-        ),
-        currentPeriodEnds: expect.any(Date),
-        trialEndsAt: null,
-        seatLimit: null,
-      });
+      expect(orgSubRepo.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: TENANT_ID,
+          tier: 'enterprise',
+          stripeCustomerId: expect.stringMatching(/^cus_devtools_enterprise_/),
+          stripeSubscriptionId: expect.stringMatching(
+            /^sub_devtools_enterprise_/,
+          ),
+          stripeSubscriptionStatus: 'active',
+          currentPeriodEnds: expect.any(Date),
+          trialEndsAt: null,
+          lastInvoicePaidAt: expect.any(Date),
+          seatLimit: null,
+        }),
+      );
       expect(featuresStub.getTenantFeatures).toHaveBeenCalledWith(TENANT_ID);
       expect(result).toEqual(mockFeatures);
     });

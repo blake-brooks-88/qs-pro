@@ -3,7 +3,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
-import { RlsContextService } from '@qpp/backend-shared';
+import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
 import type { Sql } from 'postgres';
 import {
   afterAll,
@@ -19,6 +19,7 @@ import { AppModule } from '../src/app.module';
 import { BillingService } from '../src/billing/billing.service';
 import { STRIPE_CLIENT } from '../src/billing/stripe.provider';
 import { configureApp } from '../src/configure-app';
+import { FeaturesService } from '../src/features/features.service';
 import { deleteTestTenantSubscription } from './helpers/set-test-tenant-tier';
 
 function getRequiredEnv(key: string): string {
@@ -34,15 +35,23 @@ function getRequiredEnv(key: string): string {
 // Only the Stripe SDK is mocked. Everything else is real.
 
 function createStripeMock() {
+  let checkoutCounter = 0;
+
   return {
     webhooks: {
       constructEvent: vi.fn(),
     },
     checkout: {
       sessions: {
-        create: vi.fn().mockResolvedValue({
-          url: 'https://checkout.stripe.com/test-session',
+        create: vi.fn().mockImplementation(async () => {
+          checkoutCounter += 1;
+          return {
+            id: `cs_test_checkout_session_${checkoutCounter}`,
+            url: 'https://checkout.stripe.com/test-session',
+            expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+          };
         }),
+        retrieve: vi.fn(),
       },
     },
     prices: {
@@ -86,6 +95,8 @@ describe('BillingService (integration)', () => {
   let app: NestFastifyApplication;
   let sqlClient: Sql;
   let billingService: BillingService;
+  let featuresService: FeaturesService;
+  let encryptionService: EncryptionService;
   let rlsContext: RlsContextService;
   let stripeMock: ReturnType<typeof createStripeMock>;
 
@@ -113,22 +124,84 @@ describe('BillingService (integration)', () => {
       tier: string;
       stripeCustomerId?: string | null;
       stripeSubscriptionId?: string | null;
+      stripeSubscriptionStatus?:
+        | 'inactive'
+        | 'trialing'
+        | 'active'
+        | 'past_due'
+        | 'unpaid'
+        | 'canceled';
+      currentPeriodEnds?: Date | null;
+      lastInvoicePaidAt?: Date | null;
     },
   ): Promise<void> {
     const stripeCusId = data.stripeCustomerId ?? null;
     const stripeSubId = data.stripeSubscriptionId ?? null;
+    const stripeSubscriptionStatus =
+      data.stripeSubscriptionStatus ??
+      (stripeSubId ? 'active' : 'inactive');
+    const currentPeriodEnds = data.currentPeriodEnds?.toISOString() ?? null;
+    const lastInvoicePaidAt =
+      data.lastInvoicePaidAt?.toISOString() ??
+      (stripeSubId ? new Date().toISOString() : null);
 
     await sqlClient.begin(async (tx) => {
       await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
       await tx`
-        INSERT INTO org_subscriptions (tenant_id, tier, stripe_customer_id, stripe_subscription_id)
-        VALUES (${tenantId}::uuid, ${data.tier}, ${stripeCusId}, ${stripeSubId})
+        INSERT INTO org_subscriptions (
+          tenant_id,
+          tier,
+          stripe_customer_id,
+          stripe_subscription_id,
+          stripe_subscription_status,
+          current_period_ends,
+          last_invoice_paid_at
+        )
+        VALUES (
+          ${tenantId}::uuid,
+          ${data.tier},
+          ${stripeCusId},
+          ${stripeSubId},
+          ${stripeSubscriptionStatus},
+          ${currentPeriodEnds},
+          ${lastInvoicePaidAt}
+        )
         ON CONFLICT (tenant_id) DO UPDATE SET
           tier = ${data.tier},
           stripe_customer_id = ${stripeCusId},
-          stripe_subscription_id = ${stripeSubId}
+          stripe_subscription_id = ${stripeSubId},
+          stripe_subscription_status = ${stripeSubscriptionStatus},
+          current_period_ends = ${currentPeriodEnds},
+          last_invoice_paid_at = ${lastInvoicePaidAt}
       `;
     });
+  }
+
+  async function getSubscription(
+    tenantId: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const reserved = await sqlClient.reserve();
+    try {
+      await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+      const [row] = await reserved`
+        SELECT tier,
+               stripe_customer_id AS "stripeCustomerId",
+               stripe_subscription_id AS "stripeSubscriptionId",
+               stripe_subscription_status AS "stripeSubscriptionStatus",
+               current_period_ends AS "currentPeriodEnds",
+               last_invoice_paid_at AS "lastInvoicePaidAt"
+        FROM org_subscriptions
+        WHERE tenant_id = ${tenantId}::uuid
+      `;
+      return row ?? undefined;
+    } finally {
+      try {
+        await reserved`RESET app.tenant_id`;
+      } catch {
+        // ignore
+      }
+      reserved.release();
+    }
   }
 
   /**
@@ -174,6 +247,8 @@ describe('BillingService (integration)', () => {
 
     sqlClient = app.get<Sql>('SQL_CLIENT');
     billingService = app.get(BillingService);
+    featuresService = app.get(FeaturesService);
+    encryptionService = app.get(EncryptionService);
     rlsContext = app.get(RlsContextService);
   });
 
@@ -182,9 +257,16 @@ describe('BillingService (integration)', () => {
     clearPriceCache();
 
     // Reset default Stripe mock return values
-    stripeMock.checkout.sessions.create.mockResolvedValue({
-      url: 'https://checkout.stripe.com/test-session',
+    let checkoutCounter = 0;
+    stripeMock.checkout.sessions.create.mockImplementation(async () => {
+      checkoutCounter += 1;
+      return {
+        id: `cs_test_checkout_session_${Date.now()}_${checkoutCounter}`,
+        url: 'https://checkout.stripe.com/test-session',
+        expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+      };
     });
+    stripeMock.checkout.sessions.retrieve.mockReset();
     stripeMock.prices.list.mockResolvedValue({
       data: [
         {
@@ -262,10 +344,16 @@ describe('BillingService (integration)', () => {
         expect.objectContaining({
           mode: 'subscription',
           metadata: expect.objectContaining({ tier: 'pro' }),
+          success_url: expect.stringContaining(
+            'session_id={CHECKOUT_SESSION_ID}',
+          ),
           allow_promotion_codes: true,
           custom_fields: expect.arrayContaining([
             expect.objectContaining({ key: 'purchase_order' }),
           ]),
+        }),
+        expect.objectContaining({
+          idempotencyKey: expect.stringContaining(`checkout:${tenant.id}:`),
         }),
       );
     });
@@ -327,6 +415,8 @@ describe('BillingService (integration)', () => {
         tier: 'pro',
         stripeCustomerId: 'cus_existing_paid',
         stripeSubscriptionId: 'sub_existing_paid',
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        lastInvoicePaidAt: new Date(),
       });
 
       await expect(
@@ -336,6 +426,208 @@ describe('BillingService (integration)', () => {
       );
 
       expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+    });
+
+    it('reconciles a completed paid checkout before deciding whether to reuse it', async () => {
+      const tenant = await createTestTenant('checkout-reconcile-stale');
+      const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+
+      stripeMock.checkout.sessions.create.mockResolvedValueOnce({
+        id: 'cs_test_stale_paid',
+        url: 'https://checkout.stripe.com/stale-session',
+        expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+      });
+
+      await billingService.createCheckoutSession(tenant.id, 'pro', 'monthly');
+
+      stripeMock.checkout.sessions.retrieve.mockResolvedValueOnce({
+        id: 'cs_test_stale_paid',
+        status: 'complete',
+        payment_status: 'paid',
+        customer: 'cus_reconciled_paid',
+        subscription: 'sub_reconciled_paid',
+        metadata: { eid: encryptedEid },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+        id: 'sub_reconciled_paid',
+        customer: 'cus_reconciled_paid',
+        status: 'active',
+        metadata: { eid: encryptedEid },
+        items: {
+          data: [
+            {
+              price: { product: 'prod_reconciled_paid' },
+              quantity: 1,
+              current_period_end:
+                Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            },
+          ],
+        },
+      });
+      stripeMock.products.retrieve.mockResolvedValueOnce({
+        id: 'prod_reconciled_paid',
+        metadata: { tier: 'pro' },
+      });
+
+      await expect(
+        billingService.createCheckoutSession(tenant.id, 'pro', 'monthly'),
+      ).rejects.toThrow(
+        'An active paid subscription already exists for this tenant',
+      );
+
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
+      expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith(
+        'cs_test_stale_paid',
+      );
+
+      const subscription = await getSubscription(tenant.id);
+      expect(subscription?.tier).toBe('pro');
+      expect(subscription?.stripeCustomerId).toBe('cus_reconciled_paid');
+      expect(subscription?.stripeSubscriptionId).toBe('sub_reconciled_paid');
+      expect(subscription?.lastInvoicePaidAt).not.toBeNull();
+
+      const features = await featuresService.getTenantFeatures(tenant.id);
+      expect(features.tier).toBe('pro');
+    });
+
+    it('creates a fresh checkout when the previous completed session did not produce a paid entitlement', async () => {
+      const tenant = await createTestTenant('checkout-recreate-terminal');
+      const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+
+      stripeMock.checkout.sessions.create
+        .mockResolvedValueOnce({
+          id: 'cs_test_terminal_old',
+          url: 'https://checkout.stripe.com/terminal-old',
+          expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+        })
+        .mockResolvedValueOnce({
+          id: 'cs_test_terminal_new',
+          url: 'https://checkout.stripe.com/terminal-new',
+          expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+        });
+
+      await billingService.createCheckoutSession(tenant.id, 'pro', 'monthly');
+
+      stripeMock.checkout.sessions.retrieve.mockResolvedValueOnce({
+        id: 'cs_test_terminal_old',
+        status: 'complete',
+        payment_status: 'unpaid',
+        metadata: { eid: encryptedEid },
+      });
+
+      const result = await billingService.createCheckoutSession(
+        tenant.id,
+        'pro',
+        'monthly',
+      );
+
+      expect(result.url).toBe('https://checkout.stripe.com/terminal-new');
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(2);
+      expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith(
+        'cs_test_terminal_old',
+      );
+      expect(await getSubscription(tenant.id)).toBeUndefined();
+    });
+  });
+
+  // ─── confirmCheckoutSession ────────────────────────────────────
+
+  describe('confirmCheckoutSession', () => {
+    it('reconciles a paid checkout session into effective pro access', async () => {
+      const tenant = await createTestTenant('confirm-paid');
+      const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        id: 'cs_test_confirm_paid',
+        customer: 'cus_confirm_paid',
+        subscription: 'sub_confirm_paid',
+        metadata: { eid: encryptedEid },
+        payment_status: 'paid',
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_confirm_paid',
+        customer: 'cus_confirm_paid',
+        status: 'active',
+        metadata: { eid: encryptedEid },
+        items: {
+          data: [
+            {
+              price: { product: 'prod_confirm_paid' },
+              quantity: 1,
+              current_period_end:
+                Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            },
+          ],
+        },
+      });
+      stripeMock.products.retrieve.mockResolvedValue({
+        id: 'prod_confirm_paid',
+        metadata: { tier: 'pro' },
+      });
+
+      const result = await billingService.confirmCheckoutSession(
+        tenant.id,
+        'cs_test_confirm_paid',
+      );
+
+      expect(result.status).toBe('fulfilled');
+
+      const subscription = await getSubscription(tenant.id);
+      expect(subscription?.tier).toBe('pro');
+      expect(subscription?.stripeCustomerId).toBe('cus_confirm_paid');
+      expect(subscription?.stripeSubscriptionId).toBe('sub_confirm_paid');
+      expect(subscription?.lastInvoicePaidAt).not.toBeNull();
+
+      const features = await featuresService.getTenantFeatures(tenant.id);
+      expect(features.tier).toBe('pro');
+      expect(features.features.advancedAutocomplete).toBe(true);
+    });
+
+    it('returns pending when checkout session is not yet paid', async () => {
+      const tenant = await createTestTenant('confirm-pending');
+      const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        id: 'cs_test_confirm_pending',
+        status: 'open',
+        customer: 'cus_confirm_pending',
+        subscription: 'sub_confirm_pending',
+        metadata: { eid: encryptedEid },
+        payment_status: 'unpaid',
+      });
+
+      const result = await billingService.confirmCheckoutSession(
+        tenant.id,
+        'cs_test_confirm_pending',
+      );
+
+      expect(result.status).toBe('pending');
+      expect(await getSubscription(tenant.id)).toBeUndefined();
+    });
+
+    it('returns failed when checkout completed without payment', async () => {
+      const tenant = await createTestTenant('confirm-failed');
+      const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        id: 'cs_test_confirm_failed',
+        status: 'complete',
+        customer: 'cus_confirm_failed',
+        subscription: 'sub_confirm_failed',
+        metadata: { eid: encryptedEid },
+        payment_status: 'unpaid',
+      });
+
+      const result = await billingService.confirmCheckoutSession(
+        tenant.id,
+        'cs_test_confirm_failed',
+      );
+
+      expect(result).toEqual({
+        status: 'failed',
+        reason: 'unpaid',
+      });
+      expect(await getSubscription(tenant.id)).toBeUndefined();
     });
   });
 

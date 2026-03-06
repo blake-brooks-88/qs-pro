@@ -2,12 +2,12 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
 import type { FastifyRequest } from 'fastify';
+import type { Queue } from 'bullmq';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BillingController } from '../billing.controller';
 import type { BillingService } from '../billing.service';
-import type { WebhookHandlerService } from '../webhook-handler.service';
 
 function createStripeMock() {
   return {
@@ -28,11 +28,9 @@ function createConfigMock() {
   };
 }
 
-function createWebhookHandlerMock(): {
-  process: ReturnType<typeof vi.fn>;
-} {
+function createQueueMock(): { add: ReturnType<typeof vi.fn> } {
   return {
-    process: vi.fn().mockResolvedValue(undefined),
+    add: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -51,17 +49,17 @@ describe('BillingController', () => {
   let controller: BillingController;
   let stripeMock: ReturnType<typeof createStripeMock>;
   let configMock: ReturnType<typeof createConfigMock>;
-  let handlerMock: ReturnType<typeof createWebhookHandlerMock>;
+  let queueMock: ReturnType<typeof createQueueMock>;
 
   beforeEach(() => {
     stripeMock = createStripeMock();
     configMock = createConfigMock();
-    handlerMock = createWebhookHandlerMock();
+    queueMock = createQueueMock();
 
     controller = new BillingController(
       stripeMock as unknown as Stripe,
+      queueMock as unknown as Queue,
       configMock as unknown as ConfigService,
-      handlerMock as unknown as WebhookHandlerService,
       createBillingServiceMock() as unknown as BillingService,
     );
   });
@@ -70,8 +68,8 @@ describe('BillingController', () => {
     it('returns 503 when Stripe client is null', async () => {
       const nullStripeController = new BillingController(
         null,
+        queueMock as unknown as Queue,
         configMock as unknown as ConfigService,
-        handlerMock as unknown as WebhookHandlerService,
         createBillingServiceMock() as unknown as BillingService,
       );
 
@@ -133,7 +131,7 @@ describe('BillingController', () => {
       );
     });
 
-    it('calls webhookHandler.process with the constructed event', async () => {
+    it('enqueues the constructed event for async processing', async () => {
       const mockEvent = {
         id: 'evt_123',
         type: 'checkout.session.completed',
@@ -143,15 +141,19 @@ describe('BillingController', () => {
 
       await controller.handleWebhook(createReq('body'), 'sig_test');
 
-      expect(handlerMock.process).toHaveBeenCalledWith(mockEvent);
+      expect(queueMock.add).toHaveBeenCalledWith(
+        'process-stripe-webhook',
+        { event: mockEvent },
+        expect.objectContaining({ jobId: 'evt_123' }),
+      );
     });
 
-    it('propagates errors from webhookHandler.process', async () => {
-      handlerMock.process.mockRejectedValue(new Error('Handler failed'));
+    it('propagates errors from queue enqueue', async () => {
+      queueMock.add.mockRejectedValue(new Error('Queue failed'));
 
       await expect(
         controller.handleWebhook(createReq('body'), 'sig_test'),
-      ).rejects.toThrow('Handler failed');
+      ).rejects.toThrow('Queue failed');
     });
   });
 });
