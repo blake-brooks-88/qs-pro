@@ -1,8 +1,8 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
-import type { FastifyRequest } from 'fastify';
 import type { Queue } from 'bullmq';
+import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

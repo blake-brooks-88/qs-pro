@@ -110,8 +110,7 @@ describe('Trial Lifecycle (integration)', () => {
     const stripeSubId = data.stripeSubscriptionId ?? null;
     const stripeCusId = data.stripeCustomerId ?? null;
     const stripeSubscriptionStatus =
-      data.stripeSubscriptionStatus ??
-      (stripeSubId ? 'active' : 'inactive');
+      data.stripeSubscriptionStatus ?? (stripeSubId ? 'active' : 'inactive');
     const lastInvoicePaidAt =
       data.lastInvoicePaidAt?.toISOString() ??
       (stripeSubId ? new Date().toISOString() : null);

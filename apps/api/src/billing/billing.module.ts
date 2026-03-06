@@ -10,10 +10,10 @@ import {
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { AuditModule } from '../audit/audit.module';
-import { BillingWebhookProcessor } from './billing-webhook.processor';
-import { BILLING_WEBHOOK_QUEUE } from './billing.queue';
 import { BillingController } from './billing.controller';
+import { BILLING_WEBHOOK_QUEUE } from './billing.queue';
 import { BillingService } from './billing.service';
+import { BillingWebhookProcessor } from './billing-webhook.processor';
 import { createContextAwareOrgSubscriptionRepository } from './context-aware-org-subscription.repository';
 import { StripeProvider } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';

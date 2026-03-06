@@ -138,8 +138,7 @@ describe('BillingService (integration)', () => {
     const stripeCusId = data.stripeCustomerId ?? null;
     const stripeSubId = data.stripeSubscriptionId ?? null;
     const stripeSubscriptionStatus =
-      data.stripeSubscriptionStatus ??
-      (stripeSubId ? 'active' : 'inactive');
+      data.stripeSubscriptionStatus ?? (stripeSubId ? 'active' : 'inactive');
     const currentPeriodEnds = data.currentPeriodEnds?.toISOString() ?? null;
     const lastInvoicePaidAt =
       data.lastInvoicePaidAt?.toISOString() ??
@@ -318,11 +317,7 @@ describe('BillingService (integration)', () => {
     it('calls Stripe prices.list with the correct lookup key', async () => {
       const tenant = await createTestTenant('checkout-lookup');
 
-      await billingService.createCheckoutSession(
-        tenant.id,
-        'pro',
-        'monthly',
-      );
+      await billingService.createCheckoutSession(tenant.id, 'pro', 'monthly');
 
       expect(stripeMock.prices.list).toHaveBeenCalledWith({
         lookup_keys: ['pro_monthly'],
@@ -334,11 +329,7 @@ describe('BillingService (integration)', () => {
     it('calls Stripe checkout.sessions.create with subscription mode and metadata', async () => {
       const tenant = await createTestTenant('checkout-metadata');
 
-      await billingService.createCheckoutSession(
-        tenant.id,
-        'pro',
-        'monthly',
-      );
+      await billingService.createCheckoutSession(tenant.id, 'pro', 'monthly');
 
       expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -361,11 +352,7 @@ describe('BillingService (integration)', () => {
     it('uses pro_annual lookup key for annual interval', async () => {
       const tenant = await createTestTenant('checkout-annual');
 
-      await billingService.createCheckoutSession(
-        tenant.id,
-        'pro',
-        'annual',
-      );
+      await billingService.createCheckoutSession(tenant.id, 'pro', 'annual');
 
       expect(stripeMock.prices.list).toHaveBeenCalledWith({
         lookup_keys: ['pro_annual'],

@@ -157,8 +157,7 @@ export class DevToolsService {
         effectiveState.tier === 'free' ? 'inactive' : 'active',
       currentPeriodEnds: effectiveState.currentPeriodEnds,
       trialEndsAt: effectiveState.trialEndsAt,
-      lastInvoicePaidAt:
-        effectiveState.tier === 'free' ? null : new Date(now),
+      lastInvoicePaidAt: effectiveState.tier === 'free' ? null : new Date(now),
       seatLimit: effectiveState.seatLimit,
     });
 

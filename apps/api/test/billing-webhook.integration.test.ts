@@ -200,8 +200,7 @@ describe('Billing Webhook (integration)', () => {
     const stripeSubId = data.stripeSubscriptionId ?? null;
     const stripeCusId = data.stripeCustomerId ?? null;
     const stripeSubscriptionStatus =
-      data.stripeSubscriptionStatus ??
-      (stripeSubId ? 'active' : 'inactive');
+      data.stripeSubscriptionStatus ?? (stripeSubId ? 'active' : 'inactive');
     const lastInvoicePaidAt =
       data.lastInvoicePaidAt?.toISOString() ??
       (stripeSubId ? new Date().toISOString() : null);
@@ -631,7 +630,8 @@ describe('Billing Webhook (integration)', () => {
     it('updates currentPeriodEnds and preserves tier on interval change', async () => {
       const tenant = await createTestTenant('sub-updated-interval');
       const refs = makeStripeRefs('sub-updated-interval');
-      const annualPeriodEnd = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const annualPeriodEnd =
+        Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
 
       await setSubscriptionState(tenant.id, {
         tier: 'pro',
@@ -688,8 +688,7 @@ describe('Billing Webhook (integration)', () => {
         metadata: { tier: 'pro' },
       });
 
-      const newPeriodEnd =
-        Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const newPeriodEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
 
       // Act — send subscription.updated with status='past_due'
       await webhookHandler.process({

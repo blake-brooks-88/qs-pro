@@ -40,7 +40,8 @@ export class FeaturesService {
       const subscription =
         await this.orgSubscriptionRepo.findByTenantId(tenantId);
 
-      const effectiveTier: SubscriptionTier = resolveEffectiveTier(subscription);
+      const effectiveTier: SubscriptionTier =
+        resolveEffectiveTier(subscription);
 
       const features = getTierFeatures(effectiveTier);
 

@@ -19,8 +19,8 @@ import type {
 } from '@qpp/database';
 import type Stripe from 'stripe';
 
-import { hasPaidEntitlement } from './subscription-entitlements';
 import { STRIPE_CLIENT } from './stripe.provider';
+import { hasPaidEntitlement } from './subscription-entitlements';
 import { WebhookHandlerService } from './webhook-handler.service';
 
 const PRICE_LOOKUP_KEYS = {
@@ -212,8 +212,7 @@ export class BillingService {
         }
 
         const idempotencyKey =
-          existingCheckout &&
-          existingCheckout.tier === tier &&
+          existingCheckout?.tier === tier &&
           existingCheckout.interval === interval &&
           (existingCheckout.status === 'creating' ||
             existingCheckout.status === 'failed')
@@ -240,7 +239,9 @@ export class BillingService {
 
           const eid = this.encryptionService.encrypt(tenant.eid);
           if (!eid) {
-            throw new BadRequestException('Failed to encrypt tenant identifier');
+            throw new BadRequestException(
+              'Failed to encrypt tenant identifier',
+            );
           }
 
           const base = new URL(
@@ -346,7 +347,9 @@ export class BillingService {
     const encryptedEid = session.metadata?.eid;
 
     if (!encryptedEid) {
-      throw new BadRequestException('Checkout session is missing tenant metadata');
+      throw new BadRequestException(
+        'Checkout session is missing tenant metadata',
+      );
     }
 
     const eid = this.encryptionService.decrypt(encryptedEid);

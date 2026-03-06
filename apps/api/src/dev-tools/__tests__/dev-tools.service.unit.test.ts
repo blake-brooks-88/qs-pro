@@ -284,7 +284,9 @@ describe('DevToolsService', () => {
         lastInvoicePaidAt: null,
         seatLimit: null,
       });
-      expect(stripeBindingRepo.deleteByTenantId).toHaveBeenCalledWith(TENANT_ID);
+      expect(stripeBindingRepo.deleteByTenantId).toHaveBeenCalledWith(
+        TENANT_ID,
+      );
       expect(stripeCheckoutSessionRepo.deleteByTenantId).toHaveBeenCalledWith(
         TENANT_ID,
       );
