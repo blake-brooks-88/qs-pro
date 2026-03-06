@@ -29,7 +29,10 @@ describe("FeatureGate", () => {
 
   it("renders children without badge when feature enabled", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), createTenantFeaturesStub());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -47,7 +50,10 @@ describe("FeatureGate", () => {
 
   it("renders children with premium badge when feature disabled", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), createTenantFeaturesStub());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -65,7 +71,10 @@ describe("FeatureGate", () => {
 
   it("renders locked button variant with disabled styling", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), createTenantFeaturesStub());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -82,7 +91,10 @@ describe("FeatureGate", () => {
 
   it("renders locked panel variant with backdrop", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), createTenantFeaturesStub());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -100,7 +112,10 @@ describe("FeatureGate", () => {
 
   it("renders locked menuItem variant", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), createTenantFeaturesStub());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(

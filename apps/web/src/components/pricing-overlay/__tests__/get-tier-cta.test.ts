@@ -59,7 +59,12 @@ describe("getTierCta", () => {
 
   describe("enterprise user viewing cards", () => {
     it("shows 'Current Plan' disabled on Enterprise card", () => {
-      const result = getTierCta("enterprise", "enterprise", false, "Contact Sales");
+      const result = getTierCta(
+        "enterprise",
+        "enterprise",
+        false,
+        "Contact Sales",
+      );
       expect(result.text).toBe("Current Plan");
       expect(result.disabled).toBe(true);
     });

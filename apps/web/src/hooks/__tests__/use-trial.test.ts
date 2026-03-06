@@ -29,7 +29,11 @@ describe("useTrial", () => {
     mockFeatures(
       createTenantFeaturesStub({
         tier: "pro",
-        trial: { active: true, daysRemaining: 3, endsAt: "2026-03-01T00:00:00Z" },
+        trial: {
+          active: true,
+          daysRemaining: 3,
+          endsAt: "2026-03-01T00:00:00Z",
+        },
       }),
     );
 
@@ -45,7 +49,11 @@ describe("useTrial", () => {
     mockFeatures(
       createTenantFeaturesStub({
         tier: "pro",
-        trial: { active: true, daysRemaining: 8, endsAt: "2026-03-05T00:00:00Z" },
+        trial: {
+          active: true,
+          daysRemaining: 8,
+          endsAt: "2026-03-05T00:00:00Z",
+        },
       }),
     );
 
@@ -60,7 +68,11 @@ describe("useTrial", () => {
     mockFeatures(
       createTenantFeaturesStub({
         tier: "pro",
-        trial: { active: true, daysRemaining: 5, endsAt: "2026-03-03T00:00:00Z" },
+        trial: {
+          active: true,
+          daysRemaining: 5,
+          endsAt: "2026-03-03T00:00:00Z",
+        },
       }),
     );
 
@@ -74,7 +86,11 @@ describe("useTrial", () => {
     mockFeatures(
       createTenantFeaturesStub({
         tier: "pro",
-        trial: { active: true, daysRemaining: 6, endsAt: "2026-03-04T00:00:00Z" },
+        trial: {
+          active: true,
+          daysRemaining: 6,
+          endsAt: "2026-03-04T00:00:00Z",
+        },
       }),
     );
 

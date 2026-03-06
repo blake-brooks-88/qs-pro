@@ -35,10 +35,14 @@ export function PricingOverlay() {
   const isTrialActive = featuresData?.trial?.active ?? false;
 
   const tiers = useMemo(() => {
-    if (!prices) return TIERS;
+    if (!prices) {
+      return TIERS;
+    }
 
     return TIERS.map((tier) => {
-      if (tier.id !== "pro") return tier;
+      if (tier.id !== "pro") {
+        return tier;
+      }
       return {
         ...tier,
         monthlyPrice: prices.pro.monthly,
@@ -48,8 +52,12 @@ export function PricingOverlay() {
   }, [prices]);
 
   const savingsPercent = useMemo(() => {
-    if (!prices) return undefined;
-    if (prices.pro.monthly === 0) return undefined;
+    if (!prices) {
+      return undefined;
+    }
+    if (prices.pro.monthly === 0) {
+      return undefined;
+    }
     return Math.round((1 - prices.pro.annual / prices.pro.monthly) * 100);
   }, [prices]);
 
