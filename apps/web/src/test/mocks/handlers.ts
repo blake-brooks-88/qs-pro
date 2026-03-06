@@ -161,4 +161,10 @@ export const handlers = [
       totalCount: 0,
     });
   }),
+
+  http.get("/api/billing/prices", () => {
+    return HttpResponse.json({
+      pro: { monthly: 2900, annual: 24900 },
+    });
+  }),
 ];
