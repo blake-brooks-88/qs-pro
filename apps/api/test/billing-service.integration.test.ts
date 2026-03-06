@@ -526,6 +526,7 @@ describe('BillingService (integration)', () => {
 
       stripeMock.checkout.sessions.retrieve.mockResolvedValue({
         id: 'cs_test_confirm_paid',
+        status: 'complete',
         customer: 'cus_confirm_paid',
         subscription: 'sub_confirm_paid',
         metadata: { eid: encryptedEid },

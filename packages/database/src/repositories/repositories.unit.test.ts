@@ -7,6 +7,7 @@ import {
   DrizzleCredentialsRepository,
   DrizzleFeatureOverrideRepository,
   DrizzleOrgSubscriptionRepository,
+  DrizzleStripeBillingBindingRepository,
   DrizzleStripeWebhookEventRepository,
   DrizzleTenantRepository,
   DrizzleUserRepository,
@@ -556,36 +557,6 @@ describe("DrizzleOrgSubscriptionRepository", () => {
     });
   });
 
-  describe("findByStripeCustomerId()", () => {
-    it("returns subscription when found", async () => {
-      // Arrange
-      const subscription = {
-        id: "sub-1",
-        tenantId: "tenant-1",
-        stripeCustomerId: "cus_abc",
-      };
-      mockDb.setSelectResult([subscription]);
-
-      // Act
-      const result = await repository.findByStripeCustomerId("cus_abc");
-
-      // Assert
-      expect(result).toEqual(subscription);
-      expect(mockDb.mocks.where).toHaveBeenCalled();
-    });
-
-    it("returns undefined when not found", async () => {
-      // Arrange
-      mockDb.setSelectResult([]);
-
-      // Act
-      const result = await repository.findByStripeCustomerId("cus_nonexistent");
-
-      // Assert
-      expect(result).toBeUndefined();
-    });
-  });
-
   describe("upsert()", () => {
     it("returns the upserted subscription", async () => {
       // Arrange
@@ -698,6 +669,49 @@ describe("DrizzleOrgSubscriptionRepository", () => {
       const setArgs = mockDb.getCapturedSetArgs();
       const setData = setArgs[0] as { updatedAt: Date };
       expect(setData.updatedAt).toBeInstanceOf(Date);
+    });
+  });
+});
+
+describe("DrizzleStripeBillingBindingRepository", () => {
+  let mockDb: MockDrizzleDb;
+  let repository: DrizzleStripeBillingBindingRepository;
+
+  beforeEach(() => {
+    mockDb = createMockDrizzleDb();
+    repository = new DrizzleStripeBillingBindingRepository(
+      mockDb as unknown as PostgresJsDatabase,
+    );
+    mockDb.resetCaptures();
+  });
+
+  describe("findByStripeCustomerId()", () => {
+    it("returns binding when found", async () => {
+      // Arrange
+      const binding = {
+        id: "bind-1",
+        tenantId: "tenant-1",
+        stripeCustomerId: "cus_abc",
+      };
+      mockDb.setSelectResult([binding]);
+
+      // Act
+      const result = await repository.findByStripeCustomerId("cus_abc");
+
+      // Assert
+      expect(result).toEqual(binding);
+      expect(mockDb.mocks.where).toHaveBeenCalled();
+    });
+
+    it("returns undefined when not found", async () => {
+      // Arrange
+      mockDb.setSelectResult([]);
+
+      // Act
+      const result = await repository.findByStripeCustomerId("cus_nonexistent");
+
+      // Assert
+      expect(result).toBeUndefined();
     });
   });
 });
