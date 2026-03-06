@@ -108,14 +108,40 @@ export class DevToolsService {
       seatLimit: number | null;
     },
   ) {
+    const now = Date.now();
+    const effectiveState =
+      state.tier === 'free'
+        ? {
+            ...state,
+            stripeCustomerId: state.stripeCustomerId ?? null,
+            stripeSubscriptionId: state.stripeSubscriptionId ?? null,
+            currentPeriodEnds: state.currentPeriodEnds ?? null,
+            trialEndsAt: state.trialEndsAt ?? new Date(0),
+            seatLimit: state.seatLimit ?? null,
+          }
+        : {
+            ...state,
+            stripeCustomerId:
+              state.stripeCustomerId ??
+              `cus_devtools_${state.tier}_${randomUUID()}`,
+            stripeSubscriptionId:
+              state.stripeSubscriptionId ??
+              `sub_devtools_${state.tier}_${randomUUID()}`,
+            currentPeriodEnds:
+              state.currentPeriodEnds ??
+              new Date(now + 30 * 24 * 60 * 60 * 1000),
+            trialEndsAt: state.trialEndsAt ?? null,
+            seatLimit: state.seatLimit ?? null,
+          };
+
     await this.orgSubscriptionRepo.upsert({
       tenantId,
-      tier: state.tier,
-      stripeCustomerId: state.stripeCustomerId,
-      stripeSubscriptionId: state.stripeSubscriptionId,
-      currentPeriodEnds: state.currentPeriodEnds,
-      trialEndsAt: state.trialEndsAt,
-      seatLimit: state.seatLimit,
+      tier: effectiveState.tier,
+      stripeCustomerId: effectiveState.stripeCustomerId,
+      stripeSubscriptionId: effectiveState.stripeSubscriptionId,
+      currentPeriodEnds: effectiveState.currentPeriodEnds,
+      trialEndsAt: effectiveState.trialEndsAt,
+      seatLimit: effectiveState.seatLimit,
     });
 
     return this.featuresService.getTenantFeatures(tenantId);

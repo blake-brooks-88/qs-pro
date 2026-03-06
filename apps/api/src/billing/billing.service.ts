@@ -5,7 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EncryptionService } from '@qpp/backend-shared';
+import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
 import type {
   IOrgSubscriptionRepository,
   ITenantRepository,
@@ -47,6 +47,7 @@ export class BillingService {
     @Inject('ORG_SUBSCRIPTION_REPOSITORY')
     private readonly orgSubscriptionRepo: IOrgSubscriptionRepository,
     private readonly encryptionService: EncryptionService,
+    private readonly rlsContext: RlsContextService,
   ) {}
 
   async getPrices(): Promise<PricesResponse> {
@@ -113,15 +114,26 @@ export class BillingService {
       throw new ServiceUnavailableException('Stripe is not configured');
     }
 
-    const lookupKey = PRICE_LOOKUP_KEYS[
-      `${tier}_${interval}`
-    ] as PriceLookupKey;
-    const priceId = await this.resolvePriceId(lookupKey);
-
     const tenant = await this.tenantRepo.findById(tenantId);
     if (!tenant) {
       throw new BadRequestException('Tenant not found');
     }
+
+    const existingSubscription = await this.rlsContext.runWithTenantContext(
+      tenantId,
+      'system',
+      () => this.orgSubscriptionRepo.findByTenantId(tenantId),
+    );
+    if (existingSubscription?.stripeSubscriptionId) {
+      throw new BadRequestException(
+        'An active paid subscription already exists for this tenant',
+      );
+    }
+
+    const lookupKey = PRICE_LOOKUP_KEYS[
+      `${tier}_${interval}`
+    ] as PriceLookupKey;
+    const priceId = await this.resolvePriceId(lookupKey);
 
     const eid = this.encryptionService.encrypt(tenant.eid);
     if (!eid) {

@@ -264,6 +264,31 @@ describe('DevToolsService', () => {
       expect(featuresStub.getTenantFeatures).toHaveBeenCalledWith(TENANT_ID);
       expect(result).toEqual(mockFeatures);
     });
+
+    it('derives Stripe-backed defaults for paid tiers when optional fields are omitted', async () => {
+      const result = await service.setSubscriptionState(TENANT_ID, {
+        tier: 'enterprise',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        currentPeriodEnds: null,
+        trialEndsAt: null,
+        seatLimit: null,
+      });
+
+      expect(orgSubRepo.upsert).toHaveBeenCalledWith({
+        tenantId: TENANT_ID,
+        tier: 'enterprise',
+        stripeCustomerId: expect.stringMatching(/^cus_devtools_enterprise_/),
+        stripeSubscriptionId: expect.stringMatching(
+          /^sub_devtools_enterprise_/,
+        ),
+        currentPeriodEnds: expect.any(Date),
+        trialEndsAt: null,
+        seatLimit: null,
+      });
+      expect(featuresStub.getTenantFeatures).toHaveBeenCalledWith(TENANT_ID);
+      expect(result).toEqual(mockFeatures);
+    });
   });
 
   describe('simulateWebhook', () => {

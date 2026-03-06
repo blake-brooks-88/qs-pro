@@ -320,6 +320,23 @@ describe('BillingService (integration)', () => {
         billingService.createCheckoutSession(tenant.id, 'pro', 'monthly'),
       ).rejects.toThrow('Price not configured');
     });
+
+    it('rejects checkout when tenant already has an active Stripe subscription', async () => {
+      const tenant = await createTestTenant('checkout-already-paid');
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: 'cus_existing_paid',
+        stripeSubscriptionId: 'sub_existing_paid',
+      });
+
+      await expect(
+        billingService.createCheckoutSession(tenant.id, 'pro', 'monthly'),
+      ).rejects.toThrow(
+        'An active paid subscription already exists for this tenant',
+      );
+
+      expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+    });
   });
 
   // ─── createPortalSession ────────────────────────────────────────

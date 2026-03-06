@@ -702,7 +702,9 @@ describe('Billing Webhook (integration)', () => {
       await webhookHandler.process(makeInvoicePaidEvent());
 
       const sub = await getSubscription(tenant.id);
-      expect(sub).toBeDefined();
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
       const periodEnds = new Date(sub.currentPeriodEnds as string);
       expect(periodEnds.getTime()).not.toBe(initialPeriodEnds.getTime());
       const expectedPeriodEnds = new Date(PERIOD_END_EPOCH * 1000);
@@ -972,7 +974,9 @@ describe('Billing Webhook (integration)', () => {
           ORDER BY created_at DESC
           LIMIT 1
         `;
-        expect(auditRow).toBeDefined();
+        if (!auditRow) {
+          throw new Error('Expected audit log row to exist');
+        }
         expect(auditRow.event_type).toBe('subscription.webhook_conflict');
         const meta = auditRow.metadata as Record<string, unknown>;
         expect(meta.eventType).toBe('customer.subscription.updated');
@@ -1059,7 +1063,9 @@ describe('Billing Webhook (integration)', () => {
           ORDER BY created_at DESC
           LIMIT 1
         `;
-        expect(auditRow).toBeDefined();
+        if (!auditRow) {
+          throw new Error('Expected audit log row to exist');
+        }
         expect(auditRow.event_type).toBe('subscription.payment_failed');
         expect((auditRow.metadata as Record<string, unknown>).invoiceId).toBe(
           'in_test_failed_001',
@@ -1125,7 +1131,9 @@ describe('Billing Webhook (integration)', () => {
           ORDER BY created_at DESC
           LIMIT 1
         `;
-        expect(auditRow).toBeDefined();
+        if (!auditRow) {
+          throw new Error('Expected audit log row to exist');
+        }
         expect(auditRow.event_type).toBe('checkout.expired');
       } finally {
         try {
@@ -1253,6 +1261,9 @@ describe('Billing Webhook (integration)', () => {
         FROM stripe_webhook_events
         WHERE id = ${eventId}
       `;
+      if (!webhookRow) {
+        throw new Error('Expected webhook event row to exist');
+      }
       expect(webhookRow.status).toBe('failed');
       expect(webhookRow.error_message).toContain('Invalid metadata.eid token');
     });
