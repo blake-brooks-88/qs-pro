@@ -48,6 +48,8 @@ function normalizeSubscriptionStatus(
     case 'incomplete_expired':
     case 'paused':
       return status;
+    case null:
+    case undefined:
     default:
       return 'inactive';
   }
@@ -139,14 +141,12 @@ export class WebhookHandlerService {
     return typeof sub === 'string' ? sub : sub.id;
   }
 
-  private async resolveTenant(
-    params: {
-      encryptedEid?: string | null;
-      stripeCustomerId?: string | null;
-      stripeSubscriptionId?: string | null;
-      eventType: string;
-    },
-  ): Promise<Tenant | null> {
+  private async resolveTenant(params: {
+    encryptedEid?: string | null;
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
+    eventType: string;
+  }): Promise<Tenant | null> {
     if (params.encryptedEid) {
       const eid = this.decryptEidToken(params.encryptedEid);
       const tenant = await this.tenantRepo.findByEid(eid);
@@ -210,7 +210,8 @@ export class WebhookHandlerService {
         );
       if (subscriptionBinding && subscriptionBinding.tenantId !== tenantId) {
         await this.auditWebhookConflict(tenantId, {
-          reason: 'Incoming Stripe subscription is already bound to another tenant',
+          reason:
+            'Incoming Stripe subscription is already bound to another tenant',
           eventType: params.eventType,
           incomingStripeSubscriptionId: params.stripeSubscriptionId,
           boundTenantId: subscriptionBinding.tenantId,
@@ -308,11 +309,11 @@ export class WebhookHandlerService {
           seatLimit: params.seatLimit,
           lastInvoicePaidAt:
             params.lastInvoicePaidAt === undefined
-              ? existing?.lastInvoicePaidAt ?? null
+              ? (existing?.lastInvoicePaidAt ?? null)
               : params.lastInvoicePaidAt,
           trialEndsAt:
             params.trialEndsAt === undefined
-              ? existing?.trialEndsAt ?? null
+              ? (existing?.trialEndsAt ?? null)
               : params.trialEndsAt,
         };
 
@@ -324,7 +325,10 @@ export class WebhookHandlerService {
           return;
         }
 
-        await this.orgSubscriptionRepo.updateFromWebhook(params.tenantId, payload);
+        await this.orgSubscriptionRepo.updateFromWebhook(
+          params.tenantId,
+          payload,
+        );
       },
     );
   }
@@ -342,7 +346,8 @@ export class WebhookHandlerService {
     }
 
     try {
-      switch (event.type) {
+      const eventType: string = event.type;
+      switch (eventType) {
         case 'checkout.session.completed':
           await this.handleCheckoutSessionCompleted(
             event.data.object as Stripe.Checkout.Session,
@@ -430,7 +435,9 @@ export class WebhookHandlerService {
     const subscription =
       await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
     const item = this.getSubscriptionItem(subscription);
-    const tier = await this.resolveTierFromProduct(item.price.product as string);
+    const tier = await this.resolveTierFromProduct(
+      item.price.product as string,
+    );
     const tenant = await this.resolveTenant({
       encryptedEid: session.metadata?.eid ?? null,
       stripeCustomerId,
@@ -452,13 +459,19 @@ export class WebhookHandlerService {
       return;
     }
 
-    await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+    await this.persistBinding(
+      tenant.id,
+      stripeCustomerId,
+      stripeSubscriptionId,
+    );
     await this.upsertSubscriptionState({
       tenantId: tenant.id,
       tier,
       stripeCustomerId,
       stripeSubscriptionId,
-      stripeSubscriptionStatus: normalizeSubscriptionStatus(subscription.status),
+      stripeSubscriptionStatus: normalizeSubscriptionStatus(
+        subscription.status,
+      ),
       currentPeriodEnds: this.getSubscriptionCurrentPeriodEnds(subscription),
       seatLimit: item.quantity ?? null,
       lastInvoicePaidAt: new Date(),
@@ -472,7 +485,9 @@ export class WebhookHandlerService {
 
   private async handleSubscriptionChange(
     subscription: Stripe.Subscription,
-    eventType: 'customer.subscription.created' | 'customer.subscription.updated',
+    eventType:
+      | 'customer.subscription.created'
+      | 'customer.subscription.updated',
   ): Promise<void> {
     const item = this.getSubscriptionItem(subscription);
     const stripeCustomerId = getStripeId(subscription.customer);
@@ -517,7 +532,11 @@ export class WebhookHandlerService {
         ? existing.tier
         : resolvedTier;
 
-    await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+    await this.persistBinding(
+      tenant.id,
+      stripeCustomerId,
+      stripeSubscriptionId,
+    );
     await this.upsertSubscriptionState({
       tenantId: tenant.id,
       tier,
@@ -543,7 +562,8 @@ export class WebhookHandlerService {
         tier,
         status: stripeSubscriptionStatus,
         currentPeriodEnds:
-          this.getSubscriptionCurrentPeriodEnds(subscription)?.toISOString() ?? null,
+          this.getSubscriptionCurrentPeriodEnds(subscription)?.toISOString() ??
+          null,
       },
     });
   }
@@ -605,7 +625,8 @@ export class WebhookHandlerService {
       throw new Error('Stripe client not configured');
     }
 
-    const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const subscription =
+      await this.stripe.subscriptions.retrieve(subscriptionId);
     const item = this.getSubscriptionItem(subscription);
     const stripeCustomerId = getStripeId(subscription.customer);
     const stripeSubscriptionId = subscription.id;
@@ -629,16 +650,25 @@ export class WebhookHandlerService {
       return;
     }
 
-    const tier = await this.resolveTierFromProduct(item.price.product as string);
-    const currentPeriodEnds = this.getSubscriptionCurrentPeriodEnds(subscription);
+    const tier = await this.resolveTierFromProduct(
+      item.price.product as string,
+    );
+    const currentPeriodEnds =
+      this.getSubscriptionCurrentPeriodEnds(subscription);
 
-    await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+    await this.persistBinding(
+      tenant.id,
+      stripeCustomerId,
+      stripeSubscriptionId,
+    );
     await this.upsertSubscriptionState({
       tenantId: tenant.id,
       tier,
       stripeCustomerId,
       stripeSubscriptionId,
-      stripeSubscriptionStatus: normalizeSubscriptionStatus(subscription.status),
+      stripeSubscriptionStatus: normalizeSubscriptionStatus(
+        subscription.status,
+      ),
       currentPeriodEnds,
       seatLimit: item.quantity ?? null,
       lastInvoicePaidAt: new Date(),
@@ -668,7 +698,8 @@ export class WebhookHandlerService {
     }
 
     try {
-      const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const subscription =
+        await this.stripe.subscriptions.retrieve(subscriptionId);
       const item = this.getSubscriptionItem(subscription);
       const stripeCustomerId = getStripeId(subscription.customer);
       const stripeSubscriptionId = subscription.id;
@@ -696,13 +727,19 @@ export class WebhookHandlerService {
         item.price.product as string,
       );
 
-      await this.persistBinding(tenant.id, stripeCustomerId, stripeSubscriptionId);
+      await this.persistBinding(
+        tenant.id,
+        stripeCustomerId,
+        stripeSubscriptionId,
+      );
       await this.upsertSubscriptionState({
         tenantId: tenant.id,
         tier,
         stripeCustomerId,
         stripeSubscriptionId,
-        stripeSubscriptionStatus: normalizeSubscriptionStatus(subscription.status),
+        stripeSubscriptionStatus: normalizeSubscriptionStatus(
+          subscription.status,
+        ),
         currentPeriodEnds: this.getSubscriptionCurrentPeriodEnds(subscription),
         seatLimit: item.quantity ?? null,
         trialEndsAt: null,
@@ -732,9 +769,8 @@ export class WebhookHandlerService {
       return;
     }
 
-    const binding = await this.stripeBindingRepo.findByStripeCustomerId(
-      stripeCustomerId,
-    );
+    const binding =
+      await this.stripeBindingRepo.findByStripeCustomerId(stripeCustomerId);
     if (!binding) {
       this.logger.warn('charge.refunded: no binding for customer — skipping');
       return;
@@ -779,9 +815,8 @@ export class WebhookHandlerService {
       return;
     }
 
-    const binding = await this.stripeBindingRepo.findByStripeCustomerId(
-      stripeCustomerId,
-    );
+    const binding =
+      await this.stripeBindingRepo.findByStripeCustomerId(stripeCustomerId);
     if (!binding) {
       this.logger.warn(
         'charge.dispute.created: no binding for customer — skipping',
@@ -815,9 +850,8 @@ export class WebhookHandlerService {
       return;
     }
 
-    const binding = await this.stripeBindingRepo.findByStripeCustomerId(
-      stripeCustomerId,
-    );
+    const binding =
+      await this.stripeBindingRepo.findByStripeCustomerId(stripeCustomerId);
     if (!binding) {
       this.logger.warn(
         'charge.dispute.closed: no binding for customer — skipping',
