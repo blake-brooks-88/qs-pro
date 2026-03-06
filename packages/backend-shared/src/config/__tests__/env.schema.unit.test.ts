@@ -142,6 +142,24 @@ describe("env.schema", () => {
       expect(result.success).toBe(true);
     });
 
+    it("requires Stripe env vars in production", () => {
+      const result = apiEnvSchema.safeParse(
+        makeApiEnv({ NODE_ENV: "production" }),
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("Expected parse to fail");
+      }
+
+      const messages = result.error.issues.map((issue) => issue.message);
+      expect(messages).toContain("In production, STRIPE_SECRET_KEY is required");
+      expect(messages).toContain("In production, STRIPE_API_VERSION is required");
+      expect(messages).toContain(
+        "In production, STRIPE_WEBHOOK_SECRET is required",
+      );
+    });
+
     it("validates STRIPE_SECRET_KEY prefix when provided", () => {
       const valid = apiEnvSchema.safeParse(
         makeApiEnv({
@@ -172,6 +190,46 @@ describe("env.schema", () => {
         makeApiEnv({ STRIPE_WEBHOOK_SECRET: "wrong_abc123" }),
       );
       expect(invalid.success).toBe(false);
+    });
+
+    it("rejects Stripe test secret keys in production", () => {
+      const result = apiEnvSchema.safeParse(
+        makeApiEnv({
+          NODE_ENV: "production",
+          STRIPE_SECRET_KEY: "sk_test_abc123",
+          STRIPE_API_VERSION: "2024-06-20",
+          STRIPE_WEBHOOK_SECRET: "whsec_test123",
+        }),
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("Expected parse to fail");
+      }
+
+      const messages = result.error.issues.map((issue) => issue.message);
+      expect(messages).toContain("Production cannot use Stripe test secret keys");
+    });
+
+    it("rejects Stripe live secret keys outside production", () => {
+      const result = apiEnvSchema.safeParse(
+        makeApiEnv({
+          NODE_ENV: "development",
+          STRIPE_SECRET_KEY: "sk_live_abc123",
+          STRIPE_API_VERSION: "2024-06-20",
+          STRIPE_WEBHOOK_SECRET: "whsec_live123",
+        }),
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("Expected parse to fail");
+      }
+
+      const messages = result.error.issues.map((issue) => issue.message);
+      expect(messages).toContain(
+        "Non-production environments cannot use Stripe live secret keys",
+      );
     });
 
     it("exposes validateApiEnv() for NestJS ConfigModule usage", () => {

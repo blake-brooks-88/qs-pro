@@ -14,6 +14,22 @@ import { ALL_FEATURE_KEYS, getTierFeatures } from '@qpp/shared-types';
 
 import { TrialService } from '../trial/trial.service';
 
+function hasActivePaidSubscription(
+  subscription: {
+    stripeSubscriptionId: string | null;
+    currentPeriodEnds: Date | null;
+    tier: SubscriptionTier;
+  },
+  now: Date,
+): boolean {
+  return (
+    Boolean(subscription.stripeSubscriptionId) &&
+    subscription.tier !== 'free' &&
+    Boolean(subscription.currentPeriodEnds) &&
+    subscription.currentPeriodEnds!.getTime() > now.getTime()
+  );
+}
+
 @Injectable()
 export class FeaturesService {
   constructor(
@@ -38,14 +54,15 @@ export class FeaturesService {
 
       const subscription =
         await this.orgSubscriptionRepo.findByTenantId(tenantId);
+      const now = new Date();
 
       let effectiveTier: SubscriptionTier;
       if (subscription) {
-        if (subscription.stripeSubscriptionId) {
+        if (hasActivePaidSubscription(subscription, now)) {
           effectiveTier = subscription.tier;
         } else if (
           subscription.trialEndsAt &&
-          new Date(subscription.trialEndsAt) > new Date()
+          new Date(subscription.trialEndsAt) > now
         ) {
           effectiveTier = subscription.tier;
         } else {
@@ -69,7 +86,12 @@ export class FeaturesService {
 
       const trial = await this.trialService.getTrialState(tenantId);
 
-      return { tier: effectiveTier, features, trial };
+      return {
+        tier: effectiveTier,
+        features,
+        trial,
+        currentPeriodEnds: subscription?.currentPeriodEnds?.toISOString() ?? null,
+      };
     });
   }
 

@@ -11,7 +11,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SkipThrottle } from '@nestjs/throttler';
 import {
   AppError,
   EncryptionService,
@@ -23,7 +22,7 @@ import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 
 import { STRIPE_CLIENT } from './stripe.provider';
-import { WebhookHandlerService } from './webhook-handler.service';
+import { BillingWebhookQueueService } from './billing-webhook-queue.service';
 
 @Controller('billing')
 export class BillingController {
@@ -32,7 +31,7 @@ export class BillingController {
   constructor(
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null,
     private readonly configService: ConfigService,
-    private readonly webhookHandler: WebhookHandlerService,
+    private readonly billingWebhookQueue: BillingWebhookQueueService,
     private readonly encryptionService: EncryptionService,
     @Inject('TENANT_REPOSITORY')
     private readonly tenantRepo: ITenantRepository,
@@ -68,7 +67,6 @@ export class BillingController {
     return { token };
   }
 
-  @SkipThrottle()
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
@@ -111,7 +109,7 @@ export class BillingController {
       });
     }
 
-    await this.webhookHandler.process(event);
+    await this.billingWebhookQueue.enqueue(event);
     return { received: true };
   }
 }

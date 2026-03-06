@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
 import {
@@ -7,17 +8,28 @@ import {
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { AuditModule } from '../audit/audit.module';
+import { STRIPE_WEBHOOK_QUEUE } from './billing.constants';
 import { BillingController } from './billing.controller';
+import { BillingWebhookProcessor } from './billing-webhook.processor';
+import { BillingWebhookQueueService } from './billing-webhook-queue.service';
 import { createContextAwareOrgSubscriptionRepository } from './context-aware-org-subscription.repository';
 import { StripeProvider } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';
 
 @Module({
-  imports: [DatabaseModule, AuditModule],
+  imports: [
+    BullModule.registerQueue({
+      name: STRIPE_WEBHOOK_QUEUE,
+    }),
+    DatabaseModule,
+    AuditModule,
+  ],
   controllers: [BillingController],
   providers: [
     StripeProvider,
     WebhookHandlerService,
+    BillingWebhookQueueService,
+    BillingWebhookProcessor,
     {
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
       useFactory: (db: PostgresJsDatabase) =>
@@ -36,5 +48,6 @@ import { WebhookHandlerService } from './webhook-handler.service';
       inject: ['DATABASE'],
     },
   ],
+  exports: [WebhookHandlerService],
 })
 export class BillingModule {}

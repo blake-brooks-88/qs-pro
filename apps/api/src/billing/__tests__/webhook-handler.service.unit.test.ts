@@ -120,6 +120,7 @@ function makeCheckoutSessionEvent(
     customer: string | null;
     subscription: string | null;
     metadata: Record<string, string>;
+    payment_status: Stripe.Checkout.Session.PaymentStatus | null;
   }> = {},
 ): Stripe.Event {
   return makeEvent('checkout.session.completed', {
@@ -128,6 +129,8 @@ function makeCheckoutSessionEvent(
       'subscription' in overrides ? overrides.subscription : 'sub_xyz',
     metadata:
       'metadata' in overrides ? overrides.metadata : { eid: TENANT_EID_TOKEN },
+    payment_status:
+      'payment_status' in overrides ? overrides.payment_status : 'paid',
   });
 }
 
@@ -237,7 +240,7 @@ describe('WebhookHandlerService', () => {
   });
 
   describe('checkout.session.completed', () => {
-    it('resolves tenant via eid and updates org subscription', async () => {
+    it('resolves tenant via eid and binds Stripe identifiers', async () => {
       const event = makeCheckoutSessionEvent();
 
       await service.process(event);
@@ -246,8 +249,6 @@ describe('WebhookHandlerService', () => {
       expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(TENANT_ID, {
         stripeCustomerId: 'cus_abc',
         stripeSubscriptionId: 'sub_xyz',
-        tier: 'pro',
-        trialEndsAt: null,
       });
     });
 
@@ -263,30 +264,50 @@ describe('WebhookHandlerService', () => {
       );
     });
 
-    it('logs subscription.created audit event with mid=system', async () => {
+    it('logs subscription.updated audit event with checkout metadata', async () => {
       const event = makeCheckoutSessionEvent();
 
       await service.process(event);
 
       expect(auditStub.log).toHaveBeenCalledWith(
         expect.objectContaining({
-          eventType: 'subscription.created',
+          eventType: 'subscription.updated',
           mid: 'system',
           tenantId: TENANT_ID,
           actorType: 'system',
+          metadata: expect.objectContaining({
+            paymentStatus: 'paid',
+            stripeCustomerId: 'cus_abc',
+            stripeSubscriptionId: 'sub_xyz',
+          }),
         }),
       );
     });
 
-    it('does NOT set currentPeriodEnds (delegates to subscription events)', async () => {
+    it('does NOT set tier or currentPeriodEnds (delegates fulfillment to later events)', async () => {
       const event = makeCheckoutSessionEvent();
 
       await service.process(event);
 
       expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
         TENANT_ID,
-        expect.not.objectContaining({ currentPeriodEnds: expect.anything() }),
+        {
+          stripeCustomerId: 'cus_abc',
+          stripeSubscriptionId: 'sub_xyz',
+        },
       );
+      expect(stripeStub.subscriptions.retrieve).not.toHaveBeenCalled();
+      expect(stripeStub.products.retrieve).not.toHaveBeenCalled();
+    });
+
+    it('ignores unpaid checkout sessions before any business logic', async () => {
+      const event = makeCheckoutSessionEvent({ payment_status: 'unpaid' });
+
+      await service.process(event);
+
+      expect(tenantRepo.findByEid).not.toHaveBeenCalled();
+      expect(orgSubRepo.updateFromWebhook).not.toHaveBeenCalled();
+      expect(webhookEventRepo.markCompleted).toHaveBeenCalledWith(event.id);
     });
 
     it('throws when eid is missing from session metadata', async () => {
@@ -299,15 +320,6 @@ describe('WebhookHandlerService', () => {
         event.id,
         'Checkout session missing metadata.eid',
       );
-    });
-
-    it('resolves tier from Stripe subscription product metadata', async () => {
-      const event = makeCheckoutSessionEvent();
-
-      await service.process(event);
-
-      expect(stripeStub.subscriptions.retrieve).toHaveBeenCalledWith('sub_xyz');
-      expect(stripeStub.products.retrieve).toHaveBeenCalledWith('prod_123');
     });
 
     it('throws when customer is null', async () => {
@@ -408,12 +420,13 @@ describe('WebhookHandlerService', () => {
 
       expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
         TENANT_ID,
-        expect.not.objectContaining({ tier: expect.anything() }),
+        expect.objectContaining({
+          currentPeriodEnds: new Date(1700000000 * 1000),
+          seatLimit: 10,
+          trialEndsAt: null,
+        }),
       );
-      expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({ currentPeriodEnds: expect.any(Date) }),
-      );
+      expect(stripeStub.products.retrieve).not.toHaveBeenCalled();
     });
 
     it('does NOT change tier when subscription status is unpaid', async () => {
@@ -427,6 +440,27 @@ describe('WebhookHandlerService', () => {
         TENANT_ID,
         expect.not.objectContaining({ tier: expect.anything() }),
       );
+      expect(stripeStub.products.retrieve).not.toHaveBeenCalled();
+    });
+
+    it('creates a free placeholder when a non-entitled subscription arrives before payment', async () => {
+      orgSubRepo.findByTenantId.mockResolvedValue(undefined);
+      const event = makeSubscriptionEvent('customer.subscription.created', {
+        status: 'incomplete',
+      });
+
+      await service.process(event);
+
+      expect(orgSubRepo.upsert).toHaveBeenCalledWith({
+        tenantId: TENANT_ID,
+        tier: 'free',
+        stripeCustomerId: 'cus_abc',
+        stripeSubscriptionId: 'sub_xyz',
+        trialEndsAt: null,
+        currentPeriodEnds: null,
+        seatLimit: 10,
+      });
+      expect(stripeStub.products.retrieve).not.toHaveBeenCalled();
     });
 
     it('throws when eid is missing from subscription metadata', async () => {
@@ -488,13 +522,19 @@ describe('WebhookHandlerService', () => {
       expect(tenantRepo.findByEid).toHaveBeenCalledWith(TENANT_EID);
       expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(TENANT_ID, {
         tier: 'free',
+        stripeCustomerId: null,
         stripeSubscriptionId: null,
         currentPeriodEnds: null,
         seatLimit: null,
+        trialEndsAt: null,
       });
     });
 
     it('wraps DB write in RLS context', async () => {
+      orgSubRepo.findByTenantId.mockResolvedValueOnce({
+        stripeCustomerId: 'cus_abc',
+        stripeSubscriptionId: 'sub_xyz',
+      });
       const event = makeSubscriptionEvent('customer.subscription.deleted');
 
       await service.process(event);
@@ -507,6 +547,10 @@ describe('WebhookHandlerService', () => {
     });
 
     it('logs subscription.canceled audit event', async () => {
+      orgSubRepo.findByTenantId.mockResolvedValueOnce({
+        stripeCustomerId: 'cus_abc',
+        stripeSubscriptionId: 'sub_xyz',
+      });
       const event = makeSubscriptionEvent('customer.subscription.deleted');
 
       await service.process(event);
@@ -557,17 +601,23 @@ describe('WebhookHandlerService', () => {
       expect(tenantRepo.findByEid).toHaveBeenCalledWith(TENANT_EID);
     });
 
-    it('updates currentPeriodEnds from invoice period_end', async () => {
+    it('updates the full paid subscription state from the Stripe subscription', async () => {
       const event = makeInvoiceEvent('invoice.paid');
 
       await service.process(event);
 
       expect(orgSubRepo.updateFromWebhook).toHaveBeenCalledWith(
         TENANT_ID,
-        expect.objectContaining({
+        {
+          tier: 'pro',
+          stripeCustomerId: 'cus_abc',
+          stripeSubscriptionId: 'sub_xyz',
           currentPeriodEnds: new Date(1700000000 * 1000),
-        }),
+          seatLimit: 10,
+          trialEndsAt: null,
+        },
       );
+      expect(stripeStub.products.retrieve).toHaveBeenCalledWith('prod_123');
     });
 
     it('wraps DB write in RLS context', async () => {
@@ -593,7 +643,18 @@ describe('WebhookHandlerService', () => {
 
     it('skips when subscription has no eid metadata', async () => {
       stripeStub.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_xyz',
+        customer: 'cus_abc',
         metadata: {},
+        items: {
+          data: [
+            {
+              price: { product: 'prod_123' },
+              quantity: 10,
+              current_period_end: 1700000000,
+            },
+          ],
+        },
       });
       const event = makeInvoiceEvent('invoice.paid');
 
@@ -612,6 +673,10 @@ describe('WebhookHandlerService', () => {
         expect.objectContaining({
           eventType: 'subscription.updated',
           mid: 'system',
+          metadata: expect.objectContaining({
+            tier: 'pro',
+            seatLimit: 10,
+          }),
         }),
       );
     });

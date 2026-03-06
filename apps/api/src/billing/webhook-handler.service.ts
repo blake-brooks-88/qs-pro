@@ -13,6 +13,14 @@ import { STRIPE_CLIENT } from './stripe.provider';
 
 const VALID_TIERS = ['pro', 'enterprise'] as const;
 type PaidTier = (typeof VALID_TIERS)[number];
+const ENTITLED_STATUSES = new Set<Stripe.Subscription.Status>([
+  'active',
+  'trialing',
+]);
+
+function isEntitledStatus(status: Stripe.Subscription.Status): boolean {
+  return ENTITLED_STATUSES.has(status);
+}
 
 function isValidPaidTier(value: unknown): value is PaidTier {
   return typeof value === 'string' && VALID_TIERS.includes(value as PaidTier);
@@ -219,6 +227,13 @@ export class WebhookHandlerService {
   private async handleCheckoutSessionCompleted(
     session: Stripe.Checkout.Session,
   ): Promise<void> {
+    if (session.payment_status !== 'paid') {
+      this.logger.warn(
+        `checkout.session.completed ignored because payment_status=${session.payment_status ?? 'unknown'}`,
+      );
+      return;
+    }
+
     const stripeCustomerId = getStripeId(session.customer);
     const stripeSubscriptionId = getStripeId(session.subscription);
 
@@ -231,18 +246,6 @@ export class WebhookHandlerService {
       throw new Error('Checkout session missing metadata.eid');
     }
     const eid = this.decryptEidToken(rawEid);
-
-    if (!this.stripe) {
-      throw new Error('Stripe client not configured');
-    }
-
-    const subscription =
-      await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
-    if (!subscription.items.data[0]) {
-      throw new Error('Stripe subscription missing line items');
-    }
-    const productId = subscription.items.data[0].price.product as string;
-    const tier = await this.resolveTierFromProduct(productId);
 
     const tenant = await this.tenantRepo.findByEid(eid);
     if (!tenant) {
@@ -259,7 +262,7 @@ export class WebhookHandlerService {
         if (!existing) {
           await this.orgSubscriptionRepo.upsert({
             tenantId: tenant.id,
-            tier,
+            tier: 'free',
             stripeCustomerId,
             stripeSubscriptionId,
             trialEndsAt: null,
@@ -292,20 +295,23 @@ export class WebhookHandlerService {
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
           stripeCustomerId,
           stripeSubscriptionId,
-          tier,
-          trialEndsAt: null,
         });
       },
     );
 
     await this.auditService.log({
-      eventType: 'subscription.created',
+      eventType: 'subscription.updated',
       actorType: 'system',
       actorId: null,
       tenantId: tenant.id,
       mid: 'system',
       targetId: tenant.id,
-      metadata: { tier, stripeCustomerId, stripeSubscriptionId },
+      metadata: {
+        checkoutSessionId: session.id,
+        paymentStatus: session.payment_status,
+        stripeCustomerId,
+        stripeSubscriptionId,
+      },
     });
   }
 
@@ -332,18 +338,18 @@ export class WebhookHandlerService {
       return;
     }
 
-    const productId = subscription.items.data[0].price.product as string;
-    const tier = await this.resolveTierFromProduct(productId);
-
-    const isPastDueOrUnpaid =
-      subscription.status === 'past_due' || subscription.status === 'unpaid';
-
     const currentPeriodEnds = new Date(
       subscription.items.data[0].current_period_end * 1000,
     );
     const seatLimit = subscription.items.data[0].quantity ?? null;
     const stripeCustomerId = getStripeId(subscription.customer);
     const stripeSubscriptionId = subscription.id;
+    const status = subscription.status;
+    const isEntitled = isEntitledStatus(status);
+    const productId = subscription.items.data[0].price.product as string;
+    const tier = isEntitled
+      ? await this.resolveTierFromProduct(productId)
+      : 'free';
 
     await this.rlsContext.runWithTenantContext(
       tenant.id,
@@ -355,15 +361,11 @@ export class WebhookHandlerService {
         if (!existing) {
           await this.orgSubscriptionRepo.upsert({
             tenantId: tenant.id,
-            // If the row doesn't exist yet, persist the resolved tier even if
-            // Stripe is reporting past_due/unpaid. The "graceful degradation"
-            // behavior applies to preserving an existing tier, not defaulting
-            // a brand-new row to free.
             tier,
             stripeCustomerId,
             stripeSubscriptionId,
             trialEndsAt: null,
-            currentPeriodEnds,
+            currentPeriodEnds: isEntitled ? currentPeriodEnds : null,
             seatLimit,
           });
           return;
@@ -390,9 +392,9 @@ export class WebhookHandlerService {
         }
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-          ...(isPastDueOrUnpaid ? {} : { tier }),
           stripeCustomerId,
           stripeSubscriptionId,
+          ...(isEntitled ? { tier } : {}),
           currentPeriodEnds,
           seatLimit,
           trialEndsAt: null,
@@ -408,8 +410,8 @@ export class WebhookHandlerService {
       mid: 'system',
       targetId: tenant.id,
       metadata: {
-        tier: isPastDueOrUnpaid ? 'unchanged (graceful degradation)' : tier,
-        status: subscription.status,
+        tier: isEntitled ? tier : 'unchanged until current period ends',
+        status,
         currentPeriodEnds: currentPeriodEnds.toISOString(),
         seatLimit,
       },
@@ -472,9 +474,11 @@ export class WebhookHandlerService {
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
           tier: 'free',
+          stripeCustomerId: null,
           stripeSubscriptionId: null,
           currentPeriodEnds: null,
           seatLimit: null,
+          trialEndsAt: null,
         });
       },
     );
@@ -509,6 +513,9 @@ export class WebhookHandlerService {
 
     const subscription =
       await this.stripe.subscriptions.retrieve(subscriptionId);
+    if (!subscription.items.data[0]) {
+      throw new Error('invoice.paid: subscription missing line items');
+    }
     const rawEid = subscription.metadata?.eid;
     if (!rawEid) {
       this.logger.warn(
@@ -527,6 +534,12 @@ export class WebhookHandlerService {
     }
 
     const stripeCustomerId = getStripeId(subscription.customer);
+    const currentPeriodEnds = new Date(
+      subscription.items.data[0].current_period_end * 1000,
+    );
+    const seatLimit = subscription.items.data[0].quantity ?? null;
+    const productId = subscription.items.data[0].price.product as string;
+    const tier = await this.resolveTierFromProduct(productId);
 
     await this.rlsContext.runWithTenantContext(
       tenant.id,
@@ -536,16 +549,22 @@ export class WebhookHandlerService {
           tenant.id,
         );
         if (!existing) {
-          this.logger.warn(
-            `invoice.paid — ignored (org_subscriptions missing, tenantId=${tenant.id})`,
-          );
+          await this.orgSubscriptionRepo.upsert({
+            tenantId: tenant.id,
+            tier,
+            stripeCustomerId,
+            stripeSubscriptionId: subscription.id,
+            trialEndsAt: null,
+            currentPeriodEnds,
+            seatLimit,
+          });
           return;
         }
 
         const binding = this.checkStripeBinding(
           existing,
           { stripeCustomerId, stripeSubscriptionId: subscription.id },
-          { allowBindWhenUnbound: false, requireSubscriptionMatch: true },
+          { allowBindWhenUnbound: true },
         );
         if (!binding.allowed) {
           this.logger.warn(
@@ -564,7 +583,12 @@ export class WebhookHandlerService {
         }
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-          currentPeriodEnds: new Date(invoice.period_end * 1000),
+          tier,
+          stripeCustomerId,
+          stripeSubscriptionId: subscription.id,
+          currentPeriodEnds,
+          seatLimit,
+          trialEndsAt: null,
         });
       },
     );
@@ -578,7 +602,9 @@ export class WebhookHandlerService {
       targetId: tenant.id,
       metadata: {
         invoiceId: invoice.id,
-        currentPeriodEnds: new Date(invoice.period_end * 1000).toISOString(),
+        currentPeriodEnds: currentPeriodEnds.toISOString(),
+        tier,
+        seatLimit,
       },
     });
   }

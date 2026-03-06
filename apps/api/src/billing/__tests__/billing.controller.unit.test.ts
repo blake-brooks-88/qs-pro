@@ -7,8 +7,8 @@ import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { BillingWebhookQueueService } from '../billing-webhook-queue.service';
 import { BillingController } from '../billing.controller';
-import type { WebhookHandlerService } from '../webhook-handler.service';
 
 function createStripeMock() {
   return {
@@ -29,11 +29,11 @@ function createConfigMock() {
   };
 }
 
-function createWebhookHandlerMock(): {
-  process: ReturnType<typeof vi.fn>;
+function createWebhookQueueMock(): {
+  enqueue: ReturnType<typeof vi.fn>;
 } {
   return {
-    process: vi.fn().mockResolvedValue(undefined),
+    enqueue: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -58,17 +58,17 @@ describe('BillingController', () => {
   let controller: BillingController;
   let stripeMock: ReturnType<typeof createStripeMock>;
   let configMock: ReturnType<typeof createConfigMock>;
-  let handlerMock: ReturnType<typeof createWebhookHandlerMock>;
+  let queueMock: ReturnType<typeof createWebhookQueueMock>;
 
   beforeEach(() => {
     stripeMock = createStripeMock();
     configMock = createConfigMock();
-    handlerMock = createWebhookHandlerMock();
+    queueMock = createWebhookQueueMock();
 
     controller = new BillingController(
       stripeMock as unknown as Stripe,
       configMock as unknown as ConfigService,
-      handlerMock as unknown as WebhookHandlerService,
+      queueMock as unknown as BillingWebhookQueueService,
       createEncryptionServiceMock() as unknown as EncryptionService,
       createTenantRepoMock() as unknown as ITenantRepository,
     );
@@ -79,7 +79,7 @@ describe('BillingController', () => {
       const nullStripeController = new BillingController(
         null,
         configMock as unknown as ConfigService,
-        handlerMock as unknown as WebhookHandlerService,
+        queueMock as unknown as BillingWebhookQueueService,
         createEncryptionServiceMock() as unknown as EncryptionService,
         createTenantRepoMock() as unknown as ITenantRepository,
       );
@@ -154,7 +154,7 @@ describe('BillingController', () => {
       );
     });
 
-    it('calls webhookHandler.process with the constructed event', async () => {
+    it('queues the constructed event for asynchronous processing', async () => {
       const mockEvent = {
         id: 'evt_123',
         type: 'checkout.session.completed',
@@ -164,15 +164,15 @@ describe('BillingController', () => {
 
       await controller.handleWebhook(createReq('body'), 'sig_test');
 
-      expect(handlerMock.process).toHaveBeenCalledWith(mockEvent);
+      expect(queueMock.enqueue).toHaveBeenCalledWith(mockEvent);
     });
 
-    it('propagates errors from webhookHandler.process', async () => {
-      handlerMock.process.mockRejectedValue(new Error('Handler failed'));
+    it('propagates errors from webhook queueing', async () => {
+      queueMock.enqueue.mockRejectedValue(new Error('Queue failed'));
 
       await expect(
         controller.handleWebhook(createReq('body'), 'sig_test'),
-      ).rejects.toThrow('Handler failed');
+      ).rejects.toThrow('Queue failed');
     });
   });
 });

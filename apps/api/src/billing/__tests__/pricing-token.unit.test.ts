@@ -6,8 +6,8 @@ import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { BillingWebhookQueueService } from '../billing-webhook-queue.service';
 import { BillingController } from '../billing.controller';
-import type { WebhookHandlerService } from '../webhook-handler.service';
 
 const TENANT_ID = 'tenant-abc-123';
 const TENANT_EID = 'eid-org-456';
@@ -26,8 +26,8 @@ function createConfigMock() {
   };
 }
 
-function createWebhookHandlerMock() {
-  return { process: vi.fn().mockResolvedValue(undefined) };
+function createWebhookQueueMock() {
+  return { enqueue: vi.fn().mockResolvedValue(undefined) };
 }
 
 function createEncryptionServiceMock() {
@@ -71,7 +71,7 @@ describe('BillingController.getPricingToken', () => {
     controller = new BillingController(
       createStripeMock() as unknown as Stripe,
       createConfigMock() as unknown as ConfigService,
-      createWebhookHandlerMock() as unknown as WebhookHandlerService,
+      createWebhookQueueMock() as unknown as BillingWebhookQueueService,
       encryptionMock as unknown as EncryptionService,
       tenantRepoMock as unknown as ITenantRepository,
     );

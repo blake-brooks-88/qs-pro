@@ -162,6 +162,7 @@ describe('FeaturesService', () => {
       ...baseSubscription,
       tier: 'enterprise',
       stripeSubscriptionId: 'sub_stripe_123',
+      currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       trialEndsAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
     });
 
@@ -172,6 +173,21 @@ describe('FeaturesService', () => {
     expect(result.tier).toBe('enterprise');
     expect(result.features.teamSnippets).toBe(true);
     expect(result.features.auditLogs).toBe(true);
+  });
+
+  it('downgrades to free when the Stripe billing period has expired', async () => {
+    orgSubscriptionRepo.findByTenantId.mockResolvedValue({
+      ...baseSubscription,
+      tier: 'enterprise',
+      stripeSubscriptionId: 'sub_stripe_123',
+      currentPeriodEnds: new Date(Date.now() - 60 * 1000),
+      trialEndsAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    });
+
+    const result = await service.getTenantFeatures('tenant-1');
+
+    expect(result.tier).toBe('free');
+    expect(result.features.auditLogs).toBe(false);
   });
 
   it('defaults to free tier when no org_subscriptions row exists', async () => {
@@ -296,6 +312,7 @@ describe('FeaturesService', () => {
           versionHistory: false,
         },
         trial: null,
+        currentPeriodEnds: null,
       });
     });
 
@@ -305,6 +322,7 @@ describe('FeaturesService', () => {
         ...baseSubscription,
         stripeSubscriptionId: 'sub_123',
         tier: 'pro',
+        currentPeriodEnds: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
 
       // Act
@@ -331,6 +349,7 @@ describe('FeaturesService', () => {
           versionHistory: true,
         },
         trial: null,
+        currentPeriodEnds: expect.any(String),
       });
     });
 
@@ -340,6 +359,7 @@ describe('FeaturesService', () => {
         ...baseSubscription,
         stripeSubscriptionId: 'sub_123',
         tier: 'enterprise',
+        currentPeriodEnds: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
 
       // Act
@@ -366,6 +386,7 @@ describe('FeaturesService', () => {
           versionHistory: true,
         },
         trial: null,
+        currentPeriodEnds: expect.any(String),
       });
     });
   });

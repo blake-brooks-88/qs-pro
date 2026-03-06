@@ -174,6 +174,27 @@ export const apiEnvSchema = infrastructureSchema
           message: "In production, COOKIE_DOMAIN must be unset (host-only)",
         });
       }
+
+      if (!data.STRIPE_SECRET_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "In production, STRIPE_SECRET_KEY is required",
+        });
+      }
+
+      if (!data.STRIPE_API_VERSION) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "In production, STRIPE_API_VERSION is required",
+        });
+      }
+
+      if (!data.STRIPE_WEBHOOK_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "In production, STRIPE_WEBHOOK_SECRET is required",
+        });
+      }
     }
 
     if (data.STRIPE_SECRET_KEY && !data.STRIPE_API_VERSION) {
@@ -189,6 +210,26 @@ export const apiEnvSchema = infrastructureSchema
         code: z.ZodIssueCode.custom,
         message:
           "STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is configured",
+      });
+    }
+
+    if (
+      data.NODE_ENV === "production" &&
+      data.STRIPE_SECRET_KEY?.startsWith("sk_test_")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Production cannot use Stripe test secret keys",
+      });
+    }
+
+    if (
+      data.NODE_ENV !== "production" &&
+      data.STRIPE_SECRET_KEY?.startsWith("sk_live_")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Non-production environments cannot use Stripe live secret keys",
       });
     }
   })
