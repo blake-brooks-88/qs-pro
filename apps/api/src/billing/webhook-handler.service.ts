@@ -357,7 +357,7 @@ export class WebhookHandlerService {
         case 'customer.subscription.updated':
           await this.handleSubscriptionChange(
             event.data.object as Stripe.Subscription,
-            event.type,
+            eventType,
           );
           break;
         case 'customer.subscription.deleted':
