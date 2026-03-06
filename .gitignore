@@ -70,5 +70,9 @@ playwright-mcp-config.json
 .augment/
 agent-os/
 
+# Screenshots
+screenshots/
+
 # Git worktrees
 .worktrees/
+.claude/worktrees/
