@@ -30,7 +30,7 @@ describe("Upsert Conflict Behavior", () => {
   const createdUserIds: string[] = [];
 
   beforeAll(async () => {
-    client = postgres(connectionString);
+    client = postgres(connectionString, { max: 1 });
     db = drizzle(client);
     tenantRepo = new DrizzleTenantRepository(db);
     userRepo = new DrizzleUserRepository(db);

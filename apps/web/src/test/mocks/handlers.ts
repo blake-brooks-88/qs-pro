@@ -1,27 +1,8 @@
-import type { TenantFeaturesResponse } from "@qpp/shared-types";
 import { http, HttpResponse } from "msw";
 
-export const defaultFeaturesResponse: TenantFeaturesResponse = {
-  tier: "free",
-  features: {
-    basicLinting: true,
-    syntaxHighlighting: true,
-    quickFixes: false,
-    minimap: false,
-    advancedAutocomplete: false,
-    querySharing: false,
-    teamSnippets: false,
-    auditLogs: false,
-    createDataExtension: false,
-    deployToAutomation: false,
-    systemDataViews: true,
-    runToTargetDE: false,
-    executionHistory: false,
-    versionHistory: false,
-    teamCollaboration: false,
-  },
-  trial: null,
-};
+import { createTenantFeaturesStub } from "@/test/stubs";
+
+export const defaultFeaturesResponse = createTenantFeaturesStub();
 
 export const handlers = [
   http.get("/api/features", () => {
@@ -181,7 +162,9 @@ export const handlers = [
     });
   }),
 
-  http.get("/api/billing/pricing-token", () => {
-    return HttpResponse.json({ token: "test-encrypted-token" });
+  http.get("/api/billing/prices", () => {
+    return HttpResponse.json({
+      pro: { monthly: 2900, annual: 24900 },
+    });
   }),
 ];

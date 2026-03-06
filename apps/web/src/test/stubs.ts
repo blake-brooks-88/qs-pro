@@ -1,3 +1,6 @@
+import type { TenantFeaturesResponse } from "@qpp/shared-types";
+import { getTierFeatures } from "@qpp/shared-types";
+
 import type { QueryTab } from "@/features/editor-workspace/types";
 import type { Tenant, User } from "@/store/auth-store";
 
@@ -27,6 +30,19 @@ export function createTabStub(overrides?: Partial<QueryTab>): QueryTab {
     name: "Test Query",
     content: "SELECT 1",
     isDirty: false,
+    ...overrides,
+  };
+}
+
+export function createTenantFeaturesStub(
+  overrides?: Partial<TenantFeaturesResponse>,
+): TenantFeaturesResponse {
+  const tier = overrides?.tier ?? "free";
+  return {
+    tier,
+    features: getTierFeatures(tier),
+    trial: null,
+    currentPeriodEnds: null,
     ...overrides,
   };
 }

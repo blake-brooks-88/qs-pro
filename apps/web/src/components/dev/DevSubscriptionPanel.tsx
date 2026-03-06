@@ -1,4 +1,3 @@
-import type { SubscriptionTier } from "@qpp/shared-types";
 import * as Popover from "@radix-ui/react-popover";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,16 +7,10 @@ import {
   useCancelSubscription,
   useCreateCheckout,
   useResetToFree,
+  useSetSubscriptionState,
   useSetTrialDays,
 } from "@/hooks/use-dev-tools";
 import { useTenantFeatures } from "@/hooks/use-tenant-features";
-import { useUpdateTier } from "@/hooks/use-update-tier";
-
-const TIERS: Array<{ value: SubscriptionTier; label: string }> = [
-  { value: "free", label: "Free" },
-  { value: "pro", label: "Pro" },
-  { value: "enterprise", label: "Enterprise" },
-];
 
 function formatTrialStatus(
   trial: { active: boolean; daysRemaining: number | null } | null | undefined,
@@ -36,30 +29,28 @@ function formatTrialStatus(
 
 export function DevSubscriptionPanel() {
   const { data } = useTenantFeatures();
-  const updateTier = useUpdateTier();
   const setTrialDays = useSetTrialDays();
   const checkout = useCreateCheckout();
   const cancel = useCancelSubscription();
   const reset = useResetToFree();
+  const subState = useSetSubscriptionState();
 
   const [trialDaysInput, setTrialDaysInput] = useState(14);
+  const [checkoutInterval, setCheckoutInterval] = useState<
+    "monthly" | "annual"
+  >("monthly");
+  const [stateTier, setStateTier] = useState<"free" | "pro" | "enterprise">(
+    "pro",
+  );
 
   const anyPending =
-    updateTier.isPending ||
     setTrialDays.isPending ||
     checkout.isPending ||
     cancel.isPending ||
-    reset.isPending;
+    reset.isPending ||
+    subState.isPending;
 
   const hasStripe = data?.tier !== "free" && !data?.trial?.active;
-
-  function handleTierChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    updateTier.mutate(e.target.value as SubscriptionTier, {
-      onSuccess: () => toast.success(`Tier updated to ${e.target.value}`),
-      onError: (err) =>
-        toast.error(err instanceof Error ? err.message : "Operation failed"),
-    });
-  }
 
   function handleSetTrial() {
     setTrialDays.mutate(trialDaysInput, {
@@ -80,8 +71,20 @@ export function DevSubscriptionPanel() {
 
   function handleCheckout(tier: "pro" | "enterprise") {
     checkout.mutate(
-      { tier },
+      { tier, interval: checkoutInterval },
       {
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Operation failed"),
+      },
+    );
+  }
+
+  function handleSetSubscriptionState() {
+    subState.mutate(
+      { tier: stateTier },
+      {
+        onSuccess: () =>
+          toast.success(`Subscription state set to ${stateTier}`),
         onError: (err) =>
           toast.error(err instanceof Error ? err.message : "Operation failed"),
       },
@@ -133,30 +136,18 @@ export function DevSubscriptionPanel() {
                 Trial: {formatTrialStatus(data?.trial)}
               </p>
               <p className="text-xs font-mono">
+                Period ends:{" "}
+                {data?.currentPeriodEnds
+                  ? new Date(data.currentPeriodEnds).toLocaleDateString()
+                  : "N/A"}
+              </p>
+              <p className="text-xs font-mono">
                 Stripe: {hasStripe ? "Managed" : "Not connected"}
               </p>
             </div>
           </div>
 
           <div className="border-t border-border" />
-
-          <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Tier
-            </p>
-            <select
-              value={data?.tier ?? "free"}
-              onChange={handleTierChange}
-              disabled={anyPending}
-              className="h-7 w-full px-2 text-xs rounded border border-border bg-muted/50 text-muted-foreground cursor-pointer hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-            >
-              {TIERS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
 
           <div className="space-y-1.5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -197,6 +188,26 @@ export function DevSubscriptionPanel() {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Stripe Controls
             </p>
+            <div className="flex items-center gap-2 mb-1.5">
+              <label
+                htmlFor="checkout-interval"
+                className="text-xs text-muted-foreground"
+              >
+                Interval:
+              </label>
+              <select
+                id="checkout-interval"
+                value={checkoutInterval}
+                onChange={(e) =>
+                  setCheckoutInterval(e.target.value as "monthly" | "annual")
+                }
+                disabled={anyPending}
+                className="h-7 px-2 text-xs rounded border border-border bg-background disabled:opacity-50"
+              >
+                <option value="monthly">Monthly</option>
+                <option value="annual">Annual</option>
+              </select>
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -215,6 +226,35 @@ export function DevSubscriptionPanel() {
                 onClick={() => handleCheckout("enterprise")}
               >
                 Enterprise Checkout
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Subscription State
+            </p>
+            <div className="flex items-center gap-2">
+              <select
+                value={stateTier}
+                onChange={(e) =>
+                  setStateTier(e.target.value as "free" | "pro" | "enterprise")
+                }
+                disabled={anyPending}
+                className="h-7 px-2 text-xs rounded border border-border bg-background disabled:opacity-50"
+              >
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-7 text-xs"
+                disabled={anyPending}
+                onClick={handleSetSubscriptionState}
+              >
+                Set State
               </Button>
             </div>
           </div>

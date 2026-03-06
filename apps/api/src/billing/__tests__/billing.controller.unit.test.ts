@@ -1,13 +1,12 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import type { EncryptionService } from '@qpp/backend-shared';
 import { AppError, ErrorCode } from '@qpp/backend-shared';
-import type { ITenantRepository } from '@qpp/database';
 import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BillingController } from '../billing.controller';
+import type { BillingService } from '../billing.service';
 import type { WebhookHandlerService } from '../webhook-handler.service';
 
 function createStripeMock() {
@@ -37,16 +36,10 @@ function createWebhookHandlerMock(): {
   };
 }
 
-function createEncryptionServiceMock() {
-  return { encrypt: vi.fn(), decrypt: vi.fn() };
-}
-
-function createTenantRepoMock() {
+function createBillingServiceMock() {
   return {
-    findById: vi.fn(),
-    findByEid: vi.fn(),
-    upsert: vi.fn(),
-    countUsersByTenantId: vi.fn(),
+    createCheckoutSession: vi.fn(),
+    createPortalSession: vi.fn(),
   };
 }
 
@@ -69,8 +62,7 @@ describe('BillingController', () => {
       stripeMock as unknown as Stripe,
       configMock as unknown as ConfigService,
       handlerMock as unknown as WebhookHandlerService,
-      createEncryptionServiceMock() as unknown as EncryptionService,
-      createTenantRepoMock() as unknown as ITenantRepository,
+      createBillingServiceMock() as unknown as BillingService,
     );
   });
 
@@ -80,8 +72,7 @@ describe('BillingController', () => {
         null,
         configMock as unknown as ConfigService,
         handlerMock as unknown as WebhookHandlerService,
-        createEncryptionServiceMock() as unknown as EncryptionService,
-        createTenantRepoMock() as unknown as ITenantRepository,
+        createBillingServiceMock() as unknown as BillingService,
       );
 
       await expect(
@@ -90,29 +81,21 @@ describe('BillingController', () => {
     });
 
     it('throws validation error when rawBody is missing', async () => {
-      await expect(
-        controller.handleWebhook(createReq(undefined), 'sig_test'),
-      ).rejects.toThrow(AppError);
+      const error = await controller
+        .handleWebhook(createReq(undefined), 'sig_test')
+        .catch((e: unknown) => e);
 
-      try {
-        await controller.handleWebhook(createReq(undefined), 'sig_test');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).code).toBe(ErrorCode.VALIDATION_ERROR);
-      }
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe(ErrorCode.VALIDATION_ERROR);
     });
 
     it('throws unauthorized error when signature is empty', async () => {
-      await expect(
-        controller.handleWebhook(createReq('body'), ''),
-      ).rejects.toThrow(AppError);
+      const error = await controller
+        .handleWebhook(createReq('body'), '')
+        .catch((e: unknown) => e);
 
-      try {
-        await controller.handleWebhook(createReq('body'), '');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
-      }
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
     });
 
     it('throws unauthorized when signature verification fails', async () => {
@@ -120,16 +103,12 @@ describe('BillingController', () => {
         throw new Error('Signature verification failed');
       });
 
-      await expect(
-        controller.handleWebhook(createReq('body'), 'bad_sig'),
-      ).rejects.toThrow(AppError);
+      const error = await controller
+        .handleWebhook(createReq('body'), 'bad_sig')
+        .catch((e: unknown) => e);
 
-      try {
-        await controller.handleWebhook(createReq('body'), 'bad_sig');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
-      }
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
     });
 
     it('returns { received: true } on successful processing', async () => {

@@ -152,8 +152,10 @@ export class WebhookHandlerService {
       if (typeof decrypted === 'string' && decrypted.trim()) {
         return decrypted;
       }
-    } catch {
-      // fall through
+    } catch (error) {
+      this.logger.warn(
+        `decryptEidToken failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     throw new Error(
@@ -182,9 +184,15 @@ export class WebhookHandlerService {
           );
           break;
         case 'customer.subscription.created':
+          await this.handleSubscriptionChange(
+            event.data.object as Stripe.Subscription,
+            'created',
+          );
+          break;
         case 'customer.subscription.updated':
           await this.handleSubscriptionChange(
             event.data.object as Stripe.Subscription,
+            'updated',
           );
           break;
         case 'customer.subscription.deleted':
@@ -198,6 +206,24 @@ export class WebhookHandlerService {
         case 'invoice.payment_failed':
           await this.handleInvoicePaymentFailed(
             event.data.object as Stripe.Invoice,
+          );
+          break;
+        case 'charge.refunded':
+          await this.handleChargeRefunded(event.data.object as Stripe.Charge);
+          break;
+        case 'charge.dispute.created':
+          await this.handleChargeDisputeCreated(
+            event.data.object as Stripe.Dispute,
+          );
+          break;
+        case 'charge.dispute.closed':
+          await this.handleChargeDisputeClosed(
+            event.data.object as Stripe.Dispute,
+          );
+          break;
+        case 'checkout.session.expired':
+          await this.handleCheckoutSessionExpired(
+            event.data.object as Stripe.Checkout.Session,
           );
           break;
         default:
@@ -276,17 +302,16 @@ export class WebhookHandlerService {
         );
         if (!binding.allowed) {
           this.logger.warn(
-            `checkout.session.completed — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
+            `checkout.session.completed — overriding stale Stripe binding (tenantId=${tenant.id}, reason=${binding.reason})`,
           );
           await this.auditWebhookConflict(tenant.id, {
-            reason: binding.reason,
+            reason: `OVERRIDDEN: ${binding.reason}`,
             eventType: 'checkout.session.completed',
             incomingStripeCustomerId: stripeCustomerId,
             incomingStripeSubscriptionId: stripeSubscriptionId,
             existingStripeCustomerId: existing.stripeCustomerId,
             existingStripeSubscriptionId: existing.stripeSubscriptionId,
           });
-          return;
         }
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
@@ -311,6 +336,7 @@ export class WebhookHandlerService {
 
   private async handleSubscriptionChange(
     subscription: Stripe.Subscription,
+    eventKind: 'created' | 'updated',
   ): Promise<void> {
     if (!subscription.items.data[0]) {
       throw new Error('Subscription event missing line items');
@@ -375,18 +401,32 @@ export class WebhookHandlerService {
           { allowBindWhenUnbound: true },
         );
         if (!binding.allowed) {
-          this.logger.warn(
-            `subscription change — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
-          );
-          await this.auditWebhookConflict(tenant.id, {
-            reason: binding.reason,
-            eventType: 'customer.subscription.created/updated',
-            incomingStripeCustomerId: stripeCustomerId,
-            incomingStripeSubscriptionId: stripeSubscriptionId,
-            existingStripeCustomerId: existing.stripeCustomerId,
-            existingStripeSubscriptionId: existing.stripeSubscriptionId,
-          });
-          return;
+          if (eventKind === 'created') {
+            this.logger.warn(
+              `subscription.created — overriding stale Stripe binding (tenantId=${tenant.id}, reason=${binding.reason})`,
+            );
+            await this.auditWebhookConflict(tenant.id, {
+              reason: `OVERRIDDEN: ${binding.reason}`,
+              eventType: 'customer.subscription.created',
+              incomingStripeCustomerId: stripeCustomerId,
+              incomingStripeSubscriptionId: stripeSubscriptionId,
+              existingStripeCustomerId: existing.stripeCustomerId,
+              existingStripeSubscriptionId: existing.stripeSubscriptionId,
+            });
+          } else {
+            this.logger.warn(
+              `subscription.updated — ignored due to Stripe binding conflict (tenantId=${tenant.id})`,
+            );
+            await this.auditWebhookConflict(tenant.id, {
+              reason: binding.reason,
+              eventType: 'customer.subscription.updated',
+              incomingStripeCustomerId: stripeCustomerId,
+              incomingStripeSubscriptionId: stripeSubscriptionId,
+              existingStripeCustomerId: existing.stripeCustomerId,
+              existingStripeSubscriptionId: existing.stripeSubscriptionId,
+            });
+            return;
+          }
         }
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
@@ -472,9 +512,11 @@ export class WebhookHandlerService {
 
         await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
           tier: 'free',
+          stripeCustomerId: null,
           stripeSubscriptionId: null,
           currentPeriodEnds: null,
           seatLimit: null,
+          trialEndsAt: new Date(0),
         });
       },
     );
@@ -563,12 +605,22 @@ export class WebhookHandlerService {
           return;
         }
 
-        await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
-          currentPeriodEnds: new Date(invoice.period_end * 1000),
-        });
+        const item = subscription.items.data[0];
+        if (item) {
+          const currentPeriodEnds = new Date(
+            item.current_period_end * 1000,
+          );
+          await this.orgSubscriptionRepo.updateFromWebhook(tenant.id, {
+            currentPeriodEnds,
+          });
+        }
       },
     );
 
+    const item = subscription.items.data[0];
+    const currentPeriodEnds = item
+      ? new Date(item.current_period_end * 1000)
+      : null;
     await this.auditService.log({
       eventType: 'subscription.updated',
       actorType: 'system',
@@ -578,7 +630,7 @@ export class WebhookHandlerService {
       targetId: tenant.id,
       metadata: {
         invoiceId: invoice.id,
-        currentPeriodEnds: new Date(invoice.period_end * 1000).toISOString(),
+        currentPeriodEnds: currentPeriodEnds?.toISOString() ?? null,
       },
     });
   }
@@ -671,6 +723,161 @@ export class WebhookHandlerService {
         error instanceof Error ? error.message : String(error),
       );
     }
+  }
+
+  private async handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
+    const stripeCustomerId = getStripeId(charge.customer);
+    if (!stripeCustomerId) {
+      this.logger.warn('charge.refunded: missing customer — skipping');
+      return;
+    }
+
+    const subscription =
+      await this.orgSubscriptionRepo.findByStripeCustomerId(stripeCustomerId);
+    if (!subscription) {
+      this.logger.warn(
+        'charge.refunded: no subscription for customer — skipping',
+      );
+      return;
+    }
+
+    await this.auditService.log({
+      eventType: 'subscription.refunded',
+      actorType: 'system',
+      actorId: null,
+      tenantId: subscription.tenantId,
+      mid: 'system',
+      targetId: subscription.tenantId,
+      metadata: {
+        chargeId: charge.id,
+        amountRefunded: charge.amount_refunded,
+      },
+    });
+  }
+
+  private async resolveCustomerFromDispute(
+    dispute: Stripe.Dispute,
+  ): Promise<string | null> {
+    const chargeId =
+      typeof dispute.charge === 'string'
+        ? dispute.charge
+        : (dispute.charge?.id ?? null);
+    if (!chargeId) {
+      return null;
+    }
+    if (!this.stripe) {
+      return null;
+    }
+    const charge = await this.stripe.charges.retrieve(chargeId);
+    return getStripeId(charge.customer);
+  }
+
+  private async handleChargeDisputeCreated(
+    dispute: Stripe.Dispute,
+  ): Promise<void> {
+    const stripeCustomerId = await this.resolveCustomerFromDispute(dispute);
+    if (!stripeCustomerId) {
+      this.logger.warn(
+        'charge.dispute.created: could not resolve customer — skipping',
+      );
+      return;
+    }
+
+    const subscription =
+      await this.orgSubscriptionRepo.findByStripeCustomerId(stripeCustomerId);
+    if (!subscription) {
+      this.logger.warn(
+        'charge.dispute.created: no subscription for customer — skipping',
+      );
+      return;
+    }
+
+    await this.auditService.log({
+      eventType: 'subscription.dispute_opened',
+      actorType: 'system',
+      actorId: null,
+      tenantId: subscription.tenantId,
+      mid: 'system',
+      targetId: subscription.tenantId,
+      metadata: {
+        disputeId: dispute.id,
+        reason: dispute.reason,
+        status: dispute.status,
+      },
+    });
+  }
+
+  private async handleChargeDisputeClosed(
+    dispute: Stripe.Dispute,
+  ): Promise<void> {
+    const stripeCustomerId = await this.resolveCustomerFromDispute(dispute);
+    if (!stripeCustomerId) {
+      this.logger.warn(
+        'charge.dispute.closed: could not resolve customer — skipping',
+      );
+      return;
+    }
+
+    const subscription =
+      await this.orgSubscriptionRepo.findByStripeCustomerId(stripeCustomerId);
+    if (!subscription) {
+      this.logger.warn(
+        'charge.dispute.closed: no subscription for customer — skipping',
+      );
+      return;
+    }
+
+    await this.auditService.log({
+      eventType: 'subscription.dispute_closed',
+      actorType: 'system',
+      actorId: null,
+      tenantId: subscription.tenantId,
+      mid: 'system',
+      targetId: subscription.tenantId,
+      metadata: {
+        disputeId: dispute.id,
+        reason: dispute.reason,
+        status: dispute.status,
+      },
+    });
+  }
+
+  private async handleCheckoutSessionExpired(
+    session: Stripe.Checkout.Session,
+  ): Promise<void> {
+    const rawEid = session.metadata?.eid;
+    if (!rawEid) {
+      this.logger.warn(
+        'checkout.session.expired: missing metadata.eid — skipping',
+      );
+      return;
+    }
+
+    let eid: string;
+    try {
+      eid = this.decryptEidToken(rawEid);
+    } catch {
+      this.logger.warn(
+        'checkout.session.expired: invalid eid token — skipping',
+      );
+      return;
+    }
+
+    const tenant = await this.tenantRepo.findByEid(eid);
+    if (!tenant) {
+      this.logger.warn('checkout.session.expired: tenant not found — skipping');
+      return;
+    }
+
+    await this.auditService.log({
+      eventType: 'checkout.expired',
+      actorType: 'system',
+      actorId: null,
+      tenantId: tenant.id,
+      mid: 'system',
+      targetId: tenant.id,
+      metadata: {},
+    });
   }
 
   private async resolveTierFromProduct(productId: string): Promise<PaidTier> {

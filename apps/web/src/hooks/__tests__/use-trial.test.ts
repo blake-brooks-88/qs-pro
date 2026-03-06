@@ -4,6 +4,7 @@ import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { useTrial } from "@/hooks/use-trial";
+import { createTenantFeaturesStub } from "@/test/stubs";
 
 vi.mock("@/hooks/use-tenant-features", () => ({
   useTenantFeatures: vi.fn(),
@@ -23,30 +24,18 @@ function mockFeatures(
   } as UseQueryResult<TenantFeaturesResponse, Error>);
 }
 
-const BASE_FEATURES = {
-  basicLinting: true,
-  syntaxHighlighting: true,
-  quickFixes: false,
-  minimap: false,
-  advancedAutocomplete: false,
-  teamSnippets: false,
-  auditLogs: false,
-  createDataExtension: false,
-  deployToAutomation: false,
-  systemDataViews: true,
-  runToTargetDE: false,
-  executionHistory: false,
-  versionHistory: false,
-  querySharing: false,
-} as const;
-
 describe("useTrial", () => {
   it("shows countdown when trial is active and daysRemaining <= 5", () => {
-    mockFeatures({
-      tier: "pro",
-      features: BASE_FEATURES,
-      trial: { active: true, daysRemaining: 3, endsAt: "2026-03-01T00:00:00Z" },
-    });
+    mockFeatures(
+      createTenantFeaturesStub({
+        tier: "pro",
+        trial: {
+          active: true,
+          daysRemaining: 3,
+          endsAt: "2026-03-01T00:00:00Z",
+        },
+      }),
+    );
 
     const { result } = renderHook(() => useTrial());
 
@@ -57,11 +46,16 @@ describe("useTrial", () => {
   });
 
   it("does not show countdown during quiet period (daysRemaining > 5)", () => {
-    mockFeatures({
-      tier: "pro",
-      features: BASE_FEATURES,
-      trial: { active: true, daysRemaining: 8, endsAt: "2026-03-05T00:00:00Z" },
-    });
+    mockFeatures(
+      createTenantFeaturesStub({
+        tier: "pro",
+        trial: {
+          active: true,
+          daysRemaining: 8,
+          endsAt: "2026-03-05T00:00:00Z",
+        },
+      }),
+    );
 
     const { result } = renderHook(() => useTrial());
 
@@ -71,11 +65,16 @@ describe("useTrial", () => {
   });
 
   it("shows countdown at boundary (daysRemaining === 5)", () => {
-    mockFeatures({
-      tier: "pro",
-      features: BASE_FEATURES,
-      trial: { active: true, daysRemaining: 5, endsAt: "2026-03-03T00:00:00Z" },
-    });
+    mockFeatures(
+      createTenantFeaturesStub({
+        tier: "pro",
+        trial: {
+          active: true,
+          daysRemaining: 5,
+          endsAt: "2026-03-03T00:00:00Z",
+        },
+      }),
+    );
 
     const { result } = renderHook(() => useTrial());
 
@@ -84,11 +83,16 @@ describe("useTrial", () => {
   });
 
   it("does not show countdown just outside boundary (daysRemaining === 6)", () => {
-    mockFeatures({
-      tier: "pro",
-      features: BASE_FEATURES,
-      trial: { active: true, daysRemaining: 6, endsAt: "2026-03-04T00:00:00Z" },
-    });
+    mockFeatures(
+      createTenantFeaturesStub({
+        tier: "pro",
+        trial: {
+          active: true,
+          daysRemaining: 6,
+          endsAt: "2026-03-04T00:00:00Z",
+        },
+      }),
+    );
 
     const { result } = renderHook(() => useTrial());
 
@@ -97,15 +101,16 @@ describe("useTrial", () => {
   });
 
   it("shows trial expired when trial is inactive and tier is free", () => {
-    mockFeatures({
-      tier: "free",
-      features: BASE_FEATURES,
-      trial: {
-        active: false,
-        daysRemaining: 0,
-        endsAt: "2026-02-15T00:00:00Z",
-      },
-    });
+    mockFeatures(
+      createTenantFeaturesStub({
+        tier: "free",
+        trial: {
+          active: false,
+          daysRemaining: 0,
+          endsAt: "2026-02-15T00:00:00Z",
+        },
+      }),
+    );
 
     const { result } = renderHook(() => useTrial());
 
@@ -115,15 +120,16 @@ describe("useTrial", () => {
   });
 
   it("does not show trial expired when trial ended but user is on paid tier", () => {
-    mockFeatures({
-      tier: "pro",
-      features: BASE_FEATURES,
-      trial: {
-        active: false,
-        daysRemaining: 0,
-        endsAt: "2026-02-15T00:00:00Z",
-      },
-    });
+    mockFeatures(
+      createTenantFeaturesStub({
+        tier: "pro",
+        trial: {
+          active: false,
+          daysRemaining: 0,
+          endsAt: "2026-02-15T00:00:00Z",
+        },
+      }),
+    );
 
     const { result } = renderHook(() => useTrial());
 
@@ -132,11 +138,7 @@ describe("useTrial", () => {
   });
 
   it("returns defaults for paid subscriber with no trial", () => {
-    mockFeatures({
-      tier: "pro",
-      features: BASE_FEATURES,
-      trial: null,
-    });
+    mockFeatures(createTenantFeaturesStub({ tier: "pro" }));
 
     const { result } = renderHook(() => useTrial());
 
@@ -159,11 +161,7 @@ describe("useTrial", () => {
   });
 
   it("does not show trial expired when trial was never started (null trial, free tier)", () => {
-    mockFeatures({
-      tier: "free",
-      features: BASE_FEATURES,
-      trial: null,
-    });
+    mockFeatures(createTenantFeaturesStub({ tier: "free" }));
 
     const { result } = renderHook(() => useTrial());
 

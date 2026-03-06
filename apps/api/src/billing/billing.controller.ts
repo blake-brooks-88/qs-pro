@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Headers,
@@ -12,18 +13,24 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
-import {
-  AppError,
-  EncryptionService,
-  ErrorCode,
-  SessionGuard,
-} from '@qpp/backend-shared';
-import type { ITenantRepository } from '@qpp/database';
+import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
+import { z } from 'zod';
 
+import { CsrfGuard } from '../auth/csrf.guard';
+import type { UserSession } from '../common/decorators/current-user.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import type { PricesResponse } from './billing.service';
+import { BillingService } from './billing.service';
 import { STRIPE_CLIENT } from './stripe.provider';
 import { WebhookHandlerService } from './webhook-handler.service';
+
+const CheckoutBodySchema = z.object({
+  tier: z.enum(['pro', 'enterprise']),
+  interval: z.enum(['monthly', 'annual']),
+});
 
 @Controller('billing')
 export class BillingController {
@@ -33,39 +40,34 @@ export class BillingController {
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null,
     private readonly configService: ConfigService,
     private readonly webhookHandler: WebhookHandlerService,
-    private readonly encryptionService: EncryptionService,
-    @Inject('TENANT_REPOSITORY')
-    private readonly tenantRepo: ITenantRepository,
+    private readonly billingService: BillingService,
   ) {}
 
-  @Get('pricing-token')
-  @UseGuards(SessionGuard)
-  async getPricingToken(
-    @Req() req: FastifyRequest,
-  ): Promise<{ token: string }> {
-    const session = req.session;
-    const tenantId = session?.get('tenantId') as string | undefined;
-    if (!tenantId) {
-      throw new AppError(ErrorCode.AUTH_UNAUTHORIZED, undefined, {
-        reason: 'No active session',
-      });
-    }
+  @Get('prices')
+  async getPrices(): Promise<PricesResponse> {
+    return this.billingService.getPrices();
+  }
 
-    const tenant = await this.tenantRepo.findById(tenantId);
-    if (!tenant) {
-      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-        reason: 'Tenant not found',
-      });
-    }
+  @Post('checkout')
+  @UseGuards(SessionGuard, CsrfGuard)
+  async createCheckout(
+    @CurrentUser() user: UserSession,
+    @Body(new ZodValidationPipe(CheckoutBodySchema))
+    body: z.infer<typeof CheckoutBodySchema>,
+  ): Promise<{ url: string }> {
+    return this.billingService.createCheckoutSession(
+      user.tenantId,
+      body.tier,
+      body.interval,
+    );
+  }
 
-    const token = this.encryptionService.encrypt(tenant.eid);
-    if (!token) {
-      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
-        reason: 'Failed to generate pricing token',
-      });
-    }
-
-    return { token };
+  @Post('portal')
+  @UseGuards(SessionGuard, CsrfGuard)
+  async createPortal(
+    @CurrentUser() user: UserSession,
+  ): Promise<{ url: string }> {
+    return this.billingService.createPortalSession(user.tenantId);
   }
 
   @SkipThrottle()

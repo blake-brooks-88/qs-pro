@@ -34,6 +34,10 @@ function createDevToolsServiceStub(): {
       .mockResolvedValue({ url: 'https://checkout.stripe.com/session_123' }),
     cancelSubscription: vi.fn().mockResolvedValue({ canceled: true }),
     resetToFree: vi.fn().mockResolvedValue(mockFeatures),
+    setSubscriptionState: vi.fn().mockResolvedValue(mockFeatures),
+    simulateWebhook: vi
+      .fn()
+      .mockResolvedValue({ processed: true, eventId: 'evt_sim_123' }),
   };
 }
 
@@ -58,16 +62,16 @@ describe('DevToolsController', () => {
   });
 
   describe('createCheckout', () => {
-    it('delegates to devToolsService.createCheckout with tenantId, tier and returnUrl', async () => {
+    it('delegates to devToolsService.createCheckout with tenantId, tier, and interval', async () => {
       const result = await controller.createCheckout(mockUser, {
         tier: 'pro',
-        returnUrl: 'https://app.test',
+        interval: 'monthly',
       });
 
       expect(serviceMock.createCheckout).toHaveBeenCalledWith(
         'tenant-1',
         'pro',
-        'https://app.test',
+        'monthly',
       );
       expect(result).toEqual({
         url: 'https://checkout.stripe.com/session_123',
@@ -90,6 +94,41 @@ describe('DevToolsController', () => {
 
       expect(serviceMock.resetToFree).toHaveBeenCalledWith('tenant-1');
       expect(result).toEqual(mockFeatures);
+    });
+  });
+
+  describe('setSubscriptionState', () => {
+    it('delegates to devToolsService.setSubscriptionState', async () => {
+      const body = {
+        tier: 'pro' as const,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        currentPeriodEnds: null,
+        trialEndsAt: null,
+        seatLimit: null,
+      };
+      const result = await controller.setSubscriptionState(mockUser, body);
+      expect(serviceMock.setSubscriptionState).toHaveBeenCalledWith(
+        'tenant-1',
+        body,
+      );
+      expect(result).toEqual(mockFeatures);
+    });
+  });
+
+  describe('simulateWebhook', () => {
+    it('delegates to devToolsService.simulateWebhook', async () => {
+      const body = {
+        eventType: 'checkout.session.completed',
+        data: { customer: 'cus_abc' },
+      };
+      const result = await controller.simulateWebhook(mockUser, body);
+      expect(serviceMock.simulateWebhook).toHaveBeenCalledWith(
+        'checkout.session.completed',
+        { customer: 'cus_abc' },
+        undefined,
+      );
+      expect(result).toEqual({ processed: true, eventId: 'evt_sim_123' });
     });
   });
 });

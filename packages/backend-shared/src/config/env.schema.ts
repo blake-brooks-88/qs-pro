@@ -60,6 +60,7 @@ export const sessionSchema = z.object({
   SESSION_SALT: z
     .string()
     .min(16, "SESSION_SALT must be at least 16 characters"),
+  APP_WEB_ORIGIN: z.string().url(),
   COOKIE_SECURE: z
     .enum(["true", "false"])
     .default("true")
@@ -90,8 +91,6 @@ export const stripeSchema = z.object({
   STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
   STRIPE_API_VERSION: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
-  STRIPE_PRO_PRICE_ID: z.string().startsWith("price_").optional(),
-  STRIPE_ENTERPRISE_PRICE_ID: z.string().startsWith("price_").optional(),
 });
 
 /**

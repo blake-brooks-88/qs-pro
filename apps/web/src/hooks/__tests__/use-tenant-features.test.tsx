@@ -1,4 +1,3 @@
-import type { TenantFeatures, TenantFeaturesResponse } from "@qpp/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
@@ -10,6 +9,7 @@ import {
   useTenantFeatures,
 } from "@/hooks/use-tenant-features";
 import { server } from "@/test/mocks/server";
+import { createTenantFeaturesStub } from "@/test/stubs";
 
 const createWrapper = (queryClient: QueryClient) => {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -26,25 +26,7 @@ const createQueryClient = () =>
     },
   });
 
-const mockFeatures: TenantFeatures = {
-  basicLinting: true,
-  syntaxHighlighting: true,
-  quickFixes: false,
-  minimap: false,
-  advancedAutocomplete: false,
-  teamSnippets: false,
-  auditLogs: false,
-  createDataExtension: false,
-  deployToAutomation: false,
-  systemDataViews: true,
-  runToTargetDE: false,
-};
-
-const mockFeaturesResponse: TenantFeaturesResponse = {
-  tier: "free",
-  features: mockFeatures,
-  trial: null,
-};
+const mockFeaturesResponse = createTenantFeaturesStub();
 
 describe("useTenantFeatures", () => {
   beforeEach(() => {

@@ -1,5 +1,3 @@
-import type { TenantFeaturesResponse } from "@qpp/shared-types";
-import { getTierFeatures } from "@qpp/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -7,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { FeatureGate } from "@/components/FeatureGate";
 import { featuresQueryKeys } from "@/hooks/use-tenant-features";
+import { createTenantFeaturesStub } from "@/test/stubs";
 
 const createWrapper = (queryClient: QueryClient) => {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -23,13 +22,6 @@ const createQueryClient = () =>
     },
   });
 
-const seedTenantFeatures = (): TenantFeaturesResponse =>
-  ({
-    tier: "free",
-    features: getTierFeatures("free"),
-    trial: null,
-  }) satisfies TenantFeaturesResponse;
-
 describe("FeatureGate", () => {
   beforeEach(() => {
     // no-op: tests seed React Query cache directly
@@ -37,7 +29,10 @@ describe("FeatureGate", () => {
 
   it("renders children without badge when feature enabled", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), seedTenantFeatures());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -55,7 +50,10 @@ describe("FeatureGate", () => {
 
   it("renders children with premium badge when feature disabled", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), seedTenantFeatures());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -73,7 +71,10 @@ describe("FeatureGate", () => {
 
   it("renders locked button variant with disabled styling", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), seedTenantFeatures());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -90,7 +91,10 @@ describe("FeatureGate", () => {
 
   it("renders locked panel variant with backdrop", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), seedTenantFeatures());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(
@@ -108,7 +112,10 @@ describe("FeatureGate", () => {
 
   it("renders locked menuItem variant", async () => {
     const queryClient = createQueryClient();
-    queryClient.setQueryData(featuresQueryKeys.tenant(), seedTenantFeatures());
+    queryClient.setQueryData(
+      featuresQueryKeys.tenant(),
+      createTenantFeaturesStub(),
+    );
     const wrapper = createWrapper(queryClient);
 
     render(

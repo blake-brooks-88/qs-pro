@@ -3,12 +3,12 @@ import { CloseCircle, InfoCircle } from "@solar-icons/react";
 import { Button } from "@/components/ui/button";
 
 interface TrialExpiredBannerProps {
-  pricingUrl: string;
+  onViewPlans: () => void;
   onDismiss: () => void;
 }
 
 export function TrialExpiredBanner({
-  pricingUrl,
+  onViewPlans,
   onDismiss,
 }: TrialExpiredBannerProps) {
   return (
@@ -27,9 +27,7 @@ export function TrialExpiredBanner({
           variant="ghost"
           size="sm"
           className="h-7 text-xs font-medium text-primary hover:text-primary"
-          onClick={() =>
-            window.open(pricingUrl, "_blank", "noopener,noreferrer")
-          }
+          onClick={onViewPlans}
         >
           View Plans
         </Button>

@@ -6,7 +6,7 @@ import { TrialExpiredBanner } from "@/components/TrialExpiredBanner";
 
 describe("TrialExpiredBanner", () => {
   const mockOnDismiss = vi.fn();
-  const pricingUrl = "https://queryplusplus.com/pricing?eid=test-eid";
+  const mockOnViewPlans = vi.fn();
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -14,34 +14,38 @@ describe("TrialExpiredBanner", () => {
 
   it("renders expiry text", () => {
     render(
-      <TrialExpiredBanner pricingUrl={pricingUrl} onDismiss={mockOnDismiss} />,
+      <TrialExpiredBanner
+        onViewPlans={mockOnViewPlans}
+        onDismiss={mockOnDismiss}
+      />,
     );
 
     expect(screen.getByText("Your Pro trial has ended.")).toBeInTheDocument();
   });
 
-  it("opens pricing page in new tab when View Plans is clicked", async () => {
+  it("calls onViewPlans when View Plans is clicked", async () => {
     const user = userEvent.setup();
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(
-      <TrialExpiredBanner pricingUrl={pricingUrl} onDismiss={mockOnDismiss} />,
+      <TrialExpiredBanner
+        onViewPlans={mockOnViewPlans}
+        onDismiss={mockOnDismiss}
+      />,
     );
 
     await user.click(screen.getByText("View Plans"));
 
-    expect(openSpy).toHaveBeenCalledWith(
-      pricingUrl,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    expect(mockOnViewPlans).toHaveBeenCalledOnce();
   });
 
   it("calls onDismiss when dismiss button is clicked", async () => {
     const user = userEvent.setup();
 
     render(
-      <TrialExpiredBanner pricingUrl={pricingUrl} onDismiss={mockOnDismiss} />,
+      <TrialExpiredBanner
+        onViewPlans={mockOnViewPlans}
+        onDismiss={mockOnDismiss}
+      />,
     );
 
     await user.click(screen.getByLabelText("Dismiss banner"));

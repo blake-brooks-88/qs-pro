@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 interface TrialBannerProps {
   daysRemaining: number;
-  pricingUrl: string;
+  onViewPlans: () => void;
   onDismiss: () => void;
 }
 
@@ -20,7 +20,7 @@ function getCountdownText(daysRemaining: number): string {
 
 export function TrialBanner({
   daysRemaining,
-  pricingUrl,
+  onViewPlans,
   onDismiss,
 }: TrialBannerProps) {
   return (
@@ -39,9 +39,7 @@ export function TrialBanner({
           variant="ghost"
           size="sm"
           className="h-7 text-xs font-medium text-primary hover:text-primary"
-          onClick={() =>
-            window.open(pricingUrl, "_blank", "noopener,noreferrer")
-          }
+          onClick={onViewPlans}
         >
           View Plans
         </Button>

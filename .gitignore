@@ -30,7 +30,8 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Screenshots (root level only - use .screenshots/ for tracked ones)
+# Screenshots
+screenshots/
 /*.png
 
 # IDEs
@@ -72,3 +73,4 @@ agent-os/
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/

@@ -6,7 +6,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 
 describe("TrialBanner", () => {
   const mockOnDismiss = vi.fn();
-  const pricingUrl = "https://queryplusplus.com/pricing?eid=test-eid";
+  const mockOnViewPlans = vi.fn();
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -16,7 +16,7 @@ describe("TrialBanner", () => {
     render(
       <TrialBanner
         daysRemaining={3}
-        pricingUrl={pricingUrl}
+        onViewPlans={mockOnViewPlans}
         onDismiss={mockOnDismiss}
       />,
     );
@@ -30,7 +30,7 @@ describe("TrialBanner", () => {
     render(
       <TrialBanner
         daysRemaining={1}
-        pricingUrl={pricingUrl}
+        onViewPlans={mockOnViewPlans}
         onDismiss={mockOnDismiss}
       />,
     );
@@ -44,7 +44,7 @@ describe("TrialBanner", () => {
     render(
       <TrialBanner
         daysRemaining={0}
-        pricingUrl={pricingUrl}
+        onViewPlans={mockOnViewPlans}
         onDismiss={mockOnDismiss}
       />,
     );
@@ -52,25 +52,20 @@ describe("TrialBanner", () => {
     expect(screen.getByText("Your Pro trial ends today.")).toBeInTheDocument();
   });
 
-  it("opens pricing page in new tab when View Plans is clicked", async () => {
+  it("calls onViewPlans when View Plans is clicked", async () => {
     const user = userEvent.setup();
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(
       <TrialBanner
         daysRemaining={3}
-        pricingUrl={pricingUrl}
+        onViewPlans={mockOnViewPlans}
         onDismiss={mockOnDismiss}
       />,
     );
 
     await user.click(screen.getByText("View Plans"));
 
-    expect(openSpy).toHaveBeenCalledWith(
-      pricingUrl,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    expect(mockOnViewPlans).toHaveBeenCalledOnce();
   });
 
   it("calls onDismiss when dismiss button is clicked", async () => {
@@ -79,7 +74,7 @@ describe("TrialBanner", () => {
     render(
       <TrialBanner
         daysRemaining={3}
-        pricingUrl={pricingUrl}
+        onViewPlans={mockOnViewPlans}
         onDismiss={mockOnDismiss}
       />,
     );

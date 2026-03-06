@@ -6,6 +6,7 @@ import {
   type LockedOverlayProps,
 } from "@/components/ui/locked-overlay";
 import { useFeature } from "@/hooks/use-feature";
+import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 
 const FEATURE_CONFIG: Record<
   string,
@@ -14,45 +15,49 @@ const FEATURE_CONFIG: Record<
   createDataExtension: {
     title: "Create Data Extension",
     description:
-      "Create new Data Extensions directly from query results with automatic schema detection.",
+      "Skip the manual DE setup. Create Data Extensions directly from query results with automatic schema detection.",
     tier: "pro",
   },
   advancedAutocomplete: {
     title: "Advanced Autocomplete",
     description:
-      "Get intelligent code suggestions based on your data extensions and schema.",
+      "Write queries faster with intelligent suggestions based on your data extensions and schema.",
     tier: "pro",
   },
   quickFixes: {
     title: "Quick Fixes",
-    description: "Automatically fix common SQL issues with one click.",
+    description:
+      "Stop debugging syntax errors. Fix common SQL issues automatically with one click.",
     tier: "pro",
   },
   minimap: {
     title: "Code Minimap",
     description:
-      "See a bird's-eye view of your entire query for easy navigation.",
+      "Navigate long queries instantly with a bird's-eye minimap view.",
     tier: "pro",
   },
   deployToAutomation: {
     title: "Automation Studio",
     description:
-      "Create and publish Query Activities for scheduled automation workflows in MCE.",
+      "Automate your queries. Create and publish Query Activities for scheduled workflows in MCE.",
     tier: "enterprise",
   },
   teamSnippets: {
     title: "Team Snippets",
-    description: "Share and collaborate on SQL snippets with your team.",
+    description:
+      "Stop rewriting common queries. Share and reuse SQL snippets across your team.",
     tier: "enterprise",
   },
   auditLogs: {
     title: "Audit Logs",
-    description: "Track all query executions and changes for compliance.",
+    description:
+      "Stay audit-ready. Track every query execution and change for compliance.",
     tier: "enterprise",
   },
   runToTargetDE: {
     title: "Run to Target DE",
-    description: "Run query results directly to an existing Data Extension.",
+    description:
+      "Populate DEs in one step. Run query results directly to any existing Data Extension.",
     tier: "pro",
   },
 };
@@ -75,6 +80,7 @@ export function FeatureGate({
   onUpgradeClick,
 }: FeatureGateProps) {
   const { enabled: isEnabled } = useFeature(feature);
+  const openPricing = usePricingOverlayStore((s) => s.open);
   /**
    * ESLINT-DISABLE JUSTIFICATION:
    * This eslint-disable is an exception to project standards, not a pattern to follow.
@@ -105,7 +111,7 @@ export function FeatureGate({
       title={config.title}
       description={config.description}
       ctaLabel={`Upgrade to ${config.tier === "enterprise" ? "Enterprise" : "Pro"}`}
-      onCtaClick={onUpgradeClick}
+      onCtaClick={onUpgradeClick ?? (() => openPricing("feature_gate"))}
       badgeSize={badgeSize}
       badgePosition={badgePosition}
     >

@@ -11,6 +11,7 @@ vi.mock("@/hooks/use-dev-tools", () => ({
   useCreateCheckout: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelSubscription: () => ({ mutate: vi.fn(), isPending: false }),
   useResetToFree: () => ({ mutate: vi.fn(), isPending: false }),
+  useSetSubscriptionState: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/use-tenant-features", () => ({
@@ -18,10 +19,6 @@ vi.mock("@/hooks/use-tenant-features", () => ({
     data: { tier: "free", features: {}, trial: null },
   }),
   featuresQueryKeys: { all: ["features"] },
-}));
-
-vi.mock("@/hooks/use-update-tier", () => ({
-  useUpdateTier: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const createQueryClient = () =>
@@ -62,17 +59,6 @@ describe("DevSubscriptionPanel", () => {
     await user.click(screen.getByText("DEV"));
 
     expect(screen.getByText("Tier: free")).toBeInTheDocument();
-  });
-
-  it("has tier selector dropdown", async () => {
-    const user = userEvent.setup();
-    render(<DevSubscriptionPanel />, { wrapper: Wrapper });
-
-    await user.click(screen.getByText("DEV"));
-
-    const select = screen.getByRole("combobox");
-    expect(select).toBeInTheDocument();
-    expect(select).toHaveValue("free");
   });
 
   it("has trial controls", async () => {
@@ -126,5 +112,27 @@ describe("DevSubscriptionPanel", () => {
     await user.click(screen.getByText("DEV"));
 
     expect(screen.getByText("Stripe: Not connected")).toBeInTheDocument();
+  });
+
+  it("has interval selector in stripe controls", async () => {
+    const user = userEvent.setup();
+    render(<DevSubscriptionPanel />, { wrapper: Wrapper });
+
+    await user.click(screen.getByText("DEV"));
+
+    const intervalSelect = screen.getByDisplayValue("Monthly");
+    expect(intervalSelect).toBeInTheDocument();
+  });
+
+  it("has subscription state section with tier selector and Set State button", async () => {
+    const user = userEvent.setup();
+    render(<DevSubscriptionPanel />, { wrapper: Wrapper });
+
+    await user.click(screen.getByText("DEV"));
+
+    expect(screen.getByText("Subscription State")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Set State" }),
+    ).toBeInTheDocument();
   });
 });
