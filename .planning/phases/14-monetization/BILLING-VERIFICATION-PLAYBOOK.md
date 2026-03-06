@@ -46,6 +46,17 @@ After each scenario is manually verified, **before moving to the next scenario**
 - [ ] Database accessible (PostgreSQL on localhost:5432)
 - [ ] Browser open to http://localhost:5173, logged in
 
+**Recommended automated baseline before manual verification:**
+```bash
+pnpm --filter api exec vitest run --config ./vitest-integration.config.ts \
+  test/billing-service.integration.test.ts \
+  test/billing-webhook.integration.test.ts \
+  test/features.integration.test.ts \
+  test/trial-lifecycle.integration.test.ts \
+  src/features/__tests__/features-remaining.integration.test.ts
+```
+This does not replace manual verification. It confirms the current billing/trial regression suite is green before you start clicking through Stripe flows.
+
 **Companion Document:** See `BILLING-SUCCESS-CRITERIA.md` for complete success criteria per scenario.
 
 ---
@@ -74,7 +85,17 @@ After each scenario is manually verified, **before moving to the next scenario**
 UI: DevSubscriptionPanel → "Reset to Free"
 API: curl -X POST http://localhost:3000/api/dev-tools/reset -H "Cookie: <session>"
 ```
-This clears: tier → 'free', stripeCustomerId → null, stripeSubscriptionId → null, trialEndsAt → null
+This clears:
+- tier → `free`
+- stripeCustomerId → `null`
+- stripeSubscriptionId → `null`
+- stripeSubscriptionStatus → `inactive`
+- currentPeriodEnds → `null`
+- lastInvoicePaidAt → `null`
+- Stripe binding row deleted from `stripe_billing_bindings`
+- pending checkout row deleted from `stripe_checkout_sessions`
+
+Note: reset now writes an inert trial sentinel (`trialEndsAt = epoch`) rather than leaving a null trial field. That prevents accidental trial re-provisioning.
 
 ### Set Trial State
 ```
@@ -85,22 +106,54 @@ Clear: curl -X POST http://localhost:3000/api/dev-tools/trial -H "Cookie: <sessi
 
 ### Direct DB Manipulation (for edge cases)
 ```sql
--- Set specific subscription state
+-- Set an ACTIVE paid subscription state.
+-- Do not rely on stripe_subscription_id alone; paid access now requires
+-- subscription status + billing period + last invoice paid timestamp.
 UPDATE org_subscriptions SET
   tier = 'pro',
   stripe_customer_id = 'cus_test123',
   stripe_subscription_id = 'sub_test456',
+  stripe_subscription_status = 'active',
   trial_ends_at = NULL,
-  current_period_ends = NOW() + INTERVAL '30 days'
+  current_period_ends = NOW() + INTERVAL '30 days',
+  last_invoice_paid_at = NOW()
 WHERE tenant_id = '<your-tenant-id>';
 
--- Simulate past-due (set period end in the past)
+INSERT INTO stripe_billing_bindings (
+  tenant_id,
+  stripe_customer_id,
+  stripe_subscription_id
+)
+VALUES ('<your-tenant-id>', 'cus_test123', 'sub_test456')
+ON CONFLICT (tenant_id) DO UPDATE SET
+  stripe_customer_id = EXCLUDED.stripe_customer_id,
+  stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+  updated_at = NOW();
+
+-- Simulate past_due grace period with paid access still present
 UPDATE org_subscriptions SET
-  current_period_ends = NOW() - INTERVAL '5 days'
+  tier = 'pro',
+  stripe_customer_id = 'cus_test123',
+  stripe_subscription_id = 'sub_test456',
+  stripe_subscription_status = 'past_due',
+  current_period_ends = NOW() + INTERVAL '3 days',
+  last_invoice_paid_at = NOW() - INTERVAL '27 days'
+WHERE tenant_id = '<your-tenant-id>';
+
+-- Simulate expired unpaid subscription (should resolve to free features)
+UPDATE org_subscriptions SET
+  tier = 'pro',
+  stripe_customer_id = 'cus_test123',
+  stripe_subscription_id = 'sub_test456',
+  stripe_subscription_status = 'past_due',
+  current_period_ends = NOW() - INTERVAL '5 days',
+  last_invoice_paid_at = NOW() - INTERVAL '35 days'
 WHERE tenant_id = '<your-tenant-id>';
 
 -- Clear everything (nuclear reset)
 DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
+DELETE FROM stripe_billing_bindings WHERE tenant_id = '<your-tenant-id>';
+DELETE FROM stripe_checkout_sessions WHERE tenant_id = '<your-tenant-id>';
 DELETE FROM stripe_webhook_events;
 ```
 
@@ -569,21 +622,21 @@ SELECT id, eid FROM tenants LIMIT 5;
 ### Scenario E3: Past-Due Grace Period — PASS (2026-03-04)
 
 **Setup via DB:**
-- [x] Set `tier = 'pro'`, `current_period_ends = NOW() - 5 days` directly in DB
+- [x] Set `tier = 'pro'`, `stripe_subscription_status = 'past_due'`, `current_period_ends = NOW() + 3 days`, `last_invoice_paid_at` to a recent paid timestamp
 
 **Walkthrough:**
 - [x] Refresh the app — UI shows Pro with all features accessible
 - [x] **DOCUMENTED:** `GET /features` returns `tier: "pro"` with all Pro features enabled (`advancedAutocomplete`, `createDataExtension`, `deployToAutomation`, etc.)
-- [x] **DOCUMENTED:** User is still on "Pro" — `currentPeriodEnds` being in the past does NOT revoke access
-- [x] **CONFIRMED:** The app relies on the `tier` column, not `currentPeriodEnds`. Stripe manages the subscription lifecycle via webhooks — `customer.subscription.updated` (status changes) and `customer.subscription.deleted` (terminal cancellation) are what drive tier changes. This is correct SaaS dunning behavior.
+- [x] **DOCUMENTED:** User stays on Pro during the grace window because the app uses `stripe_subscription_status + current_period_ends + last_invoice_paid_at`, not just the presence of a subscription ID
+- [x] **CONFIRMED:** Past-due access is temporary. Once the grace window ends or Stripe sends terminal/unpaid state, features resolve to Free.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 **Bugs found:** None
 
 **Test Audit (2026-03-05):**
-- Code path: `handleSubscriptionChange()` line 431 — `...(isPastDueOrUnpaid ? {} : { tier })` conditional
-- **Gap found:** No test covered the past-due grace period behavior (tier preservation when status=past_due)
+- Code path: `handleSubscriptionChange()` preserves the existing tier for `past_due`/`unpaid` transitions while paid-through access still exists
+- **Gap found:** No test covered the grace-period behavior (tier preservation when status=`past_due`)
 - **Added:** Integration test `preserves tier when subscription status is past_due (grace period)` in `billing-webhook.integration.test.ts`
 - **Mutation tested:** Changed line 431 to always pass `tier` → test failed with `expected 'pro' to be 'enterprise'` → reverted. PASS.
 
@@ -624,6 +677,8 @@ SELECT id, eid FROM tenants LIMIT 5;
 ```sql
 -- Delete the subscription row to simulate brand new tenant
 DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
+DELETE FROM stripe_billing_bindings WHERE tenant_id = '<your-tenant-id>';
+DELETE FROM stripe_checkout_sessions WHERE tenant_id = '<your-tenant-id>';
 ```
 
 **Walkthrough:**
@@ -661,7 +716,7 @@ DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
 
 **Setup:**
 - [x] DevSubscriptionPanel → "Reset to Free"
-- [x] Set trial to expired: DevSubscriptionPanel → Set Trial Days: 0 (or via SQL: `UPDATE org_subscriptions SET tier = 'free', trial_ends_at = NOW() - INTERVAL '1 day' WHERE tenant_id = '<id>'`)
+- [x] Set trial to expired: DevSubscriptionPanel → Set Trial Days: 0 (or via SQL: `UPDATE org_subscriptions SET tier = 'pro', stripe_subscription_id = NULL, stripe_customer_id = NULL, stripe_subscription_status = 'inactive', current_period_ends = NULL, last_invoice_paid_at = NULL, trial_ends_at = NOW() - INTERVAL '1 day' WHERE tenant_id = '<id>'`)
 
 **Walkthrough:**
 - [x] Refresh the app
@@ -687,7 +742,7 @@ DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
 **Walkthrough:**
 - [x] Complete checkout (Subscribe → Pro → test card `4242 4242 4242 4242`)
 - [x] **CRITICAL:** Watch for tier flash — tier stays "Pro" throughout (no momentary drop to "Free") ✅
-- [x] In DB: trialEndsAt is now null, stripeSubscriptionId is set
+- [x] In DB: `trialEndsAt` is now null, `stripeSubscriptionId` is set, and the paid subscription fields are populated (`stripe_subscription_status`, `current_period_ends`, `last_invoice_paid_at`) once Stripe confirms payment
 - [x] Stripe CLI shows `subscription.created` webhook event — all webhooks 200 OK
 - [x] Features query refreshed — no stale trial data visible in UI (trial banner gone, Pro features accessible)
 
@@ -695,10 +750,10 @@ DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
 
 **Test Audit (2026-03-04):**
 - F4's code paths overlap heavily with A4/A5 — all already covered by existing integration tests
-- **Key test:** `billing-webhook.integration.test.ts` → `'upgrades trial tenant to paid pro, clearing trial'` (line 402) — sets up trial tenant, processes checkout.session.completed, asserts tier=pro + trialEndsAt=null + stripeSubscriptionId set
+- **Key test:** `billing-webhook.integration.test.ts` → `'upgrades trial tenant to paid pro, clearing trial'` — sets up a trial tenant, processes the Stripe webhook flow, and asserts the trial is cleared while the paid subscription binding is persisted
 - **Supporting tests:** `trial-lifecycle.integration.test.ts` → `'returns subscription tier when Stripe subscription exists'` (features query), `'does not restart trial for paid subscriber'` (re-provisioning guard)
 - **Frontend:** `get-tier-cta.test.ts` covers trial-active → "Subscribe to Pro" CTA logic (tested per A4)
-- Mutation tested: removed `trialEndsAt: null` from `handleCheckoutSessionCompleted` → test caught it immediately at line 436 ✅
+- Mutation tested: removed the trial-clearing write from `handleCheckoutSessionCompleted` → test failed immediately ✅
 - No new tests needed — existing coverage is comprehensive for F4's paths
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
@@ -728,8 +783,9 @@ DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
 
 **Test Audit (2026-03-05):**
 - Code path: `process()` idempotency guard via `webhookEventRepo.markProcessing()`
-- Existing coverage: `checkout.session.expired and past-due grace period tests` already cover the idempotency layer (markProcessing → markCompleted/markFailed)
-- No new tests needed — idempotency is exercised implicitly by every integration test that calls `process()`
+- Existing coverage: `billing-webhook.integration.test.ts` includes an explicit duplicate-delivery test that resends the same event and asserts it is skipped without mutating subscription state
+- Supporting coverage: other webhook integration tests still exercise the `markProcessing()` → `markCompleted()` / `markFailed()` lifecycle on the same code path
+- No new tests needed — idempotency is covered both explicitly and incidentally
 
 ---
 
@@ -739,8 +795,26 @@ DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
 ```sql
 UPDATE org_subscriptions SET
   stripe_customer_id = 'cus_existing_customer',
-  stripe_subscription_id = 'sub_existing_sub'
+  stripe_subscription_id = 'sub_existing_sub',
+  stripe_subscription_status = 'active',
+  current_period_ends = NOW() + INTERVAL '30 days',
+  last_invoice_paid_at = NOW()
 WHERE tenant_id = '06bb7b4f-4777-4081-92bf-8ec9d6e32eb2';
+
+INSERT INTO stripe_billing_bindings (
+  tenant_id,
+  stripe_customer_id,
+  stripe_subscription_id
+)
+VALUES (
+  '06bb7b4f-4777-4081-92bf-8ec9d6e32eb2',
+  'cus_existing_customer',
+  'sub_existing_sub'
+)
+ON CONFLICT (tenant_id) DO UPDATE SET
+  stripe_customer_id = EXCLUDED.stripe_customer_id,
+  stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+  updated_at = NOW();
 ```
 
 **Walkthrough:**
@@ -779,7 +853,7 @@ WHERE tenant_id = '06bb7b4f-4777-4081-92bf-8ec9d6e32eb2';
 
 **Test Audit (2026-03-05):**
 - Code path: `billing.controller.ts` lines 73-119 — `stripe.webhooks.constructEvent()` signature verification
-- Existing coverage: Webhook signature verification is tested via `billing-webhook.integration.test.ts` (returns 401 AUTH_UNAUTHORIZED on invalid signature)
+- Existing coverage: Webhook signature verification is tested in `apps/api/src/billing/__tests__/billing.controller.unit.test.ts` (missing raw body, empty signature, invalid signature, and correct `constructEvent` wiring)
 - No new tests needed — signature verification is a Stripe SDK responsibility; our test covers the controller's error handling
 
 ---
@@ -1019,7 +1093,7 @@ Run scenarios in this order to minimize resets and build on prior state:
 17. **I2** — 3D Secure authentication
 18. **I6** ✅ — Checkout abandonment (verified 2026-03-04, no bugs)
 19. **E2** ✅ — Renewal payment failure (verified 2026-03-04, no bugs — app correctly keeps Pro during past_due)
-20. **E3** ✅ — Past-due grace period (verified 2026-03-04, no bugs — tier column drives access, not currentPeriodEnds)
+20. **E3** ✅ — Past-due grace period (verified 2026-03-04, no bugs — access is derived from subscription status + billing period state, not `stripeSubscriptionId` alone)
 21. **E4** ✅ — Payment recovery (verified 2026-03-04, no bugs — invoice paid, subscription restored to active)
 
 ### Wave 4: Security & Edge Cases

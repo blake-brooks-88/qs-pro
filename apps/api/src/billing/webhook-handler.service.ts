@@ -292,7 +292,7 @@ export class WebhookHandlerService {
     lastInvoicePaidAt?: Date | null;
     trialEndsAt?: Date | null;
   }): Promise<void> {
-    await this.rlsContext.runWithTenantContext(
+    await this.rlsContext.runWithIsolatedTenantContext(
       params.tenantId,
       'system',
       async () => {

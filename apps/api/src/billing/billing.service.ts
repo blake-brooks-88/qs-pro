@@ -148,6 +148,51 @@ export class BillingService {
       );
     }
 
+    // Pre-check: reconcile any stale completed checkout before entering
+    // the locked transaction. This ensures reconciliation commits independently
+    // so it isn't rolled back by subsequent errors within the checkout transaction.
+    const staleSession = await this.rlsContext.runWithTenantContext(
+      tenantId,
+      'system',
+      async () => {
+        const existingCheckout =
+          await this.stripeCheckoutSessionRepo.findByTenantId(tenantId);
+        if (
+          existingCheckout?.status === 'open' &&
+          existingCheckout.tier === tier &&
+          existingCheckout.interval === interval &&
+          existingCheckout.sessionId
+        ) {
+          const liveSession = await stripe.checkout.sessions.retrieve(
+            existingCheckout.sessionId,
+          );
+          await this.syncStoredCheckoutSession(liveSession);
+          if (
+            liveSession.status === 'complete' &&
+            liveSession.payment_status === 'paid'
+          ) {
+            return liveSession;
+          }
+        }
+        return null;
+      },
+    );
+
+    if (staleSession) {
+      await this.processCheckoutCompletion(staleSession);
+
+      const reconciledSubscription = await this.rlsContext.runWithTenantContext(
+        tenantId,
+        'system',
+        () => this.orgSubscriptionRepo.findByTenantId(tenantId),
+      );
+      if (hasPaidEntitlement(reconciledSubscription)) {
+        throw new BadRequestException(
+          'An active paid subscription already exists for this tenant',
+        );
+      }
+    }
+
     return this.rlsContext.runWithIsolatedTenantContext(
       tenantId,
       'system',
@@ -182,20 +227,6 @@ export class BillingService {
           );
 
           await this.syncStoredCheckoutSession(liveSession);
-
-          if (liveSession.status === 'complete') {
-            if (liveSession.payment_status === 'paid') {
-              await this.processCheckoutCompletion(liveSession);
-
-              const reconciledSubscription =
-                await this.orgSubscriptionRepo.findByTenantId(tenantId);
-              if (hasPaidEntitlement(reconciledSubscription)) {
-                throw new BadRequestException(
-                  'An active paid subscription already exists for this tenant',
-                );
-              }
-            }
-          }
 
           const liveExpiresAt = liveSession.expires_at
             ? new Date(liveSession.expires_at * 1000)
