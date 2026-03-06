@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
 import { useCheckout } from "@/hooks/use-checkout";
+import { hasPendingCheckout } from "@/lib/pending-checkout";
 
 vi.mock("@/services/billing", () => ({
   createCheckout: vi.fn(),
@@ -111,6 +112,7 @@ describe("useCheckout", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["usage"],
     });
+    expect(hasPendingCheckout()).toBe(true);
   });
 
   it("shows a toast with the API detail when checkout fails", async () => {
@@ -137,6 +139,37 @@ describe("useCheckout", () => {
 
     expect(mockToastError).toHaveBeenCalledWith("Unable to start checkout", {
       description: "Cannot POST /api/billing/checkout",
+    });
+  });
+
+  it("re-syncs features when checkout is already paid server-side", async () => {
+    mockCreateCheckout.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          detail: "An active paid subscription already exists for this tenant",
+        },
+      },
+      isAxiosError: true,
+    });
+
+    const queryClient = createQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = createWrapper(queryClient);
+
+    const { result } = renderHook(() => useCheckout(), { wrapper });
+
+    result.current.mutate({ tier: "pro", interval: "monthly" });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["features"],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["usage"],
     });
   });
 });

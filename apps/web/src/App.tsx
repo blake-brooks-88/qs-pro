@@ -15,8 +15,15 @@ import { EditorWorkspacePage } from "@/features/editor-workspace/EditorWorkspace
 import { featuresQueryKeys } from "@/hooks/use-tenant-features";
 import { useTrial } from "@/hooks/use-trial";
 import { track } from "@/lib/analytics";
+import {
+  clearPendingCheckout,
+  hasPendingCheckout,
+  PENDING_CHECKOUT_CHANGED_EVENT,
+} from "@/lib/pending-checkout";
 import { getMe, loginWithJwt } from "@/services/auth";
+import { confirmCheckoutSession } from "@/services/billing";
 import { consumeEmbeddedJwt } from "@/services/embedded-jwt";
+import { getTenantFeatures } from "@/services/features";
 import { useAuthStore } from "@/store/auth-store";
 import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 
@@ -47,6 +54,14 @@ function getHttpData(error: unknown): unknown {
   return response.data;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+const PENDING_CHECKOUT_SESSION_KEY = "pendingCheckoutSessionId";
+
 function App() {
   const queryClient = useQueryClient();
   const { isAuthenticated, setAuth, logout } = useAuthStore();
@@ -55,8 +70,12 @@ function App() {
   const [showLaunchHelp, setShowLaunchHelp] = useState(false);
   const [oauthRedirectAttempted, setOauthRedirectAttempted] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [pendingCheckoutActive, setPendingCheckoutActive] = useState(() =>
+    hasPendingCheckout(),
+  );
   const { showCountdown, isTrialExpired, daysRemaining } = useTrial();
   const openPricing = usePricingOverlayStore((s) => s.open);
+  const closePricing = usePricingOverlayStore((s) => s.close);
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") {
       return false;
@@ -188,19 +207,116 @@ function App() {
   }, [isEmbedded, isAuthenticated, setAuth]);
 
   useEffect(() => {
+    const syncPendingCheckout = (): void => {
+      setPendingCheckoutActive(hasPendingCheckout());
+    };
+
+    syncPendingCheckout();
+    window.addEventListener(
+      PENDING_CHECKOUT_CHANGED_EVENT,
+      syncPendingCheckout,
+    );
+
+    return () => {
+      window.removeEventListener(
+        PENDING_CHECKOUT_CHANGED_EVENT,
+        syncPendingCheckout,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get("checkout");
-    if (checkout === "success") {
-      track("checkout_completed");
-      toast.success("Welcome to Pro!", {
-        description: "All Pro features are now unlocked.",
-      });
-      void queryClient.invalidateQueries({ queryKey: featuresQueryKeys.all });
-    } else if (checkout === "cancel") {
-      track("checkout_canceled");
+    const sessionIdFromUrl = params.get("session_id");
+    const sessionId =
+      sessionIdFromUrl ??
+      window.sessionStorage.getItem(PENDING_CHECKOUT_SESSION_KEY);
+
+    if (sessionIdFromUrl) {
+      window.sessionStorage.setItem(PENDING_CHECKOUT_SESSION_KEY, sessionIdFromUrl);
     }
+
+    const handleCheckoutRedirect = async (): Promise<void> => {
+      try {
+        if (checkout === "success" || sessionId) {
+          if (checkout === "success") {
+            track("checkout_completed");
+          }
+
+          if (sessionId) {
+            for (let attempt = 0; attempt < 10; attempt += 1) {
+              const result = await confirmCheckoutSession(sessionId);
+              if (cancelled) {
+                return;
+              }
+
+              if (result.status === "fulfilled") {
+                toast.success("Welcome to Pro!", {
+                  description: "All Pro features are now unlocked.",
+                });
+                window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+                void queryClient.invalidateQueries({
+                  queryKey: featuresQueryKeys.all,
+                });
+                return;
+              }
+
+              if (result.status === "failed") {
+                window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+                toast.error("Checkout did not complete", {
+                  description:
+                    result.reason === "expired"
+                      ? "Your previous checkout session expired. Start checkout again."
+                      : "Your previous checkout did not complete payment. Start checkout again.",
+                });
+                void queryClient.invalidateQueries({
+                  queryKey: featuresQueryKeys.all,
+                });
+                return;
+              }
+
+              await delay(1500);
+            }
+
+            window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+            toast.message("Checkout is still processing", {
+              description:
+                "Payment succeeded, but billing is still syncing. Refresh in a moment if Pro does not appear.",
+            });
+            void queryClient.invalidateQueries({
+              queryKey: featuresQueryKeys.all,
+            });
+            return;
+          }
+
+          toast.success("Welcome to Pro!", {
+            description: "All Pro features are now unlocked.",
+          });
+        window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+        void queryClient.invalidateQueries({ queryKey: featuresQueryKeys.all });
+      } else if (checkout === "cancel") {
+        track("checkout_canceled");
+        window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+      }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error("Unable to confirm checkout", {
+            description:
+              error instanceof Error
+                ? error.message
+                : "Billing is still syncing. Refresh in a moment.",
+          });
+        }
+      }
+    };
+
+    void handleCheckoutRedirect();
+
     if (checkout) {
       params.delete("checkout");
+      params.delete("session_id");
       const cleaned = params.toString();
       const newUrl =
         window.location.pathname +
@@ -208,7 +324,182 @@ function App() {
         window.location.hash;
       window.history.replaceState({}, "", newUrl);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [queryClient]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !pendingCheckoutActive) {
+      return;
+    }
+
+    let cancelled = false;
+    const pollStartedAt = Date.now();
+    const maxPollingWindowMs = 30 * 60 * 1000;
+
+    const getNextPollDelayMs = (attempt: number): number => {
+      switch (attempt) {
+        case 0:
+          return 0;
+        case 1:
+          return 1500;
+        case 2:
+          return 3000;
+        case 3:
+          return 5000;
+        case 4:
+          return 10000;
+        default:
+          return 15000;
+      }
+    };
+
+    const refreshPendingCheckout = async (): Promise<boolean> => {
+      if (!hasPendingCheckout()) {
+        setPendingCheckoutActive(false);
+        return true;
+      }
+
+      try {
+        const features = await queryClient.fetchQuery({
+          queryKey: featuresQueryKeys.tenant(),
+          queryFn: getTenantFeatures,
+          staleTime: 0,
+        });
+
+        if (cancelled) {
+          return true;
+        }
+
+        if (features.tier !== "free") {
+          clearPendingCheckout();
+          closePricing();
+          if (isEmbedded) {
+            window.location.reload();
+            return true;
+          }
+
+          toast.success("Welcome to Pro!", {
+            description: "All Pro features are now unlocked.",
+          });
+          return true;
+        }
+      } catch {
+        if (cancelled) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    const runPollingLoop = async (): Promise<void> => {
+      let attempt = 0;
+
+      while (!cancelled && Date.now() - pollStartedAt < maxPollingWindowMs) {
+        const waitMs = getNextPollDelayMs(attempt);
+        if (waitMs > 0) {
+          await delay(waitMs);
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        const done = await refreshPendingCheckout();
+        if (done) {
+          return;
+        }
+
+        attempt += 1;
+      }
+    };
+
+    const handleWindowFocus = (): void => {
+      void refreshPendingCheckout();
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === "visible") {
+        void refreshPendingCheckout();
+      }
+    };
+
+    const handlePageShow = (): void => {
+      void refreshPendingCheckout();
+    };
+
+    const handleDocumentFocusIn = (): void => {
+      void refreshPendingCheckout();
+    };
+
+    void runPollingLoop();
+
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("focusin", handleDocumentFocusIn);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("focusin", handleDocumentFocusIn);
+    };
+  }, [closePricing, isAuthenticated, isEmbedded, pendingCheckoutActive, queryClient]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !pendingCheckoutActive) {
+      return;
+    }
+
+    let refreshing = false;
+
+    const handleInteraction = (): void => {
+      if (refreshing || !hasPendingCheckout()) {
+        return;
+      }
+      refreshing = true;
+      void refreshOnInteraction();
+    };
+
+    const refreshOnInteraction = async (): Promise<void> => {
+      try {
+        const features = await queryClient.fetchQuery({
+          queryKey: featuresQueryKeys.tenant(),
+          queryFn: getTenantFeatures,
+          staleTime: 0,
+        });
+
+        if (features.tier !== "free") {
+          clearPendingCheckout();
+          closePricing();
+          if (isEmbedded) {
+            window.location.reload();
+            return;
+          }
+          toast.success("Welcome to Pro!", {
+            description: "All Pro features are now unlocked.",
+          });
+          return;
+        }
+      } catch {
+        // Will retry on next interaction
+      }
+      refreshing = false;
+    };
+
+    document.addEventListener("pointerdown", handleInteraction);
+    document.addEventListener("keydown", handleInteraction);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleInteraction);
+      document.removeEventListener("keydown", handleInteraction);
+    };
+  }, [closePricing, isAuthenticated, isEmbedded, pendingCheckoutActive, queryClient]);
 
   if (isLoading) {
     return (

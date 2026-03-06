@@ -8,9 +8,12 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
 
 import App from "@/App";
+import { markPendingCheckout } from "@/lib/pending-checkout";
 import { server } from "@/test/mocks/server";
+import { createTenantFeaturesStub } from "@/test/stubs";
 
 // Mock the SQL diagnostics hook to avoid Worker issues in tests
 vi.mock(
@@ -498,6 +501,36 @@ describe("App", () => {
       // Verify no error states
       expect(screen.queryByText("Connection Error")).not.toBeInTheDocument();
       expect(screen.queryByText("Launch Query++")).not.toBeInTheDocument();
+    });
+
+    it("refreshes features when checkout is pending in the iframe tab", async () => {
+      setEmbeddedMode(true);
+      const meResponse = createMockMeResponse();
+      let featureRequestCount = 0;
+
+      server.use(
+        http.get("/api/features", () => {
+          featureRequestCount += 1;
+          return HttpResponse.json(
+            createTenantFeaturesStub({
+              tier: featureRequestCount >= 2 ? "pro" : "free",
+            }),
+          );
+        }),
+      );
+
+      mockGetMe.mockResolvedValue(meResponse);
+      markPendingCheckout();
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      await waitFor(() => {
+        expect(mockLocationReload).toHaveBeenCalled();
+      }, { timeout: 4000 });
     });
   });
 
