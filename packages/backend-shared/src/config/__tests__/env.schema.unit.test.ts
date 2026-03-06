@@ -19,6 +19,7 @@ function makeApiEnv(overrides: Record<string, unknown> = {}) {
     MCE_JWT_SIGNING_SECRET: "x".repeat(32),
     SESSION_SECRET: "y".repeat(32),
     SESSION_SALT: "z".repeat(16),
+    APP_WEB_ORIGIN: "http://localhost:5173",
     ...overrides,
   };
 }
