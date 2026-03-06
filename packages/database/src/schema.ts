@@ -49,13 +49,24 @@ export const users = pgTable("users", {
   name: varchar("name"),
 });
 
+export type StripeSubscriptionStatus =
+  | "inactive"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "unpaid"
+  | "canceled"
+  | "incomplete"
+  | "incomplete_expired"
+  | "paused";
+
 // 2. Org Subscriptions (Org-level billing / subscription state)
 export const orgSubscriptions = pgTable(
   "org_subscriptions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull()
       .unique(),
     stripeCustomerId: varchar("stripe_customer_id"),
@@ -64,9 +75,14 @@ export const orgSubscriptions = pgTable(
       .$type<"free" | "pro" | "enterprise">()
       .default("free")
       .notNull(),
+    stripeSubscriptionStatus: varchar("stripe_subscription_status")
+      .$type<StripeSubscriptionStatus>()
+      .default("inactive")
+      .notNull(),
     seatLimit: integer("seat_limit"),
     trialEndsAt: timestamp("trial_ends_at"),
     currentPeriodEnds: timestamp("current_period_ends"),
+    lastInvoicePaidAt: timestamp("last_invoice_paid_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -75,7 +91,65 @@ export const orgSubscriptions = pgTable(
   }),
 );
 
-// 2b. Stripe Webhook Events (Idempotent webhook processing, system-level)
+// 2b. Stripe identity bindings (system-level lookups outside tenant RLS)
+export const stripeBillingBindings = pgTable(
+  "stripe_billing_bindings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id, { onDelete: "cascade" })
+      .notNull()
+      .unique(),
+    stripeCustomerId: varchar("stripe_customer_id"),
+    stripeSubscriptionId: varchar("stripe_subscription_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    stripeCustomerIdIdx: uniqueIndex(
+      "stripe_billing_bindings_customer_id_idx",
+    ).on(t.stripeCustomerId),
+    stripeSubscriptionIdIdx: uniqueIndex(
+      "stripe_billing_bindings_subscription_id_idx",
+    ).on(t.stripeSubscriptionId),
+  }),
+);
+
+// 2c. Stripe Checkout sessions (system-level idempotency + reuse)
+export const stripeCheckoutSessions = pgTable(
+  "stripe_checkout_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id, { onDelete: "cascade" })
+      .notNull()
+      .unique(),
+    idempotencyKey: varchar("idempotency_key").notNull(),
+    sessionId: varchar("session_id"),
+    sessionUrl: text("session_url"),
+    tier: varchar("tier").$type<"pro" | "enterprise">().notNull(),
+    interval: varchar("interval").$type<"monthly" | "annual">().notNull(),
+    status: varchar("status")
+      .$type<"creating" | "open" | "completed" | "expired" | "failed">()
+      .default("creating")
+      .notNull(),
+    expiresAt: timestamp("expires_at"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    tenantIdIdx: index("stripe_checkout_sessions_tenant_id_idx").on(t.tenantId),
+    idempotencyKeyIdx: uniqueIndex(
+      "stripe_checkout_sessions_idempotency_key_idx",
+    ).on(t.idempotencyKey),
+    sessionIdIdx: uniqueIndex("stripe_checkout_sessions_session_id_idx").on(
+      t.sessionId,
+    ),
+  }),
+);
+
+// 2d. Stripe Webhook Events (Idempotent webhook processing, system-level)
 export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
   id: varchar("id").primaryKey(),
   eventType: varchar("event_type").notNull(),
@@ -373,6 +447,16 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs);
 
 export const selectOrgSubscriptionSchema = createSelectSchema(orgSubscriptions);
 export const insertOrgSubscriptionSchema = createInsertSchema(orgSubscriptions);
+
+export const selectStripeBillingBindingSchema =
+  createSelectSchema(stripeBillingBindings);
+export const insertStripeBillingBindingSchema =
+  createInsertSchema(stripeBillingBindings);
+
+export const selectStripeCheckoutSessionSchema =
+  createSelectSchema(stripeCheckoutSessions);
+export const insertStripeCheckoutSessionSchema =
+  createInsertSchema(stripeCheckoutSessions);
 
 export const selectStripeWebhookEventSchema =
   createSelectSchema(stripeWebhookEvents);
