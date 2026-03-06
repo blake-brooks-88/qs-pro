@@ -121,7 +121,11 @@ function StatusIcon({ status }: { status: Status }) {
   if (status === "canceled") {
     return (
       <div className="rounded-full bg-muted p-3">
-        <CloseCircle size={48} weight="Bold" className="text-muted-foreground" />
+        <CloseCircle
+          size={48}
+          weight="Bold"
+          className="text-muted-foreground"
+        />
       </div>
     );
   }
@@ -148,7 +152,7 @@ function StatusContent({ status }: { status: Status }) {
   if (status === "success") {
     return (
       <>
-        <h1 className="text-xl font-semibold">You're on Pro!</h1>
+        <h1 className="text-xl font-semibold">You&apos;re on Pro!</h1>
         <p className="text-sm text-muted-foreground">
           Payment confirmed. Return to Marketing Cloud to start using your new
           features.

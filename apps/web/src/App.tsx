@@ -235,7 +235,10 @@ function App() {
       window.sessionStorage.getItem(PENDING_CHECKOUT_SESSION_KEY);
 
     if (sessionIdFromUrl) {
-      window.sessionStorage.setItem(PENDING_CHECKOUT_SESSION_KEY, sessionIdFromUrl);
+      window.sessionStorage.setItem(
+        PENDING_CHECKOUT_SESSION_KEY,
+        sessionIdFromUrl,
+      );
     }
 
     const handleCheckoutRedirect = async (): Promise<void> => {
@@ -294,12 +297,14 @@ function App() {
           toast.success("Welcome to Pro!", {
             description: "All Pro features are now unlocked.",
           });
-        window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
-        void queryClient.invalidateQueries({ queryKey: featuresQueryKeys.all });
-      } else if (checkout === "cancel") {
-        track("checkout_canceled");
-        window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
-      }
+          window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+          void queryClient.invalidateQueries({
+            queryKey: featuresQueryKeys.all,
+          });
+        } else if (checkout === "cancel") {
+          track("checkout_canceled");
+          window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+        }
       } catch (error) {
         if (!cancelled) {
           toast.error("Unable to confirm checkout", {
@@ -449,7 +454,13 @@ function App() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("focusin", handleDocumentFocusIn);
     };
-  }, [closePricing, isAuthenticated, isEmbedded, pendingCheckoutActive, queryClient]);
+  }, [
+    closePricing,
+    isAuthenticated,
+    isEmbedded,
+    pendingCheckoutActive,
+    queryClient,
+  ]);
 
   useEffect(() => {
     if (!isAuthenticated || !pendingCheckoutActive) {
@@ -499,7 +510,13 @@ function App() {
       document.removeEventListener("pointerdown", handleInteraction);
       document.removeEventListener("keydown", handleInteraction);
     };
-  }, [closePricing, isAuthenticated, isEmbedded, pendingCheckoutActive, queryClient]);
+  }, [
+    closePricing,
+    isAuthenticated,
+    isEmbedded,
+    pendingCheckoutActive,
+    queryClient,
+  ]);
 
   if (isLoading) {
     return (

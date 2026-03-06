@@ -2,8 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useCheckout } from "@/hooks/use-checkout";
 import { hasPendingCheckout } from "@/lib/pending-checkout";
@@ -45,7 +45,7 @@ describe("useCheckout", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(window, "open").mockImplementation(
-      () => ({ closed: false } as WindowProxy),
+      () => ({ closed: false }) as WindowProxy,
     );
     mockToastError.mockReset();
   });

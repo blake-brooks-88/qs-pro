@@ -6,9 +6,9 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { http, HttpResponse } from "msw";
 
 import App from "@/App";
 import { markPendingCheckout } from "@/lib/pending-checkout";
@@ -528,9 +528,12 @@ describe("App", () => {
         expect(screen.getByText("Query")).toBeInTheDocument();
       });
 
-      await waitFor(() => {
-        expect(mockLocationReload).toHaveBeenCalled();
-      }, { timeout: 4000 });
+      await waitFor(
+        () => {
+          expect(mockLocationReload).toHaveBeenCalled();
+        },
+        { timeout: 4000 },
+      );
     });
   });
 

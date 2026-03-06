@@ -1,5 +1,5 @@
-import axios from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { toast } from "sonner";
 
 import { featuresQueryKeys } from "@/hooks/use-tenant-features";
