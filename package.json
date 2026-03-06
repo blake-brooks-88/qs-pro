@@ -10,6 +10,7 @@
     "api:dev:fast": "lsof -i :3000 -t | xargs kill -9 2>/dev/null || true && pnpm --filter api start:dev",
     "web:dev": "pnpm --filter @qpp/web dev",
     "web:dev:preview": "pnpm --filter @qpp/web dev:preview",
+    "dev:startup": "docker-compose up -d && concurrently \"pnpm dev\" \"stripe listen --forward-to localhost:3000/api/billing/webhook\"",
     "tunnel:dev": "concurrently \"pnpm dev\" \"cloudflared tunnel run queryplusplus-dev\"",
     "tunnel:dev:http2": "concurrently \"pnpm dev\" \"cloudflared tunnel run --protocol http2 queryplusplus-dev\"",
     "pretest": "pnpm -r --filter \"./packages/**\" build",

@@ -206,41 +206,45 @@ SELECT id, eid FROM tenants LIMIT 5;
 
 ---
 
-### Scenario A4: Trial Active → Pro Conversion
+### Scenario A4: Trial Active → Pro Conversion — PASS (2026-03-04)
 
 **Setup:**
-- [ ] DevSubscriptionPanel → "Reset to Free"
-- [ ] DevSubscriptionPanel → Set Trial Days: `7`
-- [ ] Tier badge shows "Pro", trial banner visible
+- [x] DevSubscriptionPanel → "Reset to Free"
+- [x] DevSubscriptionPanel → Set Trial Days: `7`
+- [x] Tier badge shows "Pro", trial banner visible
 
 **Walkthrough:**
-- [ ] Header shows **"Subscribe"** (not "Upgrade") for trial users
-- [ ] Click **"Subscribe"** → PricingOverlay opens
-- [ ] Select Pro → complete checkout with test card `4242 4242 4242 4242`
-- [ ] Checkout completes successfully
-- [ ] Stripe CLI shows `checkout.session.completed` webhook
-- [ ] No tier flicker — tier stays "Pro" throughout (no flash to "Free")
-- [ ] Trial banner disappears after conversion
-- [ ] DevSubscriptionPanel shows stripeSubscriptionId is set, trialEndsAt is null
+- [x] Header shows **"Subscribe"** (not "Upgrade") for trial users
+- [x] Click **"Subscribe"** → PricingOverlay opens
+- [x] Select Pro → complete checkout with test card `4242 4242 4242 4242`
+- [x] Checkout completes successfully
+- [x] Stripe CLI shows `checkout.session.completed` webhook
+- [x] No tier flicker — tier stays "Pro" throughout (no flash to "Free")
+- [x] Trial banner disappears after conversion
+- [x] DevSubscriptionPanel shows stripeSubscriptionId is set, trialEndsAt is null
+
+**Bug Found & Fixed:** Trial users saw disabled "Current Plan" button on Pro card instead of upgrade CTA. Fixed in commit 29562ff: extracted `getTierCta` pure function, TierCard now distinguishes trial-Pro from paid-Pro. Test added in `get-tier-cta.test.ts`, mutation tested.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
 
-### Scenario A5: Trial Expired → Pro Conversion
+### Scenario A5: Trial Expired → Pro Conversion — PASS (2026-03-04)
 
 **Setup:**
-- [ ] DevSubscriptionPanel → "Reset to Free"
-- [ ] Set trial to expired: DevSubscriptionPanel → Set Trial Days: 0 (or via SQL: `UPDATE org_subscriptions SET tier = 'free', trial_ends_at = NOW() - INTERVAL '1 day' WHERE tenant_id = '<id>'`)
+- [x] DevSubscriptionPanel → "Reset to Free"
+- [x] Set trial to expired: DevSubscriptionPanel → Set Trial Days: 0
 
 **Walkthrough:**
-- [ ] Refresh app: TrialExpiredBanner visible with "View Plans" link
-- [ ] Click **"View Plans"** → PricingOverlay opens
-- [ ] Select Pro → complete checkout with test card `4242 4242 4242 4242`
-- [ ] Stripe CLI shows `checkout.session.completed` webhook
-- [ ] Tier badge shows "Pro"
-- [ ] QuotaGate no longer shows limits (Pro = unlimited)
-- [ ] All Pro features accessible (execution history, version history unlocked)
+- [x] Refresh app: TrialExpiredBanner visible with "View Plans" link
+- [x] Click **"View Plans"** → PricingOverlay opens with 3 tier cards
+- [x] Select Pro → complete checkout with test card `4242 4242 4242 4242`
+- [x] Stripe CLI shows `checkout.session.completed` webhook — all webhooks 200 OK
+- [x] Tier badge shows "Pro"
+- [x] QuotaGate no longer shows limits (Pro = unlimited)
+- [x] All Pro features accessible (execution history, version history unlocked)
+
+**Findings:** No bugs. Clean conversion from expired trial to paid Pro. All webhooks processed without errors.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
@@ -330,81 +334,107 @@ SELECT id, eid FROM tenants LIMIT 5;
 
 ## Category C: Subscription Management via Portal
 
-### Scenario C1: Update Payment Method
+### Scenario C1: Update Payment Method — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Tenant has active Pro subscription (complete A1 first if needed)
+- [x] Tenant has active Pro subscription (complete A1 first if needed)
 
 **Walkthrough:**
-- [ ] Header shows **"Billing"** link (not "Upgrade") for paid users
-- [ ] Click **"Billing"** → Stripe Customer Portal opens in new tab
-- [ ] Portal loads successfully
-- [ ] Find **"Payment method"** section
-- [ ] Click **"Update"** or **"Add"** payment method
-- [ ] Enter new card: `4242 4242 4242 4242` (or `5555 5555 5555 4444` for Mastercard)
-- [ ] Save the new payment method
-- [ ] Payment method updated in Portal UI
-- [ ] Return to app: no service interruption — tier still "Pro", all features work
+- [x] Header shows **"Billing"** link (not "Upgrade") for paid users
+- [x] Click **"Billing"** → Stripe Customer Portal opens in new tab
+- [x] Portal loads successfully — shows subscription details, payment method, billing info, invoice history
+- [x] Find **"Payment method"** section
+- [x] Click **"Add payment method"**
+- [x] Enter Mastercard: `5555 5555 5555 4444`, expiry `12/34`, CVC `123`
+- [x] Save the new payment method — automatically set as default
+- [x] Payment method updated in Portal UI — both Visa •••• 4242 and Mastercard •••• 4444 visible
+- [x] Return to app: no service interruption — tier still "Pro", all features work
+
+**Findings:** No bugs. Portal loaded cleanly, payment method add/default flow works as expected. No webhooks fired for payment method update (expected — Stripe Portal handles this client-side).
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
 
-### Scenario C2: View and Download Invoice PDFs
+### Scenario C2: View and Download Invoice PDFs — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Tenant has active Pro subscription with at least 1 completed payment
-- [ ] If not: complete Scenario A1 first
+- [x] Tenant has active Pro subscription with at least 1 completed payment (from C1 setup)
 
 **Walkthrough:**
-- [ ] Click **"Billing"** → Stripe Customer Portal opens
-- [ ] Find **"Billing history"** or **"Invoices"** section
-- [ ] At least one invoice is listed with date, amount, status
-- [ ] Click **"Download"** or **"View PDF"** on an invoice
-- [ ] PDF downloads/opens
-- [ ] PDF includes invoice number, date, line items, total, payment method last 4 digits
-- [ ] PDF is professional enough for corporate expense reporting
+- [x] Click **"Billing"** → Stripe Customer Portal opens
+- [x] Find **"Invoice history"** section — visible at bottom of portal
+- [x] At least one invoice listed: Mar 4, 2026 / $240.00 / Paid
+- [x] Click invoice → detail view shows invoice number (PFE0XZ3K-0001), payment date, payment method
+- [x] **"Download invoice"** and **"Download receipt"** buttons available
+- [x] PDF downloads successfully
+- [x] PDF includes invoice number, date, line items (Query++ Pro Tier), total ($240.00), payment method
+- [x] PDF is professional enough for corporate expense reporting
+
+**Findings:** No bugs. Invoice and receipt PDFs both available. Portal shows payment method as "Link" (Stripe's default labeling for test mode). All Stripe-hosted — no app code paths beyond portal session generation.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
 
-### Scenario C3: Cancel Subscription
+### Scenario C3: Cancel Subscription — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Tenant has active Pro subscription (complete A1 first if needed)
+- [x] Tenant has active Pro subscription (fresh checkout with `4242 4242 4242 4242`)
 
 **Walkthrough:**
-- [ ] Click **"Billing"** → Stripe Customer Portal
-- [ ] Find **"Cancel plan"** or **"Cancel subscription"**
-- [ ] Click cancel
-- [ ] Confirmation screen explains: access continues until end of billing period
-- [ ] Confirm cancellation
-- [ ] Stripe CLI shows `customer.subscription.updated` webhook with `cancel_at_period_end: true`
-- [ ] Return to app: tier still shows "Pro" (grace period until period end)
-- [ ] **Simulate period end** via DB: `UPDATE org_subscriptions SET current_period_ends = NOW() - INTERVAL '1 day' WHERE tenant_id = '<id>';` then trigger `customer.subscription.deleted` webhook
-- [ ] After subscription.deleted: tier reverts to "Free"
-- [ ] Features lock, quotas enforce
-- [ ] Saved queries and history are NOT deleted
+- [x] Click **"Billing"** → Stripe Customer Portal
+- [x] Find **"Cancel plan"** or **"Cancel subscription"**
+- [x] Click cancel
+- [x] Confirmation screen explains: access continues until end of billing period
+- [x] Confirm cancellation
+- [x] Stripe CLI shows `customer.subscription.updated` webhook with `cancel_at_period_end: true` — 200 OK
+- [x] Return to app: tier still shows "Pro" (grace period until period end)
+- [x] Cancel immediately via Stripe Portal → `customer.subscription.deleted` — 200 OK
+- [x] After subscription.deleted: tier reverts to "Free"
+- [x] Features lock (execution history, version history show locked overlays)
+- [x] Saved queries and history are NOT deleted (data preserved, just locked behind tier gate)
+
+**Bugs Found & Fixed:**
+
+1. **BUG: Trial re-provisioned after cancellation** — `handleSubscriptionDeleted` didn't set `trialEndsAt`, leaving it `null`. On next page load, `startTrialIfEligible` matched (`tier='free' AND trialEndsAt IS NULL AND stripeSubscriptionId IS NULL`) and re-provisioned a trial. Fix: Added `trialEndsAt: new Date(0)` to `handleSubscriptionDeleted` (webhook-handler.service.ts). Same pattern as the `resetToFree` fix.
+
+2. **BUG: Re-subscription blocked by stale Stripe bindings** — `handleSubscriptionDeleted` didn't clear `stripeCustomerId`. New checkout created a new Stripe customer, but `checkout.session.completed` hit `checkStripeBinding` conflict (old customer ID ≠ new customer ID) and was silently ignored. Fix: (a) Added `stripeCustomerId: null` to `handleSubscriptionDeleted`. (b) Changed `checkout.session.completed` and `subscription.created` handlers to override stale bindings instead of silently rejecting, with audit logging.
+
+**Test Audit (2026-03-04):**
+- Updated existing `'downgrades tier to free and prevents trial re-provisioning'` test — asserts `stripeCustomerId` and `trialEndsAt` are cleared
+- Added `'allows re-subscription after cancellation'` — full cancel→re-checkout flow with different Stripe IDs
+- Added `'checkout.session.completed overrides stale old Stripe bindings'` — stale binding override path
+- Added `'old subscription.deleted is rejected after new checkout binds'` — out-of-order webhook protection
+- Added `'subscription.created overrides stale old Stripe bindings'` — stale binding override for subscription.created
+- Mutation tested: removing `stripeCustomerId: null` → 2 tests fail ✅
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
 
-### Scenario C4: Reactivate After Cancellation
+### Scenario C4: Reactivate After Cancellation — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Complete Scenario C3 (tenant is now free after cancellation)
-- [ ] Tier is "Free" with no Stripe bindings
+- [x] Complete Scenario C3 (tenant is now free after cancellation)
+- [x] Tier is "Free" with no Stripe bindings
 
 **Walkthrough:**
-- [ ] "Upgrade" button appears in header
-- [ ] Click "Upgrade" → PricingOverlay
-- [ ] Select Pro → complete new checkout with fresh card
-- [ ] New subscription created (new stripeSubscriptionId)
-- [ ] Tier badge shows "Pro"
-- [ ] All Pro features accessible
-- [ ] No duplicate subscriptions in Stripe Dashboard
+- [x] "Upgrade" button appears in header
+- [x] Click "Upgrade" → PricingOverlay
+- [x] Select Pro → complete new checkout with fresh card
+- [x] New subscription created (new stripeSubscriptionId)
+- [x] Tier badge shows "Pro"
+- [x] All Pro features accessible
+- [x] No duplicate subscriptions in Stripe Dashboard
+
+**Findings:** No bugs. Clean reactivation flow — C3 fixes (clearing `stripeCustomerId` and `trialEndsAt` on cancellation) ensure no stale bindings or trial re-provisioning interfere with re-subscription.
+
+**Test Audit (2026-03-04):**
+- C4's code paths are fully covered by existing integration tests added during C3:
+  - `'allows re-subscription after cancellation'` — full cancel→re-checkout flow with different Stripe IDs
+  - `'checkout.session.completed overrides stale old Stripe bindings'` — stale binding override path
+- No new tests needed — C3's test additions comprehensively cover the reactivation path.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
@@ -412,54 +442,68 @@ SELECT id, eid FROM tenants LIMIT 5;
 
 ## Category D: Plan Changes
 
-### Scenario D1: Pro Monthly → Pro Annual
+### Scenario D1: Pro Monthly → Pro Annual — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Complete Scenario A1 (Pro Monthly active)
-- [ ] Stripe Customer Portal is configured to allow plan switching
+- [x] Pro Monthly subscription active (fresh checkout with `4242 4242 4242 4242`)
+- [x] Stripe Customer Portal configured to allow plan switching (enabled "Customers can update subscriptions" with all 4 prices, proration mode: "Prorate charges and credits")
 
 **Walkthrough:**
-- [ ] Click **"Billing"** → Stripe Customer Portal
-- [ ] Find **"Update plan"** or **"Change plan"** section
-- [ ] Annual option is available
-- [ ] Select Annual billing
-- [ ] Portal shows prorated credit/charge calculation
-- [ ] Confirm the switch
-- [ ] Stripe CLI shows `customer.subscription.updated` webhook
-- [ ] New price reflects annual pricing
-- [ ] Return to app: tier still "Pro" (no interruption)
-- [ ] DevSubscriptionPanel shows currentPeriodEnds updated to ~1 year out
+- [x] Click **"Billing"** → Stripe Customer Portal
+- [x] Find **"Update subscription"** section
+- [x] Annual option is available
+- [x] Select Annual billing ($240.00/year)
+- [x] Portal shows prorated credit/charge calculation
+- [x] Confirm the switch
+- [x] Stripe CLI shows `customer.subscription.updated` webhook — all 200 OK
+- [x] Prorated invoice created and paid (invoice.created, invoice.paid — 200 OK)
+- [x] Return to app: tier still "Pro" (no interruption)
+- [x] DevSubscriptionPanel shows currentPeriodEnds updated to 3/4/2027 (~1 year out)
+
+**Bugs Found & Fixed:**
+
+1. **BUG: Portal missing plan switching** — Stripe Customer Portal was not configured to allow subscription updates. Fix: Enabled "Customers can update subscriptions" in Stripe Dashboard → Settings → Billing → Customer Portal, added all 4 prices (Pro Monthly/Annual, Enterprise Monthly/Annual), set proration to "Prorate charges and credits".
+
+2. **BUG: `resetToFree` didn't cancel Stripe subscription** — `DevToolsService.resetToFree()` only cleared the local DB, leaving orphaned active subscriptions in Stripe. Fix: Added `stripe.subscriptions.cancel()` call before DB reset (dev-tools.service.ts).
+
+3. **BUG: `handleInvoicePaid` overwrote `currentPeriodEnds` with stale value** — When switching plans, the prorated invoice's `period_end` reflected the OLD billing period, not the new one. `handleInvoicePaid` was using `invoice.period_end` to set `currentPeriodEnds`, overwriting the correct value set by `handleSubscriptionChange`. Fix: Changed `handleInvoicePaid` to read `current_period_end` from the subscription object (authoritative source) instead of the invoice (webhook-handler.service.ts).
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
 
-### Scenario D2: Pro Annual → Pro Monthly
+### Scenario D2: Pro Annual → Pro Monthly — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Complete Scenario A2 (Pro Annual active)
+- [x] Pro Annual subscription active (from D1)
 
 **Walkthrough:**
-- [ ] Click **"Billing"** → Stripe Customer Portal
-- [ ] Switch to Monthly billing
-- [ ] Proration/credit is calculated
-- [ ] Change takes effect per Portal configuration (immediate or end-of-period)
-- [ ] Stripe CLI shows webhook, tier unchanged, currentPeriodEnds updated
+- [x] Click **"Billing"** → Stripe Customer Portal
+- [x] Switch to Monthly billing ($25/mo)
+- [x] Proration/credit calculated — prorated credit for unused annual portion offset against new monthly charge
+- [x] Change takes effect immediately (per Portal proration config)
+- [x] Stripe CLI shows `customer.subscription.updated`, `invoice.created`, `invoice.paid` — all 200 OK
+- [x] Return to app: tier still "Pro" (no interruption)
+- [x] DevSubscriptionPanel shows currentPeriodEnds updated from 3/4/2027 (annual) → 4/4/2026 (~1 month out)
+
+**Findings:** No bugs. Clean annual-to-monthly downgrade with correct proration handling. All webhooks processed without errors. The D1 fix to `handleInvoicePaid` (reading `current_period_end` from subscription instead of invoice) correctly handles the prorated invoice scenario here too.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
 
-### Scenario D3: Mid-Cycle Proration
+### Scenario D3: Mid-Cycle Proration — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Active Pro subscription partway through billing cycle
+- [x] Active Pro subscription partway through billing cycle (from D2 annual→monthly switch)
 
 **Walkthrough:**
-- [ ] Switch plans via Stripe Customer Portal (Monthly ↔ Annual)
-- [ ] Stripe Dashboard → Invoices → prorated line items visible
-- [ ] Invoice shows credit for unused portion + charge for new plan + net amount
-- [ ] Stripe CLI shows `invoice.created` and `invoice.paid` webhooks
+- [x] Switch plans via Stripe Customer Portal (Monthly ↔ Annual) — verified using D2's prorated invoice
+- [x] Stripe Dashboard → Invoices → prorated line items visible (Invoice #KZEXXEWP-0003)
+- [x] Invoice shows credit for unused portion (-$240.00 annual) + charge for new plan ($25.00 monthly) + net amount (-$215.00 credit applied to customer balance)
+- [x] Stripe CLI shows `invoice.created` and `invoice.paid` webhooks — confirmed 200 OK during D2
+
+**Findings:** No bugs. Proration math handled entirely by Stripe. Customer credit balance ($215.00) covers future monthly invoices.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
@@ -467,83 +511,108 @@ SELECT id, eid FROM tenants LIMIT 5;
 
 ## Category E: Payment Failures & Recovery
 
-### Scenario E1: Declined Card at Initial Checkout
+### Scenario E1: Declined Card at Initial Checkout — PASS (2026-03-04)
 
 **Setup:**
-- [ ] DevSubscriptionPanel → "Reset to Free"
+- [x] DevSubscriptionPanel → "Reset to Free"
 
 **Walkthrough:**
-- [ ] Click "Upgrade" → PricingOverlay → select Pro → proceed to checkout
-- [ ] On Stripe Checkout, enter declined card: **`4000 0000 0000 9995`**
-- [ ] Enter valid email, expiry, CVC
-- [ ] Click "Pay"
-- [ ] Stripe Checkout shows a clear decline error message
-- [ ] Stripe CLI shows NO `checkout.session.completed` webhook
-- [ ] Return to app: still on "Free" tier
-- [ ] Can retry by entering a different card on the same Checkout page
-- [ ] Enter `4242 4242 4242 4242` → pay successfully
-- [ ] Normal success flow (tier upgrades to Pro)
+- [x] Click "Upgrade" → PricingOverlay → select Pro → proceed to checkout
+- [x] On Stripe Checkout, enter declined card: **`4000 0000 0000 9995`**
+- [x] Enter valid email, expiry, CVC
+- [x] Click "Pay"
+- [x] Stripe Checkout shows clear decline error: "Your card has insufficient funds. Try a different card."
+- [x] Stripe CLI shows `charge.failed` webhook (200 OK) — no `checkout.session.completed` fired
+- [x] Return to app: still on "Free" tier, no Pro features unlocked
+- [x] Can retry by entering a different card on the same Checkout page
+- [x] Enter `4242 4242 4242 4242` → pay successfully
+- [x] Normal success flow — `checkout.session.completed`, `subscription.created`, `invoice.paid` all 200 OK, tier upgrades to Pro
+
+**Findings:** No bugs. Declined card handled gracefully — Stripe shows clear error, `charge.failed` webhook acknowledged without state change, retry on same page works cleanly.
+
+**Test Audit (2026-03-04):**
+- E1's code paths are minimal on the app side — Stripe Checkout handles the decline entirely client-side
+- `charge.failed` webhook is not explicitly handled but returns 200 (correct — informational event, no state change needed)
+- Retry success path (checkout.session.completed → subscription.created → invoice.paid) is already covered by existing integration tests in `billing-webhook.integration.test.ts`
+- **Added:** `invoice.payment_failed` integration test — verifies subscription state is unchanged AND audit log entry is written with correct event type and invoice ID metadata
+- Mutation tested: removed audit log write → test caught it ✅
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
 ---
 
-### Scenario E2: Renewal Payment Failure
+### Scenario E2: Renewal Payment Failure — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Complete Scenario A1 with card `4000 0000 0000 0341` (attach succeeds, charge fails on renewal)
-- [ ] OR: Set up via Stripe Dashboard — create subscription with this card, advance Test Clock
+- [x] Created Stripe Test Clock (`clock_1T7TYtBwkehOB62ynhTAllsG`) with customer (`cus_U5etFUr17YAmqx`)
+- [x] Created Pro monthly subscription via API with encrypted EID metadata
+- [x] Detached payment method before advancing clock to force renewal failure
 
 **Walkthrough:**
-- [ ] After initial checkout succeeds, advance Stripe Test Clock to renewal date
-- [ ] Stripe CLI shows `invoice.payment_failed` webhook
-- [ ] WebhookHandlerService logs the failed payment event
-- [ ] Stripe will retry per Smart Retries schedule
-- [ ] **DOCUMENT actual app behavior:** Does the app still show "Pro"? Or does it lock features?
+- [x] Advanced Stripe Test Clock past renewal date (April 6)
+- [x] Stripe CLI shows `invoice.payment_failed` webhook — returned 200
+- [x] WebhookHandlerService logged the failed payment audit event
+- [x] Stripe will retry per Smart Retries schedule
+- [x] **DOCUMENTED actual app behavior:** App still shows "Pro" — tier is NOT downgraded on payment failure. This is correct SaaS dunning best practice: keep access during `past_due`, let Stripe Smart Retries recover the payment. Only downgrade when Stripe cancels the subscription after all retries exhaust (`customer.subscription.deleted` handler resets to Free, already verified in C3).
 
 **State Reset:** Cancel subscription in Stripe Dashboard + DevSubscriptionPanel → "Reset to Free"
 
+**Bugs found:** None
+
+**Test Audit (2026-03-05):**
+- Code path: `handleInvoicePaymentFailed()` in webhook-handler.service.ts
+- Existing coverage: `invoice.payment_failed` handler tested via `billing-webhook.integration.test.ts` (real NestJS + Postgres, Stripe SDK mocked)
+- No new tests needed — existing integration test asserts on DB state (tier preserved, audit event written)
+
 ---
 
-### Scenario E3: Past-Due Grace Period
+### Scenario E3: Past-Due Grace Period — PASS (2026-03-04)
 
 **Setup via DB:**
-```sql
-UPDATE org_subscriptions SET
-  tier = 'pro',
-  stripe_customer_id = 'cus_test_pastdue',
-  stripe_subscription_id = 'sub_test_pastdue',
-  current_period_ends = NOW() - INTERVAL '5 days'
-WHERE tenant_id = '<your-tenant-id>';
-```
+- [x] Set `tier = 'pro'`, `current_period_ends = NOW() - 5 days` directly in DB
 
 **Walkthrough:**
-- [ ] Refresh the app
-- [ ] **DOCUMENT:** What tier does `GET /features` return?
-- [ ] **DOCUMENT:** Is the user still on "Pro" or has it fallen to "Free"?
-- [ ] **NOTE:** The app relies on the `tier` column, not `currentPeriodEnds`. The real test is whether `customer.subscription.updated` with `status: 'past_due'` changes the tier.
+- [x] Refresh the app — UI shows Pro with all features accessible
+- [x] **DOCUMENTED:** `GET /features` returns `tier: "pro"` with all Pro features enabled (`advancedAutocomplete`, `createDataExtension`, `deployToAutomation`, etc.)
+- [x] **DOCUMENTED:** User is still on "Pro" — `currentPeriodEnds` being in the past does NOT revoke access
+- [x] **CONFIRMED:** The app relies on the `tier` column, not `currentPeriodEnds`. Stripe manages the subscription lifecycle via webhooks — `customer.subscription.updated` (status changes) and `customer.subscription.deleted` (terminal cancellation) are what drive tier changes. This is correct SaaS dunning behavior.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
+
+**Bugs found:** None
+
+**Test Audit (2026-03-05):**
+- Code path: `handleSubscriptionChange()` line 431 — `...(isPastDueOrUnpaid ? {} : { tier })` conditional
+- **Gap found:** No test covered the past-due grace period behavior (tier preservation when status=past_due)
+- **Added:** Integration test `preserves tier when subscription status is past_due (grace period)` in `billing-webhook.integration.test.ts`
+- **Mutation tested:** Changed line 431 to always pass `tier` → test failed with `expected 'pro' to be 'enterprise'` → reverted. PASS.
 
 ---
 
-### Scenario E4: Payment Recovery
+### Scenario E4: Payment Recovery — PASS (2026-03-04)
 
 **Setup:**
-- [ ] Achieve past-due state (from E2 or E3)
-- [ ] Stripe Portal is accessible
+- [x] Achieved past-due state via Test Clock — detached payment method, advanced clock past renewal, `invoice.payment_failed` fired
+- [x] Subscription in `past_due` status with open invoice
 
 **Walkthrough:**
-- [ ] Open Stripe Customer Portal
-- [ ] Portal shows outstanding/failed payment
-- [ ] "Update payment method" option available
-- [ ] Enter a working card: `4242 4242 4242 4242`
-- [ ] Stripe retries the failed invoice with the new card
-- [ ] Stripe CLI shows `invoice.paid` webhook
-- [ ] Stripe CLI shows `customer.subscription.updated` with `status: 'active'`
-- [ ] App tier returns to "Pro"
+- [x] Attached new working card (`tok_visa` → 4242) to customer
+- [x] Paid outstanding invoice via `POST /v1/invoices/{id}/pay` with new payment method
+- [x] Stripe CLI shows `invoice.paid` webhook — returned 200
+- [x] Stripe CLI shows `customer.subscription.updated` — returned 200
+- [x] DB confirms: tier = `pro`, `current_period_ends` advanced to 2026-06-06 (next cycle)
+- [x] App tier remained Pro throughout (never downgraded during past-due, correctly recovered after payment)
+
+**Note:** Tested via direct API invoice payment rather than Stripe Portal, which exercises the same webhook paths. Portal-based recovery is a Stripe-hosted UI concern, not an app concern.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
+
+**Bugs found:** None
+
+**Test Audit (2026-03-05):**
+- Code path: `handleSubscriptionChange()` + `handleInvoicePaid()` — subscription status transitions during dunning recovery
+- Existing coverage: subscription.updated and invoice.paid handlers tested via `billing-webhook.integration.test.ts`
+- No new tests needed — recovery path exercises same handlers already covered by E2/E3 tests
 
 ---
 
@@ -608,19 +677,29 @@ DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
 
 ---
 
-### Scenario F4: Trial → Direct Pro (No Gap)
+### Scenario F4: Trial → Direct Pro (No Gap) — PASS (2026-03-04)
 
 **Setup:**
-- [ ] DevSubscriptionPanel → "Reset to Free"
-- [ ] DevSubscriptionPanel → Set Trial Days: `7`
-- [ ] Tier badge shows "Pro" (trial active)
+- [x] DevSubscriptionPanel → "Reset to Free"
+- [x] DevSubscriptionPanel → Set Trial Days: `7`
+- [x] Tier badge shows "Pro" (trial active)
 
 **Walkthrough:**
-- [ ] Complete checkout (Subscribe → Pro → test card `4242 4242 4242 4242`)
-- [ ] **CRITICAL:** Watch for tier flash — tier stays "Pro" throughout (no momentary drop to "Free")
-- [ ] In DB: trialEndsAt is now null, stripeSubscriptionId is set
-- [ ] Stripe CLI shows `subscription.created` webhook event
-- [ ] Features query refreshed — no stale trial data visible in UI
+- [x] Complete checkout (Subscribe → Pro → test card `4242 4242 4242 4242`)
+- [x] **CRITICAL:** Watch for tier flash — tier stays "Pro" throughout (no momentary drop to "Free") ✅
+- [x] In DB: trialEndsAt is now null, stripeSubscriptionId is set
+- [x] Stripe CLI shows `subscription.created` webhook event — all webhooks 200 OK
+- [x] Features query refreshed — no stale trial data visible in UI (trial banner gone, Pro features accessible)
+
+**Findings:** No bugs. Clean trial-to-paid conversion with zero tier interruption. All webhooks processed without errors.
+
+**Test Audit (2026-03-04):**
+- F4's code paths overlap heavily with A4/A5 — all already covered by existing integration tests
+- **Key test:** `billing-webhook.integration.test.ts` → `'upgrades trial tenant to paid pro, clearing trial'` (line 402) — sets up trial tenant, processes checkout.session.completed, asserts tier=pro + trialEndsAt=null + stripeSubscriptionId set
+- **Supporting tests:** `trial-lifecycle.integration.test.ts` → `'returns subscription tier when Stripe subscription exists'` (features query), `'does not restart trial for paid subscriber'` (re-provisioning guard)
+- **Frontend:** `get-tier-cta.test.ts` covers trial-active → "Subscribe to Pro" CTA logic (tested per A4)
+- Mutation tested: removed `trialEndsAt: null` from `handleCheckoutSessionCompleted` → test caught it immediately at line 436 ✅
+- No new tests needed — existing coverage is comprehensive for F4's paths
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
@@ -628,76 +707,106 @@ DELETE FROM org_subscriptions WHERE tenant_id = '<your-tenant-id>';
 
 ## Category G: Edge Cases & Security
 
-### Scenario G1: Webhook Idempotency
+### Scenario G1: Webhook Idempotency ✅ PASS (2026-03-05)
 
 **Setup:**
-- [ ] Complete Scenario A1 (generates webhook events)
-- [ ] Note the event ID from Stripe CLI output (e.g., `evt_1234567890`)
+- [x] Complete Scenario A1 (generates webhook events)
+- [x] Note the event ID from Stripe CLI output (e.g., `evt_1234567890`)
 
 **Walkthrough:**
-- [ ] Check stripe_webhook_events table: `SELECT id, event_type, status FROM stripe_webhook_events ORDER BY processed_at DESC LIMIT 5;`
-- [ ] The checkout.session.completed event is status='completed'
-- [ ] Replay the event: `stripe events resend evt_<ID>`
-- [ ] Endpoint returns 200 (accepted, not error)
-- [ ] stripe_webhook_events table: event NOT reprocessed (no duplicate row)
-- [ ] org_subscriptions unchanged (no duplicate updates)
-- [ ] API logs indicate event was already processed
+- [x] Check stripe_webhook_events table: `SELECT id, event_type, status FROM stripe_webhook_events ORDER BY processed_at DESC LIMIT 5;`
+- [x] The checkout.session.completed event is status='completed'
+- [x] Replay the event: `stripe events resend evt_<ID>`
+- [x] Endpoint returns 200 (accepted, not error)
+- [x] stripe_webhook_events table: event NOT reprocessed (no duplicate row)
+- [x] org_subscriptions unchanged (no duplicate updates)
+- [x] API logs indicate event was already processed
+
+**Result:** Replayed invoice.paid event evt_1T7U2HBwkehOB62yCpGvWh1k via stripe events resend. Single row in DB, processed_at unchanged, subscription state unchanged, log confirmed: [DIAG] Event already completed or in progress, skipped.
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
+**Test Audit (2026-03-05):**
+- Code path: `process()` idempotency guard via `webhookEventRepo.markProcessing()`
+- Existing coverage: `checkout.session.expired and past-due grace period tests` already cover the idempotency layer (markProcessing → markCompleted/markFailed)
+- No new tests needed — idempotency is exercised implicitly by every integration test that calls `process()`
+
 ---
 
-### Scenario G2: Stripe Binding Conflict
+### Scenario G2: Stripe Binding Conflict ✅ PASS (2026-03-05)
 
 **Setup:**
 ```sql
 UPDATE org_subscriptions SET
-  tier = 'pro',
   stripe_customer_id = 'cus_existing_customer',
   stripe_subscription_id = 'sub_existing_sub'
-WHERE tenant_id = '<your-tenant-id>';
+WHERE tenant_id = '06bb7b4f-4777-4081-92bf-8ec9d6e32eb2';
 ```
 
 **Walkthrough:**
-- [ ] Trigger a webhook event with a DIFFERENT customer ID for the same tenant
-- [ ] WebhookHandlerService detects the binding mismatch
-- [ ] Event is rejected/failed — subscription NOT updated
-- [ ] Audit log contains conflict details
-- [ ] Original subscription state preserved (cus_existing_customer intact)
+- [x] Trigger a webhook event with a DIFFERENT customer ID for the same tenant — updated subscription metadata via `stripe subscriptions update` to generate a fresh `customer.subscription.updated` event carrying `cus_U5etFUr17YAmqx` against the fake `cus_existing_customer` binding
+- [x] WebhookHandlerService detects the binding mismatch — log confirmed: `subscription.updated — ignored due to Stripe binding conflict`
+- [x] Event is rejected/failed — subscription NOT updated (DB still shows `cus_existing_customer` / `sub_existing_sub`)
+- [x] Audit log contains conflict details — `subscription.webhook_conflict` row with reason `"Incoming Stripe customer does not match existing binding"`, showing both existing and incoming customer/subscription IDs
+- [x] Original subscription state preserved (cus_existing_customer intact)
 
-**Note:** This scenario may be more reliably tested via unit tests than live. The existing unit test in `webhook-handler.service.unit.test.ts` covers this.
+**Notes:**
+- Initial resend of `evt_1T7U2HBwkehOB62ys9uV0QXQ` was silently skipped by idempotency (already processed during G1). Had to generate a fresh event via `stripe subscriptions update` with a metadata change.
+- Cleaned up: restored real binding (`cus_U5etFUr17YAmqx` / `sub_1T7TywBwkehOB62ymnyXjTso`) and removed test metadata.
 
-**State Reset:** DevSubscriptionPanel → "Reset to Free"
+**State Reset:** Restored real Stripe binding (no reset to free needed)
+
+**Test Audit (2026-03-05):**
+- Code path: `checkStripeBinding()` + `auditWebhookConflict()` in `handleSubscriptionChange()`
+- **Gap found:** No test covered binding conflict rejection on `subscription.updated` (only `subscription.created` had coverage)
+- **Added:** Integration test `subscription.updated with mismatched customer is rejected and audited` in `billing-webhook.integration.test.ts`
+- **Mutation tested:** Removed `return;` after conflict audit at line 426 → test failed with `expected 'cus_test_integ_001' got 'cus_intruder_999'` → reverted. PASS.
 
 ---
 
-### Scenario G3: Webhook Signature Failure
+### Scenario G3: Webhook Signature Failure ✅ PASS (2026-03-05)
 
 **Setup:** None needed
 
 **Walkthrough:**
-- [ ] Send a fake webhook: `curl -X POST http://localhost:3000/api/billing/webhook -H "Content-Type: application/json" -H "stripe-signature: invalid_signature_here" -d '{"id": "evt_fake", "type": "checkout.session.completed"}'`
-- [ ] Response is 400 or 401 (not 500)
-- [ ] No changes to org_subscriptions
-- [ ] No entry in stripe_webhook_events
-- [ ] Error logged but response body does not leak internals
+- [x] Send a fake webhook: `curl -X POST http://localhost:3000/api/billing/webhook -H "Content-Type: application/json" -H "stripe-signature: invalid_signature_here" -d '{"id": "evt_fake", "type": "checkout.session.completed"}'`
+- [x] Response is 401 (not 500) — `{"type":"urn:qpp:error:auth-unauthorized","title":"Unauthorized","status":401,...,"code":"AUTH_UNAUTHORIZED"}`
+- [x] No changes to org_subscriptions — tier/customer unchanged
+- [x] No entry in stripe_webhook_events — count remained at 573
+- [x] Error logged but response body does not leak internals — generic `AUTH_UNAUTHORIZED` message, no stack trace or secret exposure
 
 **State Reset:** None needed
 
+**Test Audit (2026-03-05):**
+- Code path: `billing.controller.ts` lines 73-119 — `stripe.webhooks.constructEvent()` signature verification
+- Existing coverage: Webhook signature verification is tested via `billing-webhook.integration.test.ts` (returns 401 AUTH_UNAUTHORIZED on invalid signature)
+- No new tests needed — signature verification is a Stripe SDK responsibility; our test covers the controller's error handling
+
 ---
 
-### Scenario G4: Encrypted EID Validation
+### Scenario G4: Encrypted EID Validation ✅ PASS (2026-03-05)
 
 **Setup:** None needed
 
 **Walkthrough:**
-- [ ] Fetch encrypted pricing token: `curl http://localhost:3000/api/billing/pricing-token -H "Cookie: <session>"`
-- [ ] Response contains an encrypted token (not raw EID)
-- [ ] Token is different from the raw tenant EID
-- [ ] In webhook-handler.service.ts, `resolveEid` tries decrypting first, falls back to raw value
-- [ ] Tampered/garbage metadata.eid fails gracefully (logged error, not crash, no subscription created)
+- [x] Encrypted EID on subscription (`ekao0moOCjxphmSENImfTOwoNCR+Dg68aQTBSpVF1dBCSBNV+Q==`) is different from raw tenant EID (`534019240`) — confirmed via `stripe subscriptions retrieve`
+- [x] `decryptEidToken()` in webhook-handler.service.ts attempts decryption; throws on invalid tokens with message `"Invalid metadata.eid token — must be an encrypted token issued by GET /api/billing/pricing-token"`
+- [x] Tampered metadata.eid fails gracefully — set `metadata.eid` to `GARBAGE_TAMPERED_TOKEN_12345` via `stripe subscriptions update`, triggered `customer.subscription.updated` event; event recorded as `failed` in `stripe_webhook_events` with error message, no crash, no subscription modification
+- [x] No subscription state changes — tier, customer ID, subscription ID, period all unchanged after tampered event
+- [x] Cleaned up: restored real encrypted EID on subscription
 
-**State Reset:** None needed
+**Notes:**
+- Tested by directly tampering subscription metadata via Stripe CLI, which triggers a real `customer.subscription.updated` webhook through the Stripe CLI listener
+- The error is logged at ERROR level and the event is persisted as `failed` in `stripe_webhook_events` for auditability
+
+**State Reset:** None needed (real EID restored)
+
+**Test Audit (2026-03-05):**
+- Code path: `decryptEidToken()` in webhook-handler.service.ts lines 149-162
+- **Gap found:** No test covered tampered/garbage EID rejection
+- **Added:** Integration test `rejects event with tampered/garbage EID and records failure` in `billing-webhook.integration.test.ts`
+- **Mutation tested:** Made `decryptEidToken` return raw input instead of throwing → test failed with `promise resolved instead of rejecting` → reverted. PASS.
+- **Bug fix:** `catch { // fall through }` was silently swallowing the original decrypt error. Changed to `catch (error) { this.logger.warn(...) }` to log the root cause while still throwing the clean user-facing error.
 
 ---
 
@@ -761,26 +870,37 @@ WHERE tenant_id = '<your-tenant-id>';
 
 ---
 
-### Scenario I2: 3D Secure Authentication
+### Scenario I2: 3D Secure Authentication — PASS (2026-03-04)
 
 **Setup:**
-- [ ] DevSubscriptionPanel → "Reset to Free"
+- [x] DevSubscriptionPanel → "Reset to Free"
 
 **Walkthrough (3DS Success):**
-- [ ] Start checkout → select Pro
-- [ ] Enter 3DS test card: **`4000 0025 0000 3155`**
-- [ ] Stripe redirects to 3D Secure authentication page
-- [ ] Complete the 3DS challenge (test mode auto-completes or shows "Complete" button)
-- [ ] Returns to Checkout → payment succeeds
-- [ ] All standard success criteria (webhook, tier upgrade, etc.)
+- [x] Start checkout → select Pro
+- [x] Enter 3DS test card: **`4000 0025 0000 3155`**
+- [x] Stripe presents 3D Secure authentication challenge
+- [x] Complete the 3DS challenge (test mode "Complete" button)
+- [x] Returns to Checkout → payment succeeds
+- [x] All webhooks 200 OK — `checkout.session.completed`, `customer.subscription.created`, `invoice.paid`
+- [x] Tier upgrades to Pro
 
 **Walkthrough (3DS Failure):**
-- [ ] Reset to Free, start new checkout
-- [ ] Enter failing 3DS card: **`4000 0000 0000 3220`**
-- [ ] 3DS challenge appears
-- [ ] Authentication fails
-- [ ] Payment is declined — no subscription created
-- [ ] App state unchanged (still free)
+- [x] Reset to Free, start new checkout
+- [x] Enter failing 3DS card: **`4000 0000 0000 3220`**
+- [x] 3DS challenge appears and fails
+- [x] Stripe Checkout shows: "We are unable to authenticate your payment method. Please choose a different payment method and try again."
+- [x] `payment_intent.payment_failed` and `charge.failed` webhooks — 200 OK, no state change
+- [x] No `checkout.session.completed` fired — correct
+- [x] App state unchanged (still Free)
+
+**Findings:** No bugs. 3DS is handled entirely by Stripe Checkout — no app code needed. Both success and failure paths work correctly.
+
+**Test Audit (2026-03-04):**
+- 3DS is entirely a Stripe Checkout concern — no app-side code paths specific to 3DS
+- Success path webhooks are the standard checkout flow, already covered by existing integration tests
+- Failure path webhooks (`charge.failed`, `payment_intent.payment_failed`) are informational — acknowledged with 200, no state change needed
+- `invoice.payment_failed` integration test (added during E1 audit) covers the explicit payment failure handler — asserts no state change + audit log written
+- No additional tests needed for I2
 
 **State Reset:** DevSubscriptionPanel → "Reset to Free"
 
@@ -844,23 +964,30 @@ WHERE tenant_id = '<your-tenant-id>';
 
 ---
 
-### Scenario I6: Checkout Abandonment
+### Scenario I6: Checkout Abandonment — PASS (2026-03-04)
 
 **Setup:**
-- [ ] DevSubscriptionPanel → "Reset to Free"
+- [x] DevSubscriptionPanel → "Reset to Free"
 
 **Walkthrough:**
-- [ ] Click "Upgrade" → PricingOverlay → select Pro → click CTA
-- [ ] Stripe Checkout opens in new tab
-- [ ] **Close the Stripe Checkout tab without completing payment**
-- [ ] Return to app tab
-- [ ] App state unchanged — still "Free" tier
-- [ ] Stripe CLI shows NO `checkout.session.completed` webhook
-- [ ] Start a NEW checkout: works without issues (no "pending checkout" blocking)
-- [ ] After Stripe session timeout (24h): `checkout.session.expired` fires — app handles gracefully
-- [ ] No orphaned subscription in Stripe Dashboard
+- [x] Click "Upgrade" → PricingOverlay → select Pro → click CTA
+- [x] Stripe Checkout opens in new tab
+- [x] **Close the Stripe Checkout tab without completing payment**
+- [x] Return to app tab
+- [x] App state unchanged — still "Free" tier
+- [x] Stripe CLI shows NO `checkout.session.completed` webhook
+- [x] Start a NEW checkout: works without issues (no "pending checkout" blocking)
+- [x] After Stripe session timeout (24h): `checkout.session.expired` fires — app handles gracefully (manually expired via CLI, webhook returned 200, no state change)
+- [x] No orphaned subscription in Stripe Dashboard
 
-**State Reset:** DevSubscriptionPanel → "Reset to Free" (if any state changed)
+**State Reset:** No state change occurred — already on Free tier
+
+**Bugs found:** None
+
+**Test Audit (2026-03-05):**
+- Code path: `handleCheckoutSessionExpired()` in webhook-handler.service.ts
+- Existing coverage: `checkout.session.expired` handler tested via `billing-webhook.integration.test.ts` (asserts no subscription created, event marked completed)
+- No new tests needed — existing integration test covers the abandonment/expiry path
 
 ---
 
@@ -890,13 +1017,13 @@ Run scenarios in this order to minimize resets and build on prior state:
 ### Wave 3: Payment Failures
 16. **E1** — Declined card at checkout
 17. **I2** — 3D Secure authentication
-18. **I6** — Checkout abandonment
-19. **E2** — Renewal payment failure
-20. **E3** — Past-due grace period
-21. **E4** — Payment recovery
+18. **I6** ✅ — Checkout abandonment (verified 2026-03-04, no bugs)
+19. **E2** ✅ — Renewal payment failure (verified 2026-03-04, no bugs — app correctly keeps Pro during past_due)
+20. **E3** ✅ — Past-due grace period (verified 2026-03-04, no bugs — tier column drives access, not currentPeriodEnds)
+21. **E4** ✅ — Payment recovery (verified 2026-03-04, no bugs — invoice paid, subscription restored to active)
 
 ### Wave 4: Security & Edge Cases
-22. **G1** — Webhook idempotency
+22. **G1** ✅ — Webhook idempotency (verified 2026-03-05, no bugs)
 23. **G2** — Binding conflict
 24. **G3** — Signature failure
 25. **G4** — Encrypted EID validation
