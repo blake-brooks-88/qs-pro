@@ -458,6 +458,7 @@ describe('Billing Webhook (integration)', () => {
       }
     }
     await app.close();
+    await sqlClient.end({ timeout: 5 });
   });
 
   // ─── checkout.session.completed ─────────────────────────────────

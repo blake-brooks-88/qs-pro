@@ -297,6 +297,7 @@ describe('BillingService (integration)', () => {
       }
     }
     await app.close();
+    await sqlClient.end({ timeout: 5 });
   });
 
   // ─── createCheckoutSession ──────────────────────────────────────
