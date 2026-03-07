@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 const HEX_64 = /^[0-9a-fA-F]{64}$/;
+// Stripe API versions are typically YYYY-MM-DD; Stripe "trains" can include a suffix
+// like "2026-01-28.clover". Validate format to catch typos at startup.
+const STRIPE_API_VERSION_RE = /^\d{4}-\d{2}-\d{2}(\.[A-Za-z0-9_]+)?$/;
 
 // =============================================================================
 // Capability Schemas (grouped by module/feature dependency)
@@ -88,7 +91,7 @@ export const adminSchema = z.object({
  */
 export const stripeSchema = z.object({
   STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
-  STRIPE_API_VERSION: z.string().min(1).optional(),
+  STRIPE_API_VERSION: z.string().regex(STRIPE_API_VERSION_RE).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
 });
 
@@ -177,6 +180,17 @@ export const apiEnvSchema = infrastructureSchema
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "In production, STRIPE_SECRET_KEY is required",
+        });
+      }
+
+      if (
+        data.STRIPE_SECRET_KEY &&
+        !data.STRIPE_SECRET_KEY.startsWith("sk_live_")
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "In production, STRIPE_SECRET_KEY must be a live key (sk_live_...)",
         });
       }
 

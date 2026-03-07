@@ -167,6 +167,27 @@ describe("env.schema", () => {
       );
     });
 
+    it("rejects test Stripe keys in production", () => {
+      const result = apiEnvSchema.safeParse(
+        makeApiEnv({
+          NODE_ENV: "production",
+          STRIPE_SECRET_KEY: "sk_test_abc123",
+          STRIPE_API_VERSION: "2024-06-20",
+          STRIPE_WEBHOOK_SECRET: "whsec_test123",
+        }),
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("Expected parse to fail");
+      }
+
+      const messages = result.error.issues.map((issue) => issue.message);
+      expect(messages).toContain(
+        "In production, STRIPE_SECRET_KEY must be a live key (sk_live_...)",
+      );
+    });
+
     it("validates STRIPE_SECRET_KEY prefix when provided", () => {
       const valid = apiEnvSchema.safeParse(
         makeApiEnv({
@@ -181,6 +202,26 @@ describe("env.schema", () => {
         makeApiEnv({
           STRIPE_SECRET_KEY: "pk_test_abc123",
           STRIPE_API_VERSION: "2024-06-20",
+          STRIPE_WEBHOOK_SECRET: "whsec_test123",
+        }),
+      );
+      expect(invalid.success).toBe(false);
+    });
+
+    it("validates STRIPE_API_VERSION format when provided", () => {
+      const valid = apiEnvSchema.safeParse(
+        makeApiEnv({
+          STRIPE_SECRET_KEY: "sk_test_abc123",
+          STRIPE_API_VERSION: "2026-01-28.clover",
+          STRIPE_WEBHOOK_SECRET: "whsec_test123",
+        }),
+      );
+      expect(valid.success).toBe(true);
+
+      const invalid = apiEnvSchema.safeParse(
+        makeApiEnv({
+          STRIPE_SECRET_KEY: "sk_test_abc123",
+          STRIPE_API_VERSION: "not-a-version",
           STRIPE_WEBHOOK_SECRET: "whsec_test123",
         }),
       );
