@@ -236,7 +236,9 @@ function StatusContent({ status }: { status: Status }) {
 
   return (
     <>
-      <h1 className="text-xl font-semibold">We could not confirm your plan yet</h1>
+      <h1 className="text-xl font-semibold">
+        We could not confirm your plan yet
+      </h1>
       <p className="text-sm text-muted-foreground">
         Your payment may still be processing, but Query++ has not received
         confirmation. Return to Marketing Cloud and refresh in a moment.

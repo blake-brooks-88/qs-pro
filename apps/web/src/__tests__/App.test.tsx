@@ -10,10 +10,13 @@ import { http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { mockToast } from "@/test/mocks/sonner";
 import App from "@/App";
-import { hasPendingCheckout, markPendingCheckout } from "@/lib/pending-checkout";
+import {
+  hasPendingCheckout,
+  markPendingCheckout,
+} from "@/lib/pending-checkout";
 import { server } from "@/test/mocks/server";
+import { mockToast } from "@/test/mocks/sonner";
 import { createTenantFeaturesStub } from "@/test/stubs";
 
 // Mock the SQL diagnostics hook to avoid Worker issues in tests
@@ -331,7 +334,7 @@ describe("App", () => {
       // Act
       renderApp();
 
-    // Assert: OAuth redirect was triggered
+      // Assert: OAuth redirect was triggered
       await waitFor(() => {
         expect(mockLocationAssign).toHaveBeenCalledWith("/api/auth/login");
       });
@@ -636,7 +639,9 @@ describe("App", () => {
     it("shows a confirmation error when checkout verification throws", async () => {
       const meResponse = createMockMeResponse();
       mockGetMe.mockResolvedValue(meResponse);
-      mockConfirmCheckoutSession.mockRejectedValue(new Error("Billing offline"));
+      mockConfirmCheckoutSession.mockRejectedValue(
+        new Error("Billing offline"),
+      );
 
       window.sessionStorage.clear();
       mockLocation.search = "?checkout=success&session_id=cs_error";

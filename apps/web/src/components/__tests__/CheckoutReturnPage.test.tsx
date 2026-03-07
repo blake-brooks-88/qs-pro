@@ -36,7 +36,10 @@ describe("CheckoutReturnPage", () => {
   it("shows success and schedules auto-close only after checkout is fulfilled", async () => {
     setSearch("?checkout=success&session_id=cs_success");
     mockConfirmCheckoutSession.mockResolvedValue({ status: "fulfilled" });
-    vi.spyOn(window, "setTimeout").mockImplementation(((callback: TimerHandler, delay?: number) => {
+    vi.spyOn(window, "setTimeout").mockImplementation(((
+      callback: TimerHandler,
+      delay?: number,
+    ) => {
       return originalSetTimeout(callback, delay === 4000 ? 0 : delay);
     }) as typeof window.setTimeout);
 
@@ -92,7 +95,10 @@ describe("CheckoutReturnPage", () => {
   it("shows a timeout message when confirmation never resolves successfully", async () => {
     setSearch("?checkout=success&session_id=cs_pending");
     mockConfirmCheckoutSession.mockResolvedValue({ status: "pending" });
-    vi.spyOn(window, "setTimeout").mockImplementation(((callback: TimerHandler, delay?: number) => {
+    vi.spyOn(window, "setTimeout").mockImplementation(((
+      callback: TimerHandler,
+      delay?: number,
+    ) => {
       return originalSetTimeout(callback, delay === 2000 ? 0 : delay);
     }) as typeof window.setTimeout);
 
@@ -123,9 +129,9 @@ describe("CheckoutReturnPage", () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.setup().click(
-      screen.getByRole("button", { name: "Close this tab" }),
-    );
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Close this tab" }));
 
     expect(window.close).toHaveBeenCalledTimes(1);
   });
