@@ -1,5 +1,5 @@
 import { ErrorCode } from "@qpp/shared-types";
-import { and, count, eq, isNull, lte, or, sql } from "drizzle-orm";
+import { and, count, eq, isNull, or, sql } from "drizzle-orm";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { DatabaseError } from "../errors";
@@ -188,6 +188,10 @@ export class DrizzleFeatureOverrideRepository implements IFeatureOverrideReposit
 export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionRepository {
   constructor(private db: PostgresJsDatabase) {}
 
+  private serializeFreshnessGuard(value: Date): string {
+    return value.toISOString();
+  }
+
   async findByTenantId(tenantId: string): Promise<OrgSubscription | undefined> {
     const [result] = await this.db
       .select()
@@ -219,10 +223,7 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
         setWhere: subscription.stripeStateUpdatedAt
           ? or(
               isNull(orgSubscriptions.stripeStateUpdatedAt),
-              lte(
-                orgSubscriptions.stripeStateUpdatedAt,
-                subscription.stripeStateUpdatedAt,
-              ),
+              sql`${orgSubscriptions.stripeStateUpdatedAt} <= ${this.serializeFreshnessGuard(subscription.stripeStateUpdatedAt)}`,
             )
           : undefined,
       })
@@ -304,10 +305,7 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
               eq(orgSubscriptions.tenantId, tenantId),
               or(
                 isNull(orgSubscriptions.stripeStateUpdatedAt),
-                lte(
-                  orgSubscriptions.stripeStateUpdatedAt,
-                  data.stripeStateUpdatedAt,
-                ),
+                sql`${orgSubscriptions.stripeStateUpdatedAt} <= ${this.serializeFreshnessGuard(data.stripeStateUpdatedAt)}`,
               ),
             )
           : eq(orgSubscriptions.tenantId, tenantId),
