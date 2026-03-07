@@ -601,35 +601,36 @@ describe("App", () => {
     });
 
     it("shows a syncing message after finite redirect polling exhausts retries", async () => {
+      vi.useFakeTimers();
       const meResponse = createMockMeResponse();
       mockGetMe.mockResolvedValue(meResponse);
       mockConfirmCheckoutSession.mockResolvedValue({ status: "pending" });
-      vi.spyOn(window, "setTimeout").mockImplementation((callback) => {
-        if (typeof callback === "function") {
-          callback();
-        }
-        return 0 as ReturnType<typeof window.setTimeout>;
-      });
 
       window.sessionStorage.clear();
       mockLocation.search = "?checkout=success&session_id=cs_pending";
 
       renderApp();
 
-      await waitFor(() => {
-        expect(mockToast.message).toHaveBeenCalledWith(
-          "Checkout is still processing",
-          expect.objectContaining({
-            description:
-              "Payment succeeded, but billing is still syncing. Refresh in a moment if Pro does not appear.",
-          }),
-        );
-      });
+      // Advance through 10 retry cycles × 1500ms delay each
+      for (let i = 0; i < 10; i++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1500);
+        });
+      }
+
+      expect(mockToast.message).toHaveBeenCalledWith(
+        "Checkout is still processing",
+        expect.objectContaining({
+          description:
+            "Payment succeeded, but billing is still syncing. Refresh in a moment if Pro does not appear.",
+        }),
+      );
 
       expect(mockConfirmCheckoutSession).toHaveBeenCalledTimes(10);
       expect(
         window.sessionStorage.getItem("pendingCheckoutSessionId"),
       ).toBeNull();
+      vi.useRealTimers();
     });
 
     it("shows a confirmation error when checkout verification throws", async () => {

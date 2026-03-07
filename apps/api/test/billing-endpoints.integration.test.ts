@@ -64,6 +64,7 @@ function createBillingServiceMock() {
     createPortalSession: vi.fn().mockResolvedValue({
       url: 'https://billing.stripe.com/test-portal',
     }),
+    confirmCheckoutSession: vi.fn(),
   };
 }
 
@@ -158,5 +159,47 @@ describe('Billing endpoints (integration)', () => {
       'pro',
       'monthly',
     );
+  });
+
+  it('GET /api/billing/checkout-session/:sessionId returns fulfilled status for authenticated users', async () => {
+    const { agent } = await createAuthenticatedAgent();
+    billingServiceMock.confirmCheckoutSession.mockResolvedValue({
+      status: 'fulfilled',
+    });
+
+    const response = await agent
+      .get('/api/billing/checkout-session/cs_test_123')
+      .expect(200);
+
+    expect(response.body).toEqual({ status: 'fulfilled' });
+    expect(billingServiceMock.confirmCheckoutSession).toHaveBeenCalledWith(
+      expect.any(String),
+      'cs_test_123',
+    );
+  });
+
+  it('GET /api/billing/checkout-session/:sessionId returns failed with reason', async () => {
+    const { agent } = await createAuthenticatedAgent();
+    billingServiceMock.confirmCheckoutSession.mockResolvedValue({
+      status: 'failed',
+      reason: 'expired',
+    });
+
+    const response = await agent
+      .get('/api/billing/checkout-session/cs_expired')
+      .expect(200);
+
+    expect(response.body).toEqual({
+      status: 'failed',
+      reason: 'expired',
+    });
+  });
+
+  it('GET /api/billing/checkout-session/:sessionId returns 401 for unauthenticated requests', async () => {
+    const testAgent = superagent(app.getHttpServer());
+
+    await testAgent
+      .get('/api/billing/checkout-session/cs_test_123')
+      .expect(401);
   });
 });

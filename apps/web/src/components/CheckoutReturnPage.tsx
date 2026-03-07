@@ -10,7 +10,8 @@ type Status =
   | "expired"
   | "unpaid"
   | "timeout"
-  | "canceled";
+  | "canceled"
+  | "failed";
 
 const AUTO_CLOSE_DELAY_MS = 4000;
 
@@ -210,6 +211,21 @@ function StatusContent({ status }: { status: Status }) {
         <p className="text-sm text-muted-foreground">
           Stripe did not confirm payment for this checkout. Return to Marketing
           Cloud and try again.
+        </p>
+        <Button variant="secondary" onClick={tryCloseWindow}>
+          Close this tab
+        </Button>
+      </>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <>
+        <h1 className="text-xl font-semibold">Something went wrong</h1>
+        <p className="text-sm text-muted-foreground">
+          We could not process this checkout. Return to Marketing Cloud and try
+          again.
         </p>
         <Button variant="secondary" onClick={tryCloseWindow}>
           Close this tab

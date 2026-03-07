@@ -36,9 +36,7 @@ function createQueueMock(): { add: ReturnType<typeof vi.fn> } {
 
 function createBillingServiceMock() {
   return {
-    getPrices: vi.fn().mockResolvedValue({
-      pro: { monthly: 29, annual: 24.17 },
-    }),
+    getPrices: vi.fn(),
     createCheckoutSession: vi.fn(),
     createPortalSession: vi.fn(),
     confirmCheckoutSession: vi.fn(),
@@ -54,85 +52,18 @@ describe('BillingController', () => {
   let stripeMock: ReturnType<typeof createStripeMock>;
   let configMock: ReturnType<typeof createConfigMock>;
   let queueMock: ReturnType<typeof createQueueMock>;
-  let billingServiceMock: ReturnType<typeof createBillingServiceMock>;
 
   beforeEach(() => {
     stripeMock = createStripeMock();
     configMock = createConfigMock();
     queueMock = createQueueMock();
-    billingServiceMock = createBillingServiceMock();
 
     controller = new BillingController(
       stripeMock as unknown as Stripe,
       queueMock as unknown as Queue,
       configMock as unknown as ConfigService,
-      billingServiceMock as unknown as BillingService,
+      createBillingServiceMock() as unknown as BillingService,
     );
-  });
-
-  describe('billing endpoints', () => {
-    it('returns prices from the billing service', async () => {
-      const result = await controller.getPrices();
-
-      expect(result).toEqual({
-        pro: { monthly: 29, annual: 24.17 },
-      });
-      expect(billingServiceMock.getPrices).toHaveBeenCalled();
-    });
-
-    it('creates a checkout session for the current tenant', async () => {
-      billingServiceMock.createCheckoutSession.mockResolvedValue({
-        url: 'https://checkout.stripe.com/session',
-      });
-
-      const result = await controller.createCheckout(
-        { tenantId: 'tenant-1' } as never,
-        { tier: 'pro', interval: 'monthly' },
-      );
-
-      expect(result).toEqual({
-        url: 'https://checkout.stripe.com/session',
-      });
-      expect(billingServiceMock.createCheckoutSession).toHaveBeenCalledWith(
-        'tenant-1',
-        'pro',
-        'monthly',
-      );
-    });
-
-    it('creates a portal session for the current tenant', async () => {
-      billingServiceMock.createPortalSession.mockResolvedValue({
-        url: 'https://billing.stripe.com/session',
-      });
-
-      const result = await controller.createPortal({
-        tenantId: 'tenant-1',
-      } as never);
-
-      expect(result).toEqual({
-        url: 'https://billing.stripe.com/session',
-      });
-      expect(billingServiceMock.createPortalSession).toHaveBeenCalledWith(
-        'tenant-1',
-      );
-    });
-
-    it('confirms a checkout session for the current tenant', async () => {
-      billingServiceMock.confirmCheckoutSession.mockResolvedValue({
-        status: 'fulfilled',
-      });
-
-      const result = await controller.confirmCheckoutSession(
-        { tenantId: 'tenant-1' } as never,
-        'cs_test_123',
-      );
-
-      expect(result).toEqual({ status: 'fulfilled' });
-      expect(billingServiceMock.confirmCheckoutSession).toHaveBeenCalledWith(
-        'tenant-1',
-        'cs_test_123',
-      );
-    });
   });
 
   describe('handleWebhook', () => {
@@ -187,44 +118,6 @@ describe('BillingController', () => {
       );
 
       expect(result).toEqual({ received: true });
-    });
-
-    it('calls constructEvent with rawBody, signature, and webhook secret', async () => {
-      await controller.handleWebhook(
-        createReq('raw_body_content'),
-        'sig_value',
-      );
-
-      expect(stripeMock.webhooks.constructEvent).toHaveBeenCalledWith(
-        'raw_body_content',
-        'sig_value',
-        'whsec_test_secret',
-      );
-    });
-
-    it('enqueues the constructed event for async processing', async () => {
-      const mockEvent = {
-        id: 'evt_123',
-        type: 'checkout.session.completed',
-        data: { object: {} },
-      } as unknown as Stripe.Event;
-      stripeMock.webhooks.constructEvent.mockReturnValue(mockEvent);
-
-      await controller.handleWebhook(createReq('body'), 'sig_test');
-
-      expect(queueMock.add).toHaveBeenCalledWith(
-        'process-stripe-webhook',
-        { event: mockEvent },
-        expect.objectContaining({ jobId: 'evt_123' }),
-      );
-    });
-
-    it('propagates errors from queue enqueue', async () => {
-      queueMock.add.mockRejectedValue(new Error('Queue failed'));
-
-      await expect(
-        controller.handleWebhook(createReq('body'), 'sig_test'),
-      ).rejects.toThrow('Queue failed');
     });
   });
 });

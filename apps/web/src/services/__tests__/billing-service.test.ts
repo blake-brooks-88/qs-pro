@@ -15,33 +15,34 @@ import {
   fetchPrices,
 } from "@/services/billing";
 
-const mockApi = vi.mocked(api);
+const mockGet = vi.mocked(api.get as ReturnType<typeof vi.fn>);
+const mockPost = vi.mocked(api.post as ReturnType<typeof vi.fn>);
 
 describe("billing service", () => {
   beforeEach(() => {
-    mockApi.get.mockReset();
-    mockApi.post.mockReset();
+    mockGet.mockReset();
+    mockPost.mockReset();
   });
 
   it("fetches prices from the billing prices endpoint", async () => {
-    mockApi.get.mockResolvedValue({
+    mockGet.mockResolvedValue({
       data: { pro: { monthly: 29, annual: 24.17 } },
     });
 
     const result = await fetchPrices();
 
-    expect(mockApi.get).toHaveBeenCalledWith("/billing/prices");
+    expect(mockGet).toHaveBeenCalledWith("/billing/prices");
     expect(result).toEqual({ pro: { monthly: 29, annual: 24.17 } });
   });
 
   it("creates a checkout session for the requested plan", async () => {
-    mockApi.post.mockResolvedValue({
+    mockPost.mockResolvedValue({
       data: { url: "https://checkout.stripe.com/session-1" },
     });
 
     const result = await createCheckout("pro", "monthly");
 
-    expect(mockApi.post).toHaveBeenCalledWith("/billing/checkout", {
+    expect(mockPost).toHaveBeenCalledWith("/billing/checkout", {
       tier: "pro",
       interval: "monthly",
     });
@@ -49,24 +50,24 @@ describe("billing service", () => {
   });
 
   it("creates a billing portal session", async () => {
-    mockApi.post.mockResolvedValue({
+    mockPost.mockResolvedValue({
       data: { url: "https://billing.stripe.com/session-1" },
     });
 
     const result = await createPortalSession();
 
-    expect(mockApi.post).toHaveBeenCalledWith("/billing/portal");
+    expect(mockPost).toHaveBeenCalledWith("/billing/portal");
     expect(result.url).toBe("https://billing.stripe.com/session-1");
   });
 
   it("confirms a checkout session by encoded session id", async () => {
-    mockApi.get.mockResolvedValue({
+    mockGet.mockResolvedValue({
       data: { status: "pending" },
     });
 
     const result = await confirmCheckoutSession("cs_test/with spaces");
 
-    expect(mockApi.get).toHaveBeenCalledWith(
+    expect(mockGet).toHaveBeenCalledWith(
       "/billing/checkout-session/cs_test%2Fwith%20spaces",
     );
     expect(result).toEqual({ status: "pending" });

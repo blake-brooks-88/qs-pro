@@ -1,4 +1,3 @@
-import type { Job } from 'bullmq';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BILLING_WEBHOOK_JOB } from '../billing.queue';
@@ -21,7 +20,7 @@ describe('BillingWebhookProcessor', () => {
     await processor.process({
       name: BILLING_WEBHOOK_JOB,
       data: { event },
-    } as Job<{ event: typeof event }>);
+    } as never);
 
     expect(webhookHandler.process).toHaveBeenCalledWith(event);
   });

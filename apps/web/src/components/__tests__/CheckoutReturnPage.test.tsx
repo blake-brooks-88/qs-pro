@@ -36,12 +36,9 @@ describe("CheckoutReturnPage", () => {
   it("shows success and schedules auto-close only after checkout is fulfilled", async () => {
     setSearch("?checkout=success&session_id=cs_success");
     mockConfirmCheckoutSession.mockResolvedValue({ status: "fulfilled" });
-    vi.spyOn(window, "setTimeout").mockImplementation((callback, delay) => {
-      return originalSetTimeout(
-        callback as TimerHandler,
-        delay === 4000 ? 0 : delay,
-      );
-    });
+    vi.spyOn(window, "setTimeout").mockImplementation(((callback: TimerHandler, delay?: number) => {
+      return originalSetTimeout(callback, delay === 4000 ? 0 : delay);
+    }) as typeof window.setTimeout);
 
     render(<CheckoutReturnPage />);
 
@@ -95,12 +92,9 @@ describe("CheckoutReturnPage", () => {
   it("shows a timeout message when confirmation never resolves successfully", async () => {
     setSearch("?checkout=success&session_id=cs_pending");
     mockConfirmCheckoutSession.mockResolvedValue({ status: "pending" });
-    vi.spyOn(window, "setTimeout").mockImplementation((callback, delay) => {
-      return originalSetTimeout(
-        callback as TimerHandler,
-        delay === 2000 ? 0 : delay,
-      );
-    });
+    vi.spyOn(window, "setTimeout").mockImplementation(((callback: TimerHandler, delay?: number) => {
+      return originalSetTimeout(callback, delay === 2000 ? 0 : delay);
+    }) as typeof window.setTimeout);
 
     render(<CheckoutReturnPage />);
 
