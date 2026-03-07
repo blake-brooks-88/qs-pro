@@ -20,18 +20,9 @@ import type {
 import type Stripe from 'stripe';
 
 import { STRIPE_CLIENT } from './stripe.provider';
+import { StripeCatalogService } from './stripe-catalog.service';
 import { hasPaidEntitlement } from './subscription-entitlements';
 import { WebhookHandlerService } from './webhook-handler.service';
-
-const PRICE_LOOKUP_KEYS = {
-  pro_monthly: 'pro_monthly',
-  pro_annual: 'pro_annual',
-  enterprise_monthly: 'enterprise_monthly',
-  enterprise_annual: 'enterprise_annual',
-} as const;
-
-type PriceLookupKey =
-  (typeof PRICE_LOOKUP_KEYS)[keyof typeof PRICE_LOOKUP_KEYS];
 
 export interface PricesResponse {
   pro: { monthly: number; annual: number };
@@ -44,10 +35,6 @@ export interface CheckoutConfirmationResponse {
 
 @Injectable()
 export class BillingService {
-  private readonly priceCache = new Map<
-    string,
-    { priceId: string; expiresAt: number }
-  >();
   private pricesResponseCache: {
     data: PricesResponse;
     expiresAt: number;
@@ -64,6 +51,7 @@ export class BillingService {
     private readonly stripeCheckoutSessionRepo: IStripeCheckoutSessionRepository,
     private readonly encryptionService: EncryptionService,
     private readonly rlsContext: RlsContextService,
+    private readonly stripeCatalog: StripeCatalogService,
     private readonly webhookHandler: WebhookHandlerService,
   ) {}
 
@@ -79,32 +67,20 @@ export class BillingService {
       return this.pricesResponseCache.data;
     }
 
-    const result = await this.stripe.prices.list({
-      lookup_keys: ['pro_monthly', 'pro_annual'],
-      active: true,
-    });
+    const { monthly: monthlyPrice, annual: annualPrice } =
+      await this.stripeCatalog.getPublicPrices();
 
-    const pricesByKey = new Map<string, Stripe.Price>();
-    for (const price of result.data) {
-      if (price.lookup_key) {
-        pricesByKey.set(price.lookup_key, price);
-      }
-    }
-
-    const monthlyPrice = pricesByKey.get('pro_monthly');
-    const annualPrice = pricesByKey.get('pro_annual');
-
-    if (!monthlyPrice?.unit_amount || !annualPrice?.unit_amount) {
+    if (!monthlyPrice.unitAmount || !annualPrice.unitAmount) {
       throw new ServiceUnavailableException(
         'Required Pro prices not found in Stripe',
       );
     }
 
-    const monthlyDollars = monthlyPrice.unit_amount / 100;
-    let annualDollars = annualPrice.unit_amount / 100;
+    const monthlyDollars = monthlyPrice.unitAmount / 100;
+    let annualDollars = annualPrice.unitAmount / 100;
 
     // Normalize yearly price to monthly equivalent
-    if (annualPrice.recurring?.interval === 'year') {
+    if (annualPrice.recurringInterval === 'year') {
       annualDollars = annualDollars / 12;
     }
 
@@ -157,10 +133,7 @@ export class BillingService {
       async () => {
         const existingCheckout =
           await this.stripeCheckoutSessionRepo.findByTenantId(tenantId);
-        if (
-          existingCheckout?.status === 'open' &&
-          existingCheckout.sessionId
-        ) {
+        if (existingCheckout?.status === 'open' && existingCheckout.sessionId) {
           const liveSession = await stripe.checkout.sessions.retrieve(
             existingCheckout.sessionId,
           );
@@ -261,10 +234,10 @@ export class BillingService {
         });
 
         try {
-          const lookupKey = PRICE_LOOKUP_KEYS[
-            `${tier}_${interval}`
-          ] as PriceLookupKey;
-          const priceId = await this.resolvePriceId(lookupKey);
+          const priceId = await this.stripeCatalog.resolveCheckoutPriceId(
+            tier,
+            interval,
+          );
 
           const eid = this.encryptionService.encrypt(tenant.eid);
           if (!eid) {
@@ -442,37 +415,5 @@ export class BillingService {
         object: session,
       },
     } as unknown as Stripe.Event);
-  }
-
-  private async resolvePriceId(lookupKey: string): Promise<string> {
-    const cached = this.priceCache.get(lookupKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.priceId;
-    }
-
-    if (!this.stripe) {
-      throw new ServiceUnavailableException('Stripe is not configured');
-    }
-
-    const prices = await this.stripe.prices.list({
-      lookup_keys: [lookupKey],
-      active: true,
-      limit: 1,
-    });
-
-    const price = prices.data[0];
-    if (!price) {
-      throw new BadRequestException(
-        `Price not configured for lookup key: ${lookupKey}`,
-      );
-    }
-
-    const priceId = price.id;
-    this.priceCache.set(lookupKey, {
-      priceId,
-      expiresAt: Date.now() + BillingService.CACHE_TTL_MS,
-    });
-
-    return priceId;
   }
 }

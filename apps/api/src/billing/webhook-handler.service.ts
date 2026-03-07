@@ -13,13 +13,7 @@ import type Stripe from 'stripe';
 
 import { AuditService } from '../audit/audit.service';
 import { STRIPE_CLIENT } from './stripe.provider';
-
-const VALID_TIERS = ['pro', 'enterprise'] as const;
-type PaidTier = (typeof VALID_TIERS)[number];
-
-function isValidPaidTier(value: unknown): value is PaidTier {
-  return typeof value === 'string' && VALID_TIERS.includes(value as PaidTier);
-}
+import { type PaidTier, StripeCatalogService } from './stripe-catalog.service';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -74,6 +68,7 @@ export class WebhookHandlerService {
     private readonly rlsContext: RlsContextService,
     private readonly auditService: AuditService,
     private readonly encryptionService: EncryptionService,
+    private readonly stripeCatalog: StripeCatalogService,
   ) {}
 
   private async auditWebhookConflict(
@@ -455,9 +450,7 @@ export class WebhookHandlerService {
     const subscription =
       await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
     const item = this.getSubscriptionItem(subscription);
-    const tier = await this.resolveTierFromProduct(
-      item.price.product as string,
-    );
+    const tier = await this.stripeCatalog.resolveTierFromPrice(item.price);
     const tenant = await this.resolveTenant({
       encryptedEid: session.metadata?.eid ?? null,
       stripeCustomerId,
@@ -543,8 +536,8 @@ export class WebhookHandlerService {
       'system',
       () => this.orgSubscriptionRepo.findByTenantId(tenant.id),
     );
-    const resolvedTier = await this.resolveTierFromProduct(
-      item.price.product as string,
+    const resolvedTier = await this.stripeCatalog.resolveTierFromPrice(
+      item.price,
     );
     const tier =
       (stripeSubscriptionStatus === 'past_due' ||
@@ -678,9 +671,7 @@ export class WebhookHandlerService {
       return;
     }
 
-    const tier = await this.resolveTierFromProduct(
-      item.price.product as string,
-    );
+    const tier = await this.stripeCatalog.resolveTierFromPrice(item.price);
     const currentPeriodEnds =
       this.getSubscriptionCurrentPeriodEnds(subscription);
 
@@ -753,9 +744,7 @@ export class WebhookHandlerService {
         return;
       }
 
-      const tier = await this.resolveTierFromProduct(
-        item.price.product as string,
-      );
+      const tier = await this.stripeCatalog.resolveTierFromPrice(item.price);
 
       await this.persistBinding(
         tenant.id,
@@ -935,19 +924,5 @@ export class WebhookHandlerService {
       targetId: tenant.id,
       metadata: {},
     });
-  }
-
-  private async resolveTierFromProduct(productId: string): Promise<PaidTier> {
-    if (!this.stripe) {
-      throw new Error('Stripe client not configured');
-    }
-    const product = await this.stripe.products.retrieve(productId);
-    const tier = product.metadata?.tier;
-    if (!isValidPaidTier(tier)) {
-      throw new Error(
-        `Stripe product ${productId} missing valid metadata.tier (got: ${tier})`,
-      );
-    }
-    return tier;
   }
 }

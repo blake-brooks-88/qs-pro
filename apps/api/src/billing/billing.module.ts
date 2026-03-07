@@ -16,6 +16,7 @@ import { BillingService } from './billing.service';
 import { BillingWebhookProcessor } from './billing-webhook.processor';
 import { createContextAwareOrgSubscriptionRepository } from './context-aware-org-subscription.repository';
 import { StripeProvider } from './stripe.provider';
+import { StripeCatalogService } from './stripe-catalog.service';
 import { WebhookHandlerService } from './webhook-handler.service';
 
 @Module({
@@ -29,6 +30,7 @@ import { WebhookHandlerService } from './webhook-handler.service';
   controllers: [BillingController],
   providers: [
     StripeProvider,
+    StripeCatalogService,
     WebhookHandlerService,
     BillingWebhookProcessor,
     BillingService,
@@ -62,6 +64,6 @@ import { WebhookHandlerService } from './webhook-handler.service';
       inject: ['DATABASE'],
     },
   ],
-  exports: [BillingService, WebhookHandlerService],
+  exports: [BillingService, StripeCatalogService, WebhookHandlerService],
 })
 export class BillingModule {}

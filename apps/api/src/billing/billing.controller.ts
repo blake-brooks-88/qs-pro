@@ -14,7 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import { Queue } from 'bullmq';
 import type { FastifyRequest } from 'fastify';
@@ -34,7 +34,6 @@ import { BillingService } from './billing.service';
 import { STRIPE_CLIENT } from './stripe.provider';
 
 const CheckoutBodySchema = z.object({
-  tier: z.enum(['pro', 'enterprise']),
   interval: z.enum(['monthly', 'annual']),
 });
 
@@ -64,7 +63,7 @@ export class BillingController {
   ): Promise<{ url: string }> {
     return this.billingService.createCheckoutSession(
       user.tenantId,
-      body.tier,
+      'pro',
       body.interval,
     );
   }
@@ -86,7 +85,7 @@ export class BillingController {
     return this.billingService.confirmCheckoutSession(user.tenantId, sessionId);
   }
 
-  @SkipThrottle()
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
