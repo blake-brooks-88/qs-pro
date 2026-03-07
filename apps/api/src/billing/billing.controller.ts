@@ -37,6 +37,22 @@ const CheckoutBodySchema = z.object({
   interval: z.enum(['monthly', 'annual']),
 });
 
+function isDuplicateWebhookJobEnqueueError(
+  err: unknown,
+  eventId: string | undefined,
+): boolean {
+  if (!eventId) {
+    return false;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('already exists') &&
+    normalized.includes('job') &&
+    message.includes(eventId)
+  );
+}
+
 @Controller('billing')
 export class BillingController {
   private readonly logger = new Logger(BillingController.name);
@@ -85,7 +101,7 @@ export class BillingController {
     return this.billingService.confirmCheckoutSession(user.tenantId, sessionId);
   }
 
-  @Throttle({ default: { limit: 300, ttl: 60_000 } })
+  @Throttle({ default: { limit: 5_000, ttl: 60_000 } })
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
@@ -128,20 +144,32 @@ export class BillingController {
       });
     }
 
-    await this.billingWebhookQueue.add(
-      BILLING_WEBHOOK_JOB,
-      { event },
-      {
-        jobId: event.id,
-        attempts: 8,
-        backoff: {
-          type: 'exponential',
-          delay: 5_000,
+    try {
+      await this.billingWebhookQueue.add(
+        BILLING_WEBHOOK_JOB,
+        { event },
+        {
+          jobId: event.id,
+          attempts: 8,
+          backoff: {
+            type: 'exponential',
+            delay: 5_000,
+          },
+          removeOnComplete: 1000,
+          removeOnFail: 1000,
         },
-        removeOnComplete: 1000,
-        removeOnFail: 1000,
-      },
-    );
+      );
+    } catch (enqueueError) {
+      // Stripe retries on any non-2xx response. If the job is already enqueued due to a
+      // duplicate delivery, treat it as success and avoid an infinite retry loop.
+      if (isDuplicateWebhookJobEnqueueError(enqueueError, event.id)) {
+        this.logger.log(
+          `[DIAG] Duplicate webhook job already enqueued (jobId=${event.id}); acknowledging`,
+        );
+        return { received: true };
+      }
+      throw enqueueError;
+    }
     return { received: true };
   }
 }

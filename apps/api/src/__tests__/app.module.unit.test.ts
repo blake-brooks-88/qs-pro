@@ -192,6 +192,9 @@ describe('AppModule', () => {
     async () => {
       seedApiEnv();
       process.env.NODE_ENV = 'production';
+      // Production env validation requires a live key prefix.
+      // This is a placeholder key for config validation only; tests do not call Stripe.
+      process.env.STRIPE_SECRET_KEY = 'sk_live_example';
       vi.resetModules();
       mockIoredis();
       mockThrottlerStorageRedis();

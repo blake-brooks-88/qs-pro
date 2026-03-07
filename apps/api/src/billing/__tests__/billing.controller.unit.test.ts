@@ -133,5 +133,23 @@ describe('BillingController', () => {
         }),
       );
     });
+
+    it('acknowledges duplicate webhook delivery when enqueue reports job already exists', async () => {
+      queueMock.add.mockRejectedValueOnce(
+        new Error('Job evt_test already exists'),
+      );
+
+      await expect(
+        controller.handleWebhook(createReq('body'), 'sig_test'),
+      ).resolves.toEqual({ received: true });
+    });
+
+    it('bubbles enqueue errors so Stripe retries delivery', async () => {
+      queueMock.add.mockRejectedValueOnce(new Error('Redis connection lost'));
+
+      await expect(
+        controller.handleWebhook(createReq('body'), 'sig_test'),
+      ).rejects.toThrow('Redis connection lost');
+    });
   });
 });
