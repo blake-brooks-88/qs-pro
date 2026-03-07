@@ -18,6 +18,7 @@ import {
 import { AppModule } from '../src/app.module';
 import { BillingService } from '../src/billing/billing.service';
 import { STRIPE_CLIENT } from '../src/billing/stripe.provider';
+import { StripeCatalogService } from '../src/billing/stripe-catalog.service';
 import { configureApp } from '../src/configure-app';
 import { FeaturesService } from '../src/features/features.service';
 import { deleteTestTenantSubscription } from './helpers/set-test-tenant-tier';
@@ -33,6 +34,21 @@ function getRequiredEnv(key: string): string {
 
 // ─── Stripe SDK Mock (external boundary) ───────────────────────────
 // Only the Stripe SDK is mocked. Everything else is real.
+
+function makePrice(
+  lookupKey:
+    | 'pro_monthly'
+    | 'pro_annual'
+    | 'enterprise_monthly'
+    | 'enterprise_annual',
+  product = 'prod_test_default',
+) {
+  return {
+    id: `price_${lookupKey}_test`,
+    lookup_key: lookupKey,
+    product,
+  };
+}
 
 function createStripeMock() {
   let checkoutCounter = 0;
@@ -69,6 +85,18 @@ function createStripeMock() {
             unit_amount: 27900,
             recurring: { interval: 'year' },
           },
+          {
+            id: 'price_enterprise_monthly_test',
+            lookup_key: 'enterprise_monthly',
+            unit_amount: 9900,
+            recurring: { interval: 'month' },
+          },
+          {
+            id: 'price_enterprise_annual_test',
+            lookup_key: 'enterprise_annual',
+            unit_amount: 99900,
+            recurring: { interval: 'year' },
+          },
         ],
       }),
     },
@@ -98,6 +126,7 @@ describe('BillingService (integration)', () => {
   let featuresService: FeaturesService;
   let encryptionService: EncryptionService;
   let rlsContext: RlsContextService;
+  let stripeCatalogService: StripeCatalogService;
   let stripeMock: ReturnType<typeof createStripeMock>;
 
   const createdTenantIds: string[] = [];
@@ -204,17 +233,19 @@ describe('BillingService (integration)', () => {
   }
 
   /**
-   * Clears the internal price cache on BillingService so tests
-   * that change `prices.list` mock behaviour see the new values.
+   * Clears the internal Stripe price caches so tests that change
+   * `prices.list` mock behaviour see the new values.
    */
   function clearPriceCache(): void {
-    // Access private cache maps to reset them between tests
     const svc = billingService as unknown as {
-      priceCache: Map<string, unknown>;
       pricesResponseCache: unknown;
     };
-    svc.priceCache.clear();
     svc.pricesResponseCache = null;
+
+    const catalog = stripeCatalogService as unknown as {
+      catalogCache: unknown;
+    };
+    catalog.catalogCache = null;
   }
 
   beforeAll(async () => {
@@ -246,6 +277,7 @@ describe('BillingService (integration)', () => {
 
     sqlClient = app.get<Sql>('SQL_CLIENT');
     billingService = app.get(BillingService);
+    stripeCatalogService = app.get(StripeCatalogService);
     featuresService = app.get(FeaturesService);
     encryptionService = app.get(EncryptionService);
     rlsContext = app.get(RlsContextService);
@@ -278,6 +310,18 @@ describe('BillingService (integration)', () => {
           id: 'price_pro_annual_test',
           lookup_key: 'pro_annual',
           unit_amount: 27900,
+          recurring: { interval: 'year' },
+        },
+        {
+          id: 'price_enterprise_monthly_test',
+          lookup_key: 'enterprise_monthly',
+          unit_amount: 9900,
+          recurring: { interval: 'month' },
+        },
+        {
+          id: 'price_enterprise_annual_test',
+          lookup_key: 'enterprise_annual',
+          unit_amount: 99900,
           recurring: { interval: 'year' },
         },
       ],
@@ -315,15 +359,20 @@ describe('BillingService (integration)', () => {
       expect(result.url).toBe('https://checkout.stripe.com/test-session');
     });
 
-    it('calls Stripe prices.list with the correct lookup key', async () => {
+    it('loads the Stripe catalog by lookup key before creating checkout', async () => {
       const tenant = await createTestTenant('checkout-lookup');
 
       await billingService.createCheckoutSession(tenant.id, 'pro', 'monthly');
 
       expect(stripeMock.prices.list).toHaveBeenCalledWith({
-        lookup_keys: ['pro_monthly'],
+        lookup_keys: [
+          'pro_monthly',
+          'pro_annual',
+          'enterprise_monthly',
+          'enterprise_annual',
+        ],
         active: true,
-        limit: 1,
+        limit: 4,
       });
     });
 
@@ -350,19 +399,20 @@ describe('BillingService (integration)', () => {
       );
     });
 
-    it('uses pro_annual lookup key for annual interval', async () => {
+    it('uses the mapped annual price id for annual checkout', async () => {
       const tenant = await createTestTenant('checkout-annual');
 
       await billingService.createCheckoutSession(tenant.id, 'pro', 'annual');
 
-      expect(stripeMock.prices.list).toHaveBeenCalledWith({
-        lookup_keys: ['pro_annual'],
-        active: true,
-        limit: 1,
-      });
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: [{ price: 'price_pro_annual_test', quantity: 1 }],
+        }),
+        expect.any(Object),
+      );
     });
 
-    it('uses enterprise_monthly lookup key for enterprise tier', async () => {
+    it('uses the mapped enterprise price id for enterprise tier', async () => {
       const tenant = await createTestTenant('checkout-enterprise');
 
       await billingService.createCheckoutSession(
@@ -371,11 +421,12 @@ describe('BillingService (integration)', () => {
         'monthly',
       );
 
-      expect(stripeMock.prices.list).toHaveBeenCalledWith({
-        lookup_keys: ['enterprise_monthly'],
-        active: true,
-        limit: 1,
-      });
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: [{ price: 'price_enterprise_monthly_test', quantity: 1 }],
+        }),
+        expect.any(Object),
+      );
     });
 
     it('throws BadRequestException when tenant not found', async () => {
@@ -445,7 +496,7 @@ describe('BillingService (integration)', () => {
         items: {
           data: [
             {
-              price: { product: 'prod_reconciled_paid' },
+              price: makePrice('pro_monthly', 'prod_reconciled_paid'),
               quantity: 1,
               current_period_end:
                 Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
@@ -453,11 +504,6 @@ describe('BillingService (integration)', () => {
           ],
         },
       });
-      stripeMock.products.retrieve.mockResolvedValueOnce({
-        id: 'prod_reconciled_paid',
-        metadata: { tier: 'pro' },
-      });
-
       await expect(
         billingService.createCheckoutSession(tenant.id, 'pro', 'monthly'),
       ).rejects.toThrow(
@@ -508,7 +554,7 @@ describe('BillingService (integration)', () => {
         items: {
           data: [
             {
-              price: { product: 'prod_reconciled_mismatch' },
+              price: makePrice('pro_monthly', 'prod_reconciled_mismatch'),
               quantity: 1,
               current_period_end:
                 Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
@@ -516,11 +562,6 @@ describe('BillingService (integration)', () => {
           ],
         },
       });
-      stripeMock.products.retrieve.mockResolvedValueOnce({
-        id: 'prod_reconciled_mismatch',
-        metadata: { tier: 'pro' },
-      });
-
       await expect(
         billingService.createCheckoutSession(tenant.id, 'pro', 'annual'),
       ).rejects.toThrow(
@@ -605,7 +646,7 @@ describe('BillingService (integration)', () => {
         items: {
           data: [
             {
-              price: { product: 'prod_confirm_paid' },
+              price: makePrice('pro_monthly', 'prod_confirm_paid'),
               quantity: 1,
               current_period_end:
                 Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
@@ -613,11 +654,6 @@ describe('BillingService (integration)', () => {
           ],
         },
       });
-      stripeMock.products.retrieve.mockResolvedValue({
-        id: 'prod_confirm_paid',
-        metadata: { tier: 'pro' },
-      });
-
       const result = await billingService.confirmCheckoutSession(
         tenant.id,
         sessionId,

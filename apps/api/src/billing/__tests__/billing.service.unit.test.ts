@@ -53,10 +53,17 @@ describe('BillingService', () => {
     markCompleted: ReturnType<typeof vi.fn>;
     markExpired: ReturnType<typeof vi.fn>;
   };
-  let encryptionService: { encrypt: ReturnType<typeof vi.fn>; decrypt: ReturnType<typeof vi.fn> };
+  let encryptionService: {
+    encrypt: ReturnType<typeof vi.fn>;
+    decrypt: ReturnType<typeof vi.fn>;
+  };
   let rlsContext: {
     runWithTenantContext: ReturnType<typeof vi.fn>;
     runWithIsolatedTenantContext: ReturnType<typeof vi.fn>;
+  };
+  let stripeCatalog: {
+    getPublicPrices: ReturnType<typeof vi.fn>;
+    resolveCheckoutPriceId: ReturnType<typeof vi.fn>;
   };
   let webhookHandler: { process: ReturnType<typeof vi.fn> };
   let service: BillingService;
@@ -84,10 +91,29 @@ describe('BillingService', () => {
       decrypt: vi.fn().mockReturnValue('eid-1'),
     };
     rlsContext = {
-      runWithTenantContext: vi.fn().mockImplementation((_tenantId, _mid, fn) => fn()),
-      runWithIsolatedTenantContext: vi.fn().mockImplementation(
-        (_tenantId, _mid, fn) => fn(),
-      ),
+      runWithTenantContext: vi
+        .fn()
+        .mockImplementation((_tenantId, _mid, fn) => fn()),
+      runWithIsolatedTenantContext: vi
+        .fn()
+        .mockImplementation((_tenantId, _mid, fn) => fn()),
+    };
+    stripeCatalog = {
+      getPublicPrices: vi.fn().mockResolvedValue({
+        monthly: {
+          id: 'price_pro_monthly_test',
+          unitAmount: 2900,
+          recurringInterval: 'month',
+        },
+        annual: {
+          id: 'price_pro_annual_test',
+          unitAmount: 24000,
+          recurringInterval: 'year',
+        },
+      }),
+      resolveCheckoutPriceId: vi
+        .fn()
+        .mockResolvedValue('price_pro_monthly_test'),
     };
     webhookHandler = {
       process: vi.fn().mockResolvedValue(undefined),
@@ -105,27 +131,13 @@ describe('BillingService', () => {
       stripeCheckoutSessionRepo as never,
       encryptionService as never,
       rlsContext as never,
+      stripeCatalog as never,
       webhookHandler as never,
     );
   });
 
   describe('getPrices', () => {
     it('returns normalized prices and caches the Stripe response', async () => {
-      stripeMock.prices.list.mockResolvedValue({
-        data: [
-          {
-            lookup_key: 'pro_monthly',
-            unit_amount: 2900,
-            recurring: { interval: 'month' },
-          },
-          {
-            lookup_key: 'pro_annual',
-            unit_amount: 24000,
-            recurring: { interval: 'year' },
-          },
-        ],
-      });
-
       const first = await service.getPrices();
       const second = await service.getPrices();
 
@@ -133,7 +145,7 @@ describe('BillingService', () => {
         pro: { monthly: 29, annual: 20 },
       });
       expect(second).toEqual(first);
-      expect(stripeMock.prices.list).toHaveBeenCalledTimes(1);
+      expect(stripeCatalog.getPublicPrices).toHaveBeenCalledTimes(1);
     });
 
     it('throws when Stripe is not configured', async () => {
@@ -145,6 +157,7 @@ describe('BillingService', () => {
         stripeCheckoutSessionRepo as never,
         encryptionService as never,
         rlsContext as never,
+        stripeCatalog as never,
         webhookHandler as never,
       );
 
@@ -154,14 +167,17 @@ describe('BillingService', () => {
     });
 
     it('throws when required Pro prices are missing', async () => {
-      stripeMock.prices.list.mockResolvedValue({
-        data: [
-          {
-            lookup_key: 'pro_monthly',
-            unit_amount: 2900,
-            recurring: { interval: 'month' },
-          },
-        ],
+      stripeCatalog.getPublicPrices.mockResolvedValue({
+        monthly: {
+          id: 'price_pro_monthly_test',
+          unitAmount: 2900,
+          recurringInterval: 'month',
+        },
+        annual: {
+          id: 'price_pro_annual_test',
+          unitAmount: null,
+          recurringInterval: 'year',
+        },
       });
 
       await expect(service.getPrices()).rejects.toThrow(
@@ -234,7 +250,9 @@ describe('BillingService', () => {
 
       await expect(
         service.createCheckoutSession('tenant-1', 'pro', 'annual'),
-      ).rejects.toThrow('An active paid subscription already exists for this tenant');
+      ).rejects.toThrow(
+        'An active paid subscription already exists for this tenant',
+      );
 
       expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith(
         'cs_existing',
@@ -246,6 +264,27 @@ describe('BillingService', () => {
             object: expect.objectContaining({ id: 'cs_existing' }),
           }),
         }),
+      );
+    });
+
+    it('resolves the checkout price id server-side', async () => {
+      stripeMock.checkout.sessions.create.mockResolvedValue({
+        id: 'cs_new',
+        url: 'https://checkout.stripe.com/test-session',
+        expires_at: Math.floor(Date.now() / 1000) + 1800,
+      });
+
+      await service.createCheckoutSession('tenant-1', 'pro', 'monthly');
+
+      expect(stripeCatalog.resolveCheckoutPriceId).toHaveBeenCalledWith(
+        'pro',
+        'monthly',
+      );
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: [{ price: 'price_pro_monthly_test', quantity: 1 }],
+        }),
+        expect.any(Object),
       );
     });
   });

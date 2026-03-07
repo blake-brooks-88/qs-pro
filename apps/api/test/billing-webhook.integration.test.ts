@@ -53,6 +53,22 @@ function makeStripeRefs(label: string): StripeRefs {
   };
 }
 
+function makeProPrice(product = STRIPE_PRODUCT_ID) {
+  return {
+    id: 'price_pro_monthly_test',
+    lookup_key: 'pro_monthly',
+    product,
+  };
+}
+
+function makeEnterprisePrice(product = STRIPE_PRODUCT_ID) {
+  return {
+    id: 'price_enterprise_monthly_test',
+    lookup_key: 'enterprise_monthly',
+    product,
+  };
+}
+
 function createStripeMock() {
   return {
     webhooks: {
@@ -79,7 +95,7 @@ function createStripeMock() {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -308,7 +324,7 @@ describe('Billing Webhook (integration)', () => {
           items: {
             data: [
               {
-                price: { product: STRIPE_PRODUCT_ID },
+                price: makeProPrice(),
                 quantity: 1,
                 current_period_end: PERIOD_END_EPOCH,
               },
@@ -338,7 +354,7 @@ describe('Billing Webhook (integration)', () => {
           items: {
             data: [
               {
-                price: { product: STRIPE_PRODUCT_ID },
+                price: makeProPrice(),
                 quantity: 1,
                 current_period_end: PERIOD_END_EPOCH,
               },
@@ -369,7 +385,7 @@ describe('Billing Webhook (integration)', () => {
           items: {
             data: [
               {
-                price: { product: STRIPE_PRODUCT_ID },
+                price: makeProPrice(),
                 quantity: 1,
                 current_period_end:
                   overrides?.currentPeriodEnd ?? PERIOD_END_EPOCH,
@@ -451,7 +467,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -499,7 +515,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -533,7 +549,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -570,7 +586,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -754,12 +770,6 @@ describe('Billing Webhook (integration)', () => {
         lastInvoicePaidAt: new Date(),
       });
 
-      // Product resolves to 'pro' — different from existing 'enterprise'
-      stripeMock.products.retrieve.mockResolvedValueOnce({
-        id: ENTERPRISE_PRODUCT_ID,
-        metadata: { tier: 'pro' },
-      });
-
       const newPeriodEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
 
       // Act — send subscription.updated with status='past_due'
@@ -775,7 +785,7 @@ describe('Billing Webhook (integration)', () => {
             items: {
               data: [
                 {
-                  price: { product: ENTERPRISE_PRODUCT_ID },
+                  price: makeEnterprisePrice(ENTERPRISE_PRODUCT_ID),
                   quantity: 1,
                   current_period_end: newPeriodEnd,
                 },
@@ -821,7 +831,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -887,7 +897,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -964,7 +974,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -1019,7 +1029,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -1101,7 +1111,7 @@ describe('Billing Webhook (integration)', () => {
             items: {
               data: [
                 {
-                  price: { product: STRIPE_PRODUCT_ID },
+                  price: makeProPrice(),
                   quantity: 1,
                   current_period_end: PERIOD_END_EPOCH,
                 },
@@ -1148,7 +1158,7 @@ describe('Billing Webhook (integration)', () => {
             items: {
               data: [
                 {
-                  price: { product: STRIPE_PRODUCT_ID },
+                  price: makeProPrice(),
                   quantity: 1,
                   current_period_end: PERIOD_END_EPOCH,
                 },
@@ -1224,7 +1234,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -1432,7 +1442,7 @@ describe('Billing Webhook (integration)', () => {
         items: {
           data: [
             {
-              price: { product: STRIPE_PRODUCT_ID },
+              price: makeProPrice(),
               quantity: 1,
               current_period_end: PERIOD_END_EPOCH,
             },
@@ -1487,7 +1497,7 @@ describe('Billing Webhook (integration)', () => {
             items: {
               data: [
                 {
-                  price: { product: STRIPE_PRODUCT_ID },
+                  price: makeProPrice(),
                   quantity: 1,
                   current_period_end: PERIOD_END_EPOCH,
                 },
