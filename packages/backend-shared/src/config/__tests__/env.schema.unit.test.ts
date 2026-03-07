@@ -143,6 +143,30 @@ describe("env.schema", () => {
       expect(result.success).toBe(true);
     });
 
+    it("requires Stripe config in production", () => {
+      const result = apiEnvSchema.safeParse(
+        makeApiEnv({
+          NODE_ENV: "production",
+        }),
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("Expected parse to fail");
+      }
+
+      const messages = result.error.issues.map((issue) => issue.message);
+      expect(messages).toContain(
+        "In production, STRIPE_SECRET_KEY is required",
+      );
+      expect(messages).toContain(
+        "In production, STRIPE_API_VERSION is required",
+      );
+      expect(messages).toContain(
+        "In production, STRIPE_WEBHOOK_SECRET is required",
+      );
+    });
+
     it("validates STRIPE_SECRET_KEY prefix when provided", () => {
       const valid = apiEnvSchema.safeParse(
         makeApiEnv({

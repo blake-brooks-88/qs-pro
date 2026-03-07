@@ -83,9 +83,8 @@ export const adminSchema = z.object({
 });
 
 /**
- * Stripe schema - optional env vars for Stripe billing integration.
- * All fields are optional so existing dev environments work without Stripe keys.
- * The BillingModule validates presence at runtime in production.
+ * Stripe schema for billing integration.
+ * Dev/test may omit these; production must provide them.
  */
 export const stripeSchema = z.object({
   STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
@@ -171,6 +170,27 @@ export const apiEnvSchema = infrastructureSchema
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "In production, COOKIE_DOMAIN must be unset (host-only)",
+        });
+      }
+
+      if (!data.STRIPE_SECRET_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "In production, STRIPE_SECRET_KEY is required",
+        });
+      }
+
+      if (!data.STRIPE_API_VERSION) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "In production, STRIPE_API_VERSION is required",
+        });
+      }
+
+      if (!data.STRIPE_WEBHOOK_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "In production, STRIPE_WEBHOOK_SECRET is required",
         });
       }
     }
