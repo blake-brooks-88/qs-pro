@@ -448,15 +448,19 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs);
 export const selectOrgSubscriptionSchema = createSelectSchema(orgSubscriptions);
 export const insertOrgSubscriptionSchema = createInsertSchema(orgSubscriptions);
 
-export const selectStripeBillingBindingSchema =
-  createSelectSchema(stripeBillingBindings);
-export const insertStripeBillingBindingSchema =
-  createInsertSchema(stripeBillingBindings);
+export const selectStripeBillingBindingSchema = createSelectSchema(
+  stripeBillingBindings,
+);
+export const insertStripeBillingBindingSchema = createInsertSchema(
+  stripeBillingBindings,
+);
 
-export const selectStripeCheckoutSessionSchema =
-  createSelectSchema(stripeCheckoutSessions);
-export const insertStripeCheckoutSessionSchema =
-  createInsertSchema(stripeCheckoutSessions);
+export const selectStripeCheckoutSessionSchema = createSelectSchema(
+  stripeCheckoutSessions,
+);
+export const insertStripeCheckoutSessionSchema = createInsertSchema(
+  stripeCheckoutSessions,
+);
 
 export const selectStripeWebhookEventSchema =
   createSelectSchema(stripeWebhookEvents);

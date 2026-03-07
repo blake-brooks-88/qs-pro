@@ -284,9 +284,7 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
   }
 }
 
-export class DrizzleStripeBillingBindingRepository
-  implements IStripeBillingBindingRepository
-{
+export class DrizzleStripeBillingBindingRepository implements IStripeBillingBindingRepository {
   constructor(private db: PostgresJsDatabase) {}
 
   async findByTenantId(
@@ -315,11 +313,15 @@ export class DrizzleStripeBillingBindingRepository
     const [result] = await this.db
       .select()
       .from(stripeBillingBindings)
-      .where(eq(stripeBillingBindings.stripeSubscriptionId, stripeSubscriptionId));
+      .where(
+        eq(stripeBillingBindings.stripeSubscriptionId, stripeSubscriptionId),
+      );
     return result;
   }
 
-  async upsert(binding: NewStripeBillingBinding): Promise<StripeBillingBinding> {
+  async upsert(
+    binding: NewStripeBillingBinding,
+  ): Promise<StripeBillingBinding> {
     const [result] = await this.db
       .insert(stripeBillingBindings)
       .values(binding)
@@ -359,9 +361,7 @@ export class DrizzleStripeBillingBindingRepository
   }
 }
 
-export class DrizzleStripeCheckoutSessionRepository
-  implements IStripeCheckoutSessionRepository
-{
+export class DrizzleStripeCheckoutSessionRepository implements IStripeCheckoutSessionRepository {
   constructor(private db: PostgresJsDatabase) {}
 
   async findByTenantId(
