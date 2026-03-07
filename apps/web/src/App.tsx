@@ -12,9 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { LaunchInstructionsPage } from "@/features/auth/launch-instructions-page";
 import { EditorWorkspacePage } from "@/features/editor-workspace/EditorWorkspacePage";
+import { usageQueryKeys } from "@/hooks/use-run-usage";
 import { featuresQueryKeys } from "@/hooks/use-tenant-features";
 import { useTrial } from "@/hooks/use-trial";
-import { usageQueryKeys } from "@/hooks/use-run-usage";
 import { track } from "@/lib/analytics";
 import {
   CHECKOUT_RETURN_SIGNAL_STORAGE_KEY,
