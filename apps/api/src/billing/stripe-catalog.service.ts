@@ -55,6 +55,36 @@ function isLookupKey(value: string): value is StripePriceLookupKey {
   return value in STRIPE_PRICE_DEFINITIONS;
 }
 
+function expectedStripeInterval(
+  interval: BillingInterval,
+): Stripe.Price.Recurring.Interval {
+  return interval === 'monthly' ? 'month' : 'year';
+}
+
+function getPriceDefinition(lookupKey: StripePriceLookupKey) {
+  switch (lookupKey) {
+    case 'pro_monthly':
+      return STRIPE_PRICE_DEFINITIONS.pro_monthly;
+    case 'pro_annual':
+      return STRIPE_PRICE_DEFINITIONS.pro_annual;
+    case 'enterprise_monthly':
+      return STRIPE_PRICE_DEFINITIONS.enterprise_monthly;
+    case 'enterprise_annual':
+      return STRIPE_PRICE_DEFINITIONS.enterprise_annual;
+  }
+}
+
+function getLookupKey(
+  tier: PaidTier,
+  interval: BillingInterval,
+): StripePriceLookupKey {
+  if (tier === 'pro') {
+    return interval === 'monthly' ? 'pro_monthly' : 'pro_annual';
+  }
+
+  return interval === 'monthly' ? 'enterprise_monthly' : 'enterprise_annual';
+}
+
 @Injectable()
 export class StripeCatalogService implements OnModuleInit {
   private static readonly CACHE_TTL_MS = 15 * 60 * 1000;
@@ -89,14 +119,16 @@ export class StripeCatalogService implements OnModuleInit {
     tier: PaidTier,
     interval: BillingInterval,
   ): Promise<string> {
-    const lookupKey = `${tier}_${interval}` as StripePriceLookupKey;
+    const lookupKey = getLookupKey(tier, interval);
     const price = await this.getPriceByLookupKey(lookupKey);
     return price.id;
   }
 
   async resolveTierFromPrice(price: Stripe.Price): Promise<PaidTier> {
     if (typeof price.lookup_key === 'string' && isLookupKey(price.lookup_key)) {
-      return STRIPE_PRICE_DEFINITIONS[price.lookup_key].tier;
+      return this.validateResolvedPrice(
+        this.toResolvedPrice(price.id, price.lookup_key, price),
+      ).tier;
     }
 
     const resolved = await this.getPriceById(price.id);
@@ -116,11 +148,14 @@ export class StripeCatalogService implements OnModuleInit {
         continue;
       }
 
-      if (!catalog.lookupKeyToPrice.has(lookupKey)) {
+      const price = catalog.lookupKeyToPrice.get(lookupKey);
+      if (!price) {
         throw new Error(
           `Required Stripe price not found for lookup key: ${lookupKey}`,
         );
       }
+
+      this.validateResolvedPrice(price);
     }
 
     this.logger.log('Validated required Stripe price catalog');
@@ -136,18 +171,36 @@ export class StripeCatalogService implements OnModuleInit {
         `Price not configured for lookup key: ${lookupKey}`,
       );
     }
-    return price;
+    return this.validateResolvedPrice(price);
   }
 
   private async getPriceById(priceId: string): Promise<ResolvedStripePrice> {
     const catalog = await this.loadCatalog();
     const price = catalog.priceIdToPrice.get(priceId);
-    if (!price) {
+    if (price) {
+      return this.validateResolvedPrice(price);
+    }
+
+    if (!this.stripe) {
+      throw new ServiceUnavailableException('Stripe is not configured');
+    }
+
+    const retrieved = await this.stripe.prices.retrieve(priceId);
+    if ('deleted' in retrieved && retrieved.deleted) {
+      throw new Error(`Stripe price ${priceId} no longer exists`);
+    }
+
+    if (!retrieved.lookup_key || !isLookupKey(retrieved.lookup_key)) {
       throw new Error(
         `Stripe price ${priceId} is not mapped to an application tier`,
       );
     }
-    return price;
+
+    const resolved = this.validateResolvedPrice(
+      this.toResolvedPrice(retrieved.id, retrieved.lookup_key, retrieved),
+    );
+    catalog.priceIdToPrice.set(priceId, resolved);
+    return resolved;
   }
 
   private async loadCatalog(): Promise<StripePriceCatalog> {
@@ -166,7 +219,9 @@ export class StripeCatalogService implements OnModuleInit {
     const result = await this.stripe.prices.list({
       lookup_keys: lookupKeys,
       active: true,
-      limit: lookupKeys.length,
+      // Stripe list endpoints cap at 100; use a high limit to avoid partial results
+      // if the account accidentally has multiple active prices for the same lookup_key.
+      limit: 100,
     });
 
     const lookupKeyToPrice = new Map<
@@ -180,15 +235,14 @@ export class StripeCatalogService implements OnModuleInit {
         continue;
       }
 
-      const definition = STRIPE_PRICE_DEFINITIONS[price.lookup_key];
-      const resolved: ResolvedStripePrice = {
-        id: price.id,
-        lookupKey: price.lookup_key,
-        tier: definition.tier,
-        interval: definition.interval,
-        unitAmount: price.unit_amount,
-        recurringInterval: price.recurring?.interval ?? null,
-      };
+      const resolved = this.toResolvedPrice(price.id, price.lookup_key, price);
+
+      if (lookupKeyToPrice.has(price.lookup_key)) {
+        const existing = lookupKeyToPrice.get(price.lookup_key);
+        throw new Error(
+          `Multiple active Stripe prices found for lookup key ${price.lookup_key}: ${existing?.id ?? 'unknown'} and ${price.id}`,
+        );
+      }
 
       lookupKeyToPrice.set(price.lookup_key, resolved);
       priceIdToPrice.set(price.id, resolved);
@@ -201,5 +255,34 @@ export class StripeCatalogService implements OnModuleInit {
     };
     this.catalogCache = catalog;
     return catalog;
+  }
+
+  private toResolvedPrice(
+    id: string,
+    lookupKey: StripePriceLookupKey,
+    price: Pick<Stripe.Price, 'unit_amount' | 'recurring'>,
+  ): ResolvedStripePrice {
+    const definition = getPriceDefinition(lookupKey);
+    return {
+      id,
+      lookupKey,
+      tier: definition.tier,
+      interval: definition.interval,
+      unitAmount: price.unit_amount,
+      recurringInterval: price.recurring?.interval ?? null,
+    };
+  }
+
+  private validateResolvedPrice(
+    price: ResolvedStripePrice,
+  ): ResolvedStripePrice {
+    const expectedInterval = expectedStripeInterval(price.interval);
+    if (price.recurringInterval !== expectedInterval) {
+      throw new Error(
+        `Stripe price ${price.id} for lookup key ${price.lookupKey} must recur ${expectedInterval}, got ${price.recurringInterval ?? 'none'}`,
+      );
+    }
+
+    return price;
   }
 }
