@@ -479,6 +479,68 @@ describe('BillingService (integration)', () => {
       expect(features.tier).toBe('pro');
     });
 
+    it('reconciles a completed paid checkout even when the retry requests a different interval', async () => {
+      const tenant = await createTestTenant('checkout-reconcile-mismatch');
+      const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+      const sessionId = `cs_test_stale_mismatch_${Date.now()}`;
+
+      stripeMock.checkout.sessions.create.mockResolvedValueOnce({
+        id: sessionId,
+        url: 'https://checkout.stripe.com/stale-mismatch-session',
+        expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+      });
+
+      await billingService.createCheckoutSession(tenant.id, 'pro', 'monthly');
+
+      stripeMock.checkout.sessions.retrieve.mockResolvedValueOnce({
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+        customer: 'cus_reconciled_mismatch',
+        subscription: 'sub_reconciled_mismatch',
+        metadata: { eid: encryptedEid },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+        id: 'sub_reconciled_mismatch',
+        customer: 'cus_reconciled_mismatch',
+        status: 'active',
+        metadata: { eid: encryptedEid },
+        items: {
+          data: [
+            {
+              price: { product: 'prod_reconciled_mismatch' },
+              quantity: 1,
+              current_period_end:
+                Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            },
+          ],
+        },
+      });
+      stripeMock.products.retrieve.mockResolvedValueOnce({
+        id: 'prod_reconciled_mismatch',
+        metadata: { tier: 'pro' },
+      });
+
+      await expect(
+        billingService.createCheckoutSession(tenant.id, 'pro', 'annual'),
+      ).rejects.toThrow(
+        'An active paid subscription already exists for this tenant',
+      );
+
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
+      expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith(
+        sessionId,
+      );
+
+      const subscription = await getSubscription(tenant.id);
+      expect(subscription?.tier).toBe('pro');
+      expect(subscription?.stripeCustomerId).toBe('cus_reconciled_mismatch');
+      expect(subscription?.stripeSubscriptionId).toBe(
+        'sub_reconciled_mismatch',
+      );
+      expect(subscription?.lastInvoicePaidAt).not.toBeNull();
+    });
+
     it('creates a fresh checkout when the previous completed session did not produce a paid entitlement', async () => {
       const tenant = await createTestTenant('checkout-recreate-terminal');
       const encryptedEid = encryptionService.encrypt(tenant.eid) as string;

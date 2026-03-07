@@ -203,4 +203,50 @@ describe('BillingService', () => {
       });
     });
   });
+
+  describe('createCheckoutSession', () => {
+    it('reconciles a completed checkout before plan matching and blocks duplicate paid checkouts', async () => {
+      const paidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      orgSubscriptionRepo.findByTenantId
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({
+          tenantId: 'tenant-1',
+          tier: 'pro',
+          stripeCustomerId: 'cus_paid',
+          stripeSubscriptionId: 'sub_paid',
+          stripeSubscriptionStatus: 'active',
+          currentPeriodEnds: paidUntil,
+          lastInvoicePaidAt: new Date(),
+        });
+      stripeCheckoutSessionRepo.findByTenantId.mockResolvedValue({
+        tenantId: 'tenant-1',
+        tier: 'pro',
+        interval: 'monthly',
+        status: 'open',
+        sessionId: 'cs_existing',
+      });
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        id: 'cs_existing',
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      await expect(
+        service.createCheckoutSession('tenant-1', 'pro', 'annual'),
+      ).rejects.toThrow('An active paid subscription already exists for this tenant');
+
+      expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith(
+        'cs_existing',
+      );
+      expect(webhookHandler.process).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'checkout.session.completed',
+          data: expect.objectContaining({
+            object: expect.objectContaining({ id: 'cs_existing' }),
+          }),
+        }),
+      );
+    });
+  });
 });

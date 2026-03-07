@@ -159,8 +159,6 @@ export class BillingService {
           await this.stripeCheckoutSessionRepo.findByTenantId(tenantId);
         if (
           existingCheckout?.status === 'open' &&
-          existingCheckout.tier === tier &&
-          existingCheckout.interval === interval &&
           existingCheckout.sessionId
         ) {
           const liveSession = await stripe.checkout.sessions.retrieve(
