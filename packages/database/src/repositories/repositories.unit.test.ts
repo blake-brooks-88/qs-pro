@@ -8,6 +8,7 @@ import {
   DrizzleFeatureOverrideRepository,
   DrizzleOrgSubscriptionRepository,
   DrizzleStripeBillingBindingRepository,
+  DrizzleStripeCheckoutSessionRepository,
   DrizzleStripeWebhookEventRepository,
   DrizzleTenantRepository,
   DrizzleUserRepository,
@@ -108,6 +109,7 @@ function createMockDrizzleDb() {
     mocks: {
       select: mockSelect,
       insert: mockInsert,
+      delete: mockDelete,
       from: mockFrom,
       where: mockWhere,
       values: mockValues,
@@ -713,6 +715,179 @@ describe("DrizzleStripeBillingBindingRepository", () => {
       // Assert
       expect(result).toBeUndefined();
     });
+  });
+
+  describe("findByTenantId()", () => {
+    it("returns binding when found by tenant", async () => {
+      const binding = {
+        id: "bind-tenant",
+        tenantId: "tenant-1",
+        stripeCustomerId: "cus_123",
+      };
+      mockDb.setSelectResult([binding]);
+
+      const result = await repository.findByTenantId("tenant-1");
+
+      expect(result).toEqual(binding);
+    });
+  });
+
+  describe("findByStripeSubscriptionId()", () => {
+    it("returns binding when found by subscription id", async () => {
+      const binding = {
+        id: "bind-subscription",
+        tenantId: "tenant-1",
+        stripeSubscriptionId: "sub_123",
+      };
+      mockDb.setSelectResult([binding]);
+
+      const result = await repository.findByStripeSubscriptionId("sub_123");
+
+      expect(result).toEqual(binding);
+    });
+  });
+
+  describe("upsert()", () => {
+    it("returns the upserted binding", async () => {
+      const binding = {
+        id: "bind-1",
+        tenantId: "tenant-1",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_123",
+      };
+      mockDb.setInsertResult([binding]);
+
+      const result = await repository.upsert({
+        tenantId: "tenant-1",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_123",
+      });
+
+      expect(result).toEqual(binding);
+    });
+
+    it("throws DatabaseError when upsert returns no result", async () => {
+      mockDb.setInsertResult([]);
+
+      await expect(
+        repository.upsert({
+          tenantId: "tenant-1",
+          stripeCustomerId: "cus_123",
+          stripeSubscriptionId: "sub_123",
+        }),
+      ).rejects.toThrow(DatabaseError);
+    });
+  });
+
+  describe("clearSubscription()", () => {
+    it("clears the stored Stripe subscription id", async () => {
+      await repository.clearSubscription("tenant-1");
+
+      expect(mockDb.mocks.update).toHaveBeenCalled();
+      expect(mockDb.getCapturedSetArgs()).toEqual([
+        expect.objectContaining({
+          stripeSubscriptionId: null,
+        }),
+      ]);
+    });
+  });
+
+  describe("deleteByTenantId()", () => {
+    it("deletes the binding row for the tenant", async () => {
+      await repository.deleteByTenantId("tenant-1");
+
+      expect(mockDb.mocks.update).not.toHaveBeenCalled();
+      expect(mockDb.mocks.delete).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("DrizzleStripeCheckoutSessionRepository", () => {
+  let mockDb: MockDrizzleDb;
+  let repository: DrizzleStripeCheckoutSessionRepository;
+
+  beforeEach(() => {
+    mockDb = createMockDrizzleDb();
+    repository = new DrizzleStripeCheckoutSessionRepository(
+      mockDb as unknown as PostgresJsDatabase,
+    );
+    mockDb.resetCaptures();
+  });
+
+  it("returns a checkout session by tenant id", async () => {
+    const session = {
+      id: "session-1",
+      tenantId: "tenant-1",
+      sessionId: "cs_123",
+      status: "open",
+    };
+    mockDb.setSelectResult([session]);
+
+    const result = await repository.findByTenantId("tenant-1");
+
+    expect(result).toEqual(session);
+  });
+
+  it("upserts a checkout session and returns the stored row", async () => {
+    const session = {
+      id: "session-1",
+      tenantId: "tenant-1",
+      sessionId: "cs_123",
+      status: "open",
+    };
+    mockDb.setInsertResult([session]);
+
+    const result = await repository.upsert({
+      tenantId: "tenant-1",
+      idempotencyKey: "checkout:tenant-1:123",
+      sessionId: "cs_123",
+      sessionUrl: "https://checkout.stripe.com/cs_123",
+      tier: "pro",
+      interval: "monthly",
+      status: "open",
+      expiresAt: new Date("2026-04-01T00:00:00.000Z"),
+      lastError: null,
+    });
+
+    expect(result).toEqual(session);
+  });
+
+  it("throws DatabaseError when checkout session upsert returns no result", async () => {
+    mockDb.setInsertResult([]);
+
+    await expect(
+      repository.upsert({
+        tenantId: "tenant-1",
+        idempotencyKey: "checkout:tenant-1:123",
+        sessionId: "cs_123",
+        sessionUrl: "https://checkout.stripe.com/cs_123",
+        tier: "pro",
+        interval: "monthly",
+        status: "open",
+        expiresAt: null,
+        lastError: null,
+      }),
+    ).rejects.toThrow(DatabaseError);
+  });
+
+  it("marks sessions completed, expired, or failed and deletes rows by tenant", async () => {
+    await repository.markCompleted("cs_complete");
+    await repository.markExpired("cs_expired");
+    await repository.markFailed("tenant-1", "Stripe rejected payment");
+    await repository.deleteByTenantId("tenant-1");
+
+    expect(mockDb.mocks.update).toHaveBeenCalledTimes(3);
+    expect(mockDb.getCapturedSetArgs()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: "completed" }),
+        expect.objectContaining({ status: "expired" }),
+        expect.objectContaining({
+          status: "failed",
+          lastError: "Stripe rejected payment",
+        }),
+      ]),
+    );
+    expect(mockDb.mocks.delete).toHaveBeenCalled();
   });
 });
 
