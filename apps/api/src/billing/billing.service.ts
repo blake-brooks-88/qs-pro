@@ -435,6 +435,10 @@ export class BillingService {
   ): Promise<void> {
     await this.webhookHandler.process({
       id: `evt_reconcile_checkout_${session.id}`,
+      created:
+        typeof session.created === 'number'
+          ? session.created
+          : Math.floor(Date.now() / 1000),
       type: 'checkout.session.completed',
       data: {
         object: session,

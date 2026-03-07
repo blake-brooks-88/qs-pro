@@ -118,6 +118,20 @@ describe('BillingController', () => {
       );
 
       expect(result).toEqual({ received: true });
+      expect(queueMock.add).toHaveBeenCalledWith(
+        'process-stripe-webhook',
+        expect.objectContaining({
+          event: expect.objectContaining({ id: 'evt_test' }),
+        }),
+        expect.objectContaining({
+          jobId: 'evt_test',
+          attempts: 8,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+        }),
+      );
     });
   });
 });

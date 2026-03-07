@@ -20,6 +20,7 @@ function createSubscription(
     trialEndsAt: null,
     currentPeriodEnds: new Date('2026-04-01T00:00:00.000Z'),
     lastInvoicePaidAt: new Date('2026-03-01T00:00:00.000Z'),
+    stripeStateUpdatedAt: new Date('2026-03-01T00:00:00.000Z'),
     createdAt: new Date('2026-03-01T00:00:00.000Z'),
     updatedAt: new Date('2026-03-01T00:00:00.000Z'),
     ...overrides,

@@ -134,6 +134,11 @@ export class BillingController {
       { event },
       {
         jobId: event.id,
+        attempts: 8,
+        backoff: {
+          type: 'exponential',
+          delay: 5_000,
+        },
         removeOnComplete: 1000,
         removeOnFail: 1000,
       },

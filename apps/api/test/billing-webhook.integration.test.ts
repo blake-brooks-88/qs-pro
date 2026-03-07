@@ -193,6 +193,7 @@ describe('Billing Webhook (integration)', () => {
         | 'unpaid'
         | 'canceled';
       lastInvoicePaidAt?: Date | null;
+      stripeStateUpdatedAt?: Date | null;
     },
   ): Promise<void> {
     const trialEndsAt = data.trialEndsAt?.toISOString() ?? null;
@@ -204,6 +205,8 @@ describe('Billing Webhook (integration)', () => {
     const lastInvoicePaidAt =
       data.lastInvoicePaidAt?.toISOString() ??
       (stripeSubId ? new Date().toISOString() : null);
+    const stripeStateUpdatedAt =
+      data.stripeStateUpdatedAt?.toISOString() ?? null;
 
     await sqlClient.begin(async (tx) => {
       await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
@@ -216,7 +219,8 @@ describe('Billing Webhook (integration)', () => {
           stripe_customer_id,
           stripe_subscription_status,
           current_period_ends,
-          last_invoice_paid_at
+          last_invoice_paid_at,
+          stripe_state_updated_at
         )
         VALUES (
           ${tenantId}::uuid,
@@ -226,7 +230,8 @@ describe('Billing Webhook (integration)', () => {
           ${stripeCusId},
           ${stripeSubscriptionStatus},
           ${currentPeriodEnds},
-          ${lastInvoicePaidAt}
+          ${lastInvoicePaidAt},
+          ${stripeStateUpdatedAt}
         )
         ON CONFLICT (tenant_id) DO UPDATE SET
           tier = ${data.tier},
@@ -235,7 +240,8 @@ describe('Billing Webhook (integration)', () => {
           stripe_customer_id = ${stripeCusId},
           stripe_subscription_status = ${stripeSubscriptionStatus},
           current_period_ends = ${currentPeriodEnds},
-          last_invoice_paid_at = ${lastInvoicePaidAt}
+          last_invoice_paid_at = ${lastInvoicePaidAt},
+          stripe_state_updated_at = ${stripeStateUpdatedAt}
       `;
 
       if (stripeCusId || stripeSubId) {
@@ -264,12 +270,15 @@ describe('Billing Webhook (integration)', () => {
     encryptedEid: string,
     refs: StripeRefs,
     eventId?: string,
+    created?: number,
   ): Stripe.Event {
     return {
       id: eventId ?? nextEventId(),
+      created: created ?? Math.floor(Date.now() / 1000),
       type: 'checkout.session.completed',
       data: {
         object: {
+          mode: 'subscription',
           customer: refs.customerId,
           subscription: refs.subscriptionId,
           metadata: { eid: encryptedEid },
@@ -283,15 +292,18 @@ describe('Billing Webhook (integration)', () => {
     encryptedEid: string,
     refs: StripeRefs,
     eventId?: string,
+    created?: number,
+    status: string = 'active',
   ): Stripe.Event {
     return {
       id: eventId ?? nextEventId(),
+      created: created ?? Math.floor(Date.now() / 1000),
       type: 'customer.subscription.created',
       data: {
         object: {
           id: refs.subscriptionId,
           customer: refs.customerId,
-          status: 'active',
+          status,
           metadata: { eid: encryptedEid },
           items: {
             data: [
@@ -311,9 +323,11 @@ describe('Billing Webhook (integration)', () => {
     encryptedEid: string,
     refs: StripeRefs,
     eventId?: string,
+    created?: number,
   ): Stripe.Event {
     return {
       id: eventId ?? nextEventId(),
+      created: created ?? Math.floor(Date.now() / 1000),
       type: 'customer.subscription.deleted',
       data: {
         object: {
@@ -340,9 +354,11 @@ describe('Billing Webhook (integration)', () => {
     refs: StripeRefs,
     overrides?: { currentPeriodEnd?: number },
     eventId?: string,
+    created?: number,
   ): Stripe.Event {
     return {
       id: eventId ?? nextEventId(),
+      created: created ?? Math.floor(Date.now() / 1000),
       type: 'customer.subscription.updated',
       data: {
         object: {
@@ -368,9 +384,11 @@ describe('Billing Webhook (integration)', () => {
   function makeInvoicePaidEvent(
     refs: StripeRefs,
     eventId?: string,
+    created?: number,
   ): Stripe.Event {
     return {
       id: eventId ?? nextEventId(),
+      created: created ?? Math.floor(Date.now() / 1000),
       type: 'invoice.paid',
       data: {
         object: {
@@ -573,6 +591,25 @@ describe('Billing Webhook (integration)', () => {
       expect(sub.stripeSubscriptionId).toBe(refs.subscriptionId);
       expect(sub.trialEndsAt).toBeNull();
     });
+
+    it('ignores payment-mode checkout sessions without failing the webhook job', async () => {
+      const event = {
+        id: nextEventId(),
+        created: Math.floor(Date.now() / 1000),
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_payment_mode',
+            mode: 'payment',
+            payment_status: 'paid',
+            customer: 'cus_payment_mode',
+            metadata: {},
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await expect(webhookHandler.process(event)).resolves.not.toThrow();
+    });
   });
 
   // ─── customer.subscription.created ──────────────────────────────
@@ -622,6 +659,40 @@ describe('Billing Webhook (integration)', () => {
       expect(sub.currentPeriodEnds).toBeDefined();
       const count = await countSubscriptions(tenant.id);
       expect(count).toBe(1);
+    });
+
+    it('ignores a stale incomplete created event after a newer active state was stored', async () => {
+      const tenant = await createTestTenant('sub-created-stale-incomplete');
+      const refs = makeStripeRefs('sub-created-stale-incomplete');
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: refs.customerId,
+        stripeSubscriptionId: refs.subscriptionId,
+        stripeSubscriptionStatus: 'active',
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        lastInvoicePaidAt: new Date(),
+        stripeStateUpdatedAt: new Date('2026-03-07T12:00:00.000Z'),
+      });
+
+      await webhookHandler.process(
+        makeSubscriptionCreatedEvent(
+          tenant.encryptedEid,
+          refs,
+          undefined,
+          Math.floor(new Date('2026-03-07T11:00:00.000Z').getTime() / 1000),
+          'incomplete',
+        ),
+      );
+
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.stripeSubscriptionStatus).toBe('active');
+
+      const features = await featuresService.getTenantFeatures(tenant.id);
+      expect(features.tier).toBe('pro');
     });
   });
 
@@ -1217,6 +1288,46 @@ describe('Billing Webhook (integration)', () => {
         }
         reserved.release();
       }
+    });
+
+    it('marks the webhook event failed when subscription lookup throws', async () => {
+      const refs = makeStripeRefs('payment-failed-retry');
+      const eventId = nextEventId();
+
+      stripeMock.subscriptions.retrieve.mockRejectedValueOnce(
+        new Error('stripe temporarily unavailable'),
+      );
+
+      await expect(
+        webhookHandler.process({
+          id: eventId,
+          created: Math.floor(Date.now() / 1000),
+          type: 'invoice.payment_failed',
+          data: {
+            object: {
+              id: 'in_test_failed_retry',
+              parent: {
+                subscription_details: {
+                  subscription: refs.subscriptionId,
+                },
+              },
+            },
+          },
+        } as unknown as Stripe.Event),
+      ).rejects.toThrow('stripe temporarily unavailable');
+
+      const [webhookRow] = await sqlClient`
+        SELECT status, error_message
+        FROM stripe_webhook_events
+        WHERE id = ${eventId}
+      `;
+      if (!webhookRow) {
+        throw new Error('Expected webhook event row to exist');
+      }
+      expect(webhookRow.status).toBe('failed');
+      expect(webhookRow.error_message).toContain(
+        'stripe temporarily unavailable',
+      );
     });
   });
 

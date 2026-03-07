@@ -291,6 +291,7 @@ export class WebhookHandlerService {
     seatLimit: number | null;
     lastInvoicePaidAt?: Date | null;
     trialEndsAt?: Date | null;
+    stripeStateUpdatedAt?: Date | null;
   }): Promise<void> {
     await this.rlsContext.runWithIsolatedTenantContext(
       params.tenantId,
@@ -315,22 +316,25 @@ export class WebhookHandlerService {
             params.trialEndsAt === undefined
               ? (existing?.trialEndsAt ?? null)
               : params.trialEndsAt,
+          stripeStateUpdatedAt:
+            params.stripeStateUpdatedAt === undefined
+              ? (existing?.stripeStateUpdatedAt ?? null)
+              : params.stripeStateUpdatedAt,
         };
 
-        if (!existing) {
-          await this.orgSubscriptionRepo.upsert({
-            tenantId: params.tenantId,
-            ...payload,
-          });
-          return;
-        }
-
-        await this.orgSubscriptionRepo.updateFromWebhook(
-          params.tenantId,
-          payload,
-        );
+        await this.orgSubscriptionRepo.upsert({
+          tenantId: params.tenantId,
+          ...payload,
+        });
       },
     );
+  }
+
+  private getEventCreatedAt(event: Stripe.Event): Date | null {
+    if (typeof event.created !== 'number') {
+      return null;
+    }
+    return new Date(event.created * 1000);
   }
 
   async process(event: Stripe.Event): Promise<void> {
@@ -347,10 +351,12 @@ export class WebhookHandlerService {
 
     try {
       const eventType: string = event.type;
+      const eventCreatedAt = this.getEventCreatedAt(event);
       switch (eventType) {
         case 'checkout.session.completed':
           await this.handleCheckoutSessionCompleted(
             event.data.object as Stripe.Checkout.Session,
+            eventCreatedAt,
           );
           break;
         case 'customer.subscription.created':
@@ -358,19 +364,25 @@ export class WebhookHandlerService {
           await this.handleSubscriptionChange(
             event.data.object as Stripe.Subscription,
             eventType,
+            eventCreatedAt,
           );
           break;
         case 'customer.subscription.deleted':
           await this.handleSubscriptionDeleted(
             event.data.object as Stripe.Subscription,
+            eventCreatedAt,
           );
           break;
         case 'invoice.paid':
-          await this.handleInvoicePaid(event.data.object as Stripe.Invoice);
+          await this.handleInvoicePaid(
+            event.data.object as Stripe.Invoice,
+            eventCreatedAt,
+          );
           break;
         case 'invoice.payment_failed':
           await this.handleInvoicePaymentFailed(
             event.data.object as Stripe.Invoice,
+            eventCreatedAt,
           );
           break;
         case 'charge.refunded':
@@ -410,7 +422,15 @@ export class WebhookHandlerService {
 
   private async handleCheckoutSessionCompleted(
     session: Stripe.Checkout.Session,
+    eventCreatedAt: Date | null,
   ): Promise<void> {
+    if (session.mode && session.mode !== 'subscription') {
+      this.logger.warn(
+        `checkout.session.completed received for unsupported mode=${session.mode}`,
+      );
+      return;
+    }
+
     if (session.payment_status !== 'paid') {
       if (session.id) {
         await this.stripeCheckoutSessionRepo.markCompleted(session.id);
@@ -476,6 +496,7 @@ export class WebhookHandlerService {
       seatLimit: item.quantity ?? null,
       lastInvoicePaidAt: new Date(),
       trialEndsAt: null,
+      stripeStateUpdatedAt: eventCreatedAt,
     });
 
     if (session.id) {
@@ -488,6 +509,7 @@ export class WebhookHandlerService {
     eventType:
       | 'customer.subscription.created'
       | 'customer.subscription.updated',
+    eventCreatedAt: Date | null,
   ): Promise<void> {
     const item = this.getSubscriptionItem(subscription);
     const stripeCustomerId = getStripeId(subscription.customer);
@@ -546,6 +568,7 @@ export class WebhookHandlerService {
       currentPeriodEnds: this.getSubscriptionCurrentPeriodEnds(subscription),
       seatLimit: item.quantity ?? null,
       trialEndsAt: null,
+      stripeStateUpdatedAt: eventCreatedAt,
     });
 
     await this.auditService.log({
@@ -570,6 +593,7 @@ export class WebhookHandlerService {
 
   private async handleSubscriptionDeleted(
     subscription: Stripe.Subscription,
+    eventCreatedAt: Date | null,
   ): Promise<void> {
     const stripeCustomerId = getStripeId(subscription.customer);
     const stripeSubscriptionId = subscription.id;
@@ -603,6 +627,7 @@ export class WebhookHandlerService {
       currentPeriodEnds: null,
       seatLimit: null,
       trialEndsAt: new Date(0),
+      stripeStateUpdatedAt: eventCreatedAt,
     });
 
     await this.auditService.log({
@@ -615,7 +640,10 @@ export class WebhookHandlerService {
     });
   }
 
-  private async handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
+  private async handleInvoicePaid(
+    invoice: Stripe.Invoice,
+    eventCreatedAt: Date | null,
+  ): Promise<void> {
     const subscriptionId = this.getInvoiceSubscriptionId(invoice);
     if (!subscriptionId) {
       return;
@@ -673,6 +701,7 @@ export class WebhookHandlerService {
       seatLimit: item.quantity ?? null,
       lastInvoicePaidAt: new Date(),
       trialEndsAt: null,
+      stripeStateUpdatedAt: eventCreatedAt,
     });
 
     await this.auditService.log({
@@ -691,6 +720,7 @@ export class WebhookHandlerService {
 
   private async handleInvoicePaymentFailed(
     invoice: Stripe.Invoice,
+    eventCreatedAt: Date | null,
   ): Promise<void> {
     const subscriptionId = this.getInvoiceSubscriptionId(invoice);
     if (!subscriptionId || !this.stripe) {
@@ -743,6 +773,7 @@ export class WebhookHandlerService {
         currentPeriodEnds: this.getSubscriptionCurrentPeriodEnds(subscription),
         seatLimit: item.quantity ?? null,
         trialEndsAt: null,
+        stripeStateUpdatedAt: eventCreatedAt,
       });
 
       await this.auditService.log({
@@ -759,6 +790,7 @@ export class WebhookHandlerService {
         'invoice.payment_failed: failed to resolve tenant for update',
         error instanceof Error ? error.message : String(error),
       );
+      throw error;
     }
   }
 

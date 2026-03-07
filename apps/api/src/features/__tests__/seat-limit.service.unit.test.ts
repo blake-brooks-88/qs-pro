@@ -61,6 +61,7 @@ describe('SeatLimitService', () => {
       trialEndsAt: null,
       currentPeriodEnds: null,
       lastInvoicePaidAt: null,
+      stripeStateUpdatedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -91,6 +92,7 @@ describe('SeatLimitService', () => {
       trialEndsAt: null,
       currentPeriodEnds: null,
       lastInvoicePaidAt: null,
+      stripeStateUpdatedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -124,6 +126,7 @@ describe('SeatLimitService', () => {
       trialEndsAt: null,
       currentPeriodEnds: null,
       lastInvoicePaidAt: null,
+      stripeStateUpdatedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -157,6 +160,7 @@ describe('SeatLimitService', () => {
       trialEndsAt: null,
       currentPeriodEnds: null,
       lastInvoicePaidAt: null,
+      stripeStateUpdatedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
