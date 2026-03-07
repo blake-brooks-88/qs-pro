@@ -22,6 +22,7 @@ const { mockToast } = vi.hoisted(() => ({
 vi.mock("sonner", () => ({ toast: mockToast, Toaster: () => null }));
 
 import App from "@/App";
+import { CHECKOUT_RETURN_SIGNAL_EVENT } from "@/lib/checkout-return-signal";
 import {
   hasPendingCheckout,
   markPendingCheckout,
@@ -685,6 +686,85 @@ describe("App", () => {
         window.sessionStorage.getItem("pendingCheckoutSessionId"),
       ).toBeNull();
       expect(mockConfirmCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it("clears pending checkout when the popup reports cancellation", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      markPendingCheckout();
+      window.sessionStorage.setItem("pendingCheckoutSessionId", "cs_popup");
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: window.location.origin,
+          data: {
+            type: CHECKOUT_RETURN_SIGNAL_EVENT,
+            payload: {
+              status: "canceled",
+              emittedAt: Date.now(),
+            },
+          },
+        }),
+      );
+
+      await waitFor(() => {
+        expect(hasPendingCheckout()).toBe(false);
+      });
+
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+      expect(mockToast.message).toHaveBeenCalledWith(
+        "Checkout canceled",
+        expect.objectContaining({
+          description:
+            "No charges were made. Start checkout again whenever you are ready.",
+        }),
+      );
+    });
+
+    it("clears pending checkout when the popup reports an expired checkout", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      markPendingCheckout();
+      window.sessionStorage.setItem("pendingCheckoutSessionId", "cs_expired");
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "qpp:checkout-return-signal",
+          newValue: JSON.stringify({
+            status: "expired",
+            emittedAt: Date.now(),
+          }),
+        }),
+      );
+
+      await waitFor(() => {
+        expect(hasPendingCheckout()).toBe(false);
+      });
+
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+      expect(mockToast.error).toHaveBeenCalledWith(
+        "Checkout did not complete",
+        expect.objectContaining({
+          description:
+            "Your previous checkout session expired. Start checkout again.",
+        }),
+      );
     });
 
     it("refreshes pending checkout on interaction when features unlock outside the tab", async () => {

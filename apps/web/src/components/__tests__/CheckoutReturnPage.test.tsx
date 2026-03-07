@@ -4,12 +4,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutReturnPage } from "@/components/CheckoutReturnPage";
 
+vi.mock("@/lib/checkout-return-signal", () => ({
+  broadcastCheckoutReturnSignal: vi.fn(),
+}));
+
 vi.mock("@/services/billing", () => ({
   confirmCheckoutSession: vi.fn(),
 }));
 
+import { broadcastCheckoutReturnSignal } from "@/lib/checkout-return-signal";
 import { confirmCheckoutSession } from "@/services/billing";
 
+const mockBroadcastCheckoutReturnSignal = vi.mocked(
+  broadcastCheckoutReturnSignal,
+);
 const mockConfirmCheckoutSession = vi.mocked(confirmCheckoutSession);
 
 describe("CheckoutReturnPage", () => {
@@ -20,6 +28,7 @@ describe("CheckoutReturnPage", () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
     mockConfirmCheckoutSession.mockReset();
+    mockBroadcastCheckoutReturnSignal.mockReset();
     vi.spyOn(window, "close").mockImplementation(() => undefined);
   });
 
@@ -50,6 +59,7 @@ describe("CheckoutReturnPage", () => {
     });
 
     expect(mockConfirmCheckoutSession).toHaveBeenCalledWith("cs_success");
+    expect(mockBroadcastCheckoutReturnSignal).toHaveBeenCalledWith("success");
     await waitFor(() => {
       expect(window.close).toHaveBeenCalledTimes(1);
     });
@@ -71,6 +81,7 @@ describe("CheckoutReturnPage", () => {
     expect(
       screen.getByText(/expired before payment completed/i),
     ).toBeInTheDocument();
+    expect(mockBroadcastCheckoutReturnSignal).toHaveBeenCalledWith("expired");
     expect(window.close).not.toHaveBeenCalled();
   });
 
@@ -90,6 +101,7 @@ describe("CheckoutReturnPage", () => {
     expect(
       screen.getByText(/Stripe did not confirm payment/i),
     ).toBeInTheDocument();
+    expect(mockBroadcastCheckoutReturnSignal).toHaveBeenCalledWith("unpaid");
   });
 
   it("shows a timeout message when confirmation never resolves successfully", async () => {
@@ -111,6 +123,7 @@ describe("CheckoutReturnPage", () => {
     });
 
     expect(mockConfirmCheckoutSession).toHaveBeenCalledTimes(12);
+    expect(mockBroadcastCheckoutReturnSignal).toHaveBeenCalledWith("timeout");
     expect(window.close).not.toHaveBeenCalled();
   });
 
@@ -142,6 +155,7 @@ describe("CheckoutReturnPage", () => {
     render(<CheckoutReturnPage />);
 
     expect(screen.getByText("Checkout canceled")).toBeInTheDocument();
+    expect(mockBroadcastCheckoutReturnSignal).toHaveBeenCalledWith("canceled");
     expect(mockConfirmCheckoutSession).not.toHaveBeenCalled();
   });
 });

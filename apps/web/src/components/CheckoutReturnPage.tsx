@@ -1,7 +1,8 @@
 import { CheckCircle, CloseCircle } from "@solar-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { broadcastCheckoutReturnSignal } from "@/lib/checkout-return-signal";
 import { confirmCheckoutSession } from "@/services/billing";
 
 type Status =
@@ -28,6 +29,7 @@ export function CheckoutReturnPage() {
     const params = new URLSearchParams(window.location.search);
     return params.get("checkout") === "cancel" ? "canceled" : "confirming";
   });
+  const lastBroadcastStatus = useRef<Status | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -98,6 +100,15 @@ export function CheckoutReturnPage() {
     return () => {
       window.clearTimeout(timeout);
     };
+  }, [status]);
+
+  useEffect(() => {
+    if (status === "confirming" || lastBroadcastStatus.current === status) {
+      return;
+    }
+
+    lastBroadcastStatus.current = status;
+    broadcastCheckoutReturnSignal(status);
   }, [status]);
 
   return (

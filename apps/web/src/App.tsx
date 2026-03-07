@@ -16,6 +16,12 @@ import { featuresQueryKeys } from "@/hooks/use-tenant-features";
 import { useTrial } from "@/hooks/use-trial";
 import { track } from "@/lib/analytics";
 import {
+  CHECKOUT_RETURN_SIGNAL_STORAGE_KEY,
+  type CheckoutReturnSignal,
+  isCheckoutReturnSignalMessage,
+  parseCheckoutReturnSignal,
+} from "@/lib/checkout-return-signal";
+import {
   clearPendingCheckout,
   hasPendingCheckout,
   PENDING_CHECKOUT_CHANGED_EVENT,
@@ -337,6 +343,93 @@ function App() {
       cancelled = true;
     };
   }, [queryClient]);
+
+  useEffect(() => {
+    const handleCheckoutReturnSignal = (signal: CheckoutReturnSignal): void => {
+      if (!hasPendingCheckout()) {
+        return;
+      }
+
+      window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+
+      if (signal.status === "success") {
+        clearPendingCheckout();
+        closePricing();
+        void queryClient.invalidateQueries({
+          queryKey: featuresQueryKeys.all,
+        });
+        void queryClient.invalidateQueries({
+          queryKey: usageQueryKeys.all,
+        });
+
+        if (isEmbedded) {
+          window.location.reload();
+          return;
+        }
+
+        toast.success("Welcome to Pro!", {
+          description: "All Pro features are now unlocked.",
+        });
+        return;
+      }
+
+      clearPendingCheckout();
+
+      if (signal.status === "canceled") {
+        toast.message("Checkout canceled", {
+          description:
+            "No charges were made. Start checkout again whenever you are ready.",
+        });
+        return;
+      }
+
+      if (signal.status === "expired" || signal.status === "unpaid") {
+        toast.error("Checkout did not complete", {
+          description:
+            signal.status === "expired"
+              ? "Your previous checkout session expired. Start checkout again."
+              : "Your previous checkout did not complete payment. Start checkout again.",
+        });
+        return;
+      }
+
+      toast.error("Unable to confirm checkout", {
+        description:
+          signal.status === "timeout"
+            ? "Billing is still syncing. Refresh in a moment."
+            : "We could not process this checkout. Try again from Marketing Cloud.",
+      });
+    };
+
+    const handleMessage = (event: MessageEvent): void => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (isCheckoutReturnSignalMessage(event.data)) {
+        handleCheckoutReturnSignal(event.data.payload);
+      }
+    };
+
+    const handleStorage = (event: StorageEvent): void => {
+      if (event.key !== CHECKOUT_RETURN_SIGNAL_STORAGE_KEY) {
+        return;
+      }
+
+      const signal = parseCheckoutReturnSignal(event.newValue);
+      if (signal) {
+        handleCheckoutReturnSignal(signal);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [closePricing, isEmbedded, queryClient]);
 
   useEffect(() => {
     if (!isAuthenticated || !pendingCheckoutActive) {
