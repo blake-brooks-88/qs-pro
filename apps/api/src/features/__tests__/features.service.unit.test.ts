@@ -36,7 +36,9 @@ describe('FeaturesService', () => {
       getTrialState: vi.fn().mockResolvedValue({ isActive: false }),
     };
     rlsContext = {
-      runWithTenantContext: vi.fn().mockImplementation((_tenantId, _mid, fn) => fn()),
+      runWithTenantContext: vi
+        .fn()
+        .mockImplementation((_tenantId, _mid, fn) => fn()),
     };
 
     service = new FeaturesService(
@@ -68,7 +70,9 @@ describe('FeaturesService', () => {
   it('throws RESOURCE_NOT_FOUND when the tenant does not exist', async () => {
     tenantRepo.findById.mockResolvedValue(undefined);
 
-    await expect(service.getTenantFeatures('missing-tenant')).rejects.toMatchObject({
+    await expect(
+      service.getTenantFeatures('missing-tenant'),
+    ).rejects.toMatchObject({
       code: 'RESOURCE_NOT_FOUND',
       context: { operation: 'getTenantFeatures' },
     });
