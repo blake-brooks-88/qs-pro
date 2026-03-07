@@ -142,6 +142,51 @@ describe("useCheckout", () => {
     });
   });
 
+  it("shows a redeploy hint when the checkout route returns 404 without detail", async () => {
+    mockCreateCheckout.mockRejectedValueOnce({
+      response: {
+        status: 404,
+        data: {},
+      },
+      isAxiosError: true,
+    });
+
+    const queryClient = createQueryClient();
+    const wrapper = createWrapper(queryClient);
+
+    const { result } = renderHook(() => useCheckout(), { wrapper });
+
+    result.current.mutate({ tier: "pro", interval: "monthly" });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith("Unable to start checkout", {
+      description:
+        "The billing checkout route is unavailable. Please try again after the API is redeployed.",
+    });
+  });
+
+  it("shows a generic support message for non-Axios failures", async () => {
+    mockCreateCheckout.mockRejectedValueOnce(new Error("socket hang up"));
+
+    const queryClient = createQueryClient();
+    const wrapper = createWrapper(queryClient);
+
+    const { result } = renderHook(() => useCheckout(), { wrapper });
+
+    result.current.mutate({ tier: "pro", interval: "annual" });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith("Unable to start checkout", {
+      description: "Please try again or contact support.",
+    });
+  });
+
   it("re-syncs features when checkout is already paid server-side", async () => {
     mockCreateCheckout.mockRejectedValueOnce({
       response: {

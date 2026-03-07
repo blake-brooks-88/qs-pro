@@ -243,6 +243,12 @@ function App() {
 
     const handleCheckoutRedirect = async (): Promise<void> => {
       try {
+        if (checkout === "cancel") {
+          track("checkout_canceled");
+          window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
+          return;
+        }
+
         if (checkout === "success" || sessionId) {
           if (checkout === "success") {
             track("checkout_completed");
@@ -301,9 +307,6 @@ function App() {
           void queryClient.invalidateQueries({
             queryKey: featuresQueryKeys.all,
           });
-        } else if (checkout === "cancel") {
-          track("checkout_canceled");
-          window.sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY);
         }
       } catch (error) {
         if (!cancelled) {

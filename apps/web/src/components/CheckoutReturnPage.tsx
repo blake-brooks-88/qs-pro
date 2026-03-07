@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { confirmCheckoutSession } from "@/services/billing";
 
-type Status = "confirming" | "success" | "failed" | "canceled";
+type Status =
+  | "confirming"
+  | "success"
+  | "expired"
+  | "unpaid"
+  | "timeout"
+  | "canceled";
 
 const AUTO_CLOSE_DELAY_MS = 4000;
 
@@ -55,7 +61,7 @@ export function CheckoutReturnPage() {
           }
 
           if (result.status === "failed") {
-            setStatus("failed");
+            setStatus(result.reason === "expired" ? "expired" : "unpaid");
             return;
           }
         } catch {
@@ -70,7 +76,7 @@ export function CheckoutReturnPage() {
       }
 
       if (!cancelled) {
-        setStatus("success");
+        setStatus("timeout");
       }
     };
 
@@ -94,8 +100,8 @@ export function CheckoutReturnPage() {
   }, [status]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="flex flex-col items-center gap-6 max-w-sm text-center px-6">
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex max-w-sm flex-col items-center gap-6 px-6 text-center">
         <StatusIcon status={status} />
         <StatusContent status={status} />
       </div>
@@ -132,7 +138,7 @@ function StatusIcon({ status }: { status: Status }) {
 
   return (
     <div className="rounded-full bg-amber-500/10 p-3">
-      <CheckCircle size={48} weight="Bold" className="text-amber-500" />
+      <CloseCircle size={48} weight="Bold" className="text-amber-500" />
     </div>
   );
 }
@@ -182,12 +188,42 @@ function StatusContent({ status }: { status: Status }) {
     );
   }
 
+  if (status === "expired") {
+    return (
+      <>
+        <h1 className="text-xl font-semibold">Checkout session expired</h1>
+        <p className="text-sm text-muted-foreground">
+          This checkout session expired before payment completed. Return to
+          Marketing Cloud and start checkout again.
+        </p>
+        <Button variant="secondary" onClick={tryCloseWindow}>
+          Close this tab
+        </Button>
+      </>
+    );
+  }
+
+  if (status === "unpaid") {
+    return (
+      <>
+        <h1 className="text-xl font-semibold">Payment not confirmed</h1>
+        <p className="text-sm text-muted-foreground">
+          Stripe did not confirm payment for this checkout. Return to Marketing
+          Cloud and try again.
+        </p>
+        <Button variant="secondary" onClick={tryCloseWindow}>
+          Close this tab
+        </Button>
+      </>
+    );
+  }
+
   return (
     <>
-      <h1 className="text-xl font-semibold">Payment is processing</h1>
+      <h1 className="text-xl font-semibold">We could not confirm your plan yet</h1>
       <p className="text-sm text-muted-foreground">
-        Your payment went through, but billing is still syncing. Return to
-        Marketing Cloud — your plan will update shortly.
+        Your payment may still be processing, but Query++ has not received
+        confirmation. Return to Marketing Cloud and refresh in a moment.
       </p>
       <Button variant="secondary" onClick={tryCloseWindow}>
         Close this tab
