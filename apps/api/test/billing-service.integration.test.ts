@@ -43,10 +43,12 @@ function makePrice(
     | 'enterprise_annual',
   product = 'prod_test_default',
 ) {
+  const interval = lookupKey.endsWith('_annual') ? 'year' : 'month';
   return {
     id: `price_${lookupKey}_test`,
     lookup_key: lookupKey,
     product,
+    recurring: { interval },
   };
 }
 
@@ -372,7 +374,7 @@ describe('BillingService (integration)', () => {
           'enterprise_annual',
         ],
         active: true,
-        limit: 4,
+        limit: 100,
       });
     });
 

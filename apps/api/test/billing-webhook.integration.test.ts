@@ -58,6 +58,7 @@ function makeProPrice(product = STRIPE_PRODUCT_ID) {
     id: 'price_pro_monthly_test',
     lookup_key: 'pro_monthly',
     product,
+    recurring: { interval: 'month' },
   };
 }
 
@@ -66,6 +67,7 @@ function makeEnterprisePrice(product = STRIPE_PRODUCT_ID) {
     id: 'price_enterprise_monthly_test',
     lookup_key: 'enterprise_monthly',
     product,
+    recurring: { interval: 'month' },
   };
 }
 
