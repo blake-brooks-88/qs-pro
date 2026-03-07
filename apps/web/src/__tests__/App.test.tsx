@@ -10,13 +10,23 @@ import { http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: {
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    message: vi.fn(),
+  },
+}));
+
+vi.mock("sonner", () => ({ toast: mockToast, Toaster: () => null }));
+
 import App from "@/App";
 import {
   hasPendingCheckout,
   markPendingCheckout,
 } from "@/lib/pending-checkout";
 import { server } from "@/test/mocks/server";
-import { mockToast } from "@/test/mocks/sonner";
 import { createTenantFeaturesStub } from "@/test/stubs";
 
 // Mock the SQL diagnostics hook to avoid Worker issues in tests

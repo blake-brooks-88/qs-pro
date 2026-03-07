@@ -419,9 +419,10 @@ describe('BillingService (integration)', () => {
     it('reconciles a completed paid checkout before deciding whether to reuse it', async () => {
       const tenant = await createTestTenant('checkout-reconcile-stale');
       const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+      const sessionId = `cs_test_stale_paid_${Date.now()}`;
 
       stripeMock.checkout.sessions.create.mockResolvedValueOnce({
-        id: 'cs_test_stale_paid',
+        id: sessionId,
         url: 'https://checkout.stripe.com/stale-session',
         expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       });
@@ -429,7 +430,7 @@ describe('BillingService (integration)', () => {
       await billingService.createCheckoutSession(tenant.id, 'pro', 'monthly');
 
       stripeMock.checkout.sessions.retrieve.mockResolvedValueOnce({
-        id: 'cs_test_stale_paid',
+        id: sessionId,
         status: 'complete',
         payment_status: 'paid',
         customer: 'cus_reconciled_paid',
@@ -465,7 +466,7 @@ describe('BillingService (integration)', () => {
 
       expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
       expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith(
-        'cs_test_stale_paid',
+        sessionId,
       );
 
       const subscription = await getSubscription(tenant.id);
@@ -524,9 +525,10 @@ describe('BillingService (integration)', () => {
     it('reconciles a paid checkout session into effective pro access', async () => {
       const tenant = await createTestTenant('confirm-paid');
       const encryptedEid = encryptionService.encrypt(tenant.eid) as string;
+      const sessionId = `cs_test_confirm_paid_${Date.now()}`;
 
       stripeMock.checkout.sessions.retrieve.mockResolvedValue({
-        id: 'cs_test_confirm_paid',
+        id: sessionId,
         status: 'complete',
         customer: 'cus_confirm_paid',
         subscription: 'sub_confirm_paid',
@@ -556,7 +558,7 @@ describe('BillingService (integration)', () => {
 
       const result = await billingService.confirmCheckoutSession(
         tenant.id,
-        'cs_test_confirm_paid',
+        sessionId,
       );
 
       expect(result.status).toBe('fulfilled');
