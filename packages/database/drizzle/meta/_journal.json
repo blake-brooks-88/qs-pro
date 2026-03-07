@@ -253,6 +253,13 @@
       "when": 1772802691696,
       "tag": "0035_stripe_billing_state_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1772908200000,
+      "tag": "0036_stripe_webhook_freshness",
+      "breakpoints": true
     }
   ]
 }

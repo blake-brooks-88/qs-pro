@@ -1,5 +1,5 @@
 import { ErrorCode } from "@qpp/shared-types";
-import { and, count, eq, isNull, or, sql } from "drizzle-orm";
+import { and, count, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { DatabaseError } from "../errors";
@@ -197,25 +197,43 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
   }
 
   async upsert(subscription: NewOrgSubscription): Promise<OrgSubscription> {
+    const conflictUpdateSet = {
+      tier: subscription.tier,
+      seatLimit: subscription.seatLimit,
+      stripeCustomerId: subscription.stripeCustomerId,
+      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      stripeSubscriptionStatus: subscription.stripeSubscriptionStatus,
+      trialEndsAt: subscription.trialEndsAt,
+      currentPeriodEnds: subscription.currentPeriodEnds,
+      lastInvoicePaidAt: subscription.lastInvoicePaidAt,
+      stripeStateUpdatedAt: subscription.stripeStateUpdatedAt,
+      updatedAt: new Date(),
+    };
+
     const [result] = await this.db
       .insert(orgSubscriptions)
       .values(subscription)
       .onConflictDoUpdate({
         target: orgSubscriptions.tenantId,
-        set: {
-          tier: subscription.tier,
-          seatLimit: subscription.seatLimit,
-          stripeCustomerId: subscription.stripeCustomerId,
-          stripeSubscriptionId: subscription.stripeSubscriptionId,
-          stripeSubscriptionStatus: subscription.stripeSubscriptionStatus,
-          trialEndsAt: subscription.trialEndsAt,
-          currentPeriodEnds: subscription.currentPeriodEnds,
-          lastInvoicePaidAt: subscription.lastInvoicePaidAt,
-          updatedAt: new Date(),
-        },
+        set: conflictUpdateSet,
+        setWhere: subscription.stripeStateUpdatedAt
+          ? or(
+              isNull(orgSubscriptions.stripeStateUpdatedAt),
+              lte(
+                orgSubscriptions.stripeStateUpdatedAt,
+                subscription.stripeStateUpdatedAt,
+              ),
+            )
+          : undefined,
       })
       .returning();
     if (!result) {
+      if (subscription.stripeStateUpdatedAt) {
+        const existing = await this.findByTenantId(subscription.tenantId);
+        if (existing) {
+          return existing;
+        }
+      }
       throw new DatabaseError(
         ErrorCode.DATABASE_ERROR,
         "OrgSubscription upsert failed to return a result",
@@ -280,7 +298,20 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
     await this.db
       .update(orgSubscriptions)
       .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(orgSubscriptions.tenantId, tenantId));
+      .where(
+        data.stripeStateUpdatedAt
+          ? and(
+              eq(orgSubscriptions.tenantId, tenantId),
+              or(
+                isNull(orgSubscriptions.stripeStateUpdatedAt),
+                lte(
+                  orgSubscriptions.stripeStateUpdatedAt,
+                  data.stripeStateUpdatedAt,
+                ),
+              ),
+            )
+          : eq(orgSubscriptions.tenantId, tenantId),
+      );
   }
 }
 

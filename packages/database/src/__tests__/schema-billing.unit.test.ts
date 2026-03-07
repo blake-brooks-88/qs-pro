@@ -43,6 +43,7 @@ describe("billing-related schema definitions", () => {
       expect.arrayContaining([
         "stripe_subscription_status",
         "last_invoice_paid_at",
+        "stripe_state_updated_at",
       ]),
     );
     expect(config.indexes.map((item) => item.config.name)).toContain(

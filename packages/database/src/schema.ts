@@ -83,6 +83,7 @@ export const orgSubscriptions = pgTable(
     trialEndsAt: timestamp("trial_ends_at"),
     currentPeriodEnds: timestamp("current_period_ends"),
     lastInvoicePaidAt: timestamp("last_invoice_paid_at"),
+    stripeStateUpdatedAt: timestamp("stripe_state_updated_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
