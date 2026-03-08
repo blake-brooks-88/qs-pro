@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
@@ -89,6 +89,17 @@ export function App() {
                   <ProtectedRoute requiredRole="admin">
                     <SettingsPage />
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="*"
+                element={
+                  <div className="flex flex-col items-center justify-center gap-4 py-24">
+                    <h1 className="text-2xl font-semibold">Page not found</h1>
+                    <Link to="/tenants" className="text-primary hover:underline">
+                      Back to Tenants
+                    </Link>
+                  </div>
                 }
               />
             </Route>

@@ -10,6 +10,7 @@ import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { FeatureOverridesModule } from './feature-overrides/feature-overrides.module.js';
+import { HealthModule } from './health/health.module.js';
 import { InvoicingModule } from './invoicing/invoicing.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StripeModule } from './stripe/stripe.module.js';
@@ -39,6 +40,7 @@ import { TenantsModule } from './tenants/tenants.module.js';
     AuditModule,
     StripeModule,
     FeatureOverridesModule,
+    HealthModule,
     InvoicingModule,
     SettingsModule,
     TenantsModule,
