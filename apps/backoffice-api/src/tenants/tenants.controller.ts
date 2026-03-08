@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
@@ -15,6 +16,7 @@ import type { FastifyRequest } from 'fastify';
 import { BackofficeAuditService } from '../audit/audit.service.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
+import { TierManagementService } from '../settings/tier-management.service.js';
 import { BackofficeThrottlerGuard } from './backoffice-throttler.guard.js';
 import { TenantsService } from './tenants.service.js';
 import { TenantListQuerySchema } from './tenants.types.js';
@@ -24,6 +26,7 @@ export class TenantsController {
   constructor(
     private readonly tenantsService: TenantsService,
     private readonly auditService: BackofficeAuditService,
+    private readonly tierManagement: TierManagementService,
   ) {}
 
   @Get()
@@ -70,17 +73,18 @@ export class TenantsController {
   @Roles('admin')
   async changeTier(
     @Param('id') id: string,
+    @Body() body: { tier: 'pro' | 'enterprise'; interval: 'monthly' | 'annual' },
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {
-    void this.auditService.log({
-      backofficeUserId: user.id,
-      targetTenantId: id,
-      eventType: 'tenant.tier_change',
-      ipAddress: req.ip,
-    });
-
-    return { message: 'Tier change placeholder — will be wired to Stripe' };
+    await this.tierManagement.changeTier(
+      id,
+      body.tier,
+      body.interval,
+      user.id,
+      req.ip,
+    );
+    return { success: true };
   }
 
   @Post(':id/cancel')
@@ -90,15 +94,7 @@ export class TenantsController {
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {
-    void this.auditService.log({
-      backofficeUserId: user.id,
-      targetTenantId: id,
-      eventType: 'tenant.subscription_cancel',
-      ipAddress: req.ip,
-    });
-
-    return {
-      message: 'Subscription cancellation placeholder — will be wired to Stripe',
-    };
+    await this.tierManagement.cancelSubscription(id, user.id, req.ip);
+    return { success: true };
   }
 }
