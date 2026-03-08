@@ -69,7 +69,6 @@ CREATE TABLE "bo_verifications" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "org_subscriptions" ADD COLUMN "stripe_state_updated_at" timestamp;--> statement-breakpoint
 ALTER TABLE "backoffice_audit_logs" ADD CONSTRAINT "backoffice_audit_logs_backoffice_user_id_bo_users_id_fk" FOREIGN KEY ("backoffice_user_id") REFERENCES "public"."bo_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "backoffice_audit_logs" ADD CONSTRAINT "backoffice_audit_logs_target_tenant_id_tenants_id_fk" FOREIGN KEY ("target_tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bo_accounts" ADD CONSTRAINT "bo_accounts_user_id_bo_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."bo_users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
