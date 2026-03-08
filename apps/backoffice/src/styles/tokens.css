@@ -1,0 +1,185 @@
+:root {
+  --radius: 0.5rem;
+
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+
+  /* Pro badge - warm gold/amber tones */
+  --pro-badge-bg: #FF9F1C;
+  --pro-badge-foreground: #FFFFFF;
+  --pro-badge-icon: #FFFFFF;
+  --pro-badge-accent: #FF0055;
+
+  /* Enterprise badge - premium purple/violet tones */
+  --enterprise-badge-bg: #7C3AED;
+  --enterprise-badge-foreground: #FFFFFF;
+  --enterprise-badge-icon: #FCD34D;
+  --enterprise-badge-accent: #A855F7;
+
+  --pro-shadow: rgba(255, 159, 28, 0.25);
+  --enterprise-shadow: rgba(124, 58, 237, 0.3);
+
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+
+  --primary: #D900FF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FF0055;
+  --secondary-foreground: #FFFFFF;
+
+  --success: #00FF94;
+  --success-foreground: #0F172A;
+  --warning: #FF9F1C;
+  --warning-foreground: #FFFFFF;
+  --error: #FF3333;
+  --error-foreground: #FFFFFF;
+
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #D900FF;
+
+  --surface: #F1F5F9;
+  --surface-hover: #E2E8F0;
+
+  --syntax-keyword: #A21CAF;
+  --syntax-table: #0891B2;
+  --syntax-field: #0284C7;
+  --syntax-alias: #0EA5E9;
+  --syntax-function: #D97706;
+  --syntax-string: #059669;
+  --syntax-number: #10B981;
+  --syntax-operator: #64748B;
+  --syntax-comment: #94A3B8;
+
+  --primary-50: #FDF2FF;
+  --primary-100: #FAE6FF;
+  --primary-200: #F5CCFF;
+  --primary-300: #EFB3FF;
+  --primary-400: #E680FF;
+  --primary-500: #D900FF;
+  --primary-600: #B300D1;
+  --primary-700: #8C00A3;
+  --primary-800: #660075;
+  --primary-900: #400047;
+  --primary-950: #26002B;
+
+  --secondary-50: #FFF0F5;
+  --secondary-100: #FFE0E8;
+  --secondary-200: #FFC2D1;
+  --secondary-300: #FFA3B9;
+  --secondary-400: #FF668A;
+  --secondary-500: #FF0055;
+  --secondary-600: #D10046;
+  --secondary-700: #A30036;
+  --secondary-800: #750027;
+  --secondary-900: #470018;
+  --secondary-950: #2B000E;
+
+  --success-50: #E6FFF4;
+  --success-100: #CCFFEA;
+  --success-200: #99FFD5;
+  --success-300: #66FFBF;
+  --success-400: #33FFAA;
+  --success-500: #00FF94;
+  --success-600: #00CC76;
+  --success-700: #009959;
+  --success-800: #00663B;
+  --success-900: #00331E;
+  --success-950: #001A0F;
+
+  --warning-50: #FFF5E8;
+  --warning-100: #FFECD1;
+  --warning-200: #FFD9A3;
+  --warning-300: #FFC675;
+  --warning-400: #FFB347;
+  --warning-500: #FF9F1C;
+  --warning-600: #CC7F16;
+  --warning-700: #995F11;
+  --warning-800: #66400B;
+  --warning-900: #332006;
+  --warning-950: #1A1003;
+
+  --error-50: #FFEBEB;
+  --error-100: #FFD6D6;
+  --error-200: #FFADAD;
+  --error-300: #FF8585;
+  --error-400: #FF5C5C;
+  --error-500: #FF3333;
+  --error-600: #CC2929;
+  --error-700: #991F1F;
+  --error-800: #661414;
+  --error-900: #330A0A;
+  --error-950: #1A0505;
+
+  --neutral: #64748B;
+  --neutral-50: #F8FAFC;
+  --neutral-100: #F1F5F9;
+  --neutral-200: #E2E8F0;
+  --neutral-300: #CBD5E1;
+  --neutral-400: #94A3B8;
+  --neutral-500: #64748B;
+  --neutral-600: #475569;
+  --neutral-700: #334155;
+  --neutral-800: #1E293B;
+  --neutral-900: #0F172A;
+  --neutral-950: #020617;
+}
+
+.dark {
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+  --card: #1E293B;
+  --card-foreground: #F8FAFC;
+  --popover: #1E293B;
+  --popover-foreground: #F8FAFC;
+
+  --primary: #D900FF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FF0055;
+  --secondary-foreground: #FFFFFF;
+
+  --success: #00FF94;
+  --success-foreground: #0F172A;
+  --warning: #FF9F1C;
+  --warning-foreground: #FFFFFF;
+  --error: #FF3333;
+  --error-foreground: #FFFFFF;
+
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --border: #334155;
+  --input: #334155;
+  --ring: #D900FF;
+
+  --surface: #1E293B;
+  --surface-hover: #334155;
+
+  --syntax-keyword: #D946EF;
+  --syntax-table: #22D3EE;
+  --syntax-field: #7DD3FC;
+  --syntax-alias: #BAE6FD;
+  --syntax-function: #FBBF24;
+  --syntax-string: #34D399;
+  --syntax-number: #6EE7B7;
+  --syntax-operator: #94A3B8;
+  --syntax-comment: #64748B;
+
+  /* Pro badge - slightly brighter in dark mode */
+  --pro-badge-bg: #FBBF24;
+  --pro-badge-foreground: #0F172A;
+  --pro-badge-icon: #0F172A;
+  --pro-badge-accent: #FF0055;
+
+  /* Enterprise badge - richer purple in dark mode */
+  --enterprise-badge-bg: #8B5CF6;
+  --enterprise-badge-foreground: #FFFFFF;
+  --enterprise-badge-icon: #FDE047;
+  --enterprise-badge-accent: #C084FC;
+
+  --pro-shadow: rgba(251, 191, 36, 0.25);
+  --enterprise-shadow: rgba(139, 92, 246, 0.3);
+}
