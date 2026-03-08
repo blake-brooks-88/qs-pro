@@ -24,19 +24,20 @@ describe('AuthGuard', () => {
   let reflector: Reflector;
 
   const createMockContext = (
-    request: Record<string, unknown> = {},
-  ): ExecutionContext => {
-    const mockRequest = {
+    request?: Record<string, unknown>,
+  ): { context: ExecutionContext; request: Record<string, unknown> } => {
+    const mockRequest: Record<string, unknown> = {
       headers: { authorization: 'Bearer test-token' },
       ...request,
     };
-    return {
+    const context = {
       switchToHttp: () => ({
         getRequest: () => mockRequest,
       }),
       getHandler: () => ({}),
       getClass: () => ({}),
     } as unknown as ExecutionContext;
+    return { context, request: mockRequest };
   };
 
   beforeEach(() => {
@@ -48,7 +49,7 @@ describe('AuthGuard', () => {
   it('should allow access when @Public() decorator is present', async () => {
     vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(true);
 
-    const context = createMockContext();
+    const { context } = createMockContext();
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
@@ -59,7 +60,7 @@ describe('AuthGuard', () => {
     vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
 
-    const context = createMockContext();
+    const { context } = createMockContext();
     const result = await guard.canActivate(context);
 
     expect(result).toBe(false);
@@ -80,8 +81,7 @@ describe('AuthGuard', () => {
         : never,
     );
 
-    const request: Record<string, unknown> = {};
-    const context = createMockContext(request);
+    const { context, request } = createMockContext();
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
@@ -103,8 +103,7 @@ describe('AuthGuard', () => {
         : never,
     );
 
-    const request: Record<string, unknown> = {};
-    const context = createMockContext(request);
+    const { context, request } = createMockContext();
     await guard.canActivate(context);
 
     expect(request['backofficeSession']).toEqual(mockSession.session);
@@ -115,7 +114,7 @@ describe('AuthGuard', () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
 
     const headers = { authorization: 'Bearer xyz', cookie: 'sid=abc' };
-    const context = createMockContext({ headers });
+    const { context } = createMockContext({ headers });
     await guard.canActivate(context);
 
     expect(fromNodeHeaders).toHaveBeenCalledWith(headers);

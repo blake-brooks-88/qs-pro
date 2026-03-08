@@ -4,6 +4,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from '@qpp/backend-shared';
 
+import { AuthModule } from './auth/auth.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -14,6 +16,7 @@ import { LoggerModule } from '@qpp/backend-shared';
       ],
     }),
     LoggerModule,
+    AuthModule,
   ],
 })
 export class AppModule {}
