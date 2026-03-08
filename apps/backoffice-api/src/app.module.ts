@@ -4,7 +4,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from '@qpp/backend-shared';
 
+import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { DatabaseModule } from './database/database.module.js';
 
 @Module({
   imports: [
@@ -16,7 +18,9 @@ import { AuthModule } from './auth/auth.module.js';
       ],
     }),
     LoggerModule,
+    DatabaseModule,
     AuthModule,
+    AuditModule,
   ],
 })
 export class AppModule {}
