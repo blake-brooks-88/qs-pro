@@ -12,6 +12,7 @@
     "lint": "eslint . --report-unused-disable-directives --max-warnings 50"
   },
   "dependencies": {
+    "@qpp/shared-types": "workspace:^",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.4",

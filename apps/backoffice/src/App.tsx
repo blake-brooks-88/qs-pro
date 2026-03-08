@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { TwoFactorPage } from "@/features/auth/TwoFactorPage";
 import { TwoFactorSetupPage } from "@/features/auth/TwoFactorSetupPage";
+import { TenantDetailPage } from "@/features/tenants/TenantDetailPage";
 import { TenantListPage } from "@/features/tenants/TenantListPage";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -78,7 +79,7 @@ export function App() {
               />
               <Route
                 path="tenants/:tenantId"
-                element={<PlaceholderPage title="Tenant Detail" />}
+                element={<TenantDetailPage />}
               />
               <Route
                 path="invoicing"
