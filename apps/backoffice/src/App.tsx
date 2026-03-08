@@ -7,6 +7,8 @@ import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { TwoFactorPage } from "@/features/auth/TwoFactorPage";
 import { TwoFactorSetupPage } from "@/features/auth/TwoFactorSetupPage";
+import { InvoiceCreatePage } from "@/features/invoicing/InvoiceCreatePage";
+import { InvoiceListPage } from "@/features/invoicing/InvoiceListPage";
 import { TenantDetailPage } from "@/features/tenants/TenantDetailPage";
 import { TenantListPage } from "@/features/tenants/TenantListPage";
 import { AuthLayout } from "@/layouts/AuthLayout";
@@ -83,13 +85,13 @@ export function App() {
               />
               <Route
                 path="invoicing"
-                element={<PlaceholderPage title="Invoicing" />}
+                element={<InvoiceListPage />}
               />
               <Route
                 path="invoicing/create"
                 element={
                   <ProtectedRoute requiredRole="editor">
-                    <PlaceholderPage title="Create Invoice" />
+                    <InvoiceCreatePage />
                   </ProtectedRoute>
                 }
               />

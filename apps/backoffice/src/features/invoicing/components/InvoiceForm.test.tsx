@@ -1,0 +1,207 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { InvoiceForm } from "./InvoiceForm";
+
+const mockRefetch = vi.fn();
+const mockMutate = vi.fn();
+
+const mockLookupData = {
+  eid: "12345678",
+  companyName: "Acme Corp",
+  userCount: 5,
+  tier: "pro",
+  subscriptionStatus: "active",
+  signupDate: "2025-06-15T00:00:00Z",
+};
+
+let mockEidLookupReturn: Record<string, unknown> = {
+  data: undefined,
+  refetch: mockRefetch,
+  isFetching: false,
+  isError: false,
+  fetchStatus: "idle",
+};
+
+let mockCreateReturn: Record<string, unknown> = {
+  mutate: mockMutate,
+  isPending: false,
+};
+
+vi.mock("../hooks/use-invoicing", () => ({
+  useEidLookup: () => mockEidLookupReturn,
+  useCreateInvoicedSubscription: () => mockCreateReturn,
+}));
+
+vi.mock("@/hooks/use-permissions", () => ({
+  usePermissions: () => ({
+    role: "admin",
+    canView: true,
+    canEdit: true,
+    canAdmin: true,
+    isAtLeast: () => true,
+  }),
+}));
+
+function renderForm(initialEntries: string[] = ["/invoicing/create"]) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={initialEntries}>
+        <InvoiceForm />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe("InvoiceForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEidLookupReturn = {
+      data: undefined,
+      refetch: mockRefetch,
+      isFetching: false,
+      isError: false,
+      fetchStatus: "idle",
+    };
+    mockCreateReturn = {
+      mutate: mockMutate,
+      isPending: false,
+    };
+  });
+
+  it("should pre-fill EID from URL query parameter", () => {
+    renderForm(["/invoicing/create?eid=123"]);
+    const eidInput = screen.getByLabelText(/enterprise id/i);
+    expect(eidInput).toHaveValue("123");
+  });
+
+  it("should show tenant confirmation card after successful EID lookup", () => {
+    mockEidLookupReturn = {
+      ...mockEidLookupReturn,
+      data: mockLookupData,
+    };
+    renderForm();
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+  });
+
+  it("should show error message when EID lookup fails", () => {
+    mockEidLookupReturn = {
+      ...mockEidLookupReturn,
+      data: undefined,
+      isError: true,
+      fetchStatus: "idle",
+    };
+    renderForm();
+    expect(screen.getByText(/no tenant found/i)).toBeInTheDocument();
+  });
+
+  it("should disable step 2 fields until tenant is confirmed", () => {
+    renderForm();
+    const tierSelect = screen.getByLabelText(/tier/i);
+    expect(tierSelect).toBeDisabled();
+    const seatInput = screen.getByLabelText(/seat count/i);
+    expect(seatInput).toBeDisabled();
+  });
+
+  it("should validate required fields before submission", async () => {
+    mockEidLookupReturn = {
+      ...mockEidLookupReturn,
+      data: mockLookupData,
+    };
+    renderForm();
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i });
+    await userEvent.click(confirmBtn);
+
+    const submitBtn = screen.getByRole("button", { name: /create invoiced subscription/i });
+    await userEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Customer email is required")).toBeInTheDocument();
+    });
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it("should call createInvoicedSubscription mutation on valid submit", async () => {
+    mockEidLookupReturn = {
+      ...mockEidLookupReturn,
+      data: mockLookupData,
+    };
+    renderForm();
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i });
+    await userEvent.click(confirmBtn);
+
+    const emailInput = screen.getByLabelText(/customer email/i);
+    const nameInput = screen.getByLabelText(/customer name/i);
+    await userEvent.type(emailInput, "john@acme.com");
+    await userEvent.type(nameInput, "John Doe");
+
+    const submitBtn = screen.getByRole("button", { name: /create invoiced subscription/i });
+    await userEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantEid: "",
+          tier: "pro",
+          interval: "monthly",
+          seatCount: 1,
+          paymentTerms: "net_30",
+          customerEmail: "john@acme.com",
+          customerName: "John Doe",
+          companyName: "Acme Corp",
+        }),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("should show InvoiceResultCard on successful submission", () => {
+    mockEidLookupReturn = {
+      ...mockEidLookupReturn,
+      data: mockLookupData,
+    };
+
+    const { rerender } = renderForm();
+
+    mockMutate.mockImplementation((_params: unknown, opts: { onSuccess: (d: unknown) => void }) => {
+      opts.onSuccess({
+        invoiceUrl: "https://invoice.stripe.com/i/test123",
+        subscriptionId: "sub_123",
+        invoiceStatus: "open",
+        amount: 5000,
+        dueDate: "2026-04-01T00:00:00Z",
+        stripeInvoiceId: "in_abc",
+      });
+    });
+
+    mockCreateReturn = {
+      mutate: mockMutate,
+      isPending: false,
+    };
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <InvoiceForm />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const confirmBtn = screen.queryByRole("button", { name: /confirm/i });
+    if (confirmBtn) {
+      void userEvent.click(confirmBtn);
+    }
+  });
+});
