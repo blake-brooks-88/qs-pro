@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   Body,
   Controller,
@@ -6,14 +7,16 @@ import {
   HttpCode,
   Inject,
   Logger,
+  Param,
   Post,
   Req,
   ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import { Queue } from 'bullmq';
 import type { FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { z } from 'zod';
@@ -22,15 +25,33 @@ import { CsrfGuard } from '../auth/csrf.guard';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import type { PricesResponse } from './billing.service';
+import { BILLING_WEBHOOK_JOB, BILLING_WEBHOOK_QUEUE } from './billing.queue';
+import type {
+  CheckoutConfirmationResponse,
+  PricesResponse,
+} from './billing.service';
 import { BillingService } from './billing.service';
 import { STRIPE_CLIENT } from './stripe.provider';
-import { WebhookHandlerService } from './webhook-handler.service';
 
 const CheckoutBodySchema = z.object({
-  tier: z.enum(['pro', 'enterprise']),
   interval: z.enum(['monthly', 'annual']),
 });
+
+function isDuplicateWebhookJobEnqueueError(
+  err: unknown,
+  eventId: string | undefined,
+): boolean {
+  if (!eventId) {
+    return false;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('already exists') &&
+    normalized.includes('job') &&
+    message.includes(eventId)
+  );
+}
 
 @Controller('billing')
 export class BillingController {
@@ -38,8 +59,9 @@ export class BillingController {
 
   constructor(
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null,
+    @InjectQueue(BILLING_WEBHOOK_QUEUE)
+    private readonly billingWebhookQueue: Queue,
     private readonly configService: ConfigService,
-    private readonly webhookHandler: WebhookHandlerService,
     private readonly billingService: BillingService,
   ) {}
 
@@ -57,7 +79,7 @@ export class BillingController {
   ): Promise<{ url: string }> {
     return this.billingService.createCheckoutSession(
       user.tenantId,
-      body.tier,
+      'pro',
       body.interval,
     );
   }
@@ -70,7 +92,16 @@ export class BillingController {
     return this.billingService.createPortalSession(user.tenantId);
   }
 
-  @SkipThrottle()
+  @Get('checkout-session/:sessionId')
+  @UseGuards(SessionGuard)
+  async confirmCheckoutSession(
+    @CurrentUser() user: UserSession,
+    @Param('sessionId') sessionId: string,
+  ): Promise<CheckoutConfirmationResponse> {
+    return this.billingService.confirmCheckoutSession(user.tenantId, sessionId);
+  }
+
+  @Throttle({ default: { limit: 5_000, ttl: 60_000 } })
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
@@ -113,7 +144,32 @@ export class BillingController {
       });
     }
 
-    await this.webhookHandler.process(event);
+    try {
+      await this.billingWebhookQueue.add(
+        BILLING_WEBHOOK_JOB,
+        { event },
+        {
+          jobId: event.id,
+          attempts: 8,
+          backoff: {
+            type: 'exponential',
+            delay: 5_000,
+          },
+          removeOnComplete: 1000,
+          removeOnFail: 1000,
+        },
+      );
+    } catch (enqueueError) {
+      // Stripe retries on any non-2xx response. If the job is already enqueued due to a
+      // duplicate delivery, treat it as success and avoid an infinite retry loop.
+      if (isDuplicateWebhookJobEnqueueError(enqueueError, event.id)) {
+        this.logger.log(
+          `[DIAG] Duplicate webhook job already enqueued (jobId=${event.id}); acknowledging`,
+        );
+        return { received: true };
+      }
+      throw enqueueError;
+    }
     return { received: true };
   }
 }

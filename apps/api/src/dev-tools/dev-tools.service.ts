@@ -4,7 +4,11 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
-import type { IOrgSubscriptionRepository } from '@qpp/database';
+import type {
+  IOrgSubscriptionRepository,
+  IStripeBillingBindingRepository,
+  IStripeCheckoutSessionRepository,
+} from '@qpp/database';
 import { randomUUID } from 'crypto';
 import type Stripe from 'stripe';
 
@@ -18,6 +22,10 @@ export class DevToolsService {
   constructor(
     @Inject('ORG_SUBSCRIPTION_REPOSITORY')
     private readonly orgSubscriptionRepo: IOrgSubscriptionRepository,
+    @Inject('STRIPE_BILLING_BINDING_REPOSITORY')
+    private readonly stripeBindingRepo: IStripeBillingBindingRepository,
+    @Inject('STRIPE_CHECKOUT_SESSION_REPOSITORY')
+    private readonly stripeCheckoutSessionRepo: IStripeCheckoutSessionRepository,
     @Inject(STRIPE_CLIENT)
     private readonly stripe: Stripe | null,
     private readonly featuresService: FeaturesService,
@@ -30,10 +38,12 @@ export class DevToolsService {
       await this.orgSubscriptionRepo.upsert({
         tenantId,
         tier: 'pro',
+        stripeSubscriptionStatus: 'inactive',
         trialEndsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
         stripeSubscriptionId: null,
         stripeCustomerId: null,
         currentPeriodEnds: null,
+        lastInvoicePaidAt: null,
         seatLimit: null,
       });
     } else {
@@ -89,10 +99,14 @@ export class DevToolsService {
       tier: 'free',
       stripeCustomerId: null,
       stripeSubscriptionId: null,
+      stripeSubscriptionStatus: 'inactive',
       trialEndsAt: new Date(0),
       currentPeriodEnds: null,
+      lastInvoicePaidAt: null,
       seatLimit: null,
     });
+    await this.stripeBindingRepo.deleteByTenantId(tenantId);
+    await this.stripeCheckoutSessionRepo.deleteByTenantId(tenantId);
 
     return this.featuresService.getTenantFeatures(tenantId);
   }
@@ -139,10 +153,23 @@ export class DevToolsService {
       tier: effectiveState.tier,
       stripeCustomerId: effectiveState.stripeCustomerId,
       stripeSubscriptionId: effectiveState.stripeSubscriptionId,
+      stripeSubscriptionStatus:
+        effectiveState.tier === 'free' ? 'inactive' : 'active',
       currentPeriodEnds: effectiveState.currentPeriodEnds,
       trialEndsAt: effectiveState.trialEndsAt,
+      lastInvoicePaidAt: effectiveState.tier === 'free' ? null : new Date(now),
       seatLimit: effectiveState.seatLimit,
     });
+
+    if (effectiveState.tier === 'free') {
+      await this.stripeBindingRepo.deleteByTenantId(tenantId);
+    } else {
+      await this.stripeBindingRepo.upsert({
+        tenantId,
+        stripeCustomerId: effectiveState.stripeCustomerId,
+        stripeSubscriptionId: effectiveState.stripeSubscriptionId,
+      });
+    }
 
     return this.featuresService.getTenantFeatures(tenantId);
   }

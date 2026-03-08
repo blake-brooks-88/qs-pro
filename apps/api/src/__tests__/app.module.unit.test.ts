@@ -70,6 +70,9 @@ function seedApiEnv(): void {
   process.env.APP_WEB_ORIGIN = 'http://localhost:5173';
   process.env.COOKIE_SECURE = 'true';
   process.env.COOKIE_SAMESITE = 'none';
+  process.env.STRIPE_SECRET_KEY = 'sk_test_example';
+  process.env.STRIPE_API_VERSION = '2024-06-20';
+  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_example';
 }
 
 type ConfigServiceStub = {
@@ -189,6 +192,9 @@ describe('AppModule', () => {
     async () => {
       seedApiEnv();
       process.env.NODE_ENV = 'production';
+      // Production env validation requires a live key prefix.
+      // This is a placeholder key for config validation only; tests do not call Stripe.
+      process.env.STRIPE_SECRET_KEY = 'sk_live_example';
       vi.resetModules();
       mockIoredis();
       mockThrottlerStorageRedis();

@@ -1,6 +1,8 @@
 import {
   credentials,
   orgSubscriptions,
+  stripeBillingBindings,
+  stripeCheckoutSessions,
   stripeWebhookEvents,
   tenantFeatureOverrides,
   tenants,
@@ -22,6 +24,13 @@ export type NewTenantFeatureOverride =
 
 export type OrgSubscription = typeof orgSubscriptions.$inferSelect;
 export type NewOrgSubscription = typeof orgSubscriptions.$inferInsert;
+
+export type StripeBillingBinding = typeof stripeBillingBindings.$inferSelect;
+export type NewStripeBillingBinding = typeof stripeBillingBindings.$inferInsert;
+
+export type StripeCheckoutSession = typeof stripeCheckoutSessions.$inferSelect;
+export type NewStripeCheckoutSession =
+  typeof stripeCheckoutSessions.$inferInsert;
 
 export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
 export type NewStripeWebhookEvent = typeof stripeWebhookEvents.$inferInsert;
@@ -54,9 +63,6 @@ export interface IFeatureOverrideRepository {
 
 export interface IOrgSubscriptionRepository {
   findByTenantId(tenantId: string): Promise<OrgSubscription | undefined>;
-  findByStripeCustomerId(
-    stripeCustomerId: string,
-  ): Promise<OrgSubscription | undefined>;
   upsert(subscription: NewOrgSubscription): Promise<OrgSubscription>;
   insertIfNotExists(subscription: NewOrgSubscription): Promise<boolean>;
   startTrialIfEligible(tenantId: string, trialEndsAt: Date): Promise<boolean>;
@@ -68,6 +74,28 @@ export interface IOrgSubscriptionRepository {
     tenantId: string,
     data: Partial<OrgSubscription>,
   ): Promise<void>;
+}
+
+export interface IStripeBillingBindingRepository {
+  findByTenantId(tenantId: string): Promise<StripeBillingBinding | undefined>;
+  findByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<StripeBillingBinding | undefined>;
+  findByStripeSubscriptionId(
+    stripeSubscriptionId: string,
+  ): Promise<StripeBillingBinding | undefined>;
+  upsert(binding: NewStripeBillingBinding): Promise<StripeBillingBinding>;
+  clearSubscription(tenantId: string): Promise<void>;
+  deleteByTenantId(tenantId: string): Promise<void>;
+}
+
+export interface IStripeCheckoutSessionRepository {
+  findByTenantId(tenantId: string): Promise<StripeCheckoutSession | undefined>;
+  upsert(session: NewStripeCheckoutSession): Promise<StripeCheckoutSession>;
+  markCompleted(sessionId: string): Promise<void>;
+  markExpired(sessionId: string): Promise<void>;
+  markFailed(tenantId: string, errorMessage: string): Promise<void>;
+  deleteByTenantId(tenantId: string): Promise<void>;
 }
 
 export interface IStripeWebhookEventRepository {

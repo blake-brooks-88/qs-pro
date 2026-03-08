@@ -12,6 +12,7 @@ import type {
 } from '@qpp/shared-types';
 import { ALL_FEATURE_KEYS, getTierFeatures } from '@qpp/shared-types';
 
+import { resolveEffectiveTier } from '../billing/subscription-entitlements';
 import { TrialService } from '../trial/trial.service';
 
 @Injectable()
@@ -39,21 +40,8 @@ export class FeaturesService {
       const subscription =
         await this.orgSubscriptionRepo.findByTenantId(tenantId);
 
-      let effectiveTier: SubscriptionTier;
-      if (subscription) {
-        if (subscription.stripeSubscriptionId) {
-          effectiveTier = subscription.tier;
-        } else if (
-          subscription.trialEndsAt &&
-          new Date(subscription.trialEndsAt) > new Date()
-        ) {
-          effectiveTier = subscription.tier;
-        } else {
-          effectiveTier = 'free';
-        }
-      } else {
-        effectiveTier = 'free';
-      }
+      const effectiveTier: SubscriptionTier =
+        resolveEffectiveTier(subscription);
 
       const features = getTierFeatures(effectiveTier);
 

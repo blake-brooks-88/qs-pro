@@ -81,6 +81,41 @@ describe('createContextAwareOrgSubscriptionRepository', () => {
     updateSpy.mockRestore();
   });
 
+  it('delegates insertIfNotExists to the active repository instance', async () => {
+    mockedGetDbFromContext.mockReturnValue(contextDb);
+    const insertSpy = vi
+      .spyOn(DrizzleOrgSubscriptionRepository.prototype, 'insertIfNotExists')
+      .mockResolvedValue(true);
+
+    const inserted = await repo.insertIfNotExists({
+      tenantId: 'tenant-1',
+      tier: 'free',
+    });
+
+    expect(inserted).toBe(true);
+    expect(insertSpy).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      tier: 'free',
+    });
+    insertSpy.mockRestore();
+  });
+
+  it('delegates updateFromWebhook to the active repository instance', async () => {
+    mockedGetDbFromContext.mockReturnValue(undefined);
+    const updateSpy = vi
+      .spyOn(DrizzleOrgSubscriptionRepository.prototype, 'updateFromWebhook')
+      .mockResolvedValue(undefined);
+
+    await repo.updateFromWebhook('tenant-1', {
+      stripeSubscriptionStatus: 'active',
+    });
+
+    expect(updateSpy).toHaveBeenCalledWith('tenant-1', {
+      stripeSubscriptionStatus: 'active',
+    });
+    updateSpy.mockRestore();
+  });
+
   it('creates a new repo instance per call when context DB is present', async () => {
     // Arrange
     mockedGetDbFromContext.mockReturnValue(contextDb);

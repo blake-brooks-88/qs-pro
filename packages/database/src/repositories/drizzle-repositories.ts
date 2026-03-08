@@ -8,14 +8,20 @@ import {
   ICredentialsRepository,
   IFeatureOverrideRepository,
   IOrgSubscriptionRepository,
+  IStripeBillingBindingRepository,
+  IStripeCheckoutSessionRepository,
   IStripeWebhookEventRepository,
   ITenantRepository,
   IUserRepository,
   NewCredential,
   NewOrgSubscription,
+  NewStripeBillingBinding,
+  NewStripeCheckoutSession,
   NewTenant,
   NewUser,
   OrgSubscription,
+  StripeBillingBinding,
+  StripeCheckoutSession,
   Tenant,
   TenantFeatureOverride,
   User,
@@ -23,6 +29,8 @@ import {
 import {
   credentials,
   orgSubscriptions,
+  stripeBillingBindings,
+  stripeCheckoutSessions,
   stripeWebhookEvents,
   tenantFeatureOverrides,
   tenants,
@@ -180,6 +188,10 @@ export class DrizzleFeatureOverrideRepository implements IFeatureOverrideReposit
 export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionRepository {
   constructor(private db: PostgresJsDatabase) {}
 
+  private serializeFreshnessGuard(value: Date): string {
+    return value.toISOString();
+  }
+
   async findByTenantId(tenantId: string): Promise<OrgSubscription | undefined> {
     const [result] = await this.db
       .select()
@@ -188,34 +200,41 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
     return result;
   }
 
-  async findByStripeCustomerId(
-    stripeCustomerId: string,
-  ): Promise<OrgSubscription | undefined> {
-    const [result] = await this.db
-      .select()
-      .from(orgSubscriptions)
-      .where(eq(orgSubscriptions.stripeCustomerId, stripeCustomerId));
-    return result;
-  }
-
   async upsert(subscription: NewOrgSubscription): Promise<OrgSubscription> {
+    const conflictUpdateSet = {
+      tier: subscription.tier,
+      seatLimit: subscription.seatLimit,
+      stripeCustomerId: subscription.stripeCustomerId,
+      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      stripeSubscriptionStatus: subscription.stripeSubscriptionStatus,
+      trialEndsAt: subscription.trialEndsAt,
+      currentPeriodEnds: subscription.currentPeriodEnds,
+      lastInvoicePaidAt: subscription.lastInvoicePaidAt,
+      stripeStateUpdatedAt: subscription.stripeStateUpdatedAt,
+      updatedAt: new Date(),
+    };
+
     const [result] = await this.db
       .insert(orgSubscriptions)
       .values(subscription)
       .onConflictDoUpdate({
         target: orgSubscriptions.tenantId,
-        set: {
-          tier: subscription.tier,
-          seatLimit: subscription.seatLimit,
-          stripeCustomerId: subscription.stripeCustomerId,
-          stripeSubscriptionId: subscription.stripeSubscriptionId,
-          trialEndsAt: subscription.trialEndsAt,
-          currentPeriodEnds: subscription.currentPeriodEnds,
-          updatedAt: new Date(),
-        },
+        set: conflictUpdateSet,
+        setWhere: subscription.stripeStateUpdatedAt
+          ? or(
+              isNull(orgSubscriptions.stripeStateUpdatedAt),
+              sql`${orgSubscriptions.stripeStateUpdatedAt} <= ${this.serializeFreshnessGuard(subscription.stripeStateUpdatedAt)}`,
+            )
+          : undefined,
       })
       .returning();
     if (!result) {
+      if (subscription.stripeStateUpdatedAt) {
+        const existing = await this.findByTenantId(subscription.tenantId);
+        if (existing) {
+          return existing;
+        }
+      }
       throw new DatabaseError(
         ErrorCode.DATABASE_ERROR,
         "OrgSubscription upsert failed to return a result",
@@ -280,7 +299,176 @@ export class DrizzleOrgSubscriptionRepository implements IOrgSubscriptionReposit
     await this.db
       .update(orgSubscriptions)
       .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(orgSubscriptions.tenantId, tenantId));
+      .where(
+        data.stripeStateUpdatedAt
+          ? and(
+              eq(orgSubscriptions.tenantId, tenantId),
+              or(
+                isNull(orgSubscriptions.stripeStateUpdatedAt),
+                sql`${orgSubscriptions.stripeStateUpdatedAt} <= ${this.serializeFreshnessGuard(data.stripeStateUpdatedAt)}`,
+              ),
+            )
+          : eq(orgSubscriptions.tenantId, tenantId),
+      );
+  }
+}
+
+export class DrizzleStripeBillingBindingRepository implements IStripeBillingBindingRepository {
+  constructor(private db: PostgresJsDatabase) {}
+
+  async findByTenantId(
+    tenantId: string,
+  ): Promise<StripeBillingBinding | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(stripeBillingBindings)
+      .where(eq(stripeBillingBindings.tenantId, tenantId));
+    return result;
+  }
+
+  async findByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<StripeBillingBinding | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(stripeBillingBindings)
+      .where(eq(stripeBillingBindings.stripeCustomerId, stripeCustomerId));
+    return result;
+  }
+
+  async findByStripeSubscriptionId(
+    stripeSubscriptionId: string,
+  ): Promise<StripeBillingBinding | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(stripeBillingBindings)
+      .where(
+        eq(stripeBillingBindings.stripeSubscriptionId, stripeSubscriptionId),
+      );
+    return result;
+  }
+
+  async upsert(
+    binding: NewStripeBillingBinding,
+  ): Promise<StripeBillingBinding> {
+    const [result] = await this.db
+      .insert(stripeBillingBindings)
+      .values(binding)
+      .onConflictDoUpdate({
+        target: stripeBillingBindings.tenantId,
+        set: {
+          stripeCustomerId: binding.stripeCustomerId,
+          stripeSubscriptionId: binding.stripeSubscriptionId,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!result) {
+      throw new DatabaseError(
+        ErrorCode.DATABASE_ERROR,
+        "Stripe billing binding upsert failed to return a result",
+        { operation: "upsertStripeBillingBinding" },
+      );
+    }
+    return result;
+  }
+
+  async clearSubscription(tenantId: string): Promise<void> {
+    await this.db
+      .update(stripeBillingBindings)
+      .set({
+        stripeSubscriptionId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(stripeBillingBindings.tenantId, tenantId));
+  }
+
+  async deleteByTenantId(tenantId: string): Promise<void> {
+    await this.db
+      .delete(stripeBillingBindings)
+      .where(eq(stripeBillingBindings.tenantId, tenantId));
+  }
+}
+
+export class DrizzleStripeCheckoutSessionRepository implements IStripeCheckoutSessionRepository {
+  constructor(private db: PostgresJsDatabase) {}
+
+  async findByTenantId(
+    tenantId: string,
+  ): Promise<StripeCheckoutSession | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(stripeCheckoutSessions)
+      .where(eq(stripeCheckoutSessions.tenantId, tenantId));
+    return result;
+  }
+
+  async upsert(
+    session: NewStripeCheckoutSession,
+  ): Promise<StripeCheckoutSession> {
+    const [result] = await this.db
+      .insert(stripeCheckoutSessions)
+      .values(session)
+      .onConflictDoUpdate({
+        target: stripeCheckoutSessions.tenantId,
+        set: {
+          idempotencyKey: session.idempotencyKey,
+          sessionId: session.sessionId,
+          sessionUrl: session.sessionUrl,
+          tier: session.tier,
+          interval: session.interval,
+          status: session.status,
+          expiresAt: session.expiresAt,
+          lastError: session.lastError,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!result) {
+      throw new DatabaseError(
+        ErrorCode.DATABASE_ERROR,
+        "Stripe checkout session upsert failed to return a result",
+        { operation: "upsertStripeCheckoutSession" },
+      );
+    }
+    return result;
+  }
+
+  async markCompleted(sessionId: string): Promise<void> {
+    await this.db
+      .update(stripeCheckoutSessions)
+      .set({
+        status: "completed",
+        updatedAt: new Date(),
+      })
+      .where(eq(stripeCheckoutSessions.sessionId, sessionId));
+  }
+
+  async markExpired(sessionId: string): Promise<void> {
+    await this.db
+      .update(stripeCheckoutSessions)
+      .set({
+        status: "expired",
+        updatedAt: new Date(),
+      })
+      .where(eq(stripeCheckoutSessions.sessionId, sessionId));
+  }
+
+  async markFailed(tenantId: string, errorMessage: string): Promise<void> {
+    await this.db
+      .update(stripeCheckoutSessions)
+      .set({
+        status: "failed",
+        lastError: errorMessage,
+        updatedAt: new Date(),
+      })
+      .where(eq(stripeCheckoutSessions.tenantId, tenantId));
+  }
+
+  async deleteByTenantId(tenantId: string): Promise<void> {
+    await this.db
+      .delete(stripeCheckoutSessions)
+      .where(eq(stripeCheckoutSessions.tenantId, tenantId));
   }
 }
 

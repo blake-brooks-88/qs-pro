@@ -33,4 +33,6 @@ export async function deleteTestTenantSubscription(
     await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
     await tx`DELETE FROM org_subscriptions WHERE tenant_id = ${tenantId}::uuid`;
   });
+  await sqlClient`DELETE FROM stripe_billing_bindings WHERE tenant_id = ${tenantId}::uuid`;
+  await sqlClient`DELETE FROM stripe_checkout_sessions WHERE tenant_id = ${tenantId}::uuid`;
 }

@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@qpp/backend-shared';
+import {
+  DrizzleStripeBillingBindingRepository,
+  DrizzleStripeCheckoutSessionRepository,
+} from '@qpp/database';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { BillingModule } from '../billing/billing.module';
@@ -19,6 +23,18 @@ import { DevToolsService } from './dev-tools.service';
       provide: 'ORG_SUBSCRIPTION_REPOSITORY',
       useFactory: (db: PostgresJsDatabase) =>
         createContextAwareOrgSubscriptionRepository(db),
+      inject: ['DATABASE'],
+    },
+    {
+      provide: 'STRIPE_BILLING_BINDING_REPOSITORY',
+      useFactory: (db: PostgresJsDatabase) =>
+        new DrizzleStripeBillingBindingRepository(db),
+      inject: ['DATABASE'],
+    },
+    {
+      provide: 'STRIPE_CHECKOUT_SESSION_REPOSITORY',
+      useFactory: (db: PostgresJsDatabase) =>
+        new DrizzleStripeCheckoutSessionRepository(db),
       inject: ['DATABASE'],
     },
   ],

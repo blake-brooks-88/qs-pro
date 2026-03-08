@@ -19,12 +19,6 @@ class ContextAwareOrgSubscriptionRepository implements IOrgSubscriptionRepositor
     return this.getRepo().findByTenantId(tenantId);
   }
 
-  findByStripeCustomerId(
-    stripeCustomerId: string,
-  ): Promise<OrgSubscription | undefined> {
-    return this.getRepo().findByStripeCustomerId(stripeCustomerId);
-  }
-
   upsert(subscription: NewOrgSubscription): Promise<OrgSubscription> {
     return this.getRepo().upsert(subscription);
   }

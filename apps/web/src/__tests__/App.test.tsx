@@ -6,11 +6,29 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: {
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    message: vi.fn(),
+  },
+}));
+
+vi.mock("sonner", () => ({ toast: mockToast, Toaster: () => null }));
+
 import App from "@/App";
+import { CHECKOUT_RETURN_SIGNAL_EVENT } from "@/lib/checkout-return-signal";
+import {
+  hasPendingCheckout,
+  markPendingCheckout,
+} from "@/lib/pending-checkout";
 import { server } from "@/test/mocks/server";
+import { createTenantFeaturesStub } from "@/test/stubs";
 
 // Mock the SQL diagnostics hook to avoid Worker issues in tests
 vi.mock(
@@ -30,14 +48,24 @@ vi.mock("@/services/embedded-jwt", () => ({
   consumeEmbeddedJwt: vi.fn(),
 }));
 
+vi.mock("@/services/billing", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/billing")>();
+  return {
+    ...actual,
+    confirmCheckoutSession: vi.fn(),
+  };
+});
+
 // Import mocked modules for test manipulation
 import { getMe, loginWithJwt } from "@/services/auth";
+import { confirmCheckoutSession } from "@/services/billing";
 import { consumeEmbeddedJwt } from "@/services/embedded-jwt";
 import { useAuthStore } from "@/store/auth-store";
 
 // Type the mocked functions
 const mockGetMe = vi.mocked(getMe);
 const mockLoginWithJwt = vi.mocked(loginWithJwt);
+const mockConfirmCheckoutSession = vi.mocked(confirmCheckoutSession);
 const mockConsumeEmbeddedJwt = vi.mocked(consumeEmbeddedJwt);
 
 // Helper to create valid MeResponse data
@@ -127,6 +155,11 @@ describe("App", () => {
     // Default mock implementations
     mockConsumeEmbeddedJwt.mockReturnValue(null);
     mockLoginWithJwt.mockResolvedValue(undefined);
+    mockConfirmCheckoutSession.mockReset();
+    mockToast.success.mockReset();
+    mockToast.error.mockReset();
+    mockToast.message.mockReset();
+    mockToast.warning.mockReset();
 
     // Mock window.location
     vi.stubGlobal("location", mockLocation);
@@ -498,6 +531,271 @@ describe("App", () => {
       // Verify no error states
       expect(screen.queryByText("Connection Error")).not.toBeInTheDocument();
       expect(screen.queryByText("Launch Query++")).not.toBeInTheDocument();
+    });
+
+    it("refreshes features when checkout is pending in the iframe tab", async () => {
+      setEmbeddedMode(true);
+      const meResponse = createMockMeResponse();
+      let featureRequestCount = 0;
+
+      server.use(
+        http.get("/api/features", () => {
+          featureRequestCount += 1;
+          return HttpResponse.json(
+            createTenantFeaturesStub({
+              tier: featureRequestCount >= 2 ? "pro" : "free",
+            }),
+          );
+        }),
+      );
+
+      mockGetMe.mockResolvedValue(meResponse);
+      markPendingCheckout();
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      await waitFor(
+        () => {
+          expect(mockLocationReload).toHaveBeenCalled();
+        },
+        { timeout: 4000 },
+      );
+    });
+
+    it("confirms a successful checkout redirect and clears the pending session", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      mockConfirmCheckoutSession.mockResolvedValue({ status: "fulfilled" });
+
+      window.sessionStorage.clear();
+      mockLocation.search = "?checkout=success&session_id=cs_success";
+      const replaceStateSpy = vi.spyOn(window.history, "replaceState");
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(mockConfirmCheckoutSession).toHaveBeenCalledWith("cs_success");
+      });
+
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+      expect(replaceStateSpy).toHaveBeenCalled();
+    });
+
+    it("shows an expired checkout message when redirect confirmation fails", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      mockConfirmCheckoutSession.mockResolvedValue({
+        status: "failed",
+        reason: "expired",
+      });
+
+      window.sessionStorage.clear();
+      mockLocation.search = "?checkout=success&session_id=cs_expired";
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith(
+          "Checkout did not complete",
+          expect.objectContaining({
+            description:
+              "Your previous checkout session expired. Start checkout again.",
+          }),
+        );
+      });
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+    });
+
+    it("shows a syncing message after finite redirect polling exhausts retries", async () => {
+      vi.useFakeTimers();
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      mockConfirmCheckoutSession.mockResolvedValue({ status: "pending" });
+
+      window.sessionStorage.clear();
+      mockLocation.search = "?checkout=success&session_id=cs_pending";
+
+      renderApp();
+
+      // Advance through 10 retry cycles × 1500ms delay each
+      for (let i = 0; i < 10; i++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1500);
+        });
+      }
+
+      expect(mockToast.message).toHaveBeenCalledWith(
+        "Checkout is still processing",
+        expect.objectContaining({
+          description:
+            "Payment succeeded, but billing is still syncing. Refresh in a moment if Pro does not appear.",
+        }),
+      );
+
+      expect(mockConfirmCheckoutSession).toHaveBeenCalledTimes(10);
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it("shows a confirmation error when checkout verification throws", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      mockConfirmCheckoutSession.mockRejectedValue(
+        new Error("Billing offline"),
+      );
+
+      window.sessionStorage.clear();
+      mockLocation.search = "?checkout=success&session_id=cs_error";
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith(
+          "Unable to confirm checkout",
+          expect.objectContaining({
+            description: "Billing offline",
+          }),
+        );
+      });
+    });
+
+    it("tracks checkout cancellation and clears the stored session id", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+
+      window.sessionStorage.setItem("pendingCheckoutSessionId", "cs_cancel");
+      mockLocation.search = "?checkout=cancel";
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+      expect(mockConfirmCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it("clears pending checkout when the popup reports cancellation", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      markPendingCheckout();
+      window.sessionStorage.setItem("pendingCheckoutSessionId", "cs_popup");
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: window.location.origin,
+          data: {
+            type: CHECKOUT_RETURN_SIGNAL_EVENT,
+            payload: {
+              status: "canceled",
+              emittedAt: Date.now(),
+            },
+          },
+        }),
+      );
+
+      await waitFor(() => {
+        expect(hasPendingCheckout()).toBe(false);
+      });
+
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+      expect(mockToast.message).toHaveBeenCalledWith(
+        "Checkout canceled",
+        expect.objectContaining({
+          description:
+            "No charges were made. Start checkout again whenever you are ready.",
+        }),
+      );
+    });
+
+    it("clears pending checkout when the popup reports an expired checkout", async () => {
+      const meResponse = createMockMeResponse();
+      mockGetMe.mockResolvedValue(meResponse);
+      markPendingCheckout();
+      window.sessionStorage.setItem("pendingCheckoutSessionId", "cs_expired");
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "qpp:checkout-return-signal",
+          newValue: JSON.stringify({
+            status: "expired",
+            emittedAt: Date.now(),
+          }),
+        }),
+      );
+
+      await waitFor(() => {
+        expect(hasPendingCheckout()).toBe(false);
+      });
+
+      expect(
+        window.sessionStorage.getItem("pendingCheckoutSessionId"),
+      ).toBeNull();
+      expect(mockToast.error).toHaveBeenCalledWith(
+        "Checkout did not complete",
+        expect.objectContaining({
+          description:
+            "Your previous checkout session expired. Start checkout again.",
+        }),
+      );
+    });
+
+    it("refreshes pending checkout on interaction when features unlock outside the tab", async () => {
+      const meResponse = createMockMeResponse();
+      let featureRequestCount = 0;
+
+      server.use(
+        http.get("/api/features", () => {
+          featureRequestCount += 1;
+          return HttpResponse.json(
+            createTenantFeaturesStub({
+              tier: featureRequestCount >= 1 ? "pro" : "free",
+            }),
+          );
+        }),
+      );
+
+      mockGetMe.mockResolvedValue(meResponse);
+      markPendingCheckout();
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByText("Query")).toBeInTheDocument();
+      });
+
+      fireEvent.pointerDown(document);
+
+      await waitFor(() => {
+        expect(hasPendingCheckout()).toBe(false);
+      });
     });
   });
 

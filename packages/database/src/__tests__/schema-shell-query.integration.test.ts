@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
+
 import { eq, sql } from "drizzle-orm";
 import { drizzle, PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -28,7 +29,9 @@ describe("Shell Query Engine Schema", () => {
       await txDb.execute(
         sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`,
       );
-      await txDb.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
+      await txDb.execute(
+        sql`SELECT set_config('app.user_id', ${userId}, true)`,
+      );
       await txDb.execute(sql`SELECT set_config('app.mid', ${mid}, true)`);
       return fn(txDb as unknown as PostgresJsDatabase);
     });
@@ -73,7 +76,9 @@ describe("Shell Query Engine Schema", () => {
     if (tenantId && userId) {
       // Cleanup (need RLS context for shell_query_runs)
       await withRlsContext((txDb) =>
-        txDb.delete(shellQueryRuns).where(eq(shellQueryRuns.tenantId, tenantId)),
+        txDb
+          .delete(shellQueryRuns)
+          .where(eq(shellQueryRuns.tenantId, tenantId)),
       );
       await db
         .delete(tenantSettings)

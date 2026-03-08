@@ -5,6 +5,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import App from "@/App";
+import { CheckoutReturnPage } from "@/components/CheckoutReturnPage";
 import { ThemeProvider } from "@/components/theme-provider";
 import { startEmbeddedJwtListener } from "@/services/embedded-jwt";
 
@@ -13,9 +14,18 @@ import { sanitizeCurrentLocationAndBufferJwt } from "./sanitize-location";
 
 const queryClient = new QueryClient();
 
+const checkoutParam = new URLSearchParams(window.location.search).get(
+  "checkout",
+);
+const isCheckoutReturn =
+  checkoutParam === "success" || checkoutParam === "cancel";
+
 sanitizeCurrentLocationAndBufferJwt();
 initSentry();
-startEmbeddedJwtListener();
+
+if (!isCheckoutReturn) {
+  startEmbeddedJwtListener();
+}
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -23,10 +33,14 @@ if (!rootElement) {
 }
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      {isCheckoutReturn ? (
+        <CheckoutReturnPage />
+      ) : (
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      )}
+    </ThemeProvider>
   </React.StrictMode>,
 );

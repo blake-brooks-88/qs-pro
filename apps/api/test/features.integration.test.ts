@@ -174,9 +174,9 @@ describe('FeaturesController (integration)', () => {
     expect(res.body.features.advancedAutocomplete).toBe(false);
   });
 
-  it('returns pro features even when currentPeriodEnds is in the past', async () => {
-    const eid = `features-pastdue-eid-${Date.now()}`;
-    const tssd = 'features-pastdue-tssd';
+  it('returns free features when a Stripe subscription has expired unpaid access', async () => {
+    const eid = `features-expired-sub-eid-${Date.now()}`;
+    const tssd = 'features-expired-sub-tssd';
 
     const tenantRows =
       await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, ${tssd}) RETURNING id`;
@@ -187,14 +187,27 @@ describe('FeaturesController (integration)', () => {
     const tenantId = tenantRow.id;
     createdTenantIds.push(tenantId);
 
-    // Set tier to pro with an expired currentPeriodEnds (5 days ago)
+    // Expired billing period without a fresh paid invoice should not retain access.
     await sqlClient.begin(async (tx) => {
       await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
       await tx`
-        INSERT INTO org_subscriptions (tenant_id, tier, stripe_customer_id, stripe_subscription_id, current_period_ends)
+        INSERT INTO org_subscriptions (
+          tenant_id,
+          tier,
+          stripe_customer_id,
+          stripe_subscription_id,
+          stripe_subscription_status,
+          current_period_ends,
+          last_invoice_paid_at
+        )
         VALUES (
-          ${tenantId}::uuid, 'pro', 'cus_test_pastdue', 'sub_test_pastdue',
-          ${new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()}
+          ${tenantId}::uuid,
+          'pro',
+          'cus_test_expired',
+          'sub_test_expired',
+          'past_due',
+          ${new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()},
+          ${new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString()}
         )
       `;
     });
@@ -207,11 +220,10 @@ describe('FeaturesController (integration)', () => {
 
     const res = await testAgent.get('/features').expect(200);
 
-    // Tier column drives access, NOT currentPeriodEnds
-    expect(res.body.tier).toBe('pro');
-    expect(res.body.features.advancedAutocomplete).toBe(true);
-    expect(res.body.features.createDataExtension).toBe(true);
-    expect(res.body.features.deployToAutomation).toBe(true);
-    expect(res.body.features.executionHistory).toBe(true);
+    expect(res.body.tier).toBe('free');
+    expect(res.body.features.advancedAutocomplete).toBe(false);
+    expect(res.body.features.createDataExtension).toBe(false);
+    expect(res.body.features.deployToAutomation).toBe(false);
+    expect(res.body.features.executionHistory).toBe(false);
   });
 });

@@ -95,31 +95,57 @@ describe('Trial Lifecycle (integration)', () => {
       stripeSubscriptionId?: string | null;
       stripeCustomerId?: string | null;
       currentPeriodEnds?: Date | null;
+      stripeSubscriptionStatus?:
+        | 'inactive'
+        | 'trialing'
+        | 'active'
+        | 'past_due'
+        | 'unpaid'
+        | 'canceled';
+      lastInvoicePaidAt?: Date | null;
     },
   ): Promise<void> {
     const trialEndsAt = data.trialEndsAt?.toISOString() ?? null;
     const currentPeriodEnds = data.currentPeriodEnds?.toISOString() ?? null;
     const stripeSubId = data.stripeSubscriptionId ?? null;
     const stripeCusId = data.stripeCustomerId ?? null;
+    const stripeSubscriptionStatus =
+      data.stripeSubscriptionStatus ?? (stripeSubId ? 'active' : 'inactive');
+    const lastInvoicePaidAt =
+      data.lastInvoicePaidAt?.toISOString() ??
+      (stripeSubId ? new Date().toISOString() : null);
 
     await sqlClient.begin(async (tx) => {
       await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
       await tx`
-        INSERT INTO org_subscriptions (tenant_id, tier, trial_ends_at, stripe_subscription_id, stripe_customer_id, current_period_ends)
+        INSERT INTO org_subscriptions (
+          tenant_id,
+          tier,
+          trial_ends_at,
+          stripe_subscription_id,
+          stripe_customer_id,
+          stripe_subscription_status,
+          current_period_ends,
+          last_invoice_paid_at
+        )
         VALUES (
           ${tenantId}::uuid,
           ${data.tier},
           ${trialEndsAt},
           ${stripeSubId},
           ${stripeCusId},
-          ${currentPeriodEnds}
+          ${stripeSubscriptionStatus},
+          ${currentPeriodEnds},
+          ${lastInvoicePaidAt}
         )
         ON CONFLICT (tenant_id) DO UPDATE SET
           tier = ${data.tier},
           trial_ends_at = ${trialEndsAt},
           stripe_subscription_id = ${stripeSubId},
           stripe_customer_id = ${stripeCusId},
-          current_period_ends = ${currentPeriodEnds}
+          stripe_subscription_status = ${stripeSubscriptionStatus},
+          current_period_ends = ${currentPeriodEnds},
+          last_invoice_paid_at = ${lastInvoicePaidAt}
       `;
     });
   }
@@ -299,6 +325,8 @@ describe('Trial Lifecycle (integration)', () => {
         trialEndsAt: null,
         stripeSubscriptionId: 'sub_existing_123',
         stripeCustomerId: 'cus_existing_123',
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        lastInvoicePaidAt: new Date(),
       });
 
       await trialService.activateTrial(tenant.id, {
@@ -369,6 +397,9 @@ describe('Trial Lifecycle (integration)', () => {
         trialEndsAt: pastDate,
         stripeSubscriptionId: 'sub_real_123',
         stripeCustomerId: 'cus_real_123',
+        stripeSubscriptionStatus: 'active',
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        lastInvoicePaidAt: new Date(),
       });
 
       const testAgent = superagent(app.getHttpServer());
@@ -456,6 +487,9 @@ describe('Trial Lifecycle (integration)', () => {
         trialEndsAt: null,
         stripeSubscriptionId: 'sub_enterprise_123',
         stripeCustomerId: 'cus_enterprise_123',
+        stripeSubscriptionStatus: 'active',
+        currentPeriodEnds: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        lastInvoicePaidAt: new Date(),
       });
 
       const testAgent = superagent(app.getHttpServer());
