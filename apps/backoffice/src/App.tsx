@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { TwoFactorPage } from "@/features/auth/TwoFactorPage";
 import { TwoFactorSetupPage } from "@/features/auth/TwoFactorSetupPage";
+import { TenantListPage } from "@/features/tenants/TenantListPage";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 
@@ -73,7 +74,7 @@ export function App() {
               <Route index element={<Navigate to="/tenants" replace />} />
               <Route
                 path="tenants"
-                element={<PlaceholderPage title="Tenants" />}
+                element={<TenantListPage />}
               />
               <Route
                 path="tenants/:tenantId"
