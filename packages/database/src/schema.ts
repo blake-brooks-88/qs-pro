@@ -403,6 +403,85 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// 13. Better Auth Tables (Backoffice authentication — separate from SFMC OAuth)
+export const boUsers = pgTable("bo_users", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name").notNull(),
+  email: varchar("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  role: varchar("role").default("viewer"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpiresAt: timestamp("ban_expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const boSessions = pgTable("bo_sessions", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id")
+    .references(() => boUsers.id, { onDelete: "cascade" })
+    .notNull(),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const boAccounts = pgTable("bo_accounts", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id")
+    .references(() => boUsers.id, { onDelete: "cascade" })
+    .notNull(),
+  accountId: varchar("account_id").notNull(),
+  providerId: varchar("provider_id").notNull(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  scope: text("scope"),
+  idToken: text("id_token"),
+  password: text("password"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const boVerifications = pgTable("bo_verifications", {
+  id: varchar("id").primaryKey(),
+  identifier: varchar("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const boTwoFactors = pgTable("bo_two_factors", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id")
+    .references(() => boUsers.id, { onDelete: "cascade" })
+    .notNull(),
+  secret: text("secret").notNull(),
+  backupCodes: text("backup_codes").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// 14. Backoffice Audit Logs (Cross-tenant, no RLS — separate from tenant audit_logs)
+export const backofficeAuditLogs = pgTable("backoffice_audit_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  backofficeUserId: varchar("backoffice_user_id")
+    .references(() => boUsers.id)
+    .notNull(),
+  targetTenantId: uuid("target_tenant_id").references(() => tenants.id),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // --- Zod Validation Schemas ---
 export const selectTenantSchema = createSelectSchema(tenants);
 export const insertTenantSchema = createInsertSchema(tenants);
@@ -467,3 +546,23 @@ export const selectStripeWebhookEventSchema =
   createSelectSchema(stripeWebhookEvents);
 export const insertStripeWebhookEventSchema =
   createInsertSchema(stripeWebhookEvents);
+
+export const selectBoUserSchema = createSelectSchema(boUsers);
+export const insertBoUserSchema = createInsertSchema(boUsers);
+
+export const selectBoSessionSchema = createSelectSchema(boSessions);
+export const insertBoSessionSchema = createInsertSchema(boSessions);
+
+export const selectBoAccountSchema = createSelectSchema(boAccounts);
+export const insertBoAccountSchema = createInsertSchema(boAccounts);
+
+export const selectBoVerificationSchema = createSelectSchema(boVerifications);
+export const insertBoVerificationSchema = createInsertSchema(boVerifications);
+
+export const selectBoTwoFactorSchema = createSelectSchema(boTwoFactors);
+export const insertBoTwoFactorSchema = createInsertSchema(boTwoFactors);
+
+export const selectBackofficeAuditLogSchema =
+  createSelectSchema(backofficeAuditLogs);
+export const insertBackofficeAuditLogSchema =
+  createInsertSchema(backofficeAuditLogs);
