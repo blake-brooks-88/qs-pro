@@ -9,6 +9,7 @@ import { TwoFactorPage } from "@/features/auth/TwoFactorPage";
 import { TwoFactorSetupPage } from "@/features/auth/TwoFactorSetupPage";
 import { InvoiceCreatePage } from "@/features/invoicing/InvoiceCreatePage";
 import { InvoiceListPage } from "@/features/invoicing/InvoiceListPage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { TenantDetailPage } from "@/features/tenants/TenantDetailPage";
 import { TenantListPage } from "@/features/tenants/TenantListPage";
 import { AuthLayout } from "@/layouts/AuthLayout";
@@ -22,19 +23,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="p-8">
-      <h1 className="font-heading text-2xl font-bold text-foreground">
-        {title}
-      </h1>
-      <p className="mt-2 text-muted-foreground">
-        This page is under construction.
-      </p>
-    </div>
-  );
-}
 
 export function App() {
   return (
@@ -99,7 +87,7 @@ export function App() {
                 path="settings"
                 element={
                   <ProtectedRoute requiredRole="admin">
-                    <PlaceholderPage title="Settings" />
+                    <SettingsPage />
                   </ProtectedRoute>
                 }
               />
