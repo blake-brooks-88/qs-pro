@@ -414,6 +414,7 @@ export const boUsers = pgTable("bo_users", {
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpiresAt: timestamp("ban_expires_at"),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
