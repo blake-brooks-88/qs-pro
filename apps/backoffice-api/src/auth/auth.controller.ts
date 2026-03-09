@@ -7,7 +7,7 @@ import { auth } from './auth.js';
 @Public()
 @Controller('auth')
 export class AuthController {
-  @All('*path')
+  @All('*')
   async handleAuth(
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,

@@ -6,7 +6,6 @@ import {
   Post,
   Query,
   Req,
-  UsePipes,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 
@@ -19,15 +18,15 @@ import {
   type CreateInvoicedSubscriptionDto,
 } from './invoicing.types.js';
 
-@Controller('api/invoicing')
+@Controller('invoicing')
 export class InvoicingController {
   constructor(private readonly invoicingService: InvoicingService) {}
 
   @Post('subscriptions')
   @Roles('editor')
-  @UsePipes(new ZodValidationPipe(CreateInvoicedSubscriptionSchema))
   async createSubscription(
-    @Body() body: CreateInvoicedSubscriptionDto,
+    @Body(new ZodValidationPipe(CreateInvoicedSubscriptionSchema))
+    body: CreateInvoicedSubscriptionDto,
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {

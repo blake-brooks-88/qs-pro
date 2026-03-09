@@ -3,7 +3,6 @@ import {
   tenants,
   orgSubscriptions,
   users,
-  shellQueryRuns,
   tenantFeatureOverrides,
   backofficeAuditLogs,
   count,
@@ -13,7 +12,6 @@ import {
   and,
   desc,
   asc,
-  max,
   sql,
 } from '@qpp/database';
 import type { PostgresJsDatabase } from '@qpp/database';
@@ -60,15 +58,6 @@ export class TenantsService {
     const whereClause =
       conditions.length > 0 ? and(...conditions) : undefined;
 
-    const lastActivity = this.db
-      .select({
-        tenantId: shellQueryRuns.tenantId,
-        lastActiveDate: max(shellQueryRuns.createdAt).as('last_active_date'),
-      })
-      .from(shellQueryRuns)
-      .groupBy(shellQueryRuns.tenantId)
-      .as('last_activity');
-
     const userCounts = this.db
       .select({
         tenantId: users.tenantId,
@@ -90,12 +79,11 @@ export class TenantsService {
         subscriptionStatus: orgSubscriptions.stripeSubscriptionStatus,
         userCount: sql<number>`COALESCE(${userCounts.userCount}, 0)`,
         signupDate: tenants.installedAt,
-        lastActiveDate: lastActivity.lastActiveDate,
+        lastActiveDate: sql<Date | null>`NULL`,
       })
       .from(tenants)
       .leftJoin(orgSubscriptions, eq(tenants.id, orgSubscriptions.tenantId))
       .leftJoin(userCounts, eq(tenants.id, userCounts.tenantId))
-      .leftJoin(lastActivity, eq(tenants.id, lastActivity.tenantId))
       .where(whereClause)
       .orderBy(sortDirection(sortColumn))
       .limit(limit)
@@ -207,18 +195,12 @@ export class TenantsService {
       .select({
         name: users.name,
         email: users.email,
-        lastActiveDate: max(shellQueryRuns.createdAt),
+        lastActiveDate: sql<Date | null>`NULL`,
       })
       .from(users)
-      .leftJoin(
-        shellQueryRuns,
-        and(
-          eq(users.id, shellQueryRuns.userId),
-          eq(shellQueryRuns.tenantId, tenantId),
-        ),
-      )
       .where(eq(users.tenantId, tenantId))
-      .groupBy(users.id, users.name, users.email);
+      .limit(1000)
+      .offset(0);
 
     return rows.map((r) => ({
       name: r.name,

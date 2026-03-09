@@ -50,7 +50,10 @@ export class InvoicingService {
       );
     }
 
-    const encryptionKey = process.env.ENCRYPTION_KEY!;
+    const encryptionKey = process.env.ENCRYPTION_KEY;
+    if (!encryptionKey) {
+      throw new Error('Missing required env var: ENCRYPTION_KEY');
+    }
     const encryptedEid = encrypt(tenant.eid, encryptionKey);
 
     const [existingBinding] = await this.db
@@ -63,6 +66,15 @@ export class InvoicingService {
 
     if (existingBinding?.stripeCustomerId) {
       customerId = existingBinding.stripeCustomerId;
+      await this.stripe.customers.update(customerId, {
+        email: params.customerEmail,
+        name: params.customerName,
+        metadata: {
+          company: params.companyName,
+          eid: encryptedEid,
+          tenant_eid: tenant.eid,
+        },
+      });
     } else {
       const customer = await this.stripe.customers.create({
         email: params.customerEmail,
@@ -70,6 +82,7 @@ export class InvoicingService {
         metadata: {
           company: params.companyName,
           eid: encryptedEid,
+          tenant_eid: tenant.eid,
         },
       });
       customerId = customer.id;
@@ -85,9 +98,12 @@ export class InvoicingService {
       items: [{ price: priceId, quantity: params.seatCount }],
       collection_method: 'send_invoice',
       days_until_due: PAYMENT_TERMS_DAYS[params.paymentTerms],
+      expand: ['latest_invoice'],
       metadata: {
         eid: encryptedEid,
+        tenant_eid: tenant.eid,
         tier: params.tier,
+        interval: params.interval,
       },
     };
 
@@ -97,6 +113,40 @@ export class InvoicingService {
 
     const subscription =
       await this.stripe.subscriptions.create(subscriptionParams);
+
+    const latestInvoice =
+      typeof subscription.latest_invoice === 'object' &&
+      subscription.latest_invoice !== null
+        ? (subscription.latest_invoice as Stripe.Invoice)
+        : null;
+    const latestInvoiceId =
+      latestInvoice?.id ??
+      (typeof subscription.latest_invoice === 'string'
+        ? subscription.latest_invoice
+        : null);
+
+    let invoice: Stripe.Invoice | null = latestInvoice;
+    if (!invoice && latestInvoiceId) {
+      invoice = await this.stripe.invoices.retrieve(latestInvoiceId);
+    }
+
+    if (invoice?.id) {
+      const updateParams: Stripe.InvoiceUpdateParams = {
+        metadata: {
+          eid: encryptedEid,
+          tenant_eid: tenant.eid,
+          tier: params.tier,
+          interval: params.interval,
+        },
+      };
+
+      // Prefer leaving a draft invoice for manual review/sending in Stripe.
+      if (invoice.status === 'draft') {
+        updateParams.auto_advance = false;
+      }
+
+      invoice = await this.stripe.invoices.update(invoice.id, updateParams);
+    }
 
     await this.db
       .insert(stripeBillingBindings)
@@ -138,12 +188,13 @@ export class InvoicingService {
         },
       });
 
-    const invoices = await this.stripe.invoices.list({
-      subscription: subscription.id,
-      limit: 1,
-    });
-
-    const firstInvoice = invoices.data[0];
+    if (!invoice?.id) {
+      const invoices = await this.stripe.invoices.list({
+        subscription: subscription.id,
+        limit: 1,
+      });
+      invoice = invoices.data[0] ?? null;
+    }
 
     await this.auditService.log({
       backofficeUserId,
@@ -156,19 +207,20 @@ export class InvoicingService {
         paymentTerms: params.paymentTerms,
         customerEmail: params.customerEmail,
         subscriptionId: subscription.id,
+        stripeInvoiceId: invoice?.id ?? null,
       },
       ipAddress,
     });
 
     return {
-      invoiceUrl: firstInvoice?.hosted_invoice_url ?? null,
+      invoiceUrl: invoice?.hosted_invoice_url ?? null,
       subscriptionId: subscription.id,
-      invoiceStatus: firstInvoice?.status ?? 'pending',
-      amount: firstInvoice?.amount_due ?? 0,
-      dueDate: firstInvoice?.due_date
-        ? new Date(firstInvoice.due_date * 1000).toISOString()
+      invoiceStatus: invoice?.status ?? 'pending',
+      amount: invoice?.amount_due ?? 0,
+      dueDate: invoice?.due_date
+        ? new Date(invoice.due_date * 1000).toISOString()
         : null,
-      stripeInvoiceId: firstInvoice?.id ?? null,
+      stripeInvoiceId: invoice?.id ?? null,
     };
   }
 

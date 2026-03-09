@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, twoFactor } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { assertSafeBackofficeDatabaseUrl } from '@qpp/backend-shared';
 
 import {
   boUsers,
@@ -12,7 +13,8 @@ import {
   boTwoFactors,
 } from '@qpp/database';
 
-const client = postgres(process.env.DATABASE_URL!);
+assertSafeBackofficeDatabaseUrl(process.env.DATABASE_URL_BACKOFFICE!);
+const client = postgres(process.env.DATABASE_URL_BACKOFFICE!);
 const db = drizzle(client);
 
 export const auth = betterAuth({

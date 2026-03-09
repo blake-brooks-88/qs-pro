@@ -5,7 +5,7 @@ import { TenantsService } from './tenants.service.js';
 import { DRIZZLE_DB } from '../database/database.module.js';
 
 function createSubqueryRef() {
-  return { tenantId: {}, userCount: {}, lastActiveDate: {} };
+  return { tenantId: {}, userCount: {} };
 }
 
 function createMockDb() {
@@ -73,7 +73,7 @@ const SAMPLE_TENANT_ROW = {
   subscriptionStatus: 'active' as const,
   userCount: 5,
   signupDate: new Date('2025-06-15'),
-  lastActiveDate: new Date('2026-03-01'),
+  lastActiveDate: null,
 };
 
 describe('TenantsService', () => {
@@ -94,10 +94,9 @@ describe('TenantsService', () => {
   });
 
   it('should return paginated tenant list with correct DTO shape', async () => {
-    // findAll: 2 subqueries end with .groupBy().as() (consume resolveIndex 0,1 via groupBy)
-    // then main query ends with .offset() (consume resolveIndex 2)
-    mockDb.addResult([]); // groupBy 0: lastActivity subquery (uses .as, not awaited)
-    mockDb.addResult([]); // groupBy 1: userCounts subquery (uses .as, not awaited)
+    // findAll: userCounts subquery ends with .groupBy().as() (consume resolveIndex 0)
+    // then main query ends with .offset() (consume resolveIndex 1)
+    mockDb.addResult([]); // groupBy 0: userCounts subquery (uses .as, not awaited)
     mockDb.addResult([SAMPLE_TENANT_ROW]); // offset 0: main query
 
     const result = await service.findAll({ page: 1, limit: 25 });
@@ -114,21 +113,19 @@ describe('TenantsService', () => {
   });
 
   it('should apply search filter (ILIKE) on EID and company name', async () => {
-    mockDb.addResult([]); // subquery 1
-    mockDb.addResult([]); // subquery 2
+    mockDb.addResult([]); // userCounts subquery
     mockDb.addResult([]); // main query
 
     await service.findAll({ page: 1, limit: 25, search: 'acme' });
 
-    // 3rd select() call is the main query chain
-    const mainChain = mockDb.select.mock.results[2]?.value;
+    // 2nd select() call is the main query chain
+    const mainChain = mockDb.select.mock.results[1]?.value;
     expect(mainChain?.where).toHaveBeenCalled();
   });
 
   it('should apply tier and status filters', async () => {
-    mockDb.addResult([]);
-    mockDb.addResult([]);
-    mockDb.addResult([]);
+    mockDb.addResult([]); // userCounts subquery
+    mockDb.addResult([]); // main query
 
     await service.findAll({
       page: 1,
@@ -137,7 +134,7 @@ describe('TenantsService', () => {
       status: 'active',
     });
 
-    const mainChain = mockDb.select.mock.results[2]?.value;
+    const mainChain = mockDb.select.mock.results[1]?.value;
     expect(mainChain?.where).toHaveBeenCalled();
   });
 
@@ -157,13 +154,13 @@ describe('TenantsService', () => {
 
     // findById: offset(0) = tenant detail
     // Then Promise.all([getUsersForTenant, getFeatureOverrides, getRecentAuditLogs])
-    // getUsersForTenant: groupBy resolves to users array
+    // getUsersForTenant: offset resolves to users array
     // getFeatureOverrides: ends at .where() - awaited, returns chain (not array, but that's OK)
     // getRecentAuditLogs: ends at .limit() - awaited, returns chain
     mockDb.addResult([detailRow]); // offset: main tenant query
     mockDb.addResult([
       { name: 'John', email: 'john@test.com', lastActiveDate: null },
-    ]); // groupBy: getUsersForTenant
+    ]); // offset: getUsersForTenant
 
     const result = await service.findById(
       '550e8400-e29b-41d4-a716-446655440000',
@@ -212,19 +209,11 @@ describe('TenantsService', () => {
   });
 
   it('should derive lastActiveDate from query results', async () => {
-    const rowWithActivity = {
-      ...SAMPLE_TENANT_ROW,
-      lastActiveDate: new Date('2026-03-07T12:00:00Z'),
-    };
-
-    mockDb.addResult([]); // subquery 1
-    mockDb.addResult([]); // subquery 2
-    mockDb.addResult([rowWithActivity]); // main query
+    mockDb.addResult([]); // userCounts subquery
+    mockDb.addResult([SAMPLE_TENANT_ROW]); // main query
 
     const result = await service.findAll({ page: 1, limit: 25 });
 
-    expect(result.data[0]?.lastActiveDate).toEqual(
-      new Date('2026-03-07T12:00:00Z'),
-    );
+    expect(result.data[0]?.lastActiveDate).toBeNull();
   });
 });

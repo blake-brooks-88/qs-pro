@@ -18,15 +18,86 @@ function createMockStripe() {
   return {
     customers: {
       create: vi.fn().mockResolvedValue({ id: 'cus_new_123' }),
+      update: vi.fn().mockResolvedValue({ id: 'cus_new_123' }),
       list: vi.fn().mockResolvedValue({ data: [] }),
     },
     subscriptions: {
       create: vi.fn().mockResolvedValue({
         id: 'sub_abc123',
         status: 'active',
+        latest_invoice: {
+          id: 'inv_001',
+          hosted_invoice_url: 'https://stripe.com/invoice/001',
+          status: 'draft',
+          amount_due: 9900,
+          due_date: 1700000000,
+          created: 1699900000,
+          customer: 'cus_new_123',
+          customer_name: 'Acme Corp',
+          collection_method: 'send_invoice',
+        },
       }),
     },
     invoices: {
+      retrieve: vi.fn().mockResolvedValue({
+        id: 'inv_001',
+        hosted_invoice_url: 'https://stripe.com/invoice/001',
+        status: 'draft',
+        amount_due: 9900,
+        due_date: 1700000000,
+        created: 1699900000,
+        customer: 'cus_new_123',
+        customer_name: 'Acme Corp',
+        collection_method: 'send_invoice',
+      }),
+      update: vi.fn().mockImplementation(async (id: string) => {
+        if (id === 'inv_002') {
+          return {
+            id: 'inv_002',
+            hosted_invoice_url: null,
+            status: 'draft',
+            amount_due: 9900,
+            due_date: 1700000000,
+            created: 1699900000,
+            customer: 'cus_new_123',
+            customer_name: 'Acme Corp',
+            collection_method: 'send_invoice',
+          };
+        }
+        return {
+          id: 'inv_001',
+          hosted_invoice_url: 'https://stripe.com/invoice/001',
+          status: 'draft',
+          amount_due: 9900,
+          due_date: 1700000000,
+          created: 1699900000,
+          customer: 'cus_new_123',
+          customer_name: 'Acme Corp',
+          collection_method: 'send_invoice',
+        };
+      }),
+      finalizeInvoice: vi.fn().mockResolvedValue({
+        id: 'inv_001',
+        hosted_invoice_url: 'https://stripe.com/invoice/001',
+        status: 'open',
+        amount_due: 9900,
+        due_date: 1700000000,
+        created: 1699900000,
+        customer: 'cus_new_123',
+        customer_name: 'Acme Corp',
+        collection_method: 'send_invoice',
+      }),
+      sendInvoice: vi.fn().mockResolvedValue({
+        id: 'inv_001',
+        hosted_invoice_url: 'https://stripe.com/invoice/001',
+        status: 'open',
+        amount_due: 9900,
+        due_date: 1700000000,
+        created: 1699900000,
+        customer: 'cus_new_123',
+        customer_name: 'Acme Corp',
+        collection_method: 'send_invoice',
+      }),
       list: vi.fn().mockResolvedValue({
         data: [
           {
@@ -138,6 +209,7 @@ describe('InvoicingService', () => {
         metadata: {
           company: 'Acme Corp',
           eid: 'encrypted_eid_value',
+          tenant_eid: 'test-eid-123',
         },
       });
     });
@@ -182,9 +254,7 @@ describe('InvoicingService', () => {
       );
     });
 
-    it('should encrypt EID before embedding in Stripe metadata', async () => {
-      const { encrypt: mockEncrypt } = await import('@qpp/database');
-
+    it('should embed tenant EID in Stripe metadata', async () => {
       mockDb._chain.limit
         .mockResolvedValueOnce([MOCK_TENANT])
         .mockResolvedValueOnce([]);
@@ -195,14 +265,11 @@ describe('InvoicingService', () => {
         '127.0.0.1',
       );
 
-      expect(mockEncrypt).toHaveBeenCalledWith(
-        'test-eid-123',
-        '0'.repeat(64),
-      );
       expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
             eid: 'encrypted_eid_value',
+            tenant_eid: 'test-eid-123',
           }),
         }),
       );
@@ -212,6 +279,22 @@ describe('InvoicingService', () => {
       mockDb._chain.limit
         .mockResolvedValueOnce([MOCK_TENANT])
         .mockResolvedValueOnce([]);
+
+      mockStripe.subscriptions.create.mockResolvedValueOnce({
+        id: 'sub_abc123',
+        status: 'active',
+        latest_invoice: {
+          id: 'inv_002',
+          hosted_invoice_url: null,
+          status: 'draft',
+          amount_due: 9900,
+          due_date: 1700000000,
+          created: 1699900000,
+          customer: 'cus_new_123',
+          customer_name: 'Acme Corp',
+          collection_method: 'send_invoice',
+        },
+      });
 
       mockStripe.invoices.list.mockResolvedValueOnce({
         data: [
