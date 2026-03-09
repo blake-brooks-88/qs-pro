@@ -12,6 +12,8 @@ services:
       QS_DB_MIGRATE_PASSWORD: ${QS_DB_MIGRATE_PASSWORD}
       QS_DB_RUNTIME_USER: ${QS_DB_RUNTIME_USER}
       QS_DB_RUNTIME_PASSWORD: ${QS_DB_RUNTIME_PASSWORD}
+      QS_DB_BACKOFFICE_USER: ${QS_DB_BACKOFFICE_USER}
+      QS_DB_BACKOFFICE_PASSWORD: ${QS_DB_BACKOFFICE_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
