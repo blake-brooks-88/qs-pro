@@ -1,6 +1,7 @@
 import type { Sql } from "postgres";
 
 const DEFAULT_MIGRATIONS_USERNAME = "qs_migrate";
+const DEFAULT_BACKOFFICE_USERNAME = "qs_backoffice";
 
 /**
  * Superuser/admin role names that should never be used for application runtime.
@@ -66,6 +67,63 @@ export function assertSafeRuntimeDatabaseUrl(connectionString: string): void {
   }
 }
 
+export function assertSafeBackofficeDatabaseUrl(
+  connectionString: string,
+): void {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  const migrationsUsername =
+    process.env.QS_DB_MIGRATE_USER?.trim() || DEFAULT_MIGRATIONS_USERNAME;
+  const backofficeUsername =
+    process.env.QS_DB_BACKOFFICE_USER?.trim() || DEFAULT_BACKOFFICE_USERNAME;
+
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    throw new Error(
+      "Refusing to start in production with an unparseable DATABASE_URL_BACKOFFICE. " +
+        `Provide a standard postgres://... URL with an explicit backoffice user (e.g. ${backofficeUsername}).`,
+    );
+  }
+
+  const username =
+    getPostgresUsername(url) ||
+    process.env.PGUSER?.trim() ||
+    process.env.POSTGRES_USER?.trim() ||
+    null;
+
+  if (!username) {
+    throw new Error(
+      "Refusing to start in production without an explicit DATABASE_URL_BACKOFFICE user. " +
+        `Set DATABASE_URL_BACKOFFICE to include a dedicated backoffice role (e.g. ${backofficeUsername}), or set PGUSER.`,
+    );
+  }
+
+  if (username === migrationsUsername) {
+    throw new Error(
+      `Refusing to start in production with DATABASE_URL_BACKOFFICE user '${username}'. ` +
+        `Reserve '${migrationsUsername}' for migrations/test cleanup only.`,
+    );
+  }
+
+  if (BLOCKED_SUPERUSER_NAMES.has(username.toLowerCase())) {
+    throw new Error(
+      `Refusing to start in production with DATABASE_URL_BACKOFFICE user '${username}'. ` +
+        "Superuser/admin roles are never acceptable application credentials.",
+    );
+  }
+
+  if (username !== backofficeUsername) {
+    throw new Error(
+      `Refusing to start in production with DATABASE_URL_BACKOFFICE user '${username}'. ` +
+        `Expected the dedicated backoffice role '${backofficeUsername}'.`,
+    );
+  }
+}
+
 /**
  * Verifies the runtime database role cannot bypass row-level security.
  *
@@ -115,6 +173,93 @@ export async function assertSafeRuntimeDatabaseRole(sql: Sql): Promise<void> {
   if (inheritedPrivilegedRole) {
     throw new Error(
       `Refusing to start in production: runtime role is a member of privileged role '${inheritedPrivilegedRole.rolname}' (SUPERUSER or BYPASSRLS). ` +
+        "Revoke this membership to prevent privilege escalation via SET ROLE.",
+    );
+  }
+}
+
+/**
+ * Verifies the backoffice runtime database role is constrained correctly.
+ *
+ * Backoffice is intentionally cross-tenant and therefore uses BYPASSRLS, but it
+ * must not be SUPERUSER (or inherit SUPERUSER) and must not have privilege
+ * escalation flags like CREATEROLE/CREATEDB/REPLICATION.
+ */
+export async function assertSafeBackofficeDatabaseRole(
+  sql: Sql,
+): Promise<void> {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  const rows = await sql<
+    Array<{
+      rolsuper: boolean | null;
+      rolbypassrls: boolean | null;
+      rolcreatedb: boolean | null;
+      rolcreaterole: boolean | null;
+      rolreplication: boolean | null;
+    }>
+  >`
+    SELECT rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication
+    FROM pg_roles
+    WHERE rolname = current_user
+  `;
+  const row = rows[0];
+  if (!row) {
+    throw new Error(
+      "Refusing to start in production: unable to verify database role privileges for current_user.",
+    );
+  }
+
+  if (row.rolsuper) {
+    throw new Error(
+      "Refusing to start in production: backoffice role must not be SUPERUSER.",
+    );
+  }
+
+  if (!row.rolbypassrls) {
+    throw new Error(
+      "Refusing to start in production: backoffice role must have BYPASSRLS enabled.",
+    );
+  }
+
+  if (row.rolcreatedb || row.rolcreaterole || row.rolreplication) {
+    throw new Error(
+      "Refusing to start in production: backoffice role must not have CREATEDB/CREATEROLE/REPLICATION privileges.",
+    );
+  }
+
+  const privilegedMembership = await sql<
+    Array<{
+      rolname: string;
+      rolsuper: boolean;
+      rolcreatedb: boolean;
+      rolcreaterole: boolean;
+      rolreplication: boolean;
+    }>
+  >`
+    WITH RECURSIVE role_path AS (
+      SELECT oid, rolname, rolsuper, rolcreatedb, rolcreaterole, rolreplication
+      FROM pg_roles
+      WHERE rolname = current_user
+      UNION
+      SELECT r.oid, r.rolname, r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolreplication
+      FROM pg_roles r
+      JOIN pg_auth_members am ON r.oid = am.roleid
+      JOIN role_path rp ON am.member = rp.oid
+    )
+    SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolreplication
+    FROM role_path
+    WHERE (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication)
+      AND rolname != current_user
+    LIMIT 1
+  `;
+
+  const inheritedPrivilegedRole = privilegedMembership[0];
+  if (inheritedPrivilegedRole) {
+    throw new Error(
+      `Refusing to start in production: backoffice role is a member of privileged role '${inheritedPrivilegedRole.rolname}' (SUPERUSER/CREATEROLE/CREATEDB/REPLICATION). ` +
         "Revoke this membership to prevent privilege escalation via SET ROLE.",
     );
   }
