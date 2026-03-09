@@ -77,7 +77,7 @@ function InvoiceResultCard({ result, tenantEid, onReset }: InvoiceResultCardProp
               ) : (
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground italic">
-                    Invoice pending &mdash; URL will be available shortly
+                    Draft invoice created &mdash; URL will be available after it’s finalized/sent in Stripe
                   </span>
                   <Button
                     variant="outline"

@@ -44,7 +44,7 @@ export function useCreateInvoicedSubscription() {
   return useMutation<InvoicedSubscriptionResult, Error, CreateInvoicedSubscriptionParams>({
     mutationFn: async (params) => {
       const { data } = await api.post<InvoicedSubscriptionResult>(
-        "/api/invoicing/subscriptions",
+        "/invoicing/subscriptions",
         params,
       );
       return data;
@@ -63,12 +63,12 @@ export function useInvoices(options?: { tenantId?: string }) {
     queryFn: async () => {
       if (tenantId) {
         const { data } = await api.get<PaginatedInvoiceList>(
-          `/api/invoicing/tenants/${tenantId}/invoices`,
+          `/invoicing/tenants/${tenantId}/invoices`,
         );
         return data;
       }
       const { data } = await api.get<PaginatedInvoiceList>(
-        "/api/invoicing/invoices",
+        "/invoicing/invoices",
       );
       return data;
     },

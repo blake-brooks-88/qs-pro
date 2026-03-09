@@ -69,6 +69,8 @@ export function TwoFactorSetupPage() {
           return;
         }
 
+        await authClient.getSession({ fetchOptions: { throw: true } });
+
         if (backupCodes.length > 0) {
           setStep("backup");
         } else {
@@ -117,7 +119,13 @@ export function TwoFactorSetupPage() {
             Copy Backup Codes
           </Button>
 
-          <Button className="w-full" onClick={() => navigate("/")}>
+          <Button
+            className="w-full"
+            onClick={async () => {
+              await authClient.getSession({ fetchOptions: { throw: true } });
+              navigate("/");
+            }}
+          >
             Continue to Dashboard
           </Button>
         </CardContent>
