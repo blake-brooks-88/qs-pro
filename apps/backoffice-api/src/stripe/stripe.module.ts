@@ -1,7 +1,7 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module } from "@nestjs/common";
 
-import { StripeCatalogService } from './stripe-catalog.service.js';
-import { StripeProvider } from './stripe.provider.js';
+import { StripeProvider } from "./stripe.provider.js";
+import { StripeCatalogService } from "./stripe-catalog.service.js";
 
 @Global()
 @Module({

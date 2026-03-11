@@ -4,20 +4,20 @@ import {
   Logger,
   OnModuleInit,
   ServiceUnavailableException,
-} from '@nestjs/common';
-import type Stripe from 'stripe';
+} from "@nestjs/common";
+import type Stripe from "stripe";
 
-import { STRIPE_CLIENT } from './stripe.provider.js';
+import { STRIPE_CLIENT } from "./stripe.provider.js";
 
 const STRIPE_PRICE_DEFINITIONS = {
-  pro_monthly: { tier: 'pro', interval: 'monthly' },
-  pro_annual: { tier: 'pro', interval: 'annual' },
-  enterprise_monthly: { tier: 'enterprise', interval: 'monthly' },
-  enterprise_annual: { tier: 'enterprise', interval: 'annual' },
+  pro_monthly: { tier: "pro", interval: "monthly" },
+  pro_annual: { tier: "pro", interval: "annual" },
+  enterprise_monthly: { tier: "enterprise", interval: "monthly" },
+  enterprise_annual: { tier: "enterprise", interval: "annual" },
 } as const;
 
-export type BillingInterval = 'monthly' | 'annual';
-export type PaidTier = 'pro' | 'enterprise';
+export type BillingInterval = "monthly" | "annual";
+export type PaidTier = "pro" | "enterprise";
 export type StripePriceLookupKey = keyof typeof STRIPE_PRICE_DEFINITIONS;
 
 interface ResolvedPrice {
@@ -32,16 +32,14 @@ export class StripeCatalogService implements OnModuleInit {
   private cache: Map<StripePriceLookupKey, ResolvedPrice> | null = null;
   private cacheExpiresAt = 0;
 
-  constructor(
-    @Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null,
-  ) {}
+  constructor(@Inject(STRIPE_CLIENT) private readonly stripe: Stripe | null) {}
 
   async onModuleInit(): Promise<void> {
-    if (process.env.NODE_ENV !== 'production' || !this.stripe) {
+    if (process.env.NODE_ENV !== "production" || !this.stripe) {
       return;
     }
     await this.loadCatalog();
-    this.logger.log('Stripe price catalog loaded');
+    this.logger.log("Stripe price catalog loaded");
   }
 
   async resolveCheckoutPriceId(
@@ -59,13 +57,15 @@ export class StripeCatalogService implements OnModuleInit {
     return price.id;
   }
 
-  private async loadCatalog(): Promise<Map<StripePriceLookupKey, ResolvedPrice>> {
+  private async loadCatalog(): Promise<
+    Map<StripePriceLookupKey, ResolvedPrice>
+  > {
     if (this.cache && this.cacheExpiresAt > Date.now()) {
       return this.cache;
     }
 
     if (!this.stripe) {
-      throw new ServiceUnavailableException('Stripe is not configured');
+      throw new ServiceUnavailableException("Stripe is not configured");
     }
 
     const lookupKeys = Object.keys(
@@ -80,10 +80,7 @@ export class StripeCatalogService implements OnModuleInit {
 
     const map = new Map<StripePriceLookupKey, ResolvedPrice>();
     for (const price of result.data) {
-      if (
-        price.lookup_key &&
-        price.lookup_key in STRIPE_PRICE_DEFINITIONS
-      ) {
+      if (price.lookup_key && price.lookup_key in STRIPE_PRICE_DEFINITIONS) {
         map.set(price.lookup_key as StripePriceLookupKey, {
           id: price.id,
           lookupKey: price.lookup_key as StripePriceLookupKey,

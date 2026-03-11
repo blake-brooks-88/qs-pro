@@ -1,28 +1,28 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, inArray } from '@qpp/database';
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type {
   PostgresJsDatabase,
   StripeSubscriptionStatus,
-} from '@qpp/database';
+} from "@qpp/database";
+import { eq, inArray } from "@qpp/database";
 import {
   encrypt,
   orgSubscriptions,
   stripeBillingBindings,
   tenants,
-} from '@qpp/database';
-import type Stripe from 'stripe';
+} from "@qpp/database";
+import type Stripe from "stripe";
 
-import { BackofficeAuditService } from '../audit/audit.service.js';
-import { DRIZZLE_DB } from '../database/database.module.js';
-import { StripeCatalogService } from '../stripe/stripe-catalog.service.js';
-import { STRIPE_CLIENT } from '../stripe/stripe.provider.js';
+import { BackofficeAuditService } from "../audit/audit.service.js";
+import { DRIZZLE_DB } from "../database/database.module.js";
+import { STRIPE_CLIENT } from "../stripe/stripe.provider.js";
+import { StripeCatalogService } from "../stripe/stripe-catalog.service.js";
 import {
-  PAYMENT_TERMS_DAYS,
   type CreateInvoicedSubscriptionDto,
-  type InvoiceListItemDto,
   type InvoicedSubscriptionResultDto,
+  type InvoiceListItemDto,
   type PaginatedInvoiceList,
-} from './invoicing.types.js';
+  PAYMENT_TERMS_DAYS,
+} from "./invoicing.types.js";
 
 @Injectable()
 export class InvoicingService {
@@ -52,7 +52,7 @@ export class InvoicingService {
 
     const encryptionKey = process.env.ENCRYPTION_KEY;
     if (!encryptionKey) {
-      throw new Error('Missing required env var: ENCRYPTION_KEY');
+      throw new Error("Missing required env var: ENCRYPTION_KEY");
     }
     const encryptedEid = encrypt(tenant.eid, encryptionKey);
 
@@ -96,9 +96,9 @@ export class InvoicingService {
     const subscriptionParams: Stripe.SubscriptionCreateParams = {
       customer: customerId,
       items: [{ price: priceId, quantity: params.seatCount }],
-      collection_method: 'send_invoice',
+      collection_method: "send_invoice",
       days_until_due: PAYMENT_TERMS_DAYS[params.paymentTerms],
-      expand: ['latest_invoice'],
+      expand: ["latest_invoice"],
       metadata: {
         eid: encryptedEid,
         tenant_eid: tenant.eid,
@@ -115,13 +115,13 @@ export class InvoicingService {
       await this.stripe.subscriptions.create(subscriptionParams);
 
     const latestInvoice =
-      typeof subscription.latest_invoice === 'object' &&
+      typeof subscription.latest_invoice === "object" &&
       subscription.latest_invoice !== null
         ? (subscription.latest_invoice as Stripe.Invoice)
         : null;
     const latestInvoiceId =
       latestInvoice?.id ??
-      (typeof subscription.latest_invoice === 'string'
+      (typeof subscription.latest_invoice === "string"
         ? subscription.latest_invoice
         : null);
 
@@ -141,7 +141,7 @@ export class InvoicingService {
       };
 
       // Prefer leaving a draft invoice for manual review/sending in Stripe.
-      if (invoice.status === 'draft') {
+      if (invoice.status === "draft") {
         updateParams.auto_advance = false;
       }
 
@@ -180,7 +180,7 @@ export class InvoicingService {
         set: {
           tier: params.tier,
           stripeSubscriptionStatus:
-          subscription.status as StripeSubscriptionStatus,
+            subscription.status as StripeSubscriptionStatus,
           seatLimit: params.seatCount,
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscription.id,
@@ -199,7 +199,7 @@ export class InvoicingService {
     await this.auditService.log({
       backofficeUserId,
       targetTenantId: tenant.id,
-      eventType: 'backoffice.subscription_created',
+      eventType: "backoffice.subscription_created",
       metadata: {
         tier: params.tier,
         interval: params.interval,
@@ -215,7 +215,7 @@ export class InvoicingService {
     return {
       invoiceUrl: invoice?.hosted_invoice_url ?? null,
       subscriptionId: subscription.id,
-      invoiceStatus: invoice?.status ?? 'pending',
+      invoiceStatus: invoice?.status ?? "pending",
       amount: invoice?.amount_due ?? 0,
       dueDate: invoice?.due_date
         ? new Date(invoice.due_date * 1000).toISOString()
@@ -224,9 +224,7 @@ export class InvoicingService {
     };
   }
 
-  async listInvoicesForTenant(
-    tenantId: string,
-  ): Promise<InvoiceListItemDto[]> {
+  async listInvoicesForTenant(tenantId: string): Promise<InvoiceListItemDto[]> {
     const [binding] = await this.db
       .select()
       .from(stripeBillingBindings)
@@ -246,10 +244,8 @@ export class InvoicingService {
       tenantEid: null,
       tenantName: null,
       amount: inv.amount_due,
-      status: inv.status ?? 'unknown',
-      date: inv.created
-        ? new Date(inv.created * 1000).toISOString()
-        : null,
+      status: inv.status ?? "unknown",
+      date: inv.created ? new Date(inv.created * 1000).toISOString() : null,
       dueDate: inv.due_date
         ? new Date(inv.due_date * 1000).toISOString()
         : null,
@@ -274,7 +270,7 @@ export class InvoicingService {
       ...new Set(
         invoices.data
           .map((inv) =>
-            typeof inv.customer === 'string' ? inv.customer : null,
+            typeof inv.customer === "string" ? inv.customer : null,
           )
           .filter((id): id is string => id !== null),
       ),
@@ -290,9 +286,7 @@ export class InvoicingService {
         })
         .from(stripeBillingBindings)
         .innerJoin(tenants, eq(stripeBillingBindings.tenantId, tenants.id))
-        .where(
-          inArray(stripeBillingBindings.stripeCustomerId, customerIds),
-        );
+        .where(inArray(stripeBillingBindings.stripeCustomerId, customerIds));
 
       for (const b of bindings) {
         if (b.stripeCustomerId) {
@@ -302,18 +296,15 @@ export class InvoicingService {
     }
 
     const items: InvoiceListItemDto[] = invoices.data.map((inv) => {
-      const custId =
-        typeof inv.customer === 'string' ? inv.customer : null;
+      const custId = typeof inv.customer === "string" ? inv.customer : null;
       const tenantInfo = custId ? tenantMap.get(custId) : undefined;
 
       return {
         tenantEid: tenantInfo?.eid ?? null,
         tenantName: inv.customer_name ?? null,
         amount: inv.amount_due,
-        status: inv.status ?? 'unknown',
-        date: inv.created
-          ? new Date(inv.created * 1000).toISOString()
-          : null,
+        status: inv.status ?? "unknown",
+        date: inv.created ? new Date(inv.created * 1000).toISOString() : null,
         dueDate: inv.due_date
           ? new Date(inv.due_date * 1000).toISOString()
           : null,

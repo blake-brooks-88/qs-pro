@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module } from "@nestjs/common";
 
-import { BackofficeAuditService } from '../audit/audit.service.js';
-import { SettingsController } from './settings.controller.js';
+import { BackofficeAuditService } from "../audit/audit.service.js";
+import { SettingsController } from "./settings.controller.js";
 
 @Module({
   controllers: [SettingsController],

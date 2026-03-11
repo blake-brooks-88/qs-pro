@@ -1,8 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { backofficeAuditLogs, desc, eq } from '@qpp/database';
-import type { PostgresJsDatabase } from '@qpp/database';
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import type { PostgresJsDatabase } from "@qpp/database";
+import { backofficeAuditLogs, desc, eq } from "@qpp/database";
 
-import { DRIZZLE_DB } from '../database/database.module.js';
+import { DRIZZLE_DB } from "../database/database.module.js";
 
 export interface AuditLogParams {
   backofficeUserId: string;
@@ -31,7 +31,7 @@ export class BackofficeAuditService {
         })
         .execute();
     } catch (error) {
-      this.logger.error('Failed to write audit log', error);
+      this.logger.error("Failed to write audit log", error);
     }
   }
 

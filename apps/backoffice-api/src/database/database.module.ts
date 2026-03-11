@@ -1,13 +1,13 @@
-import { Global, Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Global, Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   assertSafeBackofficeDatabaseRole,
   assertSafeBackofficeDatabaseUrl,
-} from '@qpp/backend-shared';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+} from "@qpp/backend-shared";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
-export const DRIZZLE_DB = Symbol('DRIZZLE_DB');
+export const DRIZZLE_DB = Symbol("DRIZZLE_DB");
 
 @Global()
 @Module({
@@ -16,11 +16,11 @@ export const DRIZZLE_DB = Symbol('DRIZZLE_DB');
       provide: DRIZZLE_DB,
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
-        const url = config.getOrThrow<string>('DATABASE_URL_BACKOFFICE');
+        const url = config.getOrThrow<string>("DATABASE_URL_BACKOFFICE");
         assertSafeBackofficeDatabaseUrl(url);
         const client = postgres(url, {
           max: parseInt(
-            config.get<string>('BACKOFFICE_DB_POOL_SIZE') ?? '5',
+            config.get<string>("BACKOFFICE_DB_POOL_SIZE") ?? "5",
             10,
           ),
         });

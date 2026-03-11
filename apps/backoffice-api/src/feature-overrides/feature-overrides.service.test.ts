@@ -1,11 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BadRequestException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { BackofficeAuditService } from '../audit/audit.service.js';
-
-import { FeatureOverridesService } from './feature-overrides.service.js';
-import { DRIZZLE_DB } from '../database/database.module.js';
+import type { BackofficeAuditService } from "../audit/audit.service.js";
+import { DRIZZLE_DB } from "../database/database.module.js";
+import { FeatureOverridesService } from "./feature-overrides.service.js";
 
 function createMockDb() {
   const chain = {
@@ -39,7 +38,7 @@ function createMockAuditService(): BackofficeAuditService {
   } as unknown as BackofficeAuditService;
 }
 
-describe('FeatureOverridesService', () => {
+describe("FeatureOverridesService", () => {
   let service: FeatureOverridesService;
   let mockDb: ReturnType<typeof createMockDb>;
   let auditService: BackofficeAuditService;
@@ -52,106 +51,106 @@ describe('FeatureOverridesService', () => {
       providers: [
         FeatureOverridesService,
         { provide: DRIZZLE_DB, useValue: mockDb },
-        { provide: 'BackofficeAuditService', useValue: auditService },
+        { provide: "BackofficeAuditService", useValue: auditService },
       ],
     }).compile();
 
     service = module.get(FeatureOverridesService);
   });
 
-  it('should return all overrides for a tenant', async () => {
+  it("should return all overrides for a tenant", async () => {
     const overrides = [
-      { featureKey: 'minimap', enabled: true },
-      { featureKey: 'auditLogs', enabled: false },
+      { featureKey: "minimap", enabled: true },
+      { featureKey: "auditLogs", enabled: false },
     ];
     mockDb._chain.where.mockResolvedValueOnce(overrides);
 
-    const result = await service.getOverridesForTenant('tenant-1');
+    const result = await service.getOverridesForTenant("tenant-1");
 
     expect(result).toEqual(overrides);
     expect(mockDb.select).toHaveBeenCalled();
   });
 
-  it('should upsert override with ON CONFLICT', async () => {
+  it("should upsert override with ON CONFLICT", async () => {
     await service.setOverride(
-      'tenant-1',
-      'minimap',
+      "tenant-1",
+      "minimap",
       true,
-      'bo-user-1',
-      '10.0.0.1',
+      "bo-user-1",
+      "10.0.0.1",
     );
 
     expect(mockDb.insert).toHaveBeenCalled();
     expect(mockDb._chain.onConflictDoUpdate).toHaveBeenCalled();
   });
 
-  it('should reject invalid feature keys', async () => {
+  it("should reject invalid feature keys", async () => {
     await expect(
       service.setOverride(
-        'tenant-1',
-        'invalidFeatureKey',
+        "tenant-1",
+        "invalidFeatureKey",
         true,
-        'bo-user-1',
-        '10.0.0.1',
+        "bo-user-1",
+        "10.0.0.1",
       ),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should accept valid feature keys from shared-types', async () => {
+  it("should accept valid feature keys from shared-types", async () => {
     await expect(
       service.setOverride(
-        'tenant-1',
-        'advancedAutocomplete',
+        "tenant-1",
+        "advancedAutocomplete",
         true,
-        'bo-user-1',
-        '10.0.0.1',
+        "bo-user-1",
+        "10.0.0.1",
       ),
     ).resolves.not.toThrow();
   });
 
-  it('should delete an override', async () => {
+  it("should delete an override", async () => {
     await service.removeOverride(
-      'tenant-1',
-      'minimap',
-      'bo-user-1',
-      '10.0.0.1',
+      "tenant-1",
+      "minimap",
+      "bo-user-1",
+      "10.0.0.1",
     );
 
     expect(mockDb.delete).toHaveBeenCalled();
     expect(mockDb._deleteChain.where).toHaveBeenCalled();
   });
 
-  it('should audit log override changes', async () => {
+  it("should audit log override changes", async () => {
     await service.setOverride(
-      'tenant-1',
-      'minimap',
+      "tenant-1",
+      "minimap",
       true,
-      'bo-user-1',
-      '10.0.0.1',
+      "bo-user-1",
+      "10.0.0.1",
     );
 
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'backoffice.feature_override_changed',
-        backofficeUserId: 'bo-user-1',
-        targetTenantId: 'tenant-1',
+        eventType: "backoffice.feature_override_changed",
+        backofficeUserId: "bo-user-1",
+        targetTenantId: "tenant-1",
       }),
     );
   });
 
-  it('should audit log override removal', async () => {
+  it("should audit log override removal", async () => {
     await service.removeOverride(
-      'tenant-1',
-      'minimap',
-      'bo-user-1',
-      '10.0.0.1',
+      "tenant-1",
+      "minimap",
+      "bo-user-1",
+      "10.0.0.1",
     );
 
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'backoffice.feature_override_removed',
-        backofficeUserId: 'bo-user-1',
-        targetTenantId: 'tenant-1',
+        eventType: "backoffice.feature_override_removed",
+        backofficeUserId: "bo-user-1",
+        targetTenantId: "tenant-1",
       }),
     );
   });

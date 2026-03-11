@@ -1,8 +1,8 @@
-import { Test } from '@nestjs/testing';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Test } from "@nestjs/testing";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TenantsService } from './tenants.service.js';
-import { DRIZZLE_DB } from '../database/database.module.js';
+import { DRIZZLE_DB } from "../database/database.module.js";
+import { TenantsService } from "./tenants.service.js";
 
 function createSubqueryRef() {
   return { tenantId: {}, userCount: {} };
@@ -20,35 +20,33 @@ function createMockDb() {
     const chain: Record<string, ReturnType<typeof vi.fn>> = {};
 
     for (const method of [
-      'from',
-      'leftJoin',
-      'innerJoin',
-      'where',
-      'orderBy',
-      'limit',
+      "from",
+      "leftJoin",
+      "innerJoin",
+      "where",
+      "orderBy",
+      "limit",
     ]) {
       chain[method] = vi.fn().mockImplementation(() => chain);
     }
 
-    chain['groupBy'] = vi.fn().mockImplementation(() => {
+    chain["groupBy"] = vi.fn().mockImplementation(() => {
       const idx = resolveIndex++;
       const result = resolvedResults[idx] ?? [];
       const thenableChain = { ...chain };
-      thenableChain['then'] = vi
+      thenableChain["then"] = vi
         .fn()
-        .mockImplementation(
-          (resolve: (v: unknown) => void) => resolve(result),
-        );
-      thenableChain['as'] = vi.fn().mockReturnValue(createSubqueryRef());
+        .mockImplementation((resolve: (v: unknown) => void) => resolve(result));
+      thenableChain["as"] = vi.fn().mockReturnValue(createSubqueryRef());
       return thenableChain;
     });
 
-    chain['offset'] = vi.fn().mockImplementation(() => {
+    chain["offset"] = vi.fn().mockImplementation(() => {
       const idx = resolveIndex++;
       return Promise.resolve(resolvedResults[idx] ?? []);
     });
 
-    chain['as'] = vi.fn().mockReturnValue(createSubqueryRef());
+    chain["as"] = vi.fn().mockReturnValue(createSubqueryRef());
 
     return chain;
   }
@@ -66,17 +64,17 @@ function createMockDb() {
 }
 
 const SAMPLE_TENANT_ROW = {
-  tenantId: '550e8400-e29b-41d4-a716-446655440000',
-  eid: '100012345',
-  companyName: 'acme-corp',
-  tier: 'pro' as const,
-  subscriptionStatus: 'active' as const,
+  tenantId: "550e8400-e29b-41d4-a716-446655440000",
+  eid: "100012345",
+  companyName: "acme-corp",
+  tier: "pro" as const,
+  subscriptionStatus: "active" as const,
   userCount: 5,
-  signupDate: new Date('2025-06-15'),
+  signupDate: new Date("2025-06-15"),
   lastActiveDate: null,
 };
 
-describe('TenantsService', () => {
+describe("TenantsService", () => {
   let service: TenantsService;
   let mockDb: ReturnType<typeof createMockDb>;
 
@@ -84,16 +82,13 @@ describe('TenantsService', () => {
     mockDb = createMockDb();
 
     const module = await Test.createTestingModule({
-      providers: [
-        TenantsService,
-        { provide: DRIZZLE_DB, useValue: mockDb },
-      ],
+      providers: [TenantsService, { provide: DRIZZLE_DB, useValue: mockDb }],
     }).compile();
 
     service = module.get(TenantsService);
   });
 
-  it('should return paginated tenant list with correct DTO shape', async () => {
+  it("should return paginated tenant list with correct DTO shape", async () => {
     // findAll: userCounts subquery ends with .groupBy().as() (consume resolveIndex 0)
     // then main query ends with .offset() (consume resolveIndex 1)
     mockDb.addResult([]); // groupBy 0: userCounts subquery (uses .as, not awaited)
@@ -103,53 +98,53 @@ describe('TenantsService', () => {
 
     expect(result.data).toHaveLength(1);
     const item = result.data[0];
-    expect(item).toHaveProperty('tenantId');
-    expect(item).toHaveProperty('eid');
-    expect(item).toHaveProperty('companyName');
-    expect(item).toHaveProperty('tier');
-    expect(item).toHaveProperty('subscriptionStatus');
-    expect(item).toHaveProperty('userCount');
-    expect(item).toHaveProperty('signupDate');
+    expect(item).toHaveProperty("tenantId");
+    expect(item).toHaveProperty("eid");
+    expect(item).toHaveProperty("companyName");
+    expect(item).toHaveProperty("tier");
+    expect(item).toHaveProperty("subscriptionStatus");
+    expect(item).toHaveProperty("userCount");
+    expect(item).toHaveProperty("signupDate");
   });
 
-  it('should apply search filter (ILIKE) on EID and company name', async () => {
+  it("should apply search filter (ILIKE) on EID and company name", async () => {
     mockDb.addResult([]); // userCounts subquery
     mockDb.addResult([]); // main query
 
-    await service.findAll({ page: 1, limit: 25, search: 'acme' });
+    await service.findAll({ page: 1, limit: 25, search: "acme" });
 
     // 2nd select() call is the main query chain
     const mainChain = mockDb.select.mock.results[1]?.value;
     expect(mainChain?.where).toHaveBeenCalled();
   });
 
-  it('should apply tier and status filters', async () => {
+  it("should apply tier and status filters", async () => {
     mockDb.addResult([]); // userCounts subquery
     mockDb.addResult([]); // main query
 
     await service.findAll({
       page: 1,
       limit: 25,
-      tier: 'pro',
-      status: 'active',
+      tier: "pro",
+      status: "active",
     });
 
     const mainChain = mockDb.select.mock.results[1]?.value;
     expect(mainChain?.where).toHaveBeenCalled();
   });
 
-  it('should return full tenant detail with subscription data', async () => {
+  it("should return full tenant detail with subscription data", async () => {
     const detailRow = {
-      tenantId: '550e8400-e29b-41d4-a716-446655440000',
-      eid: '100012345',
-      companyName: 'acme-corp',
-      tier: 'pro',
-      subscriptionStatus: 'active',
+      tenantId: "550e8400-e29b-41d4-a716-446655440000",
+      eid: "100012345",
+      companyName: "acme-corp",
+      tier: "pro",
+      subscriptionStatus: "active",
       seatLimit: 10,
-      currentPeriodEnds: new Date('2026-04-15'),
+      currentPeriodEnds: new Date("2026-04-15"),
       trialEndsAt: null,
-      stripeSubscriptionId: 'sub_123',
-      signupDate: new Date('2025-06-15'),
+      stripeSubscriptionId: "sub_123",
+      signupDate: new Date("2025-06-15"),
     };
 
     // findById: offset(0) = tenant detail
@@ -159,56 +154,56 @@ describe('TenantsService', () => {
     // getRecentAuditLogs: ends at .limit() - awaited, returns chain
     mockDb.addResult([detailRow]); // offset: main tenant query
     mockDb.addResult([
-      { name: 'John', email: 'john@test.com', lastActiveDate: null },
+      { name: "John", email: "john@test.com", lastActiveDate: null },
     ]); // offset: getUsersForTenant
 
     const result = await service.findById(
-      '550e8400-e29b-41d4-a716-446655440000',
+      "550e8400-e29b-41d4-a716-446655440000",
     );
 
     expect(result).not.toBeNull();
-    expect(result?.tenantId).toBe('550e8400-e29b-41d4-a716-446655440000');
-    expect(result?.tier).toBe('pro');
-    expect(result?.subscriptionStatus).toBe('active');
-    expect(result).toHaveProperty('users');
-    expect(result).toHaveProperty('featureOverrides');
-    expect(result).toHaveProperty('recentAuditLogs');
+    expect(result?.tenantId).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(result?.tier).toBe("pro");
+    expect(result?.subscriptionStatus).toBe("active");
+    expect(result).toHaveProperty("users");
+    expect(result).toHaveProperty("featureOverrides");
+    expect(result).toHaveProperty("recentAuditLogs");
   });
 
-  it('should return only safe fields from EID lookup', async () => {
+  it("should return only safe fields from EID lookup", async () => {
     const lookupRow = {
-      eid: '100012345',
-      companyName: 'acme-corp',
+      eid: "100012345",
+      companyName: "acme-corp",
       userCount: 5,
-      tier: 'pro',
-      subscriptionStatus: 'active',
-      signupDate: new Date('2025-06-15'),
+      tier: "pro",
+      subscriptionStatus: "active",
+      signupDate: new Date("2025-06-15"),
     };
 
     // lookupByEid: subquery groupBy (index 0), main query offset (index 1)
     mockDb.addResult([]); // groupBy: userCounts subquery
     mockDb.addResult([lookupRow]); // offset: main query
 
-    const result = await service.lookupByEid('100012345');
+    const result = await service.lookupByEid("100012345");
 
     expect(result).not.toBeNull();
-    expect(result).toHaveProperty('eid');
-    expect(result).toHaveProperty('companyName');
-    expect(result).toHaveProperty('tier');
-    expect(result).not.toHaveProperty('tenantId');
-    expect(result).not.toHaveProperty('email');
+    expect(result).toHaveProperty("eid");
+    expect(result).toHaveProperty("companyName");
+    expect(result).toHaveProperty("tier");
+    expect(result).not.toHaveProperty("tenantId");
+    expect(result).not.toHaveProperty("email");
   });
 
-  it('should return null from EID lookup when tenant not found', async () => {
+  it("should return null from EID lookup when tenant not found", async () => {
     mockDb.addResult([]); // subquery
     mockDb.addResult([]); // main query returns empty
 
-    const result = await service.lookupByEid('nonexistent');
+    const result = await service.lookupByEid("nonexistent");
 
     expect(result).toBeNull();
   });
 
-  it('should derive lastActiveDate from query results', async () => {
+  it("should derive lastActiveDate from query results", async () => {
     mockDb.addResult([]); // userCounts subquery
     mockDb.addResult([SAMPLE_TENANT_ROW]); // main query
 

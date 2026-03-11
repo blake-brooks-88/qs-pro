@@ -1,6 +1,6 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module } from "@nestjs/common";
 
-import { BackofficeAuditService } from './audit.service.js';
+import { BackofficeAuditService } from "./audit.service.js";
 
 @Global()
 @Module({

@@ -1,30 +1,30 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from "@nestjs/common";
+import type { PostgresJsDatabase } from "@qpp/database";
 import {
-  tenants,
-  orgSubscriptions,
-  users,
-  tenantFeatureOverrides,
+  and,
+  asc,
   backofficeAuditLogs,
   count,
+  desc,
   eq,
   ilike,
   or,
-  and,
-  desc,
-  asc,
+  orgSubscriptions,
   sql,
-} from '@qpp/database';
-import type { PostgresJsDatabase } from '@qpp/database';
+  tenantFeatureOverrides,
+  tenants,
+  users,
+} from "@qpp/database";
 
-import { DRIZZLE_DB } from '../database/database.module.js';
+import { DRIZZLE_DB } from "../database/database.module.js";
 import type {
-  TenantListQuery,
-  TenantListItemDto,
-  TenantDetailDto,
   EidLookupResultDto,
-  TenantUserDto,
   PaginatedResult,
-} from './tenants.types.js';
+  TenantDetailDto,
+  TenantListItemDto,
+  TenantListQuery,
+  TenantUserDto,
+} from "./tenants.types.js";
 
 @Injectable()
 export class TenantsService {
@@ -55,20 +55,19 @@ export class TenantsService {
       conditions.push(eq(orgSubscriptions.stripeSubscriptionStatus, status));
     }
 
-    const whereClause =
-      conditions.length > 0 ? and(...conditions) : undefined;
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     const userCounts = this.db
       .select({
         tenantId: users.tenantId,
-        userCount: count(users.id).as('user_count'),
+        userCount: count(users.id).as("user_count"),
       })
       .from(users)
       .groupBy(users.tenantId)
-      .as('user_counts');
+      .as("user_counts");
 
     const sortColumn = this.getSortColumn(query.sortBy);
-    const sortDirection = query.sortOrder === 'desc' ? desc : asc;
+    const sortDirection = query.sortOrder === "desc" ? desc : asc;
 
     const rows = await this.db
       .select({
@@ -94,8 +93,8 @@ export class TenantsService {
         tenantId: r.tenantId,
         eid: r.eid,
         companyName: r.companyName,
-        tier: r.tier ?? 'free',
-        subscriptionStatus: r.subscriptionStatus ?? 'inactive',
+        tier: r.tier ?? "free",
+        subscriptionStatus: r.subscriptionStatus ?? "inactive",
         userCount: Number(r.userCount),
         signupDate: r.signupDate,
         lastActiveDate: r.lastActiveDate,
@@ -126,7 +125,9 @@ export class TenantsService {
       .offset(0);
 
     const row = rows[0];
-    if (!row) return null;
+    if (!row) {
+      return null;
+    }
 
     const [tenantUsers, featureOverrides, recentLogs] = await Promise.all([
       this.getUsersForTenant(tenantId),
@@ -138,8 +139,8 @@ export class TenantsService {
       tenantId: row.tenantId,
       eid: row.eid,
       companyName: row.companyName,
-      tier: row.tier ?? 'free',
-      subscriptionStatus: row.subscriptionStatus ?? 'inactive',
+      tier: row.tier ?? "free",
+      subscriptionStatus: row.subscriptionStatus ?? "inactive",
       seatLimit: row.seatLimit,
       currentPeriodEnds: row.currentPeriodEnds,
       trialEndsAt: row.trialEndsAt,
@@ -155,11 +156,11 @@ export class TenantsService {
     const userCounts = this.db
       .select({
         tenantId: users.tenantId,
-        userCount: count(users.id).as('user_count'),
+        userCount: count(users.id).as("user_count"),
       })
       .from(users)
       .groupBy(users.tenantId)
-      .as('user_counts');
+      .as("user_counts");
 
     const rows = await this.db
       .select({
@@ -178,14 +179,16 @@ export class TenantsService {
       .offset(0);
 
     const row = rows[0];
-    if (!row) return null;
+    if (!row) {
+      return null;
+    }
 
     return {
       eid: row.eid,
       companyName: row.companyName,
       userCount: Number(row.userCount),
-      tier: row.tier ?? 'free',
-      subscriptionStatus: row.subscriptionStatus ?? 'inactive',
+      tier: row.tier ?? "free",
+      subscriptionStatus: row.subscriptionStatus ?? "inactive",
       signupDate: row.signupDate,
     };
   }
@@ -236,15 +239,15 @@ export class TenantsService {
 
   private getSortColumn(sortBy?: string) {
     switch (sortBy) {
-      case 'eid':
+      case "eid":
         return tenants.eid;
-      case 'companyName':
+      case "companyName":
         return tenants.tssd;
-      case 'tier':
+      case "tier":
         return orgSubscriptions.tier;
-      case 'subscriptionStatus':
+      case "subscriptionStatus":
         return orgSubscriptions.stripeSubscriptionStatus;
-      case 'signupDate':
+      case "signupDate":
         return tenants.installedAt;
       default:
         return tenants.installedAt;

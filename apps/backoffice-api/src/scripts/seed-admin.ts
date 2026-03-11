@@ -1,16 +1,16 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import path from "node:path";
 
-import * as dotenv from 'dotenv';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import { hashPassword } from 'better-auth/crypto';
-import postgres from 'postgres';
-import { eq } from 'drizzle-orm';
-import { boUsers, boAccounts } from '@qpp/database';
+import { boAccounts, boUsers } from "@qpp/database";
+import { hashPassword } from "better-auth/crypto";
+import * as dotenv from "dotenv";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 const envCandidates = [
-  path.resolve(process.cwd(), '.env'),
-  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(process.cwd(), ".env"),
+  path.resolve(process.cwd(), "../../.env"),
 ];
 for (const envPath of envCandidates) {
   if (fs.existsSync(envPath)) {
@@ -26,14 +26,14 @@ async function main() {
 
   if (!email || !password || !name) {
     console.error(
-      'Missing required env vars: SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_ADMIN_NAME',
+      "Missing required env vars: SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_ADMIN_NAME",
     );
     process.exit(1);
   }
 
   const connectionString = process.env.DATABASE_URL_BACKOFFICE;
   if (!connectionString) {
-    console.error('Missing required env var: DATABASE_URL_BACKOFFICE');
+    console.error("Missing required env var: DATABASE_URL_BACKOFFICE");
     process.exit(1);
   }
 
@@ -48,7 +48,7 @@ async function main() {
       .limit(1);
 
     if (existing) {
-      console.warn('Admin user already exists — skipping seed.');
+      console.warn("Admin user already exists — skipping seed.");
       await client.end();
       return;
     }
@@ -60,7 +60,7 @@ async function main() {
       name,
       email,
       emailVerified: true,
-      role: 'admin',
+      role: "admin",
     });
 
     const hashedPassword = await hashPassword(password);
@@ -69,11 +69,11 @@ async function main() {
       id: crypto.randomUUID(),
       userId,
       accountId: userId,
-      providerId: 'credential',
+      providerId: "credential",
       password: hashedPassword,
     });
 
-    console.warn('Admin user created successfully.');
+    console.warn("Admin user created successfully.");
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`Failed to create admin user: ${message}`);

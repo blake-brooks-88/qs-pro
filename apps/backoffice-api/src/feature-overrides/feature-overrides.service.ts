@@ -1,24 +1,16 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
-import {
-  tenantFeatureOverrides,
-  eq,
-  and,
-} from '@qpp/database';
-import type { PostgresJsDatabase } from '@qpp/database';
-import { FeatureKeySchema } from '@qpp/shared-types';
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import type { PostgresJsDatabase } from "@qpp/database";
+import { and, eq, tenantFeatureOverrides } from "@qpp/database";
+import { FeatureKeySchema } from "@qpp/shared-types";
 
-import { DRIZZLE_DB } from '../database/database.module.js';
-import { BackofficeAuditService } from '../audit/audit.service.js';
+import { BackofficeAuditService } from "../audit/audit.service.js";
+import { DRIZZLE_DB } from "../database/database.module.js";
 
 @Injectable()
 export class FeatureOverridesService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: PostgresJsDatabase,
-    @Inject('BackofficeAuditService')
+    @Inject("BackofficeAuditService")
     private readonly auditService: BackofficeAuditService,
   ) {}
 
@@ -57,7 +49,7 @@ export class FeatureOverridesService {
     void this.auditService.log({
       backofficeUserId,
       targetTenantId: tenantId,
-      eventType: 'backoffice.feature_override_changed',
+      eventType: "backoffice.feature_override_changed",
       metadata: { featureKey, enabled },
       ipAddress: ip,
     });
@@ -81,7 +73,7 @@ export class FeatureOverridesService {
     void this.auditService.log({
       backofficeUserId,
       targetTenantId: tenantId,
-      eventType: 'backoffice.feature_override_removed',
+      eventType: "backoffice.feature_override_removed",
       metadata: { featureKey },
       ipAddress: ip,
     });
@@ -91,7 +83,7 @@ export class FeatureOverridesService {
     const result = FeatureKeySchema.safeParse(key);
     if (!result.success) {
       throw new BadRequestException(
-        `Invalid feature key: "${key}". Must be one of: ${FeatureKeySchema.options.join(', ')}`,
+        `Invalid feature key: "${key}". Must be one of: ${FeatureKeySchema.options.join(", ")}`,
       );
     }
   }

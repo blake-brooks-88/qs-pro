@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
-import type { FastifyRequest } from 'fastify';
+import { Injectable } from "@nestjs/common";
+import { ThrottlerGuard } from "@nestjs/throttler";
+import type { FastifyRequest } from "fastify";
 
 @Injectable()
 export class BackofficeThrottlerGuard extends ThrottlerGuard {

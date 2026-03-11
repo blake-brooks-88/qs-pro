@@ -2,12 +2,12 @@ import {
   type CanActivate,
   type ExecutionContext,
   Injectable,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { fromNodeHeaders } from 'better-auth/node';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { fromNodeHeaders } from "better-auth/node";
 
-import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator.js';
-import { auth } from './auth.js';
+import { IS_PUBLIC_KEY } from "../common/decorators/public.decorator.js";
+import { auth } from "./auth.js";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
