@@ -41,6 +41,8 @@ else
     "packages/backend-shared"
     "packages/database"
     "packages/shared-types"
+    "apps/backoffice-api"
+    "apps/backoffice"
   )
 fi
 
