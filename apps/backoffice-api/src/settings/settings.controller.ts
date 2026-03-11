@@ -8,36 +8,42 @@ import {
   Post,
   Query,
   Req,
-} from '@nestjs/common';
-import type { FastifyRequest } from 'fastify';
+} from "@nestjs/common";
+import { PasswordSchema } from "@qpp/shared-types";
+import { fromNodeHeaders } from "better-auth/node";
+import type { FastifyRequest } from "fastify";
 
-import { PasswordSchema } from '@qpp/shared-types';
+import { BackofficeAuditService } from "../audit/audit.service.js";
+import { auth } from "../auth/auth.js";
+import { CurrentUser } from "../auth/current-user.decorator.js";
+import { Roles } from "../auth/roles.decorator.js";
+import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe.js";
+import {
+  type ChangeRoleDto,
+  ChangeRoleSchema,
+  type InviteUserDto,
+  InviteUserSchema,
+  type ListUsersQuery,
+  ListUsersQuerySchema,
+  type ResetPasswordDto,
+  ResetPasswordSchema,
+} from "./settings.types.js";
 
-import { auth } from '../auth/auth.js';
-import { BackofficeAuditService } from '../audit/audit.service.js';
-import { Roles } from '../auth/roles.decorator.js';
-import { CurrentUser } from '../auth/current-user.decorator.js';
-
-type BackofficeRole = 'viewer' | 'editor' | 'admin';
-
-@Controller('settings')
+@Controller("settings")
 export class SettingsController {
-  constructor(
-    private readonly auditService: BackofficeAuditService,
-  ) {}
+  constructor(private readonly auditService: BackofficeAuditService) {}
 
-  @Get('users')
-  @Roles('admin')
+  @Get("users")
+  @Roles("admin")
   async listUsers(
     @Req() req: FastifyRequest,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query(new ZodValidationPipe(ListUsersQuerySchema)) query: ListUsersQuery,
   ) {
     const result = await auth.api.listUsers({
-      headers: req.headers as Record<string, string>,
+      headers: fromNodeHeaders(req.headers),
       query: {
-        limit: limit ? parseInt(limit, 10) : 25,
-        offset: offset ? parseInt(offset, 10) : 0,
+        limit: query.limit,
+        offset: query.offset,
       },
     });
 
@@ -54,29 +60,28 @@ export class SettingsController {
     };
   }
 
-  @Post('users/invite')
-  @Roles('admin')
+  @Post("users/invite")
+  @Roles("admin")
   async inviteUser(
-    @Body()
-    body: {
-      email: string;
-      name: string;
-      role: BackofficeRole;
-      temporaryPassword: string;
-    },
+    @Body(new ZodValidationPipe(InviteUserSchema))
+    body: InviteUserDto & { temporaryPassword: string },
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {
     PasswordSchema.parse(body.temporaryPassword);
 
-    const response = await (auth.api.createUser as unknown as (args: {
-      headers: Record<string, string>;
-      body: { email: string; name: string; password: string; role: string };
-    }) => Promise<{ user: { id: string; email: string; name: string; role: string } }>)({
-      headers: req.headers as Record<string, string>,
+    const response = await (
+      auth.api.createUser as unknown as (args: {
+        headers: Headers;
+        body: { email: string; name: string; password: string; role: string };
+      }) => Promise<{
+        user: { id: string; email: string; name: string; role: string };
+      }>
+    )({
+      headers: fromNodeHeaders(req.headers),
       body: {
         email: body.email,
-        name: body.name,
+        name: body.name ?? "",
         password: body.temporaryPassword,
         role: body.role,
       },
@@ -84,7 +89,7 @@ export class SettingsController {
 
     void this.auditService.log({
       backofficeUserId: user.id,
-      eventType: 'backoffice.user_invited',
+      eventType: "backoffice.user_invited",
       metadata: { invitedEmail: body.email, role: body.role },
       ipAddress: req.ip,
     });
@@ -97,31 +102,31 @@ export class SettingsController {
     };
   }
 
-  @Patch('users/:userId/role')
-  @Roles('admin')
+  @Patch("users/:userId/role")
+  @Roles("admin")
   async changeUserRole(
-    @Param('userId') userId: string,
-    @Body() body: { role: BackofficeRole },
+    @Param("userId") userId: string,
+    @Body(new ZodValidationPipe(ChangeRoleSchema)) body: ChangeRoleDto,
     @CurrentUser() currentUser: { id: string },
     @Req() req: FastifyRequest,
   ) {
-    if (currentUser.id === userId && body.role !== 'admin') {
-      throw new BadRequestException('Cannot demote yourself from admin');
+    if (currentUser.id === userId && body.role !== "admin") {
+      throw new BadRequestException("Cannot demote yourself from admin");
     }
 
-    // Better Auth types constrain role to "user" | "admin" but our config
-    // uses custom roles (viewer/editor/admin). Cast via unknown needed.
-    await (auth.api.setRole as unknown as (args: {
-      headers: Record<string, string>;
-      body: { userId: string; role: string };
-    }) => Promise<unknown>)({
-      headers: req.headers as Record<string, string>,
+    await (
+      auth.api.setRole as unknown as (args: {
+        headers: Headers;
+        body: { userId: string; role: string };
+      }) => Promise<unknown>
+    )({
+      headers: fromNodeHeaders(req.headers),
       body: { userId, role: body.role },
     });
 
     void this.auditService.log({
       backofficeUserId: currentUser.id,
-      eventType: 'backoffice.user_role_changed',
+      eventType: "backoffice.user_role_changed",
       metadata: { targetUserId: userId, newRole: body.role },
       ipAddress: req.ip,
     });
@@ -129,25 +134,25 @@ export class SettingsController {
     return { success: true };
   }
 
-  @Post('users/:userId/ban')
-  @Roles('admin')
+  @Post("users/:userId/ban")
+  @Roles("admin")
   async banUser(
-    @Param('userId') userId: string,
+    @Param("userId") userId: string,
     @CurrentUser() currentUser: { id: string },
     @Req() req: FastifyRequest,
   ) {
     if (currentUser.id === userId) {
-      throw new BadRequestException('Cannot ban yourself');
+      throw new BadRequestException("Cannot ban yourself");
     }
 
     await auth.api.banUser({
-      headers: req.headers as Record<string, string>,
+      headers: fromNodeHeaders(req.headers),
       body: { userId },
     });
 
     void this.auditService.log({
       backofficeUserId: currentUser.id,
-      eventType: 'backoffice.user_banned',
+      eventType: "backoffice.user_banned",
       metadata: { targetUserId: userId },
       ipAddress: req.ip,
     });
@@ -155,21 +160,21 @@ export class SettingsController {
     return { success: true };
   }
 
-  @Post('users/:userId/unban')
-  @Roles('admin')
+  @Post("users/:userId/unban")
+  @Roles("admin")
   async unbanUser(
-    @Param('userId') userId: string,
+    @Param("userId") userId: string,
     @CurrentUser() currentUser: { id: string },
     @Req() req: FastifyRequest,
   ) {
     await auth.api.unbanUser({
-      headers: req.headers as Record<string, string>,
+      headers: fromNodeHeaders(req.headers),
       body: { userId },
     });
 
     void this.auditService.log({
       backofficeUserId: currentUser.id,
-      eventType: 'backoffice.user_unbanned',
+      eventType: "backoffice.user_unbanned",
       metadata: { targetUserId: userId },
       ipAddress: req.ip,
     });
@@ -177,27 +182,27 @@ export class SettingsController {
     return { success: true };
   }
 
-  @Post('users/:userId/reset-password')
-  @Roles('admin')
+  @Post("users/:userId/reset-password")
+  @Roles("admin")
   async resetUserPassword(
-    @Param('userId') userId: string,
-    @Body() body: { newPassword: string },
+    @Param("userId") userId: string,
+    @Body(new ZodValidationPipe(ResetPasswordSchema)) body: ResetPasswordDto,
     @CurrentUser() currentUser: { id: string },
     @Req() req: FastifyRequest,
   ) {
-    PasswordSchema.parse(body.newPassword);
-
-    await (auth.api.setUserPassword as unknown as (args: {
-      headers: Record<string, string>;
-      body: { userId: string; newPassword: string };
-    }) => Promise<unknown>)({
-      headers: req.headers as Record<string, string>,
+    await (
+      auth.api.setUserPassword as unknown as (args: {
+        headers: Headers;
+        body: { userId: string; newPassword: string };
+      }) => Promise<unknown>
+    )({
+      headers: fromNodeHeaders(req.headers),
       body: { userId, newPassword: body.newPassword },
     });
 
     void this.auditService.log({
       backofficeUserId: currentUser.id,
-      eventType: 'backoffice.user_password_reset',
+      eventType: "backoffice.user_password_reset",
       metadata: { targetUserId: userId },
       ipAddress: req.ip,
     });
@@ -205,28 +210,30 @@ export class SettingsController {
     return { success: true };
   }
 
-  @Post('users/:userId/remove')
-  @Roles('admin')
+  @Post("users/:userId/remove")
+  @Roles("admin")
   async removeUser(
-    @Param('userId') userId: string,
+    @Param("userId") userId: string,
     @CurrentUser() currentUser: { id: string },
     @Req() req: FastifyRequest,
   ) {
     if (currentUser.id === userId) {
-      throw new BadRequestException('Cannot delete yourself');
+      throw new BadRequestException("Cannot delete yourself");
     }
 
-    await (auth.api.removeUser as unknown as (args: {
-      headers: Record<string, string>;
-      body: { userId: string };
-    }) => Promise<unknown>)({
-      headers: req.headers as Record<string, string>,
+    await (
+      auth.api.removeUser as unknown as (args: {
+        headers: Headers;
+        body: { userId: string };
+      }) => Promise<unknown>
+    )({
+      headers: fromNodeHeaders(req.headers),
       body: { userId },
     });
 
     void this.auditService.log({
       backofficeUserId: currentUser.id,
-      eventType: 'backoffice.user_deleted',
+      eventType: "backoffice.user_deleted",
       metadata: { targetUserId: userId },
       ipAddress: req.ip,
     });

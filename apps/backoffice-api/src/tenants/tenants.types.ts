@@ -1,38 +1,45 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const TenantListQuerySchema = z.object({
   search: z.string().optional(),
-  tier: z.enum(['free', 'pro', 'enterprise']).optional(),
+  tier: z.enum(["free", "pro", "enterprise"]).optional(),
   status: z
     .enum([
-      'inactive',
-      'trialing',
-      'active',
-      'past_due',
-      'unpaid',
-      'canceled',
-      'incomplete',
-      'incomplete_expired',
-      'paused',
+      "inactive",
+      "trialing",
+      "active",
+      "past_due",
+      "unpaid",
+      "canceled",
+      "incomplete",
+      "incomplete_expired",
+      "paused",
     ])
     .optional(),
   sortBy: z
     .enum([
-      'eid',
-      'companyName',
-      'tier',
-      'subscriptionStatus',
-      'userCount',
-      'signupDate',
-      'lastActiveDate',
+      "eid",
+      "companyName",
+      "tier",
+      "subscriptionStatus",
+      "userCount",
+      "signupDate",
+      "lastActiveDate",
     ])
     .optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  sortOrder: z.enum(["asc", "desc"]).default("asc"),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 });
 
 export type TenantListQuery = z.input<typeof TenantListQuerySchema>;
+
+export const ChangeTierSchema = z.object({
+  tier: z.enum(["free", "pro", "enterprise"]),
+  interval: z.enum(["month", "year"]).optional(),
+});
+
+export type ChangeTierDto = z.infer<typeof ChangeTierSchema>;
 
 export interface TenantListItemDto {
   tenantId: string;

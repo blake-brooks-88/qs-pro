@@ -1,25 +1,26 @@
-import { All, Controller, Req, Res } from '@nestjs/common';
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import { All, Controller, Req, Res } from "@nestjs/common";
+import type { FastifyReply, FastifyRequest } from "fastify";
 
-import { Public } from '../common/decorators/public.decorator.js';
-import { auth } from './auth.js';
+import { Public } from "../common/decorators/public.decorator.js";
+import { auth } from "./auth.js";
 
 @Public()
-@Controller('auth')
+@Controller("auth")
 export class AuthController {
-  @All('*')
+  @All("*")
   async handleAuth(
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const protocol = req.protocol;
-    const host = req.hostname;
-    const url = `${protocol}://${host}${req.url}`;
+    const baseUrl = process.env.BACKOFFICE_API_BASE_URL;
+    const url = baseUrl
+      ? `${baseUrl}${req.url}`
+      : `${req.protocol}://${req.hostname}${req.url}`;
 
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
       if (value !== undefined) {
-        headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+        headers.set(key, Array.isArray(value) ? value.join(", ") : value);
       }
     }
 
@@ -28,9 +29,9 @@ export class AuthController {
       headers,
     };
 
-    if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+    if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
       init.body = JSON.stringify(req.body);
-      headers.set('content-type', 'application/json');
+      headers.set("content-type", "application/json");
     }
 
     const fetchRequest = new Request(url, init);

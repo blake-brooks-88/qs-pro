@@ -1,27 +1,34 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Query,
   Req,
   UseGuards,
-  NotFoundException,
-} from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-import type { FastifyRequest } from 'fastify';
+} from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
+import type { FastifyRequest } from "fastify";
 
-import { BackofficeAuditService } from '../audit/audit.service.js';
-import { Roles } from '../auth/roles.decorator.js';
-import { CurrentUser } from '../auth/current-user.decorator.js';
-import { TierManagementService } from '../settings/tier-management.service.js';
-import { BackofficeThrottlerGuard } from './backoffice-throttler.guard.js';
-import { TenantsService } from './tenants.service.js';
-import { TenantListQuerySchema } from './tenants.types.js';
+import { BackofficeAuditService } from "../audit/audit.service.js";
+import { CurrentUser } from "../auth/current-user.decorator.js";
+import { Roles } from "../auth/roles.decorator.js";
+import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe.js";
+import { TierManagementService } from "../settings/tier-management.service.js";
+import { BackofficeThrottlerGuard } from "./backoffice-throttler.guard.js";
+import { TenantsService } from "./tenants.service.js";
+import {
+  type ChangeTierDto,
+  ChangeTierSchema,
+  type TenantListQuery,
+  TenantListQuerySchema,
+} from "./tenants.types.js";
 
-@Controller('tenants')
+@Controller("tenants")
 export class TenantsController {
   constructor(
     private readonly tenantsService: TenantsService,
@@ -30,67 +37,74 @@ export class TenantsController {
   ) {}
 
   @Get()
-  @Roles('viewer')
-  async findAll(@Query() query: Record<string, unknown>) {
-    const parsed = TenantListQuerySchema.parse(query);
-    return this.tenantsService.findAll(parsed);
+  @Roles("viewer")
+  async findAll(
+    @Query(new ZodValidationPipe(TenantListQuerySchema)) query: TenantListQuery,
+  ) {
+    return this.tenantsService.findAll(query);
   }
 
-  @Get('lookup/:eid')
-  @Roles('viewer')
+  @Get("lookup/:eid")
+  @Roles("viewer")
   @UseGuards(BackofficeThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async lookupByEid(
-    @Param('eid') eid: string,
+    @Param("eid") eid: string,
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {
     void this.auditService.log({
       backofficeUserId: user.id,
-      eventType: 'tenant.eid_lookup',
+      eventType: "tenant.eid_lookup",
       metadata: { eid },
       ipAddress: req.ip,
     });
 
     const result = await this.tenantsService.lookupByEid(eid);
     if (!result) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
     return result;
   }
 
-  @Get(':id')
-  @Roles('viewer')
-  async findById(@Param('id') id: string) {
+  @Get(":id")
+  @Roles("viewer")
+  async findById(@Param("id") id: string) {
     const result = await this.tenantsService.findById(id);
     if (!result) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
     return result;
   }
 
-  @Patch(':id/tier')
-  @Roles('admin')
+  @Patch(":id/tier")
+  @Roles("admin")
   async changeTier(
-    @Param('id') id: string,
-    @Body() body: { tier: 'pro' | 'enterprise'; interval: 'monthly' | 'annual' },
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(ChangeTierSchema)) body: ChangeTierDto,
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {
+    if (body.tier === "free") {
+      throw new BadRequestException(
+        "Cannot change tier to free via this endpoint; use cancel instead",
+      );
+    }
+
     await this.tierManagement.changeTier(
       id,
       body.tier,
-      body.interval,
+      body.interval as "monthly" | "annual",
       user.id,
       req.ip,
     );
     return { success: true };
   }
 
-  @Post(':id/cancel')
-  @Roles('admin')
+  @Post(":id/cancel")
+  @Roles("admin")
   async cancelSubscription(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {

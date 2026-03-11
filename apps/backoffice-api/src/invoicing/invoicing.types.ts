@@ -1,11 +1,11 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const CreateInvoicedSubscriptionSchema = z.object({
   tenantEid: z.string().min(1),
-  tier: z.enum(['pro', 'enterprise']),
-  interval: z.enum(['monthly', 'annual']),
+  tier: z.enum(["pro", "enterprise"]),
+  interval: z.enum(["monthly", "annual"]),
   seatCount: z.number().int().min(1).max(1000),
-  paymentTerms: z.enum(['net_15', 'net_30', 'net_60']).default('net_30'),
+  paymentTerms: z.enum(["net_15", "net_30", "net_60"]).default("net_30"),
   customerEmail: z.string().email(),
   customerName: z.string().min(1),
   companyName: z.string().min(1),
@@ -30,6 +30,14 @@ export interface InvoicedSubscriptionResultDto {
   dueDate: string | null;
   stripeInvoiceId: string | null;
 }
+
+export const ListInvoicesQuerySchema = z.object({
+  limit: z.coerce.number().pipe(z.number().int().min(1).max(100).default(25)),
+  offset: z.coerce.number().int().min(0).default(0),
+  tenantId: z.string().uuid().optional(),
+});
+
+export type ListInvoicesQuery = z.infer<typeof ListInvoicesQuerySchema>;
 
 export interface InvoiceListItemDto {
   tenantEid: string | null;
