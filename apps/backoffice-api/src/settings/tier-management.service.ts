@@ -1,30 +1,25 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  orgSubscriptions,
-  stripeBillingBindings,
-  eq,
-} from '@qpp/database';
-import type { PostgresJsDatabase } from '@qpp/database';
-import type Stripe from 'stripe';
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import type { PostgresJsDatabase } from "@qpp/database";
+import { eq, orgSubscriptions, stripeBillingBindings } from "@qpp/database";
+import type Stripe from "stripe";
 
-import { DRIZZLE_DB } from '../database/database.module.js';
-import { STRIPE_CLIENT } from '../stripe/stripe.provider.js';
-import { BackofficeAuditService } from '../audit/audit.service.js';
-import type { StripeCatalogService } from '../stripe/stripe-catalog.service.js';
-import type { BillingInterval, PaidTier } from '../stripe/stripe-catalog.service.js';
+import { BackofficeAuditService } from "../audit/audit.service.js";
+import { DRIZZLE_DB } from "../database/database.module.js";
+import { STRIPE_CLIENT } from "../stripe/stripe.provider.js";
+import type { StripeCatalogService } from "../stripe/stripe-catalog.service.js";
+import type {
+  BillingInterval,
+  PaidTier,
+} from "../stripe/stripe-catalog.service.js";
 
 @Injectable()
 export class TierManagementService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: PostgresJsDatabase,
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
-    @Inject('BackofficeAuditService')
+    @Inject("BackofficeAuditService")
     private readonly auditService: BackofficeAuditService,
-    @Inject('StripeCatalogService')
+    @Inject("StripeCatalogService")
     private readonly catalogService: StripeCatalogService,
   ) {}
 
@@ -43,17 +38,17 @@ export class TierManagementService {
     );
 
     const subscription = await this.stripe.subscriptions.retrieve(
-      binding.stripeSubscriptionId!,
+      binding.stripeSubscriptionId,
     );
 
     const currentItem = subscription.items.data[0];
     if (!currentItem) {
-      throw new NotFoundException('No subscription items found');
+      throw new NotFoundException("No subscription items found");
     }
 
-    await this.stripe.subscriptions.update(binding.stripeSubscriptionId!, {
+    await this.stripe.subscriptions.update(binding.stripeSubscriptionId, {
       items: [{ id: currentItem.id, price: newPriceId }],
-      proration_behavior: 'create_prorations',
+      proration_behavior: "create_prorations",
     });
 
     await this.db
@@ -64,7 +59,7 @@ export class TierManagementService {
     void this.auditService.log({
       backofficeUserId,
       targetTenantId: tenantId,
-      eventType: 'backoffice.tier_changed',
+      eventType: "backoffice.tier_changed",
       metadata: { newTier, interval },
       ipAddress: ip,
     });
@@ -77,12 +72,12 @@ export class TierManagementService {
   ): Promise<void> {
     const binding = await this.getBillingBinding(tenantId);
 
-    await this.stripe.subscriptions.cancel(binding.stripeSubscriptionId!);
+    await this.stripe.subscriptions.cancel(binding.stripeSubscriptionId);
 
     await this.db
       .update(orgSubscriptions)
       .set({
-        stripeSubscriptionStatus: 'canceled',
+        stripeSubscriptionStatus: "canceled",
         updatedAt: new Date(),
       })
       .where(eq(orgSubscriptions.tenantId, tenantId));
@@ -90,7 +85,7 @@ export class TierManagementService {
     void this.auditService.log({
       backofficeUserId,
       targetTenantId: tenantId,
-      eventType: 'backoffice.subscription_canceled',
+      eventType: "backoffice.subscription_canceled",
       metadata: { subscriptionId: binding.stripeSubscriptionId },
       ipAddress: ip,
     });
@@ -109,6 +104,6 @@ export class TierManagementService {
         `No Stripe billing binding found for tenant ${tenantId}`,
       );
     }
-    return binding;
+    return { ...binding, stripeSubscriptionId: binding.stripeSubscriptionId };
   }
 }
