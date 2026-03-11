@@ -628,6 +628,32 @@ describe('Billing Webhook (integration)', () => {
 
       await expect(webhookHandler.process(event)).resolves.not.toThrow();
     });
+
+    it('skips unpaid subscription-mode session and marks checkout completed', async () => {
+      const tenant = await createTestTenant('checkout-unpaid');
+      const refs = makeStripeRefs('checkout-unpaid');
+
+      const event = {
+        id: nextEventId(),
+        created: Math.floor(Date.now() / 1000),
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_unpaid_test',
+            mode: 'subscription',
+            payment_status: 'unpaid',
+            customer: refs.customerId,
+            subscription: refs.subscriptionId,
+            metadata: { eid: tenant.encryptedEid },
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await expect(webhookHandler.process(event)).resolves.not.toThrow();
+
+      const sub = await getSubscription(tenant.id);
+      expect(sub).toBeUndefined();
+    });
   });
 
   // ─── customer.subscription.created ──────────────────────────────
@@ -1478,6 +1504,267 @@ describe('Billing Webhook (integration)', () => {
     });
   });
 
+  // ─── charge.refunded ──────────────────────────────────────────
+
+  describe('charge.refunded', () => {
+    it('logs refund audit event for bound customer', async () => {
+      const tenant = await createTestTenant('charge-refund');
+      const refs = makeStripeRefs('charge-refund');
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: refs.customerId,
+        stripeSubscriptionId: refs.subscriptionId,
+      });
+
+      const event = {
+        id: nextEventId(),
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_test_refund_001',
+            customer: refs.customerId,
+            amount_refunded: 2999,
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await webhookHandler.process(event);
+
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenant.id}, false)`;
+        await reserved`SELECT set_config('app.mid', 'system', false)`;
+        const [auditRow] = await reserved`
+          SELECT event_type, tenant_id, metadata
+          FROM audit_logs
+          WHERE tenant_id = ${tenant.id}::uuid
+            AND event_type = 'subscription.refunded'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        if (!auditRow) {
+          throw new Error('Expected audit log row to exist');
+        }
+        expect(auditRow.event_type).toBe('subscription.refunded');
+        expect((auditRow.metadata as Record<string, unknown>).chargeId).toBe(
+          'ch_test_refund_001',
+        );
+        expect(
+          (auditRow.metadata as Record<string, unknown>).amountRefunded,
+        ).toBe(2999);
+      } finally {
+        try {
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+        } catch {
+          /* ignore */
+        }
+        reserved.release();
+      }
+    });
+
+    it('skips gracefully when customer has no binding', async () => {
+      const event = {
+        id: nextEventId(),
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_test_refund_unbound',
+            customer: 'cus_unknown_refund',
+            amount_refunded: 1500,
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await expect(webhookHandler.process(event)).resolves.not.toThrow();
+    });
+  });
+
+  // ─── charge.dispute.created ──────────────────────────────────
+
+  describe('charge.dispute.created', () => {
+    it('logs dispute opened audit event', async () => {
+      const tenant = await createTestTenant('dispute-created');
+      const refs = makeStripeRefs('dispute-created');
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: refs.customerId,
+        stripeSubscriptionId: refs.subscriptionId,
+      });
+
+      stripeMock.charges.retrieve.mockResolvedValueOnce({
+        id: 'ch_test_dispute_001',
+        customer: refs.customerId,
+      });
+
+      const event = {
+        id: nextEventId(),
+        type: 'charge.dispute.created',
+        data: {
+          object: {
+            id: 'dp_test_created_001',
+            charge: 'ch_test_dispute_001',
+            reason: 'fraudulent',
+            status: 'needs_response',
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await webhookHandler.process(event);
+
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenant.id}, false)`;
+        await reserved`SELECT set_config('app.mid', 'system', false)`;
+        const [auditRow] = await reserved`
+          SELECT event_type, tenant_id, metadata
+          FROM audit_logs
+          WHERE tenant_id = ${tenant.id}::uuid
+            AND event_type = 'subscription.dispute_opened'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        if (!auditRow) {
+          throw new Error('Expected audit log row to exist');
+        }
+        expect(auditRow.event_type).toBe('subscription.dispute_opened');
+        expect((auditRow.metadata as Record<string, unknown>).disputeId).toBe(
+          'dp_test_created_001',
+        );
+        expect((auditRow.metadata as Record<string, unknown>).reason).toBe(
+          'fraudulent',
+        );
+        expect((auditRow.metadata as Record<string, unknown>).status).toBe(
+          'needs_response',
+        );
+      } finally {
+        try {
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+        } catch {
+          /* ignore */
+        }
+        reserved.release();
+      }
+    });
+
+    it('skips when charge has no associated customer binding', async () => {
+      stripeMock.charges.retrieve.mockResolvedValueOnce({
+        id: 'ch_test_dispute_unbound',
+        customer: 'cus_unknown_dispute',
+      });
+
+      const event = {
+        id: nextEventId(),
+        type: 'charge.dispute.created',
+        data: {
+          object: {
+            id: 'dp_test_created_unbound',
+            charge: 'ch_test_dispute_unbound',
+            reason: 'product_not_received',
+            status: 'needs_response',
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await expect(webhookHandler.process(event)).resolves.not.toThrow();
+    });
+  });
+
+  // ─── charge.dispute.closed ───────────────────────────────────
+
+  describe('charge.dispute.closed', () => {
+    it('logs dispute closed audit event', async () => {
+      const tenant = await createTestTenant('dispute-closed');
+      const refs = makeStripeRefs('dispute-closed');
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeCustomerId: refs.customerId,
+        stripeSubscriptionId: refs.subscriptionId,
+      });
+
+      stripeMock.charges.retrieve.mockResolvedValueOnce({
+        id: 'ch_test_dispute_closed_001',
+        customer: refs.customerId,
+      });
+
+      const event = {
+        id: nextEventId(),
+        type: 'charge.dispute.closed',
+        data: {
+          object: {
+            id: 'dp_test_closed_001',
+            charge: 'ch_test_dispute_closed_001',
+            reason: 'fraudulent',
+            status: 'won',
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await webhookHandler.process(event);
+
+      const reserved = await sqlClient.reserve();
+      try {
+        await reserved`SELECT set_config('app.tenant_id', ${tenant.id}, false)`;
+        await reserved`SELECT set_config('app.mid', 'system', false)`;
+        const [auditRow] = await reserved`
+          SELECT event_type, tenant_id, metadata
+          FROM audit_logs
+          WHERE tenant_id = ${tenant.id}::uuid
+            AND event_type = 'subscription.dispute_closed'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        if (!auditRow) {
+          throw new Error('Expected audit log row to exist');
+        }
+        expect(auditRow.event_type).toBe('subscription.dispute_closed');
+        expect((auditRow.metadata as Record<string, unknown>).disputeId).toBe(
+          'dp_test_closed_001',
+        );
+        expect((auditRow.metadata as Record<string, unknown>).reason).toBe(
+          'fraudulent',
+        );
+        expect((auditRow.metadata as Record<string, unknown>).status).toBe(
+          'won',
+        );
+      } finally {
+        try {
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+        } catch {
+          /* ignore */
+        }
+        reserved.release();
+      }
+    });
+
+    it('skips when charge has no associated customer binding', async () => {
+      stripeMock.charges.retrieve.mockResolvedValueOnce({
+        id: 'ch_test_dispute_closed_unbound',
+        customer: 'cus_unknown_dispute_closed',
+      });
+
+      const event = {
+        id: nextEventId(),
+        type: 'charge.dispute.closed',
+        data: {
+          object: {
+            id: 'dp_test_closed_unbound',
+            charge: 'ch_test_dispute_closed_unbound',
+            reason: 'product_not_received',
+            status: 'lost',
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await expect(webhookHandler.process(event)).resolves.not.toThrow();
+    });
+  });
+
   // ─── Encrypted EID validation ──────────────────────────────────
 
   describe('encrypted EID validation', () => {
@@ -1511,7 +1798,7 @@ describe('Billing Webhook (integration)', () => {
 
       // Act — process() should throw because decryptEidToken rejects garbage
       await expect(webhookHandler.process(event)).rejects.toThrow(
-        'Invalid metadata.eid token',
+        'failed to resolve tenant from metadata.eid token and no bindings found',
       );
 
       // Assert — no subscription was created for this tenant
@@ -1528,7 +1815,68 @@ describe('Billing Webhook (integration)', () => {
         throw new Error('Expected webhook event row to exist');
       }
       expect(webhookRow.status).toBe('failed');
-      expect(webhookRow.error_message).toContain('Invalid metadata.eid token');
+      expect(webhookRow.error_message).toContain(
+        'failed to resolve tenant from metadata.eid token and no bindings found',
+      );
+    });
+
+    it('resolves tenant via binding fallback when EID is garbage but subscription binding exists', async () => {
+      const tenant = await createTestTenant('binding-fallback');
+      const refs = makeStripeRefs('binding-fallback');
+
+      await setSubscriptionState(tenant.id, {
+        tier: 'pro',
+        stripeSubscriptionId: refs.subscriptionId,
+        stripeCustomerId: refs.customerId,
+      });
+
+      const event: Stripe.Event = {
+        id: nextEventId(),
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: refs.subscriptionId,
+            customer: refs.customerId,
+            status: 'active',
+            metadata: { eid: 'GARBAGE_TAMPERED_TOKEN' },
+            items: {
+              data: [
+                {
+                  price: makeProPrice(),
+                  quantity: 1,
+                  current_period_end: PERIOD_END_EPOCH,
+                },
+              ],
+            },
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      stripeMock.subscriptions.retrieve.mockResolvedValueOnce({
+        id: refs.subscriptionId,
+        customer: refs.customerId,
+        status: 'active',
+        metadata: { eid: 'GARBAGE_TAMPERED_TOKEN' },
+        items: {
+          data: [
+            {
+              price: makeProPrice(),
+              quantity: 1,
+              current_period_end: PERIOD_END_EPOCH,
+            },
+          ],
+        },
+      });
+
+      await expect(webhookHandler.process(event)).resolves.not.toThrow();
+
+      const sub = await getSubscription(tenant.id);
+      if (!sub) {
+        throw new Error('Expected subscription to exist');
+      }
+      expect(sub.tier).toBe('pro');
+      expect(sub.stripeSubscriptionId).toBe(refs.subscriptionId);
+      expect(sub.stripeCustomerId).toBe(refs.customerId);
     });
   });
 });
