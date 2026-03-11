@@ -18,13 +18,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { generatePassword } from "@/lib/password";
 import { useSession } from "@/hooks/use-session";
+import { PasswordSchema } from "@qpp/shared-types";
 
 import {
   type BackofficeUser,
   useBanUser,
   useChangeUserRole,
+  useDeleteUser,
+  useResetPassword,
   useUnbanUser,
 } from "../hooks/use-backoffice-users";
 
@@ -39,7 +44,7 @@ function capitalize(s: string): string {
 }
 
 interface ConfirmAction {
-  type: "role" | "ban" | "unban";
+  type: "role" | "ban" | "unban" | "reset-password" | "delete";
   userId: string;
   userName: string;
   newRole?: string;
@@ -55,7 +60,10 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
   const changeRole = useChangeUserRole();
   const banUser = useBanUser();
   const unbanUser = useUnbanUser();
+  const resetPassword = useResetPassword();
+  const deleteUser = useDeleteUser();
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
 
   const handleConfirm = () => {
     if (!confirmAction) return;
@@ -99,10 +107,42 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
           },
         },
       );
+    } else if (confirmAction.type === "reset-password") {
+      const parsed = PasswordSchema.safeParse(resetPasswordValue);
+      if (!parsed.success) {
+        toast.error("Password must be between 16 and 128 characters");
+        return;
+      }
+      resetPassword.mutate(
+        { userId: confirmAction.userId, newPassword: resetPasswordValue },
+        {
+          onSuccess: () => {
+            toast.success("Password reset successfully");
+            setConfirmAction(null);
+            setResetPasswordValue("");
+          },
+          onError: (err) => {
+            toast.error(err.message || "Failed to reset password");
+          },
+        },
+      );
+    } else if (confirmAction.type === "delete") {
+      deleteUser.mutate(
+        { userId: confirmAction.userId },
+        {
+          onSuccess: () => {
+            toast.success("User deleted");
+            setConfirmAction(null);
+          },
+          onError: (err) => {
+            toast.error(err.message || "Failed to delete user");
+          },
+        },
+      );
     }
   };
 
-  const isPending = changeRole.isPending || banUser.isPending || unbanUser.isPending;
+  const isPending = changeRole.isPending || banUser.isPending || unbanUser.isPending || resetPassword.isPending || deleteUser.isPending;
 
   if (isLoading) {
     return (
@@ -223,6 +263,34 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
                               Ban
                             </Button>
                           )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setResetPasswordValue("");
+                              setConfirmAction({
+                                type: "reset-password",
+                                userId: user.id,
+                                userName: user.name,
+                              });
+                            }}
+                          >
+                            Reset Password
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={isSelf}
+                            onClick={() => {
+                              setConfirmAction({
+                                type: "delete",
+                                userId: user.id,
+                                userName: user.name,
+                              });
+                            }}
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -253,9 +321,36 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
                 ? `Change ${confirmAction.userName}'s role to ${confirmAction.newRole}?`
                 : confirmAction?.type === "ban"
                   ? `Ban ${confirmAction?.userName}? They will be unable to log in.`
-                  : `Unban ${confirmAction?.userName}? They will be able to log in again.`}
+                  : confirmAction?.type === "unban"
+                    ? `Unban ${confirmAction?.userName}? They will be able to log in again.`
+                    : confirmAction?.type === "delete"
+                      ? `Delete ${confirmAction?.userName}? This removes their account, sessions, and cannot be undone.`
+                      : `Reset password for ${confirmAction?.userName}?`}
             </DialogDescription>
           </DialogHeader>
+          {confirmAction?.type === "reset-password" && (
+            <div className="space-y-2 py-4">
+              <label htmlFor="reset-password-input" className="text-sm font-medium text-foreground">
+                New Password
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="reset-password-input"
+                  value={resetPasswordValue}
+                  onChange={(e) => { setResetPasswordValue(e.target.value); }}
+                  placeholder="Enter or generate..."
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setResetPasswordValue(generatePassword()); }}
+                >
+                  Generate
+                </Button>
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -265,7 +360,7 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
               Cancel
             </Button>
             <Button
-              variant={confirmAction?.type === "ban" ? "destructive" : "default"}
+              variant={confirmAction?.type === "ban" || confirmAction?.type === "delete" ? "destructive" : "default"}
               onClick={handleConfirm}
               disabled={isPending}
             >

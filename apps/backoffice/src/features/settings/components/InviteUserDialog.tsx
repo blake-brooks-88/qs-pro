@@ -12,19 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { generatePassword } from "@/lib/password";
+import { PasswordSchema } from "@qpp/shared-types";
 
 import { useInviteUser } from "../hooks/use-backoffice-users";
-
-function generatePassword(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
-  let result = "";
-  const array = new Uint8Array(16);
-  crypto.getRandomValues(array);
-  for (const byte of array) {
-    result += chars[byte % chars.length];
-  }
-  return result;
-}
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -45,6 +36,12 @@ function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !name.trim() || !password.trim()) return;
+
+    const parsed = PasswordSchema.safeParse(password);
+    if (!parsed.success) {
+      toast.error("Password must be between 16 and 128 characters");
+      return;
+    }
 
     inviteUser.mutate(
       {

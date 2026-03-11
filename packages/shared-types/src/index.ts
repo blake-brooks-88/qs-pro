@@ -156,6 +156,9 @@ export {
   RunSqlTextResponseSchema,
 } from "./execution-history.js";
 
+// Auth
+export { PasswordSchema } from "./auth.js";
+
 // Query Versions
 export type {
   UpdateVersionNameDto,

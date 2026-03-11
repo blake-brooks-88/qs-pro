@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 
+import { PasswordSchema } from '@qpp/shared-types';
+
 import { auth } from '../auth/auth.js';
 import { BackofficeAuditService } from '../audit/audit.service.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -27,10 +29,12 @@ export class SettingsController {
   @Get('users')
   @Roles('admin')
   async listUsers(
+    @Req() req: FastifyRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
     const result = await auth.api.listUsers({
+      headers: req.headers as Record<string, string>,
       query: {
         limit: limit ? parseInt(limit, 10) : 25,
         offset: offset ? parseInt(offset, 10) : 0,
@@ -63,11 +67,13 @@ export class SettingsController {
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {
-    // Better Auth's admin plugin types constrain role to "user" | "admin",
-    // but our config uses custom roles (viewer/editor/admin). Cast needed.
-    const response = await (auth.api.createUser as (args: {
+    PasswordSchema.parse(body.temporaryPassword);
+
+    const response = await (auth.api.createUser as unknown as (args: {
+      headers: Record<string, string>;
       body: { email: string; name: string; password: string; role: string };
     }) => Promise<{ user: { id: string; email: string; name: string; role: string } }>)({
+      headers: req.headers as Record<string, string>,
       body: {
         email: body.email,
         name: body.name,
@@ -106,8 +112,10 @@ export class SettingsController {
     // Better Auth types constrain role to "user" | "admin" but our config
     // uses custom roles (viewer/editor/admin). Cast via unknown needed.
     await (auth.api.setRole as unknown as (args: {
+      headers: Record<string, string>;
       body: { userId: string; role: string };
     }) => Promise<unknown>)({
+      headers: req.headers as Record<string, string>,
       body: { userId, role: body.role },
     });
 
@@ -133,6 +141,7 @@ export class SettingsController {
     }
 
     await auth.api.banUser({
+      headers: req.headers as Record<string, string>,
       body: { userId },
     });
 
@@ -154,12 +163,70 @@ export class SettingsController {
     @Req() req: FastifyRequest,
   ) {
     await auth.api.unbanUser({
+      headers: req.headers as Record<string, string>,
       body: { userId },
     });
 
     void this.auditService.log({
       backofficeUserId: currentUser.id,
       eventType: 'backoffice.user_unbanned',
+      metadata: { targetUserId: userId },
+      ipAddress: req.ip,
+    });
+
+    return { success: true };
+  }
+
+  @Post('users/:userId/reset-password')
+  @Roles('admin')
+  async resetUserPassword(
+    @Param('userId') userId: string,
+    @Body() body: { newPassword: string },
+    @CurrentUser() currentUser: { id: string },
+    @Req() req: FastifyRequest,
+  ) {
+    PasswordSchema.parse(body.newPassword);
+
+    await (auth.api.setUserPassword as unknown as (args: {
+      headers: Record<string, string>;
+      body: { userId: string; newPassword: string };
+    }) => Promise<unknown>)({
+      headers: req.headers as Record<string, string>,
+      body: { userId, newPassword: body.newPassword },
+    });
+
+    void this.auditService.log({
+      backofficeUserId: currentUser.id,
+      eventType: 'backoffice.user_password_reset',
+      metadata: { targetUserId: userId },
+      ipAddress: req.ip,
+    });
+
+    return { success: true };
+  }
+
+  @Post('users/:userId/remove')
+  @Roles('admin')
+  async removeUser(
+    @Param('userId') userId: string,
+    @CurrentUser() currentUser: { id: string },
+    @Req() req: FastifyRequest,
+  ) {
+    if (currentUser.id === userId) {
+      throw new BadRequestException('Cannot delete yourself');
+    }
+
+    await (auth.api.removeUser as unknown as (args: {
+      headers: Record<string, string>;
+      body: { userId: string };
+    }) => Promise<unknown>)({
+      headers: req.headers as Record<string, string>,
+      body: { userId },
+    });
+
+    void this.auditService.log({
+      backofficeUserId: currentUser.id,
+      eventType: 'backoffice.user_deleted',
       metadata: { targetUserId: userId },
       ipAddress: req.ip,
     });
