@@ -120,11 +120,15 @@ describe("InvoiceForm", () => {
     const confirmBtn = screen.getByRole("button", { name: /confirm/i });
     await userEvent.click(confirmBtn);
 
-    const submitBtn = screen.getByRole("button", { name: /create invoiced subscription/i });
+    const submitBtn = screen.getByRole("button", {
+      name: /create invoiced subscription/i,
+    });
     await userEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(screen.getByText("Customer email is required")).toBeInTheDocument();
+      expect(
+        screen.getByText("Customer email is required"),
+      ).toBeInTheDocument();
     });
     expect(mockMutate).not.toHaveBeenCalled();
   });
@@ -144,7 +148,9 @@ describe("InvoiceForm", () => {
     await userEvent.type(emailInput, "john@acme.com");
     await userEvent.type(nameInput, "John Doe");
 
-    const submitBtn = screen.getByRole("button", { name: /create invoiced subscription/i });
+    const submitBtn = screen.getByRole("button", {
+      name: /create invoiced subscription/i,
+    });
     await userEvent.click(submitBtn);
 
     await waitFor(() => {
@@ -172,16 +178,18 @@ describe("InvoiceForm", () => {
 
     const { rerender } = renderForm();
 
-    mockMutate.mockImplementation((_params: unknown, opts: { onSuccess: (d: unknown) => void }) => {
-      opts.onSuccess({
-        invoiceUrl: "https://invoice.stripe.com/i/test123",
-        subscriptionId: "sub_123",
-        invoiceStatus: "open",
-        amount: 5000,
-        dueDate: "2026-04-01T00:00:00Z",
-        stripeInvoiceId: "in_abc",
-      });
-    });
+    mockMutate.mockImplementation(
+      (_params: unknown, opts: { onSuccess: (d: unknown) => void }) => {
+        opts.onSuccess({
+          invoiceUrl: "https://invoice.stripe.com/i/test123",
+          subscriptionId: "sub_123",
+          invoiceStatus: "open",
+          amount: 5000,
+          dueDate: "2026-04-01T00:00:00Z",
+          stripeInvoiceId: "in_abc",
+        });
+      },
+    );
 
     mockCreateReturn = {
       mutate: mockMutate,

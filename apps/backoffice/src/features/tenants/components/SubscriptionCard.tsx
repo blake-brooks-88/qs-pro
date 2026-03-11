@@ -4,12 +4,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,9 +17,9 @@ import { Select } from "@/components/ui/select";
 import { usePermissions } from "@/hooks/use-permissions";
 
 import {
+  type TenantDetail,
   useCancelSubscription,
   useChangeTier,
-  type TenantDetail,
 } from "../hooks/use-tenant-detail";
 
 interface SubscriptionCardProps {
@@ -37,7 +32,10 @@ const TIER_VARIANT_MAP: Record<string, "secondary" | "default" | "outline"> = {
   enterprise: "outline",
 };
 
-const STATUS_VARIANT_MAP: Record<string, "success" | "warning" | "destructive" | "secondary"> = {
+const STATUS_VARIANT_MAP: Record<
+  string,
+  "success" | "warning" | "destructive" | "secondary"
+> = {
   active: "success",
   trialing: "warning",
   past_due: "destructive",
@@ -50,7 +48,9 @@ function capitalize(s: string): string {
 }
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "-";
+  if (!dateStr) {
+    return "-";
+  }
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -67,11 +67,17 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
   const [tierDialogOpen, setTierDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState<"pro" | "enterprise">("pro");
-  const [selectedInterval, setSelectedInterval] = useState<"monthly" | "annual">("monthly");
+  const [selectedInterval, setSelectedInterval] = useState<
+    "monthly" | "annual"
+  >("monthly");
 
   const handleChangeTier = () => {
     changeTier.mutate(
-      { tenantId: tenant.tenantId, tier: selectedTier, interval: selectedInterval },
+      {
+        tenantId: tenant.tenantId,
+        tier: selectedTier,
+        interval: selectedInterval,
+      },
       {
         onSuccess: () => {
           toast.success("Tier changed successfully");
@@ -118,7 +124,11 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
             <div>
               <span className="text-muted-foreground">Status</span>
               <div className="mt-0.5">
-                <Badge variant={STATUS_VARIANT_MAP[tenant.subscriptionStatus] ?? "secondary"}>
+                <Badge
+                  variant={
+                    STATUS_VARIANT_MAP[tenant.subscriptionStatus] ?? "secondary"
+                  }
+                >
                   {capitalize(tenant.subscriptionStatus.replace("_", " "))}
                 </Badge>
               </div>
@@ -167,14 +177,18 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => { setTierDialogOpen(true); }}
+                  onClick={() => {
+                    setTierDialogOpen(true);
+                  }}
                 >
                   Change Tier
                 </Button>
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => { setCancelDialogOpen(true); }}
+                  onClick={() => {
+                    setCancelDialogOpen(true);
+                  }}
                 >
                   Cancel Subscription
                 </Button>
@@ -184,7 +198,9 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => { void navigate(`/invoicing/create?eid=${tenant.eid}`); }}
+                onClick={() => {
+                  void navigate(`/invoicing/create?eid=${tenant.eid}`);
+                }}
               >
                 Create Invoice
               </Button>
@@ -206,7 +222,9 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
               <label className="text-sm text-muted-foreground">New Tier</label>
               <Select
                 value={selectedTier}
-                onChange={(e) => { setSelectedTier(e.target.value as "pro" | "enterprise"); }}
+                onChange={(e) => {
+                  setSelectedTier(e.target.value as "pro" | "enterprise");
+                }}
                 className="mt-1"
               >
                 <option value="pro">Pro</option>
@@ -214,10 +232,14 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
               </Select>
             </div>
             <div>
-              <label className="text-sm text-muted-foreground">Billing Interval</label>
+              <label className="text-sm text-muted-foreground">
+                Billing Interval
+              </label>
               <Select
                 value={selectedInterval}
-                onChange={(e) => { setSelectedInterval(e.target.value as "monthly" | "annual"); }}
+                onChange={(e) => {
+                  setSelectedInterval(e.target.value as "monthly" | "annual");
+                }}
                 className="mt-1"
               >
                 <option value="monthly">Monthly</option>
@@ -226,7 +248,12 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setTierDialogOpen(false); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTierDialogOpen(false);
+              }}
+            >
               Cancel
             </Button>
             <Button onClick={handleChangeTier} disabled={changeTier.isPending}>
@@ -241,12 +268,17 @@ function SubscriptionCard({ tenant }: SubscriptionCardProps) {
           <DialogHeader>
             <DialogTitle>Cancel Subscription</DialogTitle>
             <DialogDescription>
-              This will immediately cancel the subscription for {tenant.companyName}.
-              This action cannot be undone.
+              This will immediately cancel the subscription for{" "}
+              {tenant.companyName}. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setCancelDialogOpen(false); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelDialogOpen(false);
+              }}
+            >
               Keep Subscription
             </Button>
             <Button

@@ -27,7 +27,11 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+      >
         <BrowserRouter>
           <Routes>
             <Route
@@ -63,18 +67,9 @@ export function App() {
               }
             >
               <Route index element={<Navigate to="/tenants" replace />} />
-              <Route
-                path="tenants"
-                element={<TenantListPage />}
-              />
-              <Route
-                path="tenants/:tenantId"
-                element={<TenantDetailPage />}
-              />
-              <Route
-                path="invoicing"
-                element={<InvoiceListPage />}
-              />
+              <Route path="tenants" element={<TenantListPage />} />
+              <Route path="tenants/:tenantId" element={<TenantDetailPage />} />
+              <Route path="invoicing" element={<InvoiceListPage />} />
               <Route
                 path="invoicing/create"
                 element={
@@ -96,7 +91,10 @@ export function App() {
                 element={
                   <div className="flex flex-col items-center justify-center gap-4 py-24">
                     <h1 className="text-2xl font-semibold">Page not found</h1>
-                    <Link to="/tenants" className="text-primary hover:underline">
+                    <Link
+                      to="/tenants"
+                      className="text-primary hover:underline"
+                    >
                       Back to Tenants
                     </Link>
                   </div>

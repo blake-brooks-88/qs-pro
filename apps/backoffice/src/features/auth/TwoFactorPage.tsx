@@ -20,7 +20,9 @@ export function TwoFactorPage() {
   const [loading, setLoading] = useState(false);
 
   async function handleVerify(codeValue: string) {
-    if (codeValue.length !== 6) return;
+    if (codeValue.length !== 6) {
+      return;
+    }
     setError("");
     setLoading(true);
 
@@ -81,11 +83,13 @@ export function TwoFactorPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || code.length !== 6}
+          >
             {loading ? "Verifying..." : "Verify"}
           </Button>
 

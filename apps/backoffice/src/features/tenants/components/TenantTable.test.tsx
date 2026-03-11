@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-import { TenantTable, type TenantListItem } from "./TenantTable";
+import { type TenantListItem, TenantTable } from "./TenantTable";
 
 const sampleTenants: TenantListItem[] = [
   {

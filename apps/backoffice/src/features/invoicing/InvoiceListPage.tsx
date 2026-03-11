@@ -34,7 +34,9 @@ function InvoiceListPage() {
           {canEdit ? (
             <Button
               size="sm"
-              onClick={() => { void navigate("/invoicing/create"); }}
+              onClick={() => {
+                void navigate("/invoicing/create");
+              }}
             >
               Create Invoice
             </Button>

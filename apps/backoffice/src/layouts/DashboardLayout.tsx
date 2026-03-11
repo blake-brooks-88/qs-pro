@@ -47,8 +47,7 @@ export function DashboardLayout() {
 
   const visibleNavItems = NAV_ITEMS.filter(
     (item) =>
-      !item.minRole ||
-      ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[item.minRole],
+      !item.minRole || ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[item.minRole],
   );
 
   return (

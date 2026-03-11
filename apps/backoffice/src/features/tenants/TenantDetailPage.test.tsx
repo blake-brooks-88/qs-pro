@@ -17,7 +17,11 @@ const mockTenant = {
   stripeSubscriptionId: "sub_abc123",
   signupDate: "2025-06-15T00:00:00Z",
   users: [
-    { name: "Alice", email: "alice@acme.com", lastActiveDate: "2026-03-07T12:00:00Z" },
+    {
+      name: "Alice",
+      email: "alice@acme.com",
+      lastActiveDate: "2026-03-07T12:00:00Z",
+    },
     { name: "Bob", email: "bob@acme.com", lastActiveDate: null },
   ],
   featureOverrides: [{ featureKey: "advancedAutocomplete", enabled: true }],

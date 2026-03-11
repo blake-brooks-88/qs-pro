@@ -18,7 +18,12 @@ function SettingsPage() {
         <h1 className="font-heading text-2xl font-bold text-foreground">
           Settings
         </h1>
-        <Button size="sm" onClick={() => { setInviteOpen(true); }}>
+        <Button
+          size="sm"
+          onClick={() => {
+            setInviteOpen(true);
+          }}
+        >
           Invite User
         </Button>
       </div>

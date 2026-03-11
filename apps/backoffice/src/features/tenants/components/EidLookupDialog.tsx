@@ -18,7 +18,10 @@ interface EidLookupDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const STATUS_VARIANT_MAP: Record<string, "success" | "warning" | "destructive" | "secondary"> = {
+const STATUS_VARIANT_MAP: Record<
+  string,
+  "success" | "warning" | "destructive" | "secondary"
+> = {
   active: "success",
   trialing: "warning",
   past_due: "destructive",
@@ -33,7 +36,9 @@ function capitalize(s: string): string {
 function EidLookupDialog({ open, onOpenChange }: EidLookupDialogProps) {
   const [eid, setEid] = useState("");
   const navigate = useNavigate();
-  const { data, refetch, isFetching, isError, fetchStatus } = useEidLookup(eid.trim());
+  const { data, refetch, isFetching, isError, fetchStatus } = useEidLookup(
+    eid.trim(),
+  );
   const hasSearched = fetchStatus !== "idle" || data !== undefined || isError;
 
   const handleLookup = () => {
@@ -71,7 +76,9 @@ function EidLookupDialog({ open, onOpenChange }: EidLookupDialogProps) {
         <div className="flex items-center gap-2">
           <Input
             value={eid}
-            onChange={(e) => { setEid(e.target.value); }}
+            onChange={(e) => {
+              setEid(e.target.value);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Enter EID..."
             className="flex-1"
@@ -88,20 +95,29 @@ function EidLookupDialog({ open, onOpenChange }: EidLookupDialogProps) {
         {data ? (
           <div className="rounded-md border border-border/50 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-foreground">{data.companyName}</h4>
-              <Badge variant={STATUS_VARIANT_MAP[data.subscriptionStatus] ?? "secondary"}>
+              <h4 className="font-medium text-foreground">
+                {data.companyName}
+              </h4>
+              <Badge
+                variant={
+                  STATUS_VARIANT_MAP[data.subscriptionStatus] ?? "secondary"
+                }
+              >
                 {capitalize(data.subscriptionStatus)}
               </Badge>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
               <div>
-                <span className="font-medium text-foreground">EID:</span> {data.eid}
+                <span className="font-medium text-foreground">EID:</span>{" "}
+                {data.eid}
               </div>
               <div>
-                <span className="font-medium text-foreground">Tier:</span> {capitalize(data.tier)}
+                <span className="font-medium text-foreground">Tier:</span>{" "}
+                {capitalize(data.tier)}
               </div>
               <div>
-                <span className="font-medium text-foreground">Users:</span> {data.userCount}
+                <span className="font-medium text-foreground">Users:</span>{" "}
+                {data.userCount}
               </div>
               <div>
                 <span className="font-medium text-foreground">Signup:</span>{" "}
@@ -124,7 +140,8 @@ function EidLookupDialog({ open, onOpenChange }: EidLookupDialogProps) {
         {isError && hasSearched && !isFetching ? (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-center">
             <p className="text-sm text-muted-foreground">
-              No tenant found for EID <span className="font-mono">{eid.trim()}</span>
+              No tenant found for EID{" "}
+              <span className="font-mono">{eid.trim()}</span>
             </p>
           </div>
         ) : null}

@@ -1,9 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import type { TenantUserDto } from "../hooks/use-tenant-detail";
 
@@ -12,7 +7,9 @@ interface UserListCardProps {
 }
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "Never";
+  if (!dateStr) {
+    return "Never";
+  }
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

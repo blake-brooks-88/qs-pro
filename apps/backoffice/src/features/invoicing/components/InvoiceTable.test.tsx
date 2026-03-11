@@ -61,7 +61,10 @@ describe("InvoiceTable", () => {
     render(<InvoiceTable invoices={sampleInvoices} />);
     const links = screen.getAllByText("View");
     expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAttribute("href", "https://invoice.stripe.com/i/paid123");
+    expect(links[0]).toHaveAttribute(
+      "href",
+      "https://invoice.stripe.com/i/paid123",
+    );
     expect(links[0]).toHaveAttribute("target", "_blank");
   });
 });

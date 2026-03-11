@@ -1,3 +1,4 @@
+export { DataTable, type DataTableProps } from "./data-table";
 export {
   DataTableColumnHeader,
   type DataTableColumnHeaderProps,
@@ -6,4 +7,3 @@ export {
   DataTableToolbar,
   type DataTableToolbarProps,
 } from "./data-table-toolbar";
-export { DataTable, type DataTableProps } from "./data-table";

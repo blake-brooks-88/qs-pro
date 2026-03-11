@@ -77,7 +77,13 @@ function TenantListPage() {
         <h1 className="font-heading text-2xl font-bold text-foreground">
           Tenants
         </h1>
-        <Button variant="outline" size="sm" onClick={() => { setEidDialogOpen(true); }}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setEidDialogOpen(true);
+          }}
+        >
           EID Lookup
         </Button>
       </div>
@@ -129,10 +135,7 @@ function TenantListPage() {
         onSortingChange={setSorting}
       />
 
-      <EidLookupDialog
-        open={eidDialogOpen}
-        onOpenChange={setEidDialogOpen}
-      />
+      <EidLookupDialog open={eidDialogOpen} onOpenChange={setEidDialogOpen} />
     </div>
   );
 }

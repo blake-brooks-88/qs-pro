@@ -48,7 +48,9 @@ export function useChangeUserRole() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const { data } = await api.patch(`/settings/users/${userId}/role`, { role });
+      const { data } = await api.patch(`/settings/users/${userId}/role`, {
+        role,
+      });
       return data;
     },
     onSuccess: () => {
@@ -86,8 +88,17 @@ export function useUnbanUser() {
 export function useResetPassword() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
-      const { data } = await api.post(`/settings/users/${userId}/reset-password`, { newPassword });
+    mutationFn: async ({
+      userId,
+      newPassword,
+    }: {
+      userId: string;
+      newPassword: string;
+    }) => {
+      const { data } = await api.post(
+        `/settings/users/${userId}/reset-password`,
+        { newPassword },
+      );
       return data;
     },
     onSuccess: () => {

@@ -95,9 +95,7 @@ export function useRemoveFeatureOverride() {
       tenantId: string;
       featureKey: string;
     }) => {
-      await api.delete(
-        `/tenants/${tenantId}/feature-overrides/${featureKey}`,
-      );
+      await api.delete(`/tenants/${tenantId}/feature-overrides/${featureKey}`);
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

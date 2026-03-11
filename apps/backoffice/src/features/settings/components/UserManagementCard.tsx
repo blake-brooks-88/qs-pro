@@ -1,3 +1,4 @@
+import { PasswordSchema } from "@qpp/shared-types";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -20,9 +21,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { generatePassword } from "@/lib/password";
 import { useSession } from "@/hooks/use-session";
-import { PasswordSchema } from "@qpp/shared-types";
+import { generatePassword } from "@/lib/password";
 
 import {
   type BackofficeUser,
@@ -62,11 +62,15 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
   const unbanUser = useUnbanUser();
   const resetPassword = useResetPassword();
   const deleteUser = useDeleteUser();
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
+    null,
+  );
   const [resetPasswordValue, setResetPasswordValue] = useState("");
 
   const handleConfirm = () => {
-    if (!confirmAction) return;
+    if (!confirmAction) {
+      return;
+    }
 
     if (confirmAction.type === "role" && confirmAction.newRole) {
       changeRole.mutate(
@@ -142,7 +146,12 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
     }
   };
 
-  const isPending = changeRole.isPending || banUser.isPending || unbanUser.isPending || resetPassword.isPending || deleteUser.isPending;
+  const isPending =
+    changeRole.isPending ||
+    banUser.isPending ||
+    unbanUser.isPending ||
+    resetPassword.isPending ||
+    deleteUser.isPending;
 
   if (isLoading) {
     return (
@@ -195,16 +204,25 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
                 {users.map((user) => {
                   const isSelf = currentUser?.id === user.id;
                   return (
-                    <tr key={user.id} className="border-b transition-colors hover:bg-muted/50">
+                    <tr
+                      key={user.id}
+                      className="border-b transition-colors hover:bg-muted/50"
+                    >
                       <td className="h-12 px-4 font-medium">{user.name}</td>
-                      <td className="h-12 px-4 text-muted-foreground">{user.email}</td>
+                      <td className="h-12 px-4 text-muted-foreground">
+                        {user.email}
+                      </td>
                       <td className="h-12 px-4">
-                        <Badge variant={ROLE_VARIANT_MAP[user.role] ?? "outline"}>
+                        <Badge
+                          variant={ROLE_VARIANT_MAP[user.role] ?? "outline"}
+                        >
                           {capitalize(user.role)}
                         </Badge>
                       </td>
                       <td className="h-12 px-4">
-                        <Badge variant={user.banned ? "destructive" : "success"}>
+                        <Badge
+                          variant={user.banned ? "destructive" : "success"}
+                        >
                           {user.banned ? "Banned" : "Active"}
                         </Badge>
                       </td>
@@ -298,7 +316,10 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
                 })}
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="h-12 px-4 text-center text-muted-foreground">
+                    <td
+                      colSpan={6}
+                      className="h-12 px-4 text-center text-muted-foreground"
+                    >
                       No users found.
                     </td>
                   </tr>
@@ -311,7 +332,11 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
 
       <Dialog
         open={confirmAction !== null}
-        onOpenChange={(open) => { if (!open) setConfirmAction(null); }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmAction(null);
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
@@ -330,21 +355,28 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
           </DialogHeader>
           {confirmAction?.type === "reset-password" && (
             <div className="space-y-2 py-4">
-              <label htmlFor="reset-password-input" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="reset-password-input"
+                className="text-sm font-medium text-foreground"
+              >
                 New Password
               </label>
               <div className="flex items-center gap-2">
                 <Input
                   id="reset-password-input"
                   value={resetPasswordValue}
-                  onChange={(e) => { setResetPasswordValue(e.target.value); }}
+                  onChange={(e) => {
+                    setResetPasswordValue(e.target.value);
+                  }}
                   placeholder="Enter or generate..."
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => { setResetPasswordValue(generatePassword()); }}
+                  onClick={() => {
+                    setResetPasswordValue(generatePassword());
+                  }}
                 >
                   Generate
                 </Button>
@@ -354,13 +386,20 @@ function UserManagementCard({ users, isLoading }: UserManagementCardProps) {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => { setConfirmAction(null); }}
+              onClick={() => {
+                setConfirmAction(null);
+              }}
               disabled={isPending}
             >
               Cancel
             </Button>
             <Button
-              variant={confirmAction?.type === "ban" || confirmAction?.type === "delete" ? "destructive" : "default"}
+              variant={
+                confirmAction?.type === "ban" ||
+                confirmAction?.type === "delete"
+                  ? "destructive"
+                  : "default"
+              }
               onClick={handleConfirm}
               disabled={isPending}
             >

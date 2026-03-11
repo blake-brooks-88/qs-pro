@@ -15,13 +15,16 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
 import {
+  type InvoicedSubscriptionResult,
   useCreateInvoicedSubscription,
   useEidLookup,
-  type InvoicedSubscriptionResult,
 } from "../hooks/use-invoicing";
 import { InvoiceResultCard } from "./InvoiceResultCard";
 
-const STATUS_VARIANT_MAP: Record<string, "success" | "warning" | "destructive" | "secondary"> = {
+const STATUS_VARIANT_MAP: Record<
+  string,
+  "success" | "warning" | "destructive" | "secondary"
+> = {
   active: "success",
   trialing: "warning",
   past_due: "destructive",
@@ -62,7 +65,9 @@ function InvoiceForm() {
   const [eid, setEid] = useState(initialEid);
   const [tenantConfirmed, setTenantConfirmed] = useState(false);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof FormState, string>>
+  >({});
   const [result, setResult] = useState<InvoicedSubscriptionResult | null>(null);
 
   const eidLookup = useEidLookup(eid.trim());
@@ -80,7 +85,7 @@ function InvoiceForm() {
       setTenantConfirmed(true);
       setForm((prev) => ({
         ...prev,
-        companyName: eidLookup.data!.companyName,
+        companyName: eidLookup.data?.companyName ?? "",
       }));
     }
   }, [eidLookup.data]);
@@ -119,7 +124,9 @@ function InvoiceForm() {
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (!validate()) return;
+      if (!validate()) {
+        return;
+      }
 
       createMutation.mutate(
         {
@@ -138,7 +145,9 @@ function InvoiceForm() {
             setResult(data);
           },
           onError: (error) => {
-            toast.error(error.message || "Failed to create invoiced subscription");
+            toast.error(
+              error.message || "Failed to create invoiced subscription",
+            );
           },
         },
       );
@@ -168,7 +177,9 @@ function InvoiceForm() {
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Step 1: Tenant Identification</CardTitle>
+          <CardTitle className="text-base">
+            Step 1: Tenant Identification
+          </CardTitle>
           <CardDescription>
             Look up the tenant by their Enterprise ID.
           </CardDescription>
@@ -176,7 +187,10 @@ function InvoiceForm() {
         <CardContent className="space-y-4">
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <label htmlFor="eid" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="eid"
+                className="text-sm font-medium text-foreground"
+              >
                 Enterprise ID (EID)
               </label>
               <Input
@@ -207,7 +221,8 @@ function InvoiceForm() {
                 </h4>
                 <Badge
                   variant={
-                    STATUS_VARIANT_MAP[eidLookup.data.subscriptionStatus] ?? "secondary"
+                    STATUS_VARIANT_MAP[eidLookup.data.subscriptionStatus] ??
+                    "secondary"
                   }
                 >
                   {capitalize(eidLookup.data.subscriptionStatus)}
@@ -246,7 +261,9 @@ function InvoiceForm() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Step 2: Subscription Details</CardTitle>
+          <CardTitle className="text-base">
+            Step 2: Subscription Details
+          </CardTitle>
           <CardDescription>
             Configure the subscription tier and billing details.
           </CardDescription>
@@ -254,7 +271,10 @@ function InvoiceForm() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="tier" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="tier"
+                className="text-sm font-medium text-foreground"
+              >
                 Tier
               </label>
               <Select
@@ -280,7 +300,9 @@ function InvoiceForm() {
                     name="interval"
                     value="monthly"
                     checked={form.interval === "monthly"}
-                    onChange={() => { updateField("interval", "monthly"); }}
+                    onChange={() => {
+                      updateField("interval", "monthly");
+                    }}
                     disabled={!tenantConfirmed}
                     className="accent-primary"
                   />
@@ -292,7 +314,9 @@ function InvoiceForm() {
                     name="interval"
                     value="annual"
                     checked={form.interval === "annual"}
-                    onChange={() => { updateField("interval", "annual"); }}
+                    onChange={() => {
+                      updateField("interval", "annual");
+                    }}
                     disabled={!tenantConfirmed}
                     className="accent-primary"
                   />
@@ -303,7 +327,10 @@ function InvoiceForm() {
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label htmlFor="seatCount" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="seatCount"
+                className="text-sm font-medium text-foreground"
+              >
                 Seat Count
               </label>
               <Input
@@ -312,22 +339,32 @@ function InvoiceForm() {
                 min={1}
                 max={1000}
                 value={form.seatCount}
-                onChange={(e) => { updateField("seatCount", e.target.value); }}
+                onChange={(e) => {
+                  updateField("seatCount", e.target.value);
+                }}
                 disabled={!tenantConfirmed}
               />
               {errors.seatCount ? (
-                <p className="mt-1 text-xs text-destructive">{errors.seatCount}</p>
+                <p className="mt-1 text-xs text-destructive">
+                  {errors.seatCount}
+                </p>
               ) : null}
             </div>
             <div>
-              <label htmlFor="paymentTerms" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="paymentTerms"
+                className="text-sm font-medium text-foreground"
+              >
                 Payment Terms
               </label>
               <Select
                 id="paymentTerms"
                 value={form.paymentTerms}
                 onChange={(e) => {
-                  updateField("paymentTerms", e.target.value as "net_15" | "net_30" | "net_60");
+                  updateField(
+                    "paymentTerms",
+                    e.target.value as "net_15" | "net_30" | "net_60",
+                  );
                 }}
                 disabled={!tenantConfirmed}
               >
@@ -337,13 +374,18 @@ function InvoiceForm() {
               </Select>
             </div>
             <div>
-              <label htmlFor="couponId" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="couponId"
+                className="text-sm font-medium text-foreground"
+              >
                 Discount Coupon (optional)
               </label>
               <Input
                 id="couponId"
                 value={form.couponId}
-                onChange={(e) => { updateField("couponId", e.target.value); }}
+                onChange={(e) => {
+                  updateField("couponId", e.target.value);
+                }}
                 placeholder="Stripe coupon ID"
                 disabled={!tenantConfirmed}
               />
@@ -362,50 +404,71 @@ function InvoiceForm() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="customerEmail" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="customerEmail"
+                className="text-sm font-medium text-foreground"
+              >
                 Customer Email
               </label>
               <Input
                 id="customerEmail"
                 type="email"
                 value={form.customerEmail}
-                onChange={(e) => { updateField("customerEmail", e.target.value); }}
+                onChange={(e) => {
+                  updateField("customerEmail", e.target.value);
+                }}
                 placeholder="billing@company.com"
                 disabled={!tenantConfirmed}
               />
               {errors.customerEmail ? (
-                <p className="mt-1 text-xs text-destructive">{errors.customerEmail}</p>
+                <p className="mt-1 text-xs text-destructive">
+                  {errors.customerEmail}
+                </p>
               ) : null}
             </div>
             <div>
-              <label htmlFor="customerName" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="customerName"
+                className="text-sm font-medium text-foreground"
+              >
                 Customer Name
               </label>
               <Input
                 id="customerName"
                 value={form.customerName}
-                onChange={(e) => { updateField("customerName", e.target.value); }}
+                onChange={(e) => {
+                  updateField("customerName", e.target.value);
+                }}
                 placeholder="John Doe"
                 disabled={!tenantConfirmed}
               />
               {errors.customerName ? (
-                <p className="mt-1 text-xs text-destructive">{errors.customerName}</p>
+                <p className="mt-1 text-xs text-destructive">
+                  {errors.customerName}
+                </p>
               ) : null}
             </div>
           </div>
           <div>
-            <label htmlFor="companyName" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="companyName"
+              className="text-sm font-medium text-foreground"
+            >
               Company Name
             </label>
             <Input
               id="companyName"
               value={form.companyName}
-              onChange={(e) => { updateField("companyName", e.target.value); }}
+              onChange={(e) => {
+                updateField("companyName", e.target.value);
+              }}
               placeholder="Company Inc"
               disabled={!tenantConfirmed}
             />
             {errors.companyName ? (
-              <p className="mt-1 text-xs text-destructive">{errors.companyName}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {errors.companyName}
+              </p>
             ) : null}
           </div>
         </CardContent>
@@ -416,7 +479,9 @@ function InvoiceForm() {
         disabled={!tenantConfirmed || createMutation.isPending}
         className="w-full"
       >
-        {createMutation.isPending ? "Creating..." : "Create Invoiced Subscription"}
+        {createMutation.isPending
+          ? "Creating..."
+          : "Create Invoiced Subscription"}
       </Button>
     </form>
   );

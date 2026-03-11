@@ -41,7 +41,11 @@ export interface PaginatedInvoiceList {
 
 export function useCreateInvoicedSubscription() {
   const queryClient = useQueryClient();
-  return useMutation<InvoicedSubscriptionResult, Error, CreateInvoicedSubscriptionParams>({
+  return useMutation<
+    InvoicedSubscriptionResult,
+    Error,
+    CreateInvoicedSubscriptionParams
+  >({
     mutationFn: async (params) => {
       const { data } = await api.post<InvoicedSubscriptionResult>(
         "/invoicing/subscriptions",

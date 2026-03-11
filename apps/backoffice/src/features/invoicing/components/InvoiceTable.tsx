@@ -2,7 +2,10 @@ import { Badge } from "@/components/ui/badge";
 
 import type { InvoiceListItem } from "../hooks/use-invoicing";
 
-const STATUS_VARIANT_MAP: Record<string, "success" | "default" | "destructive" | "secondary"> = {
+const STATUS_VARIANT_MAP: Record<
+  string,
+  "success" | "default" | "destructive" | "secondary"
+> = {
   paid: "success",
   sent: "default",
   open: "default",
@@ -79,11 +82,11 @@ function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
               <td className="h-12 px-4 font-medium">
                 {invoice.tenantName ?? invoice.tenantEid ?? "-"}
               </td>
+              <td className="h-12 px-4">{formatCurrency(invoice.amount)}</td>
               <td className="h-12 px-4">
-                {formatCurrency(invoice.amount)}
-              </td>
-              <td className="h-12 px-4">
-                <Badge variant={STATUS_VARIANT_MAP[invoice.status] ?? "secondary"}>
+                <Badge
+                  variant={STATUS_VARIANT_MAP[invoice.status] ?? "secondary"}
+                >
                   {capitalize(invoice.status)}
                 </Badge>
               </td>

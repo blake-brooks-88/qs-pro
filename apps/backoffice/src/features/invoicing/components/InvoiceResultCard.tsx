@@ -16,7 +16,10 @@ import { usePermissions } from "@/hooks/use-permissions";
 
 import type { InvoicedSubscriptionResult } from "../hooks/use-invoicing";
 
-const STATUS_VARIANT_MAP: Record<string, "success" | "warning" | "destructive" | "secondary"> = {
+const STATUS_VARIANT_MAP: Record<
+  string,
+  "success" | "warning" | "destructive" | "secondary"
+> = {
   paid: "success",
   open: "warning",
   draft: "secondary",
@@ -30,7 +33,11 @@ interface InvoiceResultCardProps {
   onReset: () => void;
 }
 
-function InvoiceResultCard({ result, tenantEid, onReset }: InvoiceResultCardProps) {
+function InvoiceResultCard({
+  result,
+  tenantEid,
+  onReset,
+}: InvoiceResultCardProps) {
   const navigate = useNavigate();
   const { canAdmin } = usePermissions();
   const queryClient = useQueryClient();
@@ -69,7 +76,7 @@ function InvoiceResultCard({ result, tenantEid, onReset }: InvoiceResultCardProp
               {result.invoiceUrl ? (
                 <button
                   type="button"
-                  onClick={() => void handleCopyUrl(result.invoiceUrl!)}
+                  onClick={() => void handleCopyUrl(result.invoiceUrl ?? "")}
                   className="text-primary hover:underline break-all text-left"
                 >
                   {result.invoiceUrl}
@@ -77,7 +84,8 @@ function InvoiceResultCard({ result, tenantEid, onReset }: InvoiceResultCardProp
               ) : (
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground italic">
-                    Draft invoice created &mdash; URL will be available after it’s finalized/sent in Stripe
+                    Draft invoice created &mdash; URL will be available after
+                    it’s finalized/sent in Stripe
                   </span>
                   <Button
                     variant="outline"
@@ -85,7 +93,9 @@ function InvoiceResultCard({ result, tenantEid, onReset }: InvoiceResultCardProp
                     onClick={() => void handleRefresh()}
                     disabled={isRefreshing || isFetchingInvoices > 0}
                   >
-                    {isRefreshing || isFetchingInvoices > 0 ? "Refreshing..." : "Refresh"}
+                    {isRefreshing || isFetchingInvoices > 0
+                      ? "Refreshing..."
+                      : "Refresh"}
                   </Button>
                 </div>
               )}
@@ -94,7 +104,11 @@ function InvoiceResultCard({ result, tenantEid, onReset }: InvoiceResultCardProp
           <div>
             <span className="text-muted-foreground">Status</span>
             <div className="mt-1">
-              <Badge variant={STATUS_VARIANT_MAP[result.invoiceStatus] ?? "secondary"}>
+              <Badge
+                variant={
+                  STATUS_VARIANT_MAP[result.invoiceStatus] ?? "secondary"
+                }
+              >
                 {result.invoiceStatus}
               </Badge>
             </div>

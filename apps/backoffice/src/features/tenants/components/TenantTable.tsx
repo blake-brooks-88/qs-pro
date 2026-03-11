@@ -1,10 +1,10 @@
 import {
   type ColumnDef,
+  flexRender,
+  getCoreRowModel,
   type OnChangeFn,
   type PaginationState,
   type SortingState,
-  flexRender,
-  getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { useMemo } from "react";
@@ -59,7 +59,9 @@ const STATUS_LABEL_MAP: Record<string, string> = {
 };
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "-";
+  if (!dateStr) {
+    return "-";
+  }
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -148,7 +150,9 @@ function TenantTable({
           <DataTableColumnHeader column={column} title="Users" />
         ),
         cell: ({ row }) => (
-          <span className="text-muted-foreground">{row.original.userCount}</span>
+          <span className="text-muted-foreground">
+            {row.original.userCount}
+          </span>
         ),
         size: 70,
       },

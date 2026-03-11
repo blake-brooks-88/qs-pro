@@ -13,7 +13,9 @@ function InvoiceCreatePage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { void navigate("/invoicing"); }}
+          onClick={() => {
+            void navigate("/invoicing");
+          }}
         >
           &larr; Back to Invoices
         </Button>

@@ -38,7 +38,9 @@ function TenantDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { void navigate("/tenants"); }}
+          onClick={() => {
+            void navigate("/tenants");
+          }}
         >
           Back to Tenants
         </Button>
@@ -55,7 +57,9 @@ function TenantDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { void navigate("/tenants"); }}
+          onClick={() => {
+            void navigate("/tenants");
+          }}
           className="mb-4"
         >
           Back to Tenants
@@ -82,9 +86,7 @@ function TenantDetailPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <SubscriptionCard tenant={tenant} />
         <UserListCard users={tenant.users} />
-        {canAdmin ? (
-          <FeatureOverridesCard tenantId={tenant.tenantId} />
-        ) : null}
+        {canAdmin ? <FeatureOverridesCard tenantId={tenant.tenantId} /> : null}
         <AuditLogCard logs={tenant.recentAuditLogs} />
       </div>
     </div>

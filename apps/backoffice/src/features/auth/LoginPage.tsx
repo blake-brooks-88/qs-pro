@@ -51,13 +51,18 @@ export function LoginPage() {
   return (
     <Card className="border-border/50">
       <CardHeader className="text-center">
-        <CardTitle className="font-heading text-2xl">QS Pro Backoffice</CardTitle>
+        <CardTitle className="font-heading text-2xl">
+          QS Pro Backoffice
+        </CardTitle>
         <CardDescription>Sign in to continue</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-foreground"
+            >
               Email
             </label>
             <Input
@@ -90,9 +95,7 @@ export function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}

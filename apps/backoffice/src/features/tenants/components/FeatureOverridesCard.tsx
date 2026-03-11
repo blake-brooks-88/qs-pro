@@ -1,12 +1,7 @@
 import { ALL_FEATURE_KEYS } from "@qpp/shared-types";
 import { toast } from "sonner";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import {
   useFeatureOverrides,
@@ -30,16 +25,24 @@ function FeatureOverridesCard({ tenantId }: FeatureOverridesCardProps) {
       removeOverride.mutate(
         { tenantId, featureKey },
         {
-          onSuccess: () => { toast.success(`Override removed: ${featureKey}`); },
-          onError: () => { toast.error(`Failed to remove override: ${featureKey}`); },
+          onSuccess: () => {
+            toast.success(`Override removed: ${featureKey}`);
+          },
+          onError: () => {
+            toast.error(`Failed to remove override: ${featureKey}`);
+          },
         },
       );
     } else {
       setOverride.mutate(
         { tenantId, featureKey, enabled: true },
         {
-          onSuccess: () => { toast.success(`Override enabled: ${featureKey}`); },
-          onError: () => { toast.error(`Failed to set override: ${featureKey}`); },
+          onSuccess: () => {
+            toast.success(`Override enabled: ${featureKey}`);
+          },
+          onError: () => {
+            toast.error(`Failed to set override: ${featureKey}`);
+          },
         },
       );
     }
@@ -62,7 +65,9 @@ function FeatureOverridesCard({ tenantId }: FeatureOverridesCardProps) {
                 className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-foreground">{key}</span>
+                  <span className="text-sm font-mono text-foreground">
+                    {key}
+                  </span>
                   {isOverridden ? (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
                       {isEnabled ? "ON" : "OFF"}
@@ -73,7 +78,9 @@ function FeatureOverridesCard({ tenantId }: FeatureOverridesCardProps) {
                   type="button"
                   role="switch"
                   aria-checked={isOverridden}
-                  onClick={() => { handleToggle(key, isOverridden); }}
+                  onClick={() => {
+                    handleToggle(key, isOverridden);
+                  }}
                   className={`
                     relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors
                     ${isOverridden ? "bg-primary" : "bg-muted"}
