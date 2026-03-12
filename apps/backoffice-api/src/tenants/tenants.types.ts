@@ -82,7 +82,7 @@ export interface FeatureOverrideDto {
 
 export interface AuditLogEntryDto {
   id: string;
-  backofficeUserId: string;
+  backofficeUserId: string | null;
   eventType: string;
   metadata: Record<string, unknown> | null;
   createdAt: Date;

@@ -473,9 +473,9 @@ export const boTwoFactors = pgTable("bo_two_factors", {
 // 14. Backoffice Audit Logs (Cross-tenant, no RLS — separate from tenant audit_logs)
 export const backofficeAuditLogs = pgTable("backoffice_audit_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
-  backofficeUserId: varchar("backoffice_user_id")
-    .references(() => boUsers.id)
-    .notNull(),
+  backofficeUserId: varchar("backoffice_user_id").references(() => boUsers.id, {
+    onDelete: "set null",
+  }),
   targetTenantId: uuid("target_tenant_id").references(() => tenants.id),
   eventType: varchar("event_type", { length: 100 }).notNull(),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),

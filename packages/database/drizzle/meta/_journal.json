@@ -281,6 +281,13 @@
       "when": 1773196900000,
       "tag": "0039_backoffice_two_factor_enabled_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1773542400000,
+      "tag": "0040_audit_logs_user_fk_set_null",
+      "breakpoints": true
     }
   ]
 }
