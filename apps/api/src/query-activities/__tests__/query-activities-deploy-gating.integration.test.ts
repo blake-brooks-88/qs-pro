@@ -58,7 +58,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-deploy-gate-int';
+const TEST_EID = 'test---qa-deploy-gate-int';
 const TEST_TSSD = 'test-deploy-gate-int';
 const TEST_MID = 'mid-deploy-gate-int';
 

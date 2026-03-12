@@ -52,7 +52,7 @@ function getRequiredEnv(key: string): string {
 }
 
 const TEST_TSSD = 'test-shared-folders-int';
-const TEST_EID = 'eid-shared-folders-int';
+const TEST_EID = 'test---folders-shared-int';
 const TEST_MID = 'mid-shared-folders-int';
 
 const defaultHandlers = [

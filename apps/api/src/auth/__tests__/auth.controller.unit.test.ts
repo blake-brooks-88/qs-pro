@@ -135,7 +135,11 @@ describe('AuthController', () => {
 
   describe('loginPost()', () => {
     const mockUser = { id: 'user-1', sfUserId: 'sf-user-1' };
-    const mockTenant = { id: 'tenant-1', eid: 'eid-1', tssd: 'test-tssd' };
+    const mockTenant = {
+      id: 'tenant-1',
+      eid: 'test---auth-ctrl-unit-1',
+      tssd: 'test-tssd',
+    };
     const mockMid = 'mid-1';
 
     it('returns redirect when Accept header is not JSON', async () => {
@@ -267,7 +271,11 @@ describe('AuthController', () => {
 
   describe('me()', () => {
     const mockUser = { id: 'user-1', sfUserId: 'sf-user-1' };
-    const mockTenant = { id: 'tenant-1', eid: 'eid-1', tssd: 'test-tssd' };
+    const mockTenant = {
+      id: 'tenant-1',
+      eid: 'test---auth-ctrl-unit-1',
+      tssd: 'test-tssd',
+    };
 
     it('returns user, tenant, and csrfToken for valid session', async () => {
       // Arrange
@@ -401,7 +409,11 @@ describe('AuthController', () => {
 
   describe('login()', () => {
     const mockUser = { id: 'user-1', sfUserId: 'sf-user-1' };
-    const mockTenant = { id: 'tenant-1', eid: 'eid-1', tssd: 'test-tssd' };
+    const mockTenant = {
+      id: 'tenant-1',
+      eid: 'test---auth-ctrl-unit-1',
+      tssd: 'test-tssd',
+    };
     const mockMid = 'mid-1';
 
     it('redirects to home when valid session exists', async () => {
@@ -631,7 +643,11 @@ describe('AuthController', () => {
 
   describe('callback()', () => {
     const mockUser = { id: 'user-1', sfUserId: 'sf-user-1' };
-    const mockTenant = { id: 'tenant-1', eid: 'eid-1', tssd: 'test-tssd' };
+    const mockTenant = {
+      id: 'tenant-1',
+      eid: 'test---auth-ctrl-unit-1',
+      tssd: 'test-tssd',
+    };
     const mockMid = 'mid-1';
 
     it('throws InternalServerErrorException when session unavailable', async () => {

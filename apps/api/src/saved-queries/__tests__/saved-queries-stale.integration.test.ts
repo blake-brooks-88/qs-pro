@@ -53,7 +53,7 @@ function getRequiredEnv(key: string): string {
 }
 
 const TEST_TSSD = 'test-stale-int';
-const TEST_EID = 'eid-stale-int';
+const TEST_EID = 'test---sq-stale-int';
 const TEST_MID = 'mid-stale-int';
 
 const defaultHandlers = [

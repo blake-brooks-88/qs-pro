@@ -55,11 +55,11 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-qa-unlink-int';
+const TEST_EID = 'test---qa-unlink-int';
 const TEST_TSSD = 'test-qa-unlink-int';
 const TEST_MID = 'mid-qa-unlink-int';
 
-const TEST_EID_2 = 'eid-qa-unlink-int-2';
+const TEST_EID_2 = 'test---qa-unlink-int-2';
 const TEST_TSSD_2 = 'test-qa-unlink-int-2';
 const TEST_MID_2 = 'mid-qa-unlink-int-2';
 

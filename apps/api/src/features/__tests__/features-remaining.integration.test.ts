@@ -166,7 +166,7 @@ describe('Features Remaining Gaps (integration)', () => {
     });
 
     it('should ignore invalid featureKey in overrides without throwing', async () => {
-      const uniqueEid = `invalid-key-eid-${Date.now()}`;
+      const uniqueEid = `test---feature-flag-invalid-key-${Date.now()}`;
       createdTenantEids.push(uniqueEid);
 
       // Insert tenant (using Drizzle)
@@ -206,7 +206,7 @@ describe('Features Remaining Gaps (integration)', () => {
     });
 
     it('should apply valid override and return correct features', async () => {
-      const uniqueEid = `valid-override-eid-${Date.now()}`;
+      const uniqueEid = `test---feature-flag-valid-override-${Date.now()}`;
       createdTenantEids.push(uniqueEid);
 
       // Insert tenant

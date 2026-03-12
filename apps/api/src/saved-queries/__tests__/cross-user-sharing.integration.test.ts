@@ -38,7 +38,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-cross-user-int';
+const TEST_EID = 'test---sq-cross-user-int';
 const TEST_TSSD = 'test-cross-user-int';
 const TEST_MID = 'mid-cross-user-int';
 

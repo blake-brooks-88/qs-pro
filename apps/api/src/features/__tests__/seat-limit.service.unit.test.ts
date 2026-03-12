@@ -43,7 +43,7 @@ describe('SeatLimitService', () => {
     const tenantId = 'tenant-1';
     const mockTenant: Tenant = {
       id: tenantId,
-      eid: 'eid-1',
+      eid: 'test---seat-limit-1',
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
@@ -74,7 +74,7 @@ describe('SeatLimitService', () => {
     const tenantId = 'tenant-2';
     const mockTenant: Tenant = {
       id: tenantId,
-      eid: 'eid-2',
+      eid: 'test---seat-limit-2',
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
@@ -108,7 +108,7 @@ describe('SeatLimitService', () => {
     const tenantId = 'tenant-3';
     const mockTenant: Tenant = {
       id: tenantId,
-      eid: 'eid-3',
+      eid: 'test---seat-limit-3',
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
@@ -142,7 +142,7 @@ describe('SeatLimitService', () => {
     const tenantId = 'tenant-4';
     const mockTenant: Tenant = {
       id: tenantId,
-      eid: 'eid-4',
+      eid: 'test---seat-limit-4',
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
@@ -181,7 +181,7 @@ describe('SeatLimitService', () => {
     const tenantId = 'tenant-no-sub';
     const mockTenant: Tenant = {
       id: tenantId,
-      eid: 'eid-no-sub',
+      eid: 'test---seat-limit-nosub',
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),

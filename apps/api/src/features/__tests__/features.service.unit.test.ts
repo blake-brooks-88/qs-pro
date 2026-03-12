@@ -18,7 +18,7 @@ describe('FeaturesService', () => {
     tenantRepo = {
       findById: vi.fn().mockResolvedValue({
         id: 'tenant-1',
-        eid: 'eid-1',
+        eid: 'test---features-unit',
         tssd: 'test-tssd',
       }),
     };

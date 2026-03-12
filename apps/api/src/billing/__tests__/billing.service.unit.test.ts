@@ -73,7 +73,7 @@ describe('BillingService', () => {
     tenantRepo = {
       findById: vi.fn().mockResolvedValue({
         id: 'tenant-1',
-        eid: 'eid-1',
+        eid: 'test---billing-unit',
       }),
     };
     orgSubscriptionRepo = {
@@ -87,7 +87,7 @@ describe('BillingService', () => {
       markExpired: vi.fn().mockResolvedValue(undefined),
     };
     encryptionService = {
-      encrypt: vi.fn().mockReturnValue('encrypted-eid'),
+      encrypt: vi.fn().mockReturnValue('test---billing-unit-encrypted'),
       decrypt: vi.fn().mockReturnValue('eid-1'),
     };
     rlsContext = {
@@ -192,7 +192,7 @@ describe('BillingService', () => {
         id: 'cs_expired',
         status: 'expired',
         expires_at: Math.floor(Date.now() / 1000) - 5,
-        metadata: { eid: 'encrypted-eid' },
+        metadata: { eid: 'test---billing-unit-encrypted' },
       });
 
       await expect(
@@ -209,7 +209,7 @@ describe('BillingService', () => {
         status: 'open',
         payment_status: 'unpaid',
         expires_at: Math.floor(Date.now() / 1000) + 30,
-        metadata: { eid: 'encrypted-eid' },
+        metadata: { eid: 'test---billing-unit-encrypted' },
       });
 
       await expect(

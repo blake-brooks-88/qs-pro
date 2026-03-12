@@ -71,7 +71,7 @@ const defaultHandlers = [
     () => {
       return HttpResponse.json({
         sub: 'sf-shell-query-int',
-        enterprise_id: 'eid-shell-query-int',
+        enterprise_id: 'test---shell-query-int',
         member_id: 'mid-shell-query-int',
         email: 'shell-query-int@example.com',
         name: 'Shell Query Integration User',
@@ -110,7 +110,7 @@ describe('ShellQueryService (integration)', () => {
   let testTenantId: string;
   let testUserId: string;
   const testMid = 'mid-shell-query-int';
-  const testEid = 'eid-shell-query-int';
+  const testEid = 'test---shell-query-int';
   const testAccessToken = 'test-access-token';
 
   // Track created runs for cleanup

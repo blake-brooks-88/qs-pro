@@ -38,7 +38,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-qa-ctrl-int';
+const TEST_EID = 'test---qa-ctrl-int';
 const TEST_TSSD = 'test-qa-ctrl-int';
 const TEST_MID = 'mid-qa-ctrl-int';
 

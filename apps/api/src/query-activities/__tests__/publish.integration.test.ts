@@ -57,7 +57,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-publish-int';
+const TEST_EID = 'test---qa-publish-int';
 const TEST_TSSD = 'test-publish-int';
 const TEST_MID = 'mid-publish-int';
 
