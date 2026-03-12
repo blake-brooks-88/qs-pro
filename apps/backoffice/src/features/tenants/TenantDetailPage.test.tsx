@@ -37,6 +37,12 @@ const mockTenant = {
 };
 
 let mockRole = "viewer";
+let tenantDetailState: { data: unknown; isLoading: boolean; isError: boolean } =
+  {
+    data: mockTenant,
+    isLoading: false,
+    isError: false,
+  };
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -53,9 +59,9 @@ vi.mock("@/hooks/use-permissions", () => ({
 
 vi.mock("./hooks/use-tenant-detail", () => ({
   useTenantDetail: () => ({
-    data: mockTenant,
-    isLoading: false,
-    isError: false,
+    data: tenantDetailState.data,
+    isLoading: tenantDetailState.isLoading,
+    isError: tenantDetailState.isError,
   }),
   useFeatureOverrides: () => ({
     data: [{ featureKey: "advancedAutocomplete", enabled: true }],
@@ -68,6 +74,7 @@ vi.mock("./hooks/use-tenant-detail", () => ({
 
 function renderPage(role: string = "viewer") {
   mockRole = role;
+  tenantDetailState = { data: mockTenant, isLoading: false, isError: false };
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -124,5 +131,47 @@ describe("TenantDetailPage", () => {
       "href",
       "https://dashboard.stripe.com/subscriptions/sub_abc123",
     );
+  });
+
+  it("renders loading skeletons", () => {
+    mockRole = "viewer";
+    tenantDetailState = { data: undefined, isLoading: true, isError: false };
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/tenants/t-001"]}>
+          <Routes>
+            <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("renders not found state when tenant is missing", () => {
+    mockRole = "viewer";
+    tenantDetailState = { data: null, isLoading: false, isError: true };
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/tenants/t-001"]}>
+          <Routes>
+            <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Tenant not found.")).toBeInTheDocument();
   });
 });

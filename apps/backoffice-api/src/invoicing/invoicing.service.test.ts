@@ -1,487 +1,440 @@
 import { NotFoundException } from "@nestjs/common";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { BackofficeAuditService } from "../audit/audit.service.js";
-import type { StripeCatalogService } from "../stripe/stripe-catalog.service.js";
 import { InvoicingService } from "./invoicing.service.js";
 
-vi.mock("@qpp/database", async () => {
-  const actual = await vi.importActual("@qpp/database");
+function makeLimitSelectChain(result: unknown) {
   return {
-    ...actual,
-    encrypt: vi.fn((_text: string, _key: string) => "test---bo-invoicing-encrypted"),
-  };
-});
-
-function createMockStripe() {
-  return {
-    customers: {
-      create: vi.fn().mockResolvedValue({ id: "cus_new_123" }),
-      update: vi.fn().mockResolvedValue({ id: "cus_new_123" }),
-      list: vi.fn().mockResolvedValue({ data: [] }),
-    },
-    subscriptions: {
-      create: vi.fn().mockResolvedValue({
-        id: "sub_abc123",
-        status: "active",
-        latest_invoice: {
-          id: "inv_001",
-          hosted_invoice_url: "https://stripe.com/invoice/001",
-          status: "draft",
-          amount_due: 9900,
-          due_date: 1700000000,
-          created: 1699900000,
-          customer: "cus_new_123",
-          customer_name: "Acme Corp",
-          collection_method: "send_invoice",
-        },
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(result),
       }),
-    },
-    invoices: {
-      retrieve: vi.fn().mockResolvedValue({
-        id: "inv_001",
-        hosted_invoice_url: "https://stripe.com/invoice/001",
-        status: "draft",
-        amount_due: 9900,
-        due_date: 1700000000,
-        created: 1699900000,
-        customer: "cus_new_123",
-        customer_name: "Acme Corp",
-        collection_method: "send_invoice",
-      }),
-      update: vi.fn().mockImplementation(async (id: string) => {
-        if (id === "inv_002") {
-          return {
-            id: "inv_002",
-            hosted_invoice_url: null,
-            status: "draft",
-            amount_due: 9900,
-            due_date: 1700000000,
-            created: 1699900000,
-            customer: "cus_new_123",
-            customer_name: "Acme Corp",
-            collection_method: "send_invoice",
-          };
-        }
-        return {
-          id: "inv_001",
-          hosted_invoice_url: "https://stripe.com/invoice/001",
-          status: "draft",
-          amount_due: 9900,
-          due_date: 1700000000,
-          created: 1699900000,
-          customer: "cus_new_123",
-          customer_name: "Acme Corp",
-          collection_method: "send_invoice",
-        };
-      }),
-      finalizeInvoice: vi.fn().mockResolvedValue({
-        id: "inv_001",
-        hosted_invoice_url: "https://stripe.com/invoice/001",
-        status: "open",
-        amount_due: 9900,
-        due_date: 1700000000,
-        created: 1699900000,
-        customer: "cus_new_123",
-        customer_name: "Acme Corp",
-        collection_method: "send_invoice",
-      }),
-      sendInvoice: vi.fn().mockResolvedValue({
-        id: "inv_001",
-        hosted_invoice_url: "https://stripe.com/invoice/001",
-        status: "open",
-        amount_due: 9900,
-        due_date: 1700000000,
-        created: 1699900000,
-        customer: "cus_new_123",
-        customer_name: "Acme Corp",
-        collection_method: "send_invoice",
-      }),
-      list: vi.fn().mockResolvedValue({
-        data: [
-          {
-            id: "inv_001",
-            hosted_invoice_url: "https://stripe.com/invoice/001",
-            status: "open",
-            amount_due: 9900,
-            due_date: 1700000000,
-            created: 1699900000,
-            customer: "cus_new_123",
-            customer_name: "Acme Corp",
-          },
-        ],
-        has_more: false,
-      }),
-    },
+    }),
   };
 }
 
-const MOCK_TENANT = {
-  id: "tenant-uuid-1",
-  eid: "test---bo-invoicing-123",
-  tssd: "test-tssd",
-  auditRetentionDays: 365,
-  installedAt: new Date(),
-};
-
-function createMockDb() {
-  const mockChain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue([MOCK_TENANT]),
-    innerJoin: vi.fn().mockReturnThis(),
-    values: vi.fn().mockReturnThis(),
-    onConflictDoUpdate: vi.fn().mockReturnThis(),
-    set: vi.fn().mockReturnThis(),
-    execute: vi.fn().mockResolvedValue(undefined),
-  };
-
+function makeWhereSelectChain(result: unknown) {
   return {
-    select: vi.fn().mockReturnValue(mockChain),
-    insert: vi.fn().mockReturnValue(mockChain),
-    _chain: mockChain,
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(result),
+      }),
+      where: vi.fn().mockResolvedValue(result),
+    }),
   };
 }
 
-function createMockAuditService(): BackofficeAuditService {
+function makeInsertChain() {
   return {
-    log: vi.fn().mockResolvedValue(undefined),
-  } as unknown as BackofficeAuditService;
+    values: vi.fn().mockReturnValue({
+      onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+    }),
+  };
 }
-
-function createMockCatalogService(): StripeCatalogService {
-  return {
-    resolveCheckoutPriceId: vi
-      .fn()
-      .mockResolvedValue("price_enterprise_monthly"),
-  } as unknown as StripeCatalogService;
-}
-
-const BASE_PARAMS = {
-  tenantEid: "test---bo-invoicing-123",
-  tier: "enterprise" as const,
-  interval: "monthly" as const,
-  seatCount: 10,
-  paymentTerms: "net_30" as const,
-  customerEmail: "billing@acme.com",
-  customerName: "Jane Doe",
-  companyName: "Acme Corp",
-};
 
 describe("InvoicingService", () => {
-  let service: InvoicingService;
-  let mockStripe: ReturnType<typeof createMockStripe>;
-  let mockDb: ReturnType<typeof createMockDb>;
-  let mockAudit: BackofficeAuditService;
-  let mockCatalog: StripeCatalogService;
+  const originalEncryptionKey = process.env.ENCRYPTION_KEY;
 
   beforeEach(() => {
-    vi.stubEnv("ENCRYPTION_KEY", "0".repeat(64));
-    mockStripe = createMockStripe();
-    mockDb = createMockDb();
-    mockAudit = createMockAuditService();
-    mockCatalog = createMockCatalogService();
+    vi.restoreAllMocks();
+    process.env.ENCRYPTION_KEY = "a".repeat(64);
+  });
 
-    service = new InvoicingService(
-      mockStripe as never,
-      mockDb as never,
-      mockAudit,
-      mockCatalog,
+  afterEach(() => {
+    process.env.ENCRYPTION_KEY = originalEncryptionKey;
+  });
+
+  it("throws NotFoundException when tenant EID does not exist", async () => {
+    const stripe = {
+      customers: { update: vi.fn(), create: vi.fn() },
+      subscriptions: { create: vi.fn() },
+      invoices: { retrieve: vi.fn(), update: vi.fn(), list: vi.fn() },
+    };
+
+    const db = {
+      select: vi.fn().mockReturnValueOnce(makeLimitSelectChain([])),
+      insert: vi.fn(),
+    };
+
+    const auditService = { log: vi.fn() };
+    const catalogService = { resolveCheckoutPriceId: vi.fn() };
+
+    const service = new InvoicingService(
+      stripe as never,
+      db as never,
+      auditService as never,
+      catalogService as never,
+    );
+
+    await expect(
+      service.createInvoicedSubscription(
+        {
+          tenantEid: "missing",
+          tier: "pro",
+          interval: "monthly",
+          seatCount: 1,
+          paymentTerms: "net_30",
+          customerEmail: "billing@example.com",
+          customerName: "Billing",
+          companyName: "Example Co",
+        },
+        "bo-user-1",
+        "127.0.0.1",
+      ),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it("requires ENCRYPTION_KEY env var", async () => {
+    process.env.ENCRYPTION_KEY = "";
+
+    const stripe = {
+      customers: { update: vi.fn(), create: vi.fn() },
+      subscriptions: { create: vi.fn() },
+      invoices: { retrieve: vi.fn(), update: vi.fn(), list: vi.fn() },
+    };
+
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(
+          makeLimitSelectChain([{ id: "t-1", eid: "test---eid" }]),
+        ),
+      insert: vi.fn(),
+    };
+
+    const auditService = { log: vi.fn() };
+    const catalogService = { resolveCheckoutPriceId: vi.fn() };
+
+    const service = new InvoicingService(
+      stripe as never,
+      db as never,
+      auditService as never,
+      catalogService as never,
+    );
+
+    await expect(
+      service.createInvoicedSubscription(
+        {
+          tenantEid: "test---eid",
+          tier: "pro",
+          interval: "monthly",
+          seatCount: 1,
+          paymentTerms: "net_30",
+          customerEmail: "billing@example.com",
+          customerName: "Billing",
+          companyName: "Example Co",
+        },
+        "bo-user-1",
+        "127.0.0.1",
+      ),
+    ).rejects.toThrow("Missing required env var: ENCRYPTION_KEY");
+  });
+
+  it("creates an invoiced subscription for an existing customer and draft invoice", async () => {
+    const stripe = {
+      customers: {
+        update: vi.fn().mockResolvedValue(undefined),
+        create: vi.fn(),
+      },
+      subscriptions: {
+        create: vi.fn().mockResolvedValue({
+          id: "sub_1",
+          status: "active",
+          latest_invoice: {
+            id: "in_1",
+            status: "draft",
+            hosted_invoice_url: null,
+            amount_due: 2500,
+            due_date: 1730000000,
+          },
+        }),
+      },
+      invoices: {
+        retrieve: vi.fn(),
+        update: vi.fn().mockResolvedValue({
+          id: "in_1",
+          status: "draft",
+          hosted_invoice_url: null,
+          amount_due: 2500,
+          due_date: 1730000000,
+        }),
+        list: vi.fn(),
+      },
+    };
+
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(
+          makeLimitSelectChain([{ id: "t-1", eid: "test---eid" }]),
+        )
+        .mockReturnValueOnce(
+          makeLimitSelectChain([
+            { tenantId: "t-1", stripeCustomerId: "cus_1" },
+          ]),
+        ),
+      insert: vi.fn().mockReturnValue(makeInsertChain()),
+    };
+
+    const auditService = { log: vi.fn().mockResolvedValue(undefined) };
+    const catalogService = {
+      resolveCheckoutPriceId: vi.fn().mockResolvedValue("price_1"),
+    };
+
+    const service = new InvoicingService(
+      stripe as never,
+      db as never,
+      auditService as never,
+      catalogService as never,
+    );
+
+    const result = await service.createInvoicedSubscription(
+      {
+        tenantEid: "test---eid",
+        tier: "pro",
+        interval: "monthly",
+        seatCount: 2,
+        paymentTerms: "net_15",
+        customerEmail: "billing@example.com",
+        customerName: "Billing",
+        companyName: "Example Co",
+        couponId: "coupon_1",
+      },
+      "bo-user-1",
+      "127.0.0.1",
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        subscriptionId: "sub_1",
+        stripeInvoiceId: "in_1",
+        invoiceStatus: "draft",
+        amount: 2500,
+      }),
+    );
+    expect(stripe.customers.update).toHaveBeenCalledWith(
+      "cus_1",
+      expect.objectContaining({
+        email: "billing@example.com",
+        name: "Billing",
+      }),
+    );
+    expect(stripe.subscriptions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: "cus_1",
+        days_until_due: 15,
+        discounts: [{ coupon: "coupon_1" }],
+      }),
+    );
+    expect(stripe.invoices.update).toHaveBeenCalledWith(
+      "in_1",
+      expect.objectContaining({ auto_advance: false }),
+    );
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backofficeUserId: "bo-user-1",
+        eventType: "backoffice.subscription_created",
+        ipAddress: "127.0.0.1",
+      }),
     );
   });
 
-  describe("createInvoicedSubscription", () => {
-    it("should create a new Stripe customer when no billing binding exists", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(mockStripe.customers.create).toHaveBeenCalledWith({
-        email: "billing@acme.com",
-        name: "Jane Doe",
-        metadata: {
-          company: "Acme Corp",
-          eid: "test---bo-invoicing-encrypted",
-          tenant_eid: "test---bo-invoicing-123",
-        },
-      });
-    });
-
-    it("should reuse existing Stripe customer when billing binding exists", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([
-          { stripeCustomerId: "cus_existing_456", tenantId: "tenant-uuid-1" },
-        ]);
-
-      await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(mockStripe.customers.create).not.toHaveBeenCalled();
-      expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          customer: "cus_existing_456",
+  it("creates a new Stripe customer and retrieves invoice when latest_invoice is a string", async () => {
+    const stripe = {
+      customers: {
+        update: vi.fn(),
+        create: vi.fn().mockResolvedValue({ id: "cus_new" }),
+      },
+      subscriptions: {
+        create: vi.fn().mockResolvedValue({
+          id: "sub_2",
+          status: "active",
+          latest_invoice: "in_2",
         }),
-      );
-    });
-
-    it("should create subscription with collection_method: send_invoice", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          collection_method: "send_invoice",
-          days_until_due: 30,
+      },
+      invoices: {
+        retrieve: vi.fn().mockResolvedValue({
+          id: "in_2",
+          status: "open",
+          hosted_invoice_url: "https://invoice.test/in_2",
+          amount_due: 5000,
+          due_date: null,
         }),
-      );
-    });
-
-    it("should embed tenant EID in Stripe metadata", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({
-            eid: "test---bo-invoicing-encrypted",
-            tenant_eid: "test---bo-invoicing-123",
-          }),
+        update: vi.fn().mockResolvedValue({
+          id: "in_2",
+          status: "open",
+          hosted_invoice_url: "https://invoice.test/in_2",
+          amount_due: 5000,
+          due_date: null,
         }),
-      );
-    });
+        list: vi.fn(),
+      },
+    };
 
-    it("should return null invoiceUrl when hosted_invoice_url is not available", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(
+          makeLimitSelectChain([{ id: "t-2", eid: "test---eid-2" }]),
+        )
+        .mockReturnValueOnce(makeLimitSelectChain([])),
+      insert: vi.fn().mockReturnValue(makeInsertChain()),
+    };
 
-      mockStripe.subscriptions.create.mockResolvedValueOnce({
-        id: "sub_abc123",
-        status: "active",
-        latest_invoice: {
-          id: "inv_002",
-          hosted_invoice_url: null,
-          status: "draft",
-          amount_due: 9900,
-          due_date: 1700000000,
-          created: 1699900000,
-          customer: "cus_new_123",
-          customer_name: "Acme Corp",
-          collection_method: "send_invoice",
-        },
-      });
+    const auditService = { log: vi.fn().mockResolvedValue(undefined) };
+    const catalogService = {
+      resolveCheckoutPriceId: vi.fn().mockResolvedValue("price_2"),
+    };
 
-      mockStripe.invoices.list.mockResolvedValueOnce({
-        data: [
-          {
-            id: "inv_002",
-            status: "open",
-            amount_due: 9900,
-            due_date: 1700000000,
-          },
-        ],
-        has_more: false,
-      });
+    const service = new InvoicingService(
+      stripe as never,
+      db as never,
+      auditService as never,
+      catalogService as never,
+    );
 
-      const result = await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
+    const result = await service.createInvoicedSubscription(
+      {
+        tenantEid: "test---eid-2",
+        tier: "enterprise",
+        interval: "annual",
+        seatCount: 5,
+        paymentTerms: "net_60",
+        customerEmail: "billing@example.com",
+        customerName: "Billing",
+        companyName: "Example Co",
+      },
+      "bo-user-1",
+      "127.0.0.1",
+    );
 
-      expect(result.invoiceUrl).toBeNull();
-    });
-
-    it("should return invoiceUrl when available", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      const result = await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(result.invoiceUrl).toBe("https://stripe.com/invoice/001");
-    });
-
-    it("should upsert billing binding after subscription creation", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(mockDb.insert).toHaveBeenCalled();
-      expect(mockDb._chain.values).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantId: "tenant-uuid-1",
-          stripeCustomerId: "cus_new_123",
-          stripeSubscriptionId: "sub_abc123",
-        }),
-      );
-    });
-
-    it("should audit log the subscription creation", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(mockAudit.log).toHaveBeenCalledWith({
-        backofficeUserId: "bo-user-1",
-        targetTenantId: "tenant-uuid-1",
-        eventType: "backoffice.subscription_created",
-        metadata: expect.objectContaining({
-          tier: "enterprise",
-          interval: "monthly",
-          seatCount: 10,
-          paymentTerms: "net_30",
-          customerEmail: "billing@acme.com",
-          subscriptionId: "sub_abc123",
-        }),
-        ipAddress: "127.0.0.1",
-      });
-    });
-
-    it("should apply coupon discount when couponId provided", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      await service.createInvoicedSubscription(
-        { ...BASE_PARAMS, couponId: "coupon_xyz" },
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          discounts: [{ coupon: "coupon_xyz" }],
-        }),
-      );
-    });
-
-    it("should not include discounts when couponId is absent", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      const call = mockStripe.subscriptions.create.mock.calls[0];
-      if (!call) {
-        throw new Error("Expected subscription create to be called");
-      }
-      const callArgs = call[0];
-      expect(callArgs).not.toHaveProperty("discounts");
-    });
-
-    it("should include stripeInvoiceId in the result", async () => {
-      mockDb._chain.limit
-        .mockResolvedValueOnce([MOCK_TENANT])
-        .mockResolvedValueOnce([]);
-
-      const result = await service.createInvoicedSubscription(
-        BASE_PARAMS,
-        "bo-user-1",
-        "127.0.0.1",
-      );
-
-      expect(result.stripeInvoiceId).toBe("inv_001");
-    });
-
-    it("should throw NotFoundException when tenant does not exist", async () => {
-      mockDb._chain.limit.mockResolvedValueOnce([]);
-
-      await expect(
-        service.createInvoicedSubscription(
-          BASE_PARAMS,
-          "bo-user-1",
-          "127.0.0.1",
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        subscriptionId: "sub_2",
+        invoiceUrl: "https://invoice.test/in_2",
+        stripeInvoiceId: "in_2",
+      }),
+    );
+    expect(stripe.customers.create).toHaveBeenCalled();
+    expect(stripe.invoices.retrieve).toHaveBeenCalledWith("in_2");
+    expect(stripe.subscriptions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ days_until_due: 60 }),
+    );
   });
 
-  describe("listInvoicesForTenant", () => {
-    it("should return empty array when no binding exists", async () => {
-      mockDb._chain.limit.mockResolvedValueOnce([]);
-
-      const result = await service.listInvoicesForTenant("tenant-uuid-1");
-
-      expect(result).toEqual([]);
-    });
-
-    it("should return mapped invoices when binding exists", async () => {
-      mockDb._chain.limit.mockResolvedValueOnce([
-        { stripeCustomerId: "cus_existing_456", tenantId: "tenant-uuid-1" },
-      ]);
-
-      mockStripe.invoices.list.mockResolvedValueOnce({
-        data: [
-          {
-            id: "inv_010",
-            amount_due: 5000,
-            status: "paid",
-            hosted_invoice_url: "https://stripe.com/inv/010",
-            due_date: 1700000000,
-            created: 1699900000,
-            customer: "cus_existing_456",
-            customer_name: "Acme Corp",
-          },
-        ],
-        has_more: false,
-      });
-
-      const result = await service.listInvoicesForTenant("tenant-uuid-1");
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(
-        expect.objectContaining({
-          amount: 5000,
-          status: "paid",
-          hostedUrl: "https://stripe.com/inv/010",
+  it("lists invoices for a tenant when a Stripe binding exists", async () => {
+    const stripe = {
+      customers: { update: vi.fn(), create: vi.fn() },
+      subscriptions: { create: vi.fn() },
+      invoices: {
+        retrieve: vi.fn(),
+        update: vi.fn(),
+        list: vi.fn().mockResolvedValue({
+          data: [
+            {
+              amount_due: 1000,
+              status: "paid",
+              created: 1700000000,
+              due_date: null,
+              hosted_invoice_url: "https://invoice.test/1",
+            },
+          ],
         }),
-      );
+      },
+    };
+
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(
+          makeLimitSelectChain([{ stripeCustomerId: "cus_1" }]),
+        ),
+      insert: vi.fn(),
+    };
+
+    const auditService = { log: vi.fn() };
+    const catalogService = { resolveCheckoutPriceId: vi.fn() };
+
+    const service = new InvoicingService(
+      stripe as never,
+      db as never,
+      auditService as never,
+      catalogService as never,
+    );
+
+    const result = await service.listInvoicesForTenant("tenant-1");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        amount: 1000,
+        status: "paid",
+        hostedUrl: "https://invoice.test/1",
+      }),
+    );
+  });
+
+  it("lists all invoices and resolves tenant EIDs from customer bindings", async () => {
+    const stripe = {
+      customers: { update: vi.fn(), create: vi.fn() },
+      subscriptions: { create: vi.fn() },
+      invoices: {
+        retrieve: vi.fn(),
+        update: vi.fn(),
+        list: vi.fn().mockResolvedValue({
+          data: [
+            {
+              id: "in_1",
+              customer: "cus_1",
+              customer_name: "Acme",
+              amount_due: 2500,
+              status: "open",
+              created: 1700000000,
+              due_date: 1730000000,
+              hosted_invoice_url: "https://invoice.test/1",
+            },
+          ],
+          has_more: true,
+        }),
+      },
+    };
+
+    const db = {
+      select: vi.fn().mockReturnValueOnce(
+        makeWhereSelectChain([{ stripeCustomerId: "cus_1", eid: "eid-1" }]),
+      ),
+      insert: vi.fn(),
+    };
+
+    const auditService = { log: vi.fn() };
+    const catalogService = { resolveCheckoutPriceId: vi.fn() };
+
+    const service = new InvoicingService(
+      stripe as never,
+      db as never,
+      auditService as never,
+      catalogService as never,
+    );
+
+    const result = await service.listAllInvoices({
+      limit: 500,
+      startingAfter: "in_prev",
     });
+
+    expect(stripe.invoices.list).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 100, starting_after: "in_prev" }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        invoices: [
+          expect.objectContaining({
+            tenantEid: "eid-1",
+            tenantName: "Acme",
+            hostedUrl: "https://invoice.test/1",
+          }),
+        ],
+        hasMore: true,
+        nextCursor: "in_1",
+      }),
+    );
   });
 });

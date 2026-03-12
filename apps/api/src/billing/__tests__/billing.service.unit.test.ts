@@ -88,7 +88,7 @@ describe('BillingService', () => {
     };
     encryptionService = {
       encrypt: vi.fn().mockReturnValue('test---billing-unit-encrypted'),
-      decrypt: vi.fn().mockReturnValue('eid-1'),
+      decrypt: vi.fn().mockReturnValue('test---billing-unit'),
     };
     rlsContext = {
       runWithTenantContext: vi
@@ -217,6 +217,21 @@ describe('BillingService', () => {
       ).resolves.toEqual({
         status: 'pending',
       });
+    });
+
+    it('rejects when the checkout session metadata does not match the tenant', async () => {
+      encryptionService.decrypt.mockReturnValue('test---other-tenant');
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        id: 'cs_other',
+        status: 'open',
+        payment_status: 'unpaid',
+        expires_at: Math.floor(Date.now() / 1000) + 30,
+        metadata: { eid: 'test---billing-unit-encrypted' },
+      });
+
+      await expect(
+        service.confirmCheckoutSession('tenant-1', 'cs_other'),
+      ).rejects.toThrow('Checkout session does not belong to this tenant');
     });
   });
 

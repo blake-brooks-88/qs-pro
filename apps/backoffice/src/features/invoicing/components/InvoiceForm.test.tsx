@@ -6,6 +6,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { InvoiceForm } from "./InvoiceForm";
 
+const mocks = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
+}));
+
 const mockRefetch = vi.fn();
 const mockMutate = vi.fn();
 
@@ -117,6 +126,7 @@ describe("InvoiceForm", () => {
     };
     renderForm();
 
+    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
     const confirmBtn = screen.getByRole("button", { name: /confirm/i });
     await userEvent.click(confirmBtn);
 
@@ -140,6 +150,7 @@ describe("InvoiceForm", () => {
     };
     renderForm();
 
+    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
     const confirmBtn = screen.getByRole("button", { name: /confirm/i });
     await userEvent.click(confirmBtn);
 
@@ -156,7 +167,7 @@ describe("InvoiceForm", () => {
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          tenantEid: "",
+          tenantEid: mockLookupData.eid,
           tier: "pro",
           interval: "monthly",
           seatCount: 1,
@@ -170,13 +181,11 @@ describe("InvoiceForm", () => {
     });
   });
 
-  it("should show InvoiceResultCard on successful submission", () => {
+  it("shows InvoiceResultCard on success and resets form", async () => {
     mockEidLookupReturn = {
       ...mockEidLookupReturn,
       data: mockLookupData,
     };
-
-    const { rerender } = renderForm();
 
     mockMutate.mockImplementation(
       (_params: unknown, opts: { onSuccess: (d: unknown) => void }) => {
@@ -191,25 +200,47 @@ describe("InvoiceForm", () => {
       },
     );
 
-    mockCreateReturn = {
-      mutate: mockMutate,
-      isPending: false,
-    };
+    renderForm();
 
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <InvoiceForm />
-        </MemoryRouter>
-      </QueryClientProvider>,
+    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
+    await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
+
+    await userEvent.type(screen.getByLabelText(/customer email/i), "john@acme.com");
+    await userEvent.type(screen.getByLabelText(/customer name/i), "John Doe");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /create invoiced subscription/i }),
     );
 
-    const confirmBtn = screen.queryByRole("button", { name: /confirm/i });
-    if (confirmBtn) {
-      void userEvent.click(confirmBtn);
-    }
+    expect(await screen.findByText("Subscription Created")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Create Another" }));
+    expect(screen.getByLabelText(/enterprise id/i)).toHaveValue("");
+  });
+
+  it("shows a toast when create mutation errors", async () => {
+    mockEidLookupReturn = {
+      ...mockEidLookupReturn,
+      data: mockLookupData,
+    };
+
+    mockMutate.mockImplementationOnce(
+      (_params: unknown, opts: { onError?: (e: Error) => void }) =>
+        opts.onError?.(new Error("boom")),
+    );
+
+    renderForm();
+
+    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
+    await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
+
+    await userEvent.type(screen.getByLabelText(/customer email/i), "john@acme.com");
+    await userEvent.type(screen.getByLabelText(/customer name/i), "John Doe");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /create invoiced subscription/i }),
+    );
+
+    expect(mocks.toastError).toHaveBeenCalledWith("boom");
   });
 });

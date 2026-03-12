@@ -193,6 +193,11 @@ export async function purgeTestData(): Promise<number> {
       await tx`ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY`;
 
       await tx`
+        DELETE FROM credentials
+        WHERE tenant_id IN (
+          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        )`;
+      await tx`
         DELETE FROM users
         WHERE tenant_id IN (
           SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}

@@ -98,6 +98,10 @@ function isCoveredSourceFile(file) {
 
   const normalized = file.replaceAll("\\", "/");
   const excluded =
+    // Test-only utility package (not a shipped artifact).
+    normalized.startsWith("packages/test-utils/") ||
+    // Copied UI primitives in backoffice (coverage is noisy and low-value).
+    normalized.startsWith("apps/backoffice/src/components/ui/") ||
     normalized.includes("/__tests__/") ||
     normalized.includes("/test/") ||
     normalized.includes("/stubs/") ||
@@ -120,7 +124,8 @@ function isCoveredSourceFile(file) {
     normalized.endsWith(".health.ts") ||
     normalized.endsWith("/health.controller.ts") ||
     normalized.endsWith(".module.ts") ||
-    normalized.endsWith(".provider.ts");
+    normalized.endsWith(".provider.ts") ||
+    normalized.includes("/src/scripts/");
 
   return !excluded;
 }

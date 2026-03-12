@@ -124,11 +124,11 @@ describe("Settings Controller (integration)", () => {
   });
 
   describe("POST /settings/users/:userId/reset-password", () => {
-    it("rejects password shorter than 8 chars", async () => {
+    it("rejects password shorter than 16 chars", async () => {
       const response = await app.inject({
         method: "POST",
         url: "/settings/users/some-user-id/reset-password",
-        payload: { newPassword: "short" },
+        payload: { newPassword: "123456789012345" },
       });
 
       expect(response.statusCode).toBe(400);

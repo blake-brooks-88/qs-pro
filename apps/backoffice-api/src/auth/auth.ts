@@ -16,12 +16,19 @@ const databaseUrl = process.env.DATABASE_URL_BACKOFFICE;
 if (!databaseUrl) {
   throw new Error("DATABASE_URL_BACKOFFICE is required");
 }
+
+const authSecret = process.env.BETTER_AUTH_SECRET;
+if (!authSecret) {
+  throw new Error("BETTER_AUTH_SECRET is required");
+}
+
 assertSafeBackofficeDatabaseUrl(databaseUrl);
 const client = postgres(databaseUrl);
 const db = drizzle(client);
 
 export const auth = betterAuth({
   appName: "QS Pro Backoffice",
+  secret: authSecret,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {

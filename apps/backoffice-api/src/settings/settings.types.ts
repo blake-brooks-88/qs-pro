@@ -17,7 +17,7 @@ export const ChangeRoleSchema = z.object({
 export type ChangeRoleDto = z.infer<typeof ChangeRoleSchema>;
 
 export const ResetPasswordSchema = z.object({
-  newPassword: z.string().min(8),
+  newPassword: PasswordSchema,
 });
 
 export type ResetPasswordDto = z.infer<typeof ResetPasswordSchema>;

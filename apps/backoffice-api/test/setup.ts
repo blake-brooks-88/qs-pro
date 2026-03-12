@@ -84,6 +84,9 @@ export async function createTestApp(overrides?: {
   const { FeatureOverridesService } = await import(
     "../src/feature-overrides/feature-overrides.service.js"
   );
+  const { InvoicingService } = await import(
+    "../src/invoicing/invoicing.service.js"
+  );
   const { TenantsService } = await import("../src/tenants/tenants.service.js");
 
   const module = await Test.createTestingModule({
@@ -103,6 +106,23 @@ export async function createTestApp(overrides?: {
         }
       }),
       removeOverride: vi.fn().mockResolvedValue(undefined),
+    })
+    .overrideProvider(InvoicingService)
+    .useValue({
+      createInvoicedSubscription: vi.fn().mockResolvedValue({
+        invoiceUrl: "https://invoice.test/1",
+        subscriptionId: "sub_test",
+        invoiceStatus: "open",
+        amount: 2500,
+        dueDate: null,
+        stripeInvoiceId: "in_test",
+      }),
+      listInvoicesForTenant: vi.fn().mockResolvedValue([]),
+      listAllInvoices: vi.fn().mockResolvedValue({
+        invoices: [],
+        hasMore: false,
+        nextCursor: null,
+      }),
     })
     .overrideProvider(TenantsService)
     .useValue({

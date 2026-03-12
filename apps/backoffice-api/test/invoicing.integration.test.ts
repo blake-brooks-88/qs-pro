@@ -168,9 +168,12 @@ describe("Invoicing Controller (integration)", () => {
         url: "/invoicing/invoices",
       });
 
-      // Stripe may not be configured — accept 200 or 500, not 400 or 403
-      expect(response.statusCode).not.toBe(400);
-      expect(response.statusCode).not.toBe(403);
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body).toHaveProperty("invoices");
+      expect(Array.isArray(body.invoices)).toBe(true);
+      expect(body).toHaveProperty("hasMore");
+      expect(body).toHaveProperty("nextCursor");
     });
 
     it("accepts request with explicit pagination", async () => {
@@ -179,9 +182,9 @@ describe("Invoicing Controller (integration)", () => {
         url: "/invoicing/invoices?limit=10",
       });
 
-      // Stripe may not be configured — accept 200 or 500, not 400 or 403
-      expect(response.statusCode).not.toBe(400);
-      expect(response.statusCode).not.toBe(403);
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body).toHaveProperty("invoices");
     });
 
     it("rejects non-numeric limit", async () => {
@@ -191,6 +194,18 @@ describe("Invoicing Controller (integration)", () => {
       });
 
       expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe("GET /invoicing/tenants/:tenantId/invoices", () => {
+    it("returns an empty list for stubbed service", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/invoicing/tenants/some-tenant-id/invoices",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual([]);
     });
   });
 });
@@ -212,7 +227,7 @@ describe("Invoicing Controller — role-based access (integration)", () => {
       url: "/invoicing/invoices",
     });
 
-    expect(response.statusCode).not.toBe(403);
+    expect(response.statusCode).toBe(200);
   });
 
   it("viewer cannot create subscriptions (editor required)", async () => {

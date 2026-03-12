@@ -127,4 +127,23 @@ describe("BackofficeAuditService", () => {
     expect(mockDb._selectChain.limit).toHaveBeenCalledWith(5);
     expect(mockDb._selectChain.offset).toHaveBeenCalledWith(10);
   });
+
+  it("should return all logs with defaults when no options provided", async () => {
+    mockDb._selectChain.offset.mockResolvedValueOnce([]);
+
+    await service.getAllLogs();
+
+    expect(mockDb._selectChain.limit).toHaveBeenCalledWith(50);
+    expect(mockDb._selectChain.offset).toHaveBeenCalledWith(0);
+  });
+
+  it("should filter getAllLogs by eventType when provided", async () => {
+    mockDb._selectChain.offset.mockResolvedValueOnce([]);
+
+    await service.getAllLogs({ eventType: "tenant.view", limit: 10, offset: 5 });
+
+    expect(mockDb._selectChain.where).toHaveBeenCalledTimes(1);
+    expect(mockDb._selectChain.limit).toHaveBeenCalledWith(10);
+    expect(mockDb._selectChain.offset).toHaveBeenCalledWith(5);
+  });
 });
