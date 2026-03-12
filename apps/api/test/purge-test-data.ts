@@ -22,6 +22,18 @@ import postgres from 'postgres';
 const PRESERVED_EIDS = ['534019240', '10978264'];
 
 /**
+ * Legacy test EIDs from old test code that didn't follow the `test---` convention.
+ * These are explicitly targeted for cleanup since they don't match the `test---%` pattern.
+ */
+const LEGACY_TEST_EIDS = [
+  'csrf-eid',
+  'other-eid',
+  'eid-123',
+  'eid-jwt',
+  'eid-refresh',
+];
+
+/**
  * Parses a dotenv-style file into key-value pairs.
  * Handles CRLF/LF line endings, comments, and blank lines.
  */
@@ -119,7 +131,7 @@ export async function purgeTestData(): Promise<number> {
   try {
     const [{ count }] = await sql<[{ count: number }]>`
       SELECT count(*)::int AS count FROM tenants
-      WHERE eid LIKE 'test---%'
+      WHERE (eid LIKE 'test---%' OR eid IN ${sql(LEGACY_TEST_EIDS)})
         AND eid NOT IN ${sql(PRESERVED_EIDS)}
     `;
 
@@ -131,47 +143,47 @@ export async function purgeTestData(): Promise<number> {
       await tx`
         DELETE FROM shell_query_runs
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM query_publish_events
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM query_versions
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM credentials
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM saved_queries
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM folders
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM snippets
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM tenant_feature_overrides
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM tenant_settings
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
 
       // org_subscriptions: FORCE RLS blocks the table owner (qs_migrate).
@@ -181,7 +193,7 @@ export async function purgeTestData(): Promise<number> {
       await tx`
         DELETE FROM org_subscriptions
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`ALTER TABLE org_subscriptions FORCE ROW LEVEL SECURITY`;
 
@@ -195,7 +207,7 @@ export async function purgeTestData(): Promise<number> {
       await tx`
         DELETE FROM audit_logs
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
       await tx`ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY`;
@@ -203,23 +215,28 @@ export async function purgeTestData(): Promise<number> {
       await tx`
         DELETE FROM credentials
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM credentials
         WHERE user_id IN (
           SELECT id FROM users WHERE tenant_id IN (
-            SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+            SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
           )
         )`;
       await tx`
         DELETE FROM users
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        )`;
+      await tx`
+        DELETE FROM backoffice_audit_logs
+        WHERE target_tenant_id IN (
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM tenants
-        WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
       `;
     });
 

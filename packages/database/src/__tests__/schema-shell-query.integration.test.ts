@@ -48,8 +48,8 @@ describe("Shell Query Engine Schema", () => {
     const [tenant] = await db
       .insert(tenants)
       .values({
-        eid: `sqe-test-eid-${uniqueId}`,
-        tssd: `sqe-test-subdomain-${uniqueId}`,
+        eid: `test---sqe-${uniqueId}`,
+        tssd: `test---sqe-tssd-${uniqueId}`,
       })
       .returning();
     if (!tenant) {
@@ -60,10 +60,10 @@ describe("Shell Query Engine Schema", () => {
     const [user] = await db
       .insert(users)
       .values({
-        sfUserId: `sqe-test-user-${uniqueId}`,
+        sfUserId: `test---sqe-user-${uniqueId}`,
         tenantId: tenant.id,
-        email: "sqe@test.com",
-        name: "SQE Tester",
+        email: "test---sqe@test.com",
+        name: "Test SQE Tester",
       })
       .returning();
     if (!user) {
