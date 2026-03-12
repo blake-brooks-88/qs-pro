@@ -285,7 +285,7 @@ vi.mock("@/features/editor-workspace/hooks/use-query-versions", () => ({
 function createDefaultProps(): Parameters<typeof EditorWorkspace>[0] {
   return {
     tenantId: "tenant-1",
-    eid: "100001234",
+    eid: "test---web-stub",
     folders: [
       { id: "folder-1", name: "Queries", parentId: null, type: "library" },
     ] satisfies Folder[],

@@ -29,7 +29,7 @@ describe("useAuthStore", () => {
       email: "test@test.com",
       name: "Test",
     };
-    const tenant = { id: "t1", eid: "e1", tssd: "tssd1" };
+    const tenant = { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" };
 
     useAuthStore.getState().setAuth(user, tenant);
 
@@ -48,7 +48,7 @@ describe("useAuthStore", () => {
       email: "test@test.com",
       name: "Test",
     };
-    const tenant = { id: "t1", eid: "e1", tssd: "tssd1" };
+    const tenant = { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" };
 
     useAuthStore.getState().setAuth(user, tenant, "csrf-123");
     useAuthStore.getState().logout();
@@ -68,7 +68,7 @@ describe("useAuthStore", () => {
       email: "test@test.com",
       name: "Test",
     };
-    const tenant = { id: "t1", eid: "e1", tssd: "tssd1" };
+    const tenant = { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" };
 
     useAuthStore.getState().setAuth(user, tenant, "csrf-123");
 
@@ -94,7 +94,7 @@ describe("useAuthStore", () => {
       .getState()
       .setAuth(
         { id: "u1", sfUserId: "sf1", email: null, name: null },
-        { id: "t1", eid: "e1", tssd: "tssd1" },
+        { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" },
         "csrf-123",
       );
 

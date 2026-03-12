@@ -17,7 +17,7 @@ export function createUserStub(overrides?: Partial<User>): User {
 export function createTenantStub(overrides?: Partial<Tenant>): Tenant {
   return {
     id: "tenant-1",
-    eid: "100001234",
+    eid: "test---web-stub",
     tssd: "mcabc123.auth.marketingcloudapis.com",
     ...overrides,
   };

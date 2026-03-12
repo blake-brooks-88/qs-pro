@@ -7,7 +7,7 @@ import { TenantDetailPage } from "./TenantDetailPage";
 
 const mockTenant = {
   tenantId: "t-001",
-  eid: "12345678",
+  eid: "test---bo-tenant-detail",
   companyName: "Acme Corp",
   tier: "pro",
   subscriptionStatus: "active",

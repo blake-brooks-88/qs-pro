@@ -65,7 +65,7 @@ function createMockDb() {
 
 const SAMPLE_TENANT_ROW = {
   tenantId: "550e8400-e29b-41d4-a716-446655440000",
-  eid: "100012345",
+  eid: "test---bo-tenants",
   companyName: "acme-corp",
   tier: "pro" as const,
   subscriptionStatus: "active" as const,
@@ -136,7 +136,7 @@ describe("TenantsService", () => {
   it("should return full tenant detail with subscription data", async () => {
     const detailRow = {
       tenantId: "550e8400-e29b-41d4-a716-446655440000",
-      eid: "100012345",
+      eid: "test---bo-tenants",
       companyName: "acme-corp",
       tier: "pro",
       subscriptionStatus: "active",
@@ -172,7 +172,7 @@ describe("TenantsService", () => {
 
   it("should return only safe fields from EID lookup", async () => {
     const lookupRow = {
-      eid: "100012345",
+      eid: "test---bo-tenants",
       companyName: "acme-corp",
       userCount: 5,
       tier: "pro",
@@ -184,7 +184,7 @@ describe("TenantsService", () => {
     mockDb.addResult([]); // groupBy: userCounts subquery
     mockDb.addResult([lookupRow]); // offset: main query
 
-    const result = await service.lookupByEid("100012345");
+    const result = await service.lookupByEid("test---bo-tenants");
 
     expect(result).not.toBeNull();
     expect(result).toHaveProperty("eid");

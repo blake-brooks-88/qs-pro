@@ -9,7 +9,7 @@ vi.mock("@qpp/database", async () => {
   const actual = await vi.importActual("@qpp/database");
   return {
     ...actual,
-    encrypt: vi.fn((_text: string, _key: string) => "encrypted_eid_value"),
+    encrypt: vi.fn((_text: string, _key: string) => "test---bo-invoicing-encrypted"),
   };
 });
 
@@ -118,7 +118,7 @@ function createMockStripe() {
 
 const MOCK_TENANT = {
   id: "tenant-uuid-1",
-  eid: "test-eid-123",
+  eid: "test---bo-invoicing-123",
   tssd: "test-tssd",
   auditRetentionDays: 365,
   installedAt: new Date(),
@@ -158,7 +158,7 @@ function createMockCatalogService(): StripeCatalogService {
 }
 
 const BASE_PARAMS = {
-  tenantEid: "test-eid-123",
+  tenantEid: "test---bo-invoicing-123",
   tier: "enterprise" as const,
   interval: "monthly" as const,
   seatCount: 10,
@@ -207,8 +207,8 @@ describe("InvoicingService", () => {
         name: "Jane Doe",
         metadata: {
           company: "Acme Corp",
-          eid: "encrypted_eid_value",
-          tenant_eid: "test-eid-123",
+          eid: "test---bo-invoicing-encrypted",
+          tenant_eid: "test---bo-invoicing-123",
         },
       });
     });
@@ -267,8 +267,8 @@ describe("InvoicingService", () => {
       expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
-            eid: "encrypted_eid_value",
-            tenant_eid: "test-eid-123",
+            eid: "test---bo-invoicing-encrypted",
+            tenant_eid: "test---bo-invoicing-123",
           }),
         }),
       );

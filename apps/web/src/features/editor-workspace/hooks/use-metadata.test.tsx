@@ -60,7 +60,7 @@ describe("use-metadata hooks", () => {
     );
 
     const { result } = renderHook(
-      () => useMetadataFolders("tenant-1", "eid-1"),
+      () => useMetadataFolders("tenant-1", "test---web-metadata-hook"),
       { wrapper },
     );
 
@@ -68,7 +68,7 @@ describe("use-metadata hooks", () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(capturedEid).toBe("eid-1");
+    expect(capturedEid).toBe("test---web-metadata-hook");
     expect(result.current.data).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "10", name: "Root", parentId: null }),
@@ -92,7 +92,11 @@ describe("use-metadata hooks", () => {
     );
 
     const { result } = renderHook(
-      () => useDataExtensions({ tenantId: "tenant-1", eid: "eid-1" }),
+      () =>
+        useDataExtensions({
+          tenantId: "tenant-1",
+          eid: "test---web-metadata-hook",
+        }),
       { wrapper },
     );
 
@@ -100,7 +104,7 @@ describe("use-metadata hooks", () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(capturedEid).toBe("eid-1");
+    expect(capturedEid).toBe("test---web-metadata-hook");
     expect(result.current.data).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -175,7 +179,8 @@ describe("use-metadata hooks", () => {
     );
 
     const { result } = renderHook(
-      () => useMetadata({ tenantId: "tenant-1", eid: "eid-1" }),
+      () =>
+        useMetadata({ tenantId: "tenant-1", eid: "test---web-metadata-hook" }),
       { wrapper },
     );
 

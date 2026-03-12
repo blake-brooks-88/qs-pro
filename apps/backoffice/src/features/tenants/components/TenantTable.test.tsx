@@ -7,7 +7,7 @@ import { type TenantListItem, TenantTable } from "./TenantTable";
 const sampleTenants: TenantListItem[] = [
   {
     tenantId: "t-001",
-    eid: "12345678",
+    eid: "test---bo-tenant-1",
     companyName: "Acme Corp",
     tier: "pro",
     subscriptionStatus: "active",
@@ -17,7 +17,7 @@ const sampleTenants: TenantListItem[] = [
   },
   {
     tenantId: "t-002",
-    eid: "87654321",
+    eid: "test---bo-tenant-2",
     companyName: "Enterprise Ltd",
     tier: "enterprise",
     subscriptionStatus: "trialing",
@@ -27,7 +27,7 @@ const sampleTenants: TenantListItem[] = [
   },
   {
     tenantId: "t-003",
-    eid: "11111111",
+    eid: "test---bo-tenant-3",
     companyName: "Startup Inc",
     tier: "free",
     subscriptionStatus: "canceled",
@@ -37,7 +37,7 @@ const sampleTenants: TenantListItem[] = [
   },
   {
     tenantId: "t-004",
-    eid: "22222222",
+    eid: "test---bo-tenant-4",
     companyName: "Overdue Co",
     tier: "pro",
     subscriptionStatus: "past_due",
@@ -70,9 +70,9 @@ describe("TenantTable", () => {
     renderTable();
 
     expect(screen.getByText("Acme Corp")).toBeInTheDocument();
-    expect(screen.getByText("12345678")).toBeInTheDocument();
+    expect(screen.getByText("test---bo-tenant-1")).toBeInTheDocument();
     expect(screen.getByText("Enterprise Ltd")).toBeInTheDocument();
-    expect(screen.getByText("87654321")).toBeInTheDocument();
+    expect(screen.getByText("test---bo-tenant-2")).toBeInTheDocument();
   });
 
   it("should render tier badges with correct variants", () => {

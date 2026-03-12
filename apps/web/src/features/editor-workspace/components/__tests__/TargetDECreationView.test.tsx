@@ -110,7 +110,7 @@ describe("TargetDECreationView", () => {
   ) => {
     const defaultProps = {
       tenantId: "tenant-123",
-      eid: "eid-456",
+      eid: "test---web-target-de",
       sqlText: "SELECT SubscriberKey, EmailAddress FROM MyDE",
       folders: mockFolders,
       dataExtensions: mockDataExtensions,
@@ -301,7 +301,7 @@ describe("TargetDECreationView", () => {
         customerKey: "my_new_de_key",
       });
 
-      renderComponent({ tenantId: "tenant-123", eid: "eid-456" });
+      renderComponent({ tenantId: "tenant-123", eid: "test---web-target-de" });
 
       // Wait for loading to complete
       await waitFor(() => {
@@ -331,7 +331,7 @@ describe("TargetDECreationView", () => {
 
       // Verify DE was added to cache
       const cachedDEs = queryClient.getQueryData<DataExtension[]>(
-        metadataQueryKeys.dataExtensions("tenant-123", "eid-456"),
+        metadataQueryKeys.dataExtensions("tenant-123", "test---web-target-de"),
       );
       expect(cachedDEs).toBeDefined();
       expect(cachedDEs).toEqual(

@@ -41,7 +41,7 @@ function createMockMeResponse() {
     },
     tenant: {
       id: "tenant-1",
-      eid: "100001234",
+      eid: "test---web-stub",
       tssd: "mcabc123.auth.marketingcloudapis.com",
     },
     csrfToken: "csrf-token-123",

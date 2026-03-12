@@ -10,7 +10,7 @@ const mockRefetch = vi.fn();
 const mockMutate = vi.fn();
 
 const mockLookupData = {
-  eid: "12345678",
+  eid: "test---bo-invoice-form",
   companyName: "Acme Corp",
   userCount: 5,
   tier: "pro",
