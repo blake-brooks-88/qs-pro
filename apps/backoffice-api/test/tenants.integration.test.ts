@@ -27,6 +27,8 @@ describe("Tenants Controller (integration)", () => {
       expect(Array.isArray(body.data)).toBe(true);
       expect(body).toHaveProperty("page");
       expect(body).toHaveProperty("limit");
+      expect(body).toHaveProperty("total");
+      expect(typeof body.total).toBe("number");
     });
 
     it("applies default pagination values", async () => {

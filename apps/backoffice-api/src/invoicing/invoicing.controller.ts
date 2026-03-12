@@ -42,7 +42,7 @@ export class InvoicingController {
   ) {
     return this.invoicingService.listAllInvoices({
       limit: query.limit,
-      startingAfter: undefined,
+      startingAfter: query.startingAfter,
     });
   }
 }

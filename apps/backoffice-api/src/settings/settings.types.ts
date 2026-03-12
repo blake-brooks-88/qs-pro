@@ -1,15 +1,17 @@
+import { PasswordSchema } from "@qpp/shared-types";
 import { z } from "zod";
 
 export const InviteUserSchema = z.object({
   email: z.string().email(),
-  role: z.enum(["user", "admin"]),
+  role: z.enum(["viewer", "editor", "admin"]),
   name: z.string().optional(),
+  temporaryPassword: PasswordSchema,
 });
 
 export type InviteUserDto = z.infer<typeof InviteUserSchema>;
 
 export const ChangeRoleSchema = z.object({
-  role: z.enum(["user", "admin"]),
+  role: z.enum(["viewer", "editor", "admin"]),
 });
 
 export type ChangeRoleDto = z.infer<typeof ChangeRoleSchema>;

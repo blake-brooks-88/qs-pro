@@ -28,6 +28,25 @@ describe("Settings Controller (integration)", () => {
       expect(body.errors).toHaveProperty("email");
     });
 
+    it.each(["viewer", "editor", "admin"] as const)(
+      "accepts viewer/editor/admin roles (%s)",
+      async (role) => {
+        const response = await app.inject({
+          method: "POST",
+          url: "/settings/users/invite",
+          payload: {
+            email: "test@example.com",
+            role,
+            name: "Test",
+            temporaryPassword: "ValidPassword123456",
+          },
+        });
+
+        expect(response.statusCode).not.toBe(400);
+        expect(response.statusCode).not.toBe(403);
+      },
+    );
+
     it("rejects invalid role", async () => {
       const response = await app.inject({
         method: "POST",
@@ -66,6 +85,20 @@ describe("Settings Controller (integration)", () => {
   });
 
   describe("PATCH /settings/users/:userId/role", () => {
+    it.each(["viewer", "editor", "admin"] as const)(
+      "accepts viewer/editor/admin roles (%s)",
+      async (role) => {
+        const response = await app.inject({
+          method: "PATCH",
+          url: "/settings/users/some-user-id/role",
+          payload: { role },
+        });
+
+        expect(response.statusCode).not.toBe(400);
+        expect(response.statusCode).not.toBe(403);
+      },
+    );
+
     it("rejects invalid role", async () => {
       const response = await app.inject({
         method: "PATCH",

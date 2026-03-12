@@ -162,10 +162,21 @@ describe("Invoicing Controller (integration)", () => {
   });
 
   describe("GET /invoicing/invoices", () => {
+    it("accepts request without query params", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/invoicing/invoices",
+      });
+
+      // Stripe may not be configured — accept 200 or 500, not 400 or 403
+      expect(response.statusCode).not.toBe(400);
+      expect(response.statusCode).not.toBe(403);
+    });
+
     it("accepts request with explicit pagination", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/invoicing/invoices?limit=10&offset=0",
+        url: "/invoicing/invoices?limit=10",
       });
 
       // Stripe may not be configured — accept 200 or 500, not 400 or 403

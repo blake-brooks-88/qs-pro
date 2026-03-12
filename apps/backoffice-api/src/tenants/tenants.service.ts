@@ -69,24 +69,33 @@ export class TenantsService {
     const sortColumn = this.getSortColumn(query.sortBy);
     const sortDirection = query.sortOrder === "desc" ? desc : asc;
 
-    const rows = await this.db
-      .select({
-        tenantId: tenants.id,
-        eid: tenants.eid,
-        companyName: tenants.tssd,
-        tier: orgSubscriptions.tier,
-        subscriptionStatus: orgSubscriptions.stripeSubscriptionStatus,
-        userCount: sql<number>`COALESCE(${userCounts.userCount}, 0)`,
-        signupDate: tenants.installedAt,
-        lastActiveDate: sql<Date | null>`NULL`,
-      })
-      .from(tenants)
-      .leftJoin(orgSubscriptions, eq(tenants.id, orgSubscriptions.tenantId))
-      .leftJoin(userCounts, eq(tenants.id, userCounts.tenantId))
-      .where(whereClause)
-      .orderBy(sortDirection(sortColumn))
-      .limit(limit)
-      .offset(offset);
+    const [rows, totalRows] = await Promise.all([
+      this.db
+        .select({
+          tenantId: tenants.id,
+          eid: tenants.eid,
+          companyName: tenants.tssd,
+          tier: orgSubscriptions.tier,
+          subscriptionStatus: orgSubscriptions.stripeSubscriptionStatus,
+          userCount: sql<number>`COALESCE(${userCounts.userCount}, 0)`,
+          signupDate: tenants.installedAt,
+          lastActiveDate: sql<Date | null>`NULL`,
+        })
+        .from(tenants)
+        .leftJoin(orgSubscriptions, eq(tenants.id, orgSubscriptions.tenantId))
+        .leftJoin(userCounts, eq(tenants.id, userCounts.tenantId))
+        .where(whereClause)
+        .orderBy(sortDirection(sortColumn))
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ total: sql<number>`COUNT(DISTINCT ${tenants.id})` })
+        .from(tenants)
+        .leftJoin(orgSubscriptions, eq(tenants.id, orgSubscriptions.tenantId))
+        .where(whereClause),
+    ]);
+
+    const total = Number(totalRows[0]?.total ?? 0);
 
     return {
       data: rows.map((r) => ({
@@ -101,6 +110,7 @@ export class TenantsService {
       })),
       page,
       limit,
+      total,
     };
   }
 

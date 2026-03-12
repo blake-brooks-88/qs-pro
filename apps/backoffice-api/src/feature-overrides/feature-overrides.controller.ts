@@ -32,7 +32,7 @@ export class FeatureOverridesController {
     await this.overridesService.setOverride(
       tenantId,
       featureKey,
-      Boolean(body.value),
+      body.enabled,
       user.id,
       req.ip,
     );
