@@ -18,6 +18,7 @@ import { HealthModule } from "./health/health.module";
 import { MetricsModule } from "./metrics/metrics.module";
 import { RedisModule } from "./redis/redis.module";
 import { ShellQueryModule } from "./shell-query/shell-query.module";
+import { SiemModule } from "./siem/siem.module";
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ShellQueryModule } from "./shell-query/shell-query.module";
     MceModule,
     HealthModule,
     ShellQueryModule,
+    SiemModule,
     RedisModule,
     MetricsModule,
   ],

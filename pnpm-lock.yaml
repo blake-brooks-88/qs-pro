@@ -675,6 +675,9 @@ importers:
       '@sentry/nestjs':
         specifier: ^10.38.0
         version: 10.38.0(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.11(@nestjs/common@11.1.11(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.11)(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      axios:
+        specifier: ^1.13.5
+        version: 1.13.5
       bullmq:
         specifier: ^5.66.4
         version: 5.66.4
@@ -13474,7 +13477,7 @@ snapshots:
 
   fork-ts-checker-webpack-plugin@9.1.0(typescript@5.9.3)(webpack@5.105.2(@swc/core@1.15.8)(esbuild@0.27.2)):
     dependencies:
-      '@babel/code-frame': 7.27.1
+      '@babel/code-frame': 7.29.0
       chalk: 4.1.2
       chokidar: 4.0.3
       cosmiconfig: 8.3.6(typescript@5.9.3)
