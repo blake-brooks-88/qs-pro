@@ -42,6 +42,12 @@ export type AuditEventType =
   | "subscription.webhook_conflict"
   // Checkout
   | "checkout.expired"
+  // Roles
+  | "role.changed"
+  | "role.ownership_transferred"
+  // SIEM
+  | "siem.config_updated"
+  | "siem.config_deleted"
   // System
   | "system.sweeper_run"
   | "system.retention_purge";
@@ -80,6 +86,10 @@ export const AUDIT_EVENT_TYPES: AuditEventType[] = [
   "subscription.dispute_closed",
   "subscription.webhook_conflict",
   "checkout.expired",
+  "role.changed",
+  "role.ownership_transferred",
+  "siem.config_updated",
+  "siem.config_deleted",
   "system.sweeper_run",
   "system.retention_purge",
 ] as const;

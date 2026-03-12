@@ -178,10 +178,21 @@ export class AuthService {
       await this.seatLimitService.checkSeatLimit(tenant.id);
     }
 
-    const user = await this.userRepo.upsert({
+    let user = await this.userRepo.upsert({
       sfUserId,
       tenantId: tenant.id,
     });
+
+    if (!existingUser) {
+      const userCount = await this.tenantRepo.countUsersByTenantId(tenant.id);
+      if (userCount === 1) {
+        await this.userRepo.updateRole(user.id, "owner");
+        user = { ...user, role: "owner" as const };
+        this.logger.log(
+          `First user for tenant=${tenant.id} assigned owner role userId=${user.id}`,
+        );
+      }
+    }
 
     await this.saveTokens(tenant.id, user.id, mid, tokenData);
 
@@ -574,7 +585,7 @@ export class AuthService {
 
     const userUpsertStartedAt = Date.now();
     this.logger.log("OAuth callback user upsert starting");
-    const user = await this.userRepo.upsert({
+    let user = await this.userRepo.upsert({
       sfUserId: effectiveSfUserId,
       tenantId: tenant.id,
       email: effectiveEmail,
@@ -583,6 +594,17 @@ export class AuthService {
     this.logger.log(
       `OAuth callback user upsert completed durationMs=${Date.now() - userUpsertStartedAt}`,
     );
+
+    if (!existingUser) {
+      const userCount = await this.tenantRepo.countUsersByTenantId(tenant.id);
+      if (userCount === 1) {
+        await this.userRepo.updateRole(user.id, "owner");
+        user = { ...user, role: "owner" as const };
+        this.logger.log(
+          `First user for tenant=${tenant.id} assigned owner role userId=${user.id}`,
+        );
+      }
+    }
 
     const saveTokensStartedAt = Date.now();
     this.logger.log(
