@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthGuard } from "./auth.guard.js";
 
+const mockGetSession = vi.fn();
+
 vi.mock("./auth.js", () => ({
-  auth: {
+  getAuth: () => ({
     api: {
-      getSession: vi.fn(),
+      getSession: mockGetSession,
     },
-  },
+  }),
 }));
 
 vi.mock("better-auth/node", () => ({
@@ -17,8 +19,6 @@ vi.mock("better-auth/node", () => ({
 }));
 
 import { fromNodeHeaders } from "better-auth/node";
-
-import { auth } from "./auth.js";
 
 describe("AuthGuard", () => {
   let guard: AuthGuard;
@@ -54,12 +54,12 @@ describe("AuthGuard", () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(auth.api.getSession).not.toHaveBeenCalled();
+    expect(mockGetSession).not.toHaveBeenCalled();
   });
 
   it("should throw UnauthorizedException when no session exists", async () => {
     vi.spyOn(reflector, "getAllAndOverride").mockReturnValue(false);
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
 
     const { context } = createMockContext();
 
@@ -75,13 +75,7 @@ describe("AuthGuard", () => {
       user: { id: "user-1", role: "admin", email: "admin@test.com" },
       session: { id: "sess-1", token: "tok-1" },
     };
-    vi.mocked(auth.api.getSession).mockResolvedValue(
-      mockSession as ReturnType<typeof auth.api.getSession> extends Promise<
-        infer T
-      >
-        ? T
-        : never,
-    );
+    mockGetSession.mockResolvedValue(mockSession);
 
     const { context, request } = createMockContext();
     const result = await guard.canActivate(context);
@@ -97,13 +91,7 @@ describe("AuthGuard", () => {
       user: { id: "user-1", role: "admin", email: "admin@test.com" },
       session: { id: "sess-1", token: "tok-1" },
     };
-    vi.mocked(auth.api.getSession).mockResolvedValue(
-      mockSession as ReturnType<typeof auth.api.getSession> extends Promise<
-        infer T
-      >
-        ? T
-        : never,
-    );
+    mockGetSession.mockResolvedValue(mockSession);
 
     const { context, request } = createMockContext();
     await guard.canActivate(context);
@@ -113,7 +101,7 @@ describe("AuthGuard", () => {
 
   it("should call getSession with request headers", async () => {
     vi.spyOn(reflector, "getAllAndOverride").mockReturnValue(false);
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
 
     const headers = { authorization: "Bearer xyz", cookie: "sid=abc" };
     const { context } = createMockContext({ headers });

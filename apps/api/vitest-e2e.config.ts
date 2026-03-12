@@ -2,13 +2,13 @@ import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  root: '.',
   test: {
     name: 'api-e2e',
     globals: true,
     environment: 'node',
     include: ['test/**/*.e2e.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
+    root: './',
     env: {
       NODE_ENV: 'test',
       LOG_FORMAT: 'text',

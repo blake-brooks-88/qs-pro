@@ -9,12 +9,11 @@ import {
   Query,
   Req,
 } from "@nestjs/common";
-import { PasswordSchema } from "@qpp/shared-types";
 import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyRequest } from "fastify";
 
 import { BackofficeAuditService } from "../audit/audit.service.js";
-import { auth } from "../auth/auth.js";
+import { getAuth } from "../auth/auth.js";
 import { CurrentUser } from "../auth/current-user.decorator.js";
 import { Roles } from "../auth/roles.decorator.js";
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe.js";
@@ -39,7 +38,7 @@ export class SettingsController {
     @Req() req: FastifyRequest,
     @Query(new ZodValidationPipe(ListUsersQuerySchema)) query: ListUsersQuery,
   ) {
-    const result = await auth.api.listUsers({
+    const result = await getAuth().api.listUsers({
       headers: fromNodeHeaders(req.headers),
       query: {
         limit: query.limit,
@@ -64,14 +63,12 @@ export class SettingsController {
   @Roles("admin")
   async inviteUser(
     @Body(new ZodValidationPipe(InviteUserSchema))
-    body: InviteUserDto & { temporaryPassword: string },
+    body: InviteUserDto,
     @CurrentUser() user: { id: string },
     @Req() req: FastifyRequest,
   ) {
-    PasswordSchema.parse(body.temporaryPassword);
-
     const response = await (
-      auth.api.createUser as unknown as (args: {
+      getAuth().api.createUser as unknown as (args: {
         headers: Headers;
         body: { email: string; name: string; password: string; role: string };
       }) => Promise<{
@@ -115,7 +112,7 @@ export class SettingsController {
     }
 
     await (
-      auth.api.setRole as unknown as (args: {
+      getAuth().api.setRole as unknown as (args: {
         headers: Headers;
         body: { userId: string; role: string };
       }) => Promise<unknown>
@@ -145,7 +142,7 @@ export class SettingsController {
       throw new BadRequestException("Cannot ban yourself");
     }
 
-    await auth.api.banUser({
+    await getAuth().api.banUser({
       headers: fromNodeHeaders(req.headers),
       body: { userId },
     });
@@ -167,7 +164,7 @@ export class SettingsController {
     @CurrentUser() currentUser: { id: string },
     @Req() req: FastifyRequest,
   ) {
-    await auth.api.unbanUser({
+    await getAuth().api.unbanUser({
       headers: fromNodeHeaders(req.headers),
       body: { userId },
     });
@@ -191,7 +188,7 @@ export class SettingsController {
     @Req() req: FastifyRequest,
   ) {
     await (
-      auth.api.setUserPassword as unknown as (args: {
+      getAuth().api.setUserPassword as unknown as (args: {
         headers: Headers;
         body: { userId: string; newPassword: string };
       }) => Promise<unknown>
@@ -222,7 +219,7 @@ export class SettingsController {
     }
 
     await (
-      auth.api.removeUser as unknown as (args: {
+      getAuth().api.removeUser as unknown as (args: {
         headers: Headers;
         body: { userId: string };
       }) => Promise<unknown>

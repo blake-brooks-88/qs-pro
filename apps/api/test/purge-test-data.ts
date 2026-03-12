@@ -50,8 +50,9 @@ function parseDotenv(content: string): Record<string, string> {
  *
  * Reads credentials from (in priority order):
  *   1. PURGE_DATABASE_URL env var (explicit override for CI)
- *   2. .env file at the repo root (local dev — reads POSTGRES_USER/PASSWORD)
- *   3. DATABASE_URL with user swapped to qs_migrate (table owner, bypasses RLS)
+ *   2. .env file at the repo root (prefers DATABASE_URL_MIGRATIONS)
+ *   3. DATABASE_URL_MIGRATIONS (CI sets this to the qs_migrate role)
+ *   4. DATABASE_URL with user swapped to qs_migrate (table owner, bypasses RLS)
  */
 function getPrivilegedUrl(): string {
   if (process.env.PURGE_DATABASE_URL?.trim()) {
@@ -63,25 +64,32 @@ function getPrivilegedUrl(): string {
   try {
     const vars = parseDotenv(readFileSync(envPath, 'utf-8'));
 
+    // Prefer an explicit migrations URL if present (supports non-localhost hosts).
+    const migrationsUrlFromFile = vars.DATABASE_URL_MIGRATIONS;
+    if (migrationsUrlFromFile?.trim()) {
+      return migrationsUrlFromFile;
+    }
+
+    const runtimeUrlFromFile = vars.DATABASE_URL;
+
     // Prefer the migration user (table owner → bypasses RLS)
     const migrateUser = vars.QS_DB_MIGRATE_USER;
     const migratePassword = vars.QS_DB_MIGRATE_PASSWORD;
-    const db = vars.POSTGRES_DB ?? 'qs_pro';
-    if (migrateUser && migratePassword) {
-      return `postgres://${migrateUser}:${migratePassword}@127.0.0.1:5432/${db}`;
+    if (runtimeUrlFromFile?.trim() && migrateUser && migratePassword) {
+      const url = new URL(runtimeUrlFromFile);
+      url.username = migrateUser;
+      url.password = migratePassword;
+      return url.toString();
     }
 
-    // Fall back to the postgres superuser
-    const user = vars.POSTGRES_USER ?? 'postgres';
-    const password = vars.POSTGRES_PASSWORD;
-    if (password) {
-      return `postgres://${user}:${password}@127.0.0.1:5432/${db}`;
+    if (runtimeUrlFromFile?.trim()) {
+      return runtimeUrlFromFile;
     }
   } catch {
     // .env doesn't exist (CI) — fall through
   }
 
-  // Try DATABASE_URL_MIGRATIONS (CI sets this to the qs_migrate role)
+  // Try DATABASE_URL_MIGRATIONS (CI should set this to the qs_migrate role)
   const migrationsUrl = process.env.DATABASE_URL_MIGRATIONS;
   if (migrationsUrl?.trim()) {
     return migrationsUrl;

@@ -8,7 +8,7 @@ import { Reflector } from "@nestjs/core";
 import { fromNodeHeaders } from "better-auth/node";
 
 import { IS_PUBLIC_KEY } from "../common/decorators/public.decorator.js";
-import { auth } from "./auth.js";
+import { getAuth } from "./auth.js";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -25,7 +25,7 @@ export class AuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const session = await auth.api.getSession({
+    const session = await getAuth().api.getSession({
       headers: fromNodeHeaders(request.headers),
     });
 

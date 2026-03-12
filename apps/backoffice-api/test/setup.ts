@@ -11,6 +11,35 @@ import { DRIZZLE_DB } from "../src/database/database.module.js";
 import { STRIPE_CLIENT } from "../src/stripe/stripe.provider.js";
 
 const mockGetSession = vi.fn();
+const mockAuth = {
+  api: {
+    getSession: mockGetSession,
+    listUsers: vi.fn().mockResolvedValue({ users: [], total: 0 }),
+    createUser: vi.fn().mockImplementation(
+      async (args: {
+        body: {
+          email: string;
+          name: string;
+          password: string;
+          role: string;
+        };
+      }) => ({
+        user: {
+          id: "new-user",
+          email: args.body.email,
+          name: args.body.name,
+          role: args.body.role,
+        },
+      }),
+    ),
+    setRole: vi.fn().mockResolvedValue({}),
+    banUser: vi.fn().mockResolvedValue({}),
+    unbanUser: vi.fn().mockResolvedValue({}),
+    setUserPassword: vi.fn().mockResolvedValue({}),
+    removeUser: vi.fn().mockResolvedValue({}),
+  },
+  handler: vi.fn(),
+};
 
 vi.mock("@nest-lab/throttler-storage-redis", () => ({
   ThrottlerStorageRedisService: class ThrottlerStorageRedisService {
@@ -39,35 +68,7 @@ vi.mock("@nest-lab/throttler-storage-redis", () => ({
 }));
 
 vi.mock("../src/auth/auth.js", () => ({
-  auth: {
-    api: {
-      getSession: mockGetSession,
-      listUsers: vi.fn().mockResolvedValue({ users: [], total: 0 }),
-      createUser: vi.fn().mockImplementation(
-        async (args: {
-          body: {
-            email: string;
-            name: string;
-            password: string;
-            role: string;
-          };
-        }) => ({
-          user: {
-            id: "new-user",
-            email: args.body.email,
-            name: args.body.name,
-            role: args.body.role,
-          },
-        }),
-      ),
-      setRole: vi.fn().mockResolvedValue({}),
-      banUser: vi.fn().mockResolvedValue({}),
-      unbanUser: vi.fn().mockResolvedValue({}),
-      setUserPassword: vi.fn().mockResolvedValue({}),
-      removeUser: vi.fn().mockResolvedValue({}),
-    },
-    handler: vi.fn(),
-  },
+  getAuth: () => mockAuth,
 }));
 
 function createDefaultStripeMock() {
