@@ -26,16 +26,15 @@ describe("authClient", () => {
     await import("./auth-client");
 
     expect(mocks.createAuthClientMock).toHaveBeenCalledTimes(1);
-    const args = mocks.createAuthClientMock.mock.calls[0]?.[0] as Record<
-      string,
-      unknown
-    >;
+    const args = (
+      mocks.createAuthClientMock.mock.calls as unknown[][]
+    )[0]?.[0] as Record<string, unknown>;
     expect(args.baseURL).toBeTypeOf("string");
     expect(Array.isArray(args.plugins)).toBe(true);
 
-    const pluginArgs = mocks.twoFactorClientMock.mock.calls[0]?.[0] as
-      | { onTwoFactorRedirect?: () => void }
-      | undefined;
+    const pluginArgs = (
+      mocks.twoFactorClientMock.mock.calls as unknown[][]
+    )[0]?.[0] as { onTwoFactorRedirect?: () => void } | undefined;
 
     pluginArgs?.onTwoFactorRedirect?.();
     expect(window.location.href).toBe("/2fa");

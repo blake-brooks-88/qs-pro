@@ -2,6 +2,7 @@ import {
   type CanActivate,
   type ExecutionContext,
   Injectable,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { fromNodeHeaders } from "better-auth/node";
@@ -29,7 +30,7 @@ export class AuthGuard implements CanActivate {
     });
 
     if (!session) {
-      return false;
+      throw new UnauthorizedException();
     }
 
     request.backofficeUser = session.user;

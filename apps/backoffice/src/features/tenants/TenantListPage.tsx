@@ -30,9 +30,7 @@ const SORT_FIELD_MAP: Record<string, string> = {
   companyName: "companyName",
   tier: "tier",
   subscriptionStatus: "subscriptionStatus",
-  userCount: "userCount",
   signupDate: "signupDate",
-  lastActiveDate: "lastActiveDate",
 };
 
 function TenantListPage() {

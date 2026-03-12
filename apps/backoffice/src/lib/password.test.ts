@@ -6,9 +6,10 @@ describe("generatePassword", () => {
   it("generates a 20 character password", () => {
     const getRandomValues = vi
       .spyOn(crypto, "getRandomValues")
-      .mockImplementation((arr: Uint8Array) => {
-        for (let i = 0; i < arr.length; i++) {
-          arr[i] = i;
+      .mockImplementation(<T extends ArrayBufferView>(arr: T): T => {
+        const view = new Uint8Array((arr as unknown as Uint8Array).buffer);
+        for (let i = 0; i < view.length; i++) {
+          view[i] = i;
         }
         return arr;
       });

@@ -1,4 +1,4 @@
-import { type ExecutionContext } from "@nestjs/common";
+import { type ExecutionContext, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,14 +57,15 @@ describe("AuthGuard", () => {
     expect(auth.api.getSession).not.toHaveBeenCalled();
   });
 
-  it("should deny access when no session exists", async () => {
+  it("should throw UnauthorizedException when no session exists", async () => {
     vi.spyOn(reflector, "getAllAndOverride").mockReturnValue(false);
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
 
     const { context } = createMockContext();
-    const result = await guard.canActivate(context);
 
-    expect(result).toBe(false);
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it("should allow access and attach user to request when session exists", async () => {
@@ -116,7 +117,7 @@ describe("AuthGuard", () => {
 
     const headers = { authorization: "Bearer xyz", cookie: "sid=abc" };
     const { context } = createMockContext({ headers });
-    await guard.canActivate(context);
+    await guard.canActivate(context).catch(() => {});
 
     expect(fromNodeHeaders).toHaveBeenCalledWith(headers);
   });

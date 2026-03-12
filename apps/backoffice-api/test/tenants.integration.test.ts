@@ -7,10 +7,22 @@ import {
   orgSubscriptions,
   stripeBillingBindings,
 } from "@qpp/database";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { createTestApp } from "./setup.js";
-import { cleanupTenant, createTenant, createUsersForTenant } from "./test-data.js";
+import {
+  cleanupTenant,
+  createTenant,
+  createUsersForTenant,
+} from "./test-data.js";
 
 describe("Tenants Controller (integration)", () => {
   let app: NestFastifyApplication;
@@ -113,7 +125,9 @@ describe("Tenants Controller (integration)", () => {
 
       expect(response.statusCode).toBe(200);
       const body = response.json() as { data: unknown[] };
-      const row = body.data.find((r) => (r as { tenantId?: string }).tenantId === tenantId) as
+      const row = body.data.find(
+        (r) => (r as { tenantId?: string }).tenantId === tenantId,
+      ) as
         | {
             tenantId: string;
             eid: string;
@@ -226,7 +240,11 @@ describe("Tenants Controller (integration)", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { tenantId: string; eid: string; users: unknown[] };
+      const body = response.json() as {
+        tenantId: string;
+        eid: string;
+        users: unknown[];
+      };
       expect(body.tenantId).toBe(tenantId);
       expect(body.eid).toBe(tenantEid);
       expect(Array.isArray(body.users)).toBe(true);
@@ -313,22 +331,24 @@ describe("Tenants Controller (integration)", () => {
         .limit(1);
       expect(row?.tier).toBe("enterprise");
 
-      await expect.poll(
-        async () => {
-          const rows = await db
-            .select({ id: backofficeAuditLogs.id })
-            .from(backofficeAuditLogs)
-            .where(
-              and(
-                eq(backofficeAuditLogs.backofficeUserId, adminUserId),
-                eq(backofficeAuditLogs.targetTenantId, tenantId),
-                eq(backofficeAuditLogs.eventType, "backoffice.tier_changed"),
-              ),
-            );
-          return rows.length;
-        },
-        { timeout: 2_000, interval: 50 },
-      ).toBeGreaterThan(0);
+      await expect
+        .poll(
+          async () => {
+            const rows = await db
+              .select({ id: backofficeAuditLogs.id })
+              .from(backofficeAuditLogs)
+              .where(
+                and(
+                  eq(backofficeAuditLogs.backofficeUserId, adminUserId),
+                  eq(backofficeAuditLogs.targetTenantId, tenantId),
+                  eq(backofficeAuditLogs.eventType, "backoffice.tier_changed"),
+                ),
+              );
+            return rows.length;
+          },
+          { timeout: 2_000, interval: 50 },
+        )
+        .toBeGreaterThan(0);
     });
 
     it("rejects empty body", async () => {
@@ -359,25 +379,27 @@ describe("Tenants Controller (integration)", () => {
         .limit(1);
       expect(row?.status).toBe("canceled");
 
-      await expect.poll(
-        async () => {
-          const rows = await db
-            .select({ id: backofficeAuditLogs.id })
-            .from(backofficeAuditLogs)
-            .where(
-              and(
-                eq(backofficeAuditLogs.backofficeUserId, adminUserId),
-                eq(backofficeAuditLogs.targetTenantId, tenantId),
-                eq(
-                  backofficeAuditLogs.eventType,
-                  "backoffice.subscription_canceled",
+      await expect
+        .poll(
+          async () => {
+            const rows = await db
+              .select({ id: backofficeAuditLogs.id })
+              .from(backofficeAuditLogs)
+              .where(
+                and(
+                  eq(backofficeAuditLogs.backofficeUserId, adminUserId),
+                  eq(backofficeAuditLogs.targetTenantId, tenantId),
+                  eq(
+                    backofficeAuditLogs.eventType,
+                    "backoffice.subscription_canceled",
+                  ),
                 ),
-              ),
-            );
-          return rows.length;
-        },
-        { timeout: 2_000, interval: 50 },
-      ).toBeGreaterThan(0);
+              );
+            return rows.length;
+          },
+          { timeout: 2_000, interval: 50 },
+        )
+        .toBeGreaterThan(0);
     });
   });
 });

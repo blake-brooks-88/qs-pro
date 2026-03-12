@@ -72,7 +72,6 @@ export class InvoicingService {
         metadata: {
           company: params.companyName,
           eid: encryptedEid,
-          tenant_eid: tenant.eid,
         },
       });
     } else {
@@ -82,7 +81,6 @@ export class InvoicingService {
         metadata: {
           company: params.companyName,
           eid: encryptedEid,
-          tenant_eid: tenant.eid,
         },
       });
       customerId = customer.id;
@@ -101,7 +99,6 @@ export class InvoicingService {
       expand: ["latest_invoice"],
       metadata: {
         eid: encryptedEid,
-        tenant_eid: tenant.eid,
         tier: params.tier,
         interval: params.interval,
       },
@@ -134,7 +131,6 @@ export class InvoicingService {
       const updateParams: Stripe.InvoiceUpdateParams = {
         metadata: {
           eid: encryptedEid,
-          tenant_eid: tenant.eid,
           tier: params.tier,
           interval: params.interval,
         },

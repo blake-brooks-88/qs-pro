@@ -62,24 +62,33 @@ describe("Settings Controller (integration)", () => {
         expect(response.statusCode).toBe(201);
         const body = response.json();
         expect(body).toEqual(
-          expect.objectContaining({ id: "new-user", email: "test@example.com", role }),
+          expect.objectContaining({
+            id: "new-user",
+            email: "test@example.com",
+            role,
+          }),
         );
 
-        await expect.poll(
-          async () => {
-            const [row] = await db
-              .select({ count: sql<number>`count(*)` })
-              .from(backofficeAuditLogs)
-              .where(
-                and(
-                  eq(backofficeAuditLogs.backofficeUserId, adminUserId),
-                  eq(backofficeAuditLogs.eventType, "backoffice.user_invited"),
-                ),
-              );
-            return Number(row?.count ?? 0);
-          },
-          { timeout: 2_000, interval: 50 },
-        ).toBe(beforeCount + 1);
+        await expect
+          .poll(
+            async () => {
+              const [row] = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(backofficeAuditLogs)
+                .where(
+                  and(
+                    eq(backofficeAuditLogs.backofficeUserId, adminUserId),
+                    eq(
+                      backofficeAuditLogs.eventType,
+                      "backoffice.user_invited",
+                    ),
+                  ),
+                );
+              return Number(row?.count ?? 0);
+            },
+            { timeout: 2_000, interval: 50 },
+          )
+          .toBe(beforeCount + 1);
       },
     );
 
@@ -130,10 +139,7 @@ describe("Settings Controller (integration)", () => {
           .where(
             and(
               eq(backofficeAuditLogs.backofficeUserId, adminUserId),
-              eq(
-                backofficeAuditLogs.eventType,
-                "backoffice.user_role_changed",
-              ),
+              eq(backofficeAuditLogs.eventType, "backoffice.user_role_changed"),
             ),
           );
         const beforeCount = Number(beforeRow?.count ?? 0);
@@ -147,24 +153,26 @@ describe("Settings Controller (integration)", () => {
         expect(response.statusCode).toBe(200);
         expect(response.json()).toEqual({ success: true });
 
-        await expect.poll(
-          async () => {
-            const [row] = await db
-              .select({ count: sql<number>`count(*)` })
-              .from(backofficeAuditLogs)
-              .where(
-                and(
-                  eq(backofficeAuditLogs.backofficeUserId, adminUserId),
-                  eq(
-                    backofficeAuditLogs.eventType,
-                    "backoffice.user_role_changed",
+        await expect
+          .poll(
+            async () => {
+              const [row] = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(backofficeAuditLogs)
+                .where(
+                  and(
+                    eq(backofficeAuditLogs.backofficeUserId, adminUserId),
+                    eq(
+                      backofficeAuditLogs.eventType,
+                      "backoffice.user_role_changed",
+                    ),
                   ),
-                ),
-              );
-            return Number(row?.count ?? 0);
-          },
-          { timeout: 2_000, interval: 50 },
-        ).toBe(beforeCount + 1);
+                );
+              return Number(row?.count ?? 0);
+            },
+            { timeout: 2_000, interval: 50 },
+          )
+          .toBe(beforeCount + 1);
       },
     );
 
@@ -188,7 +196,9 @@ describe("Settings Controller (integration)", () => {
 
       expect(response.statusCode).toBe(400);
       expect(response.json()).toEqual(
-        expect.objectContaining({ message: "Cannot demote yourself from admin" }),
+        expect.objectContaining({
+          message: "Cannot demote yourself from admin",
+        }),
       );
 
       const [afterRow] = await db
@@ -236,10 +246,7 @@ describe("Settings Controller (integration)", () => {
         .where(
           and(
             eq(backofficeAuditLogs.backofficeUserId, adminUserId),
-            eq(
-              backofficeAuditLogs.eventType,
-              "backoffice.user_password_reset",
-            ),
+            eq(backofficeAuditLogs.eventType, "backoffice.user_password_reset"),
           ),
         );
       const beforeCount = Number(beforeRow?.count ?? 0);
@@ -253,24 +260,26 @@ describe("Settings Controller (integration)", () => {
       expect(response.statusCode).toBe(201);
       expect(response.json()).toEqual({ success: true });
 
-      await expect.poll(
-        async () => {
-          const [row] = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(backofficeAuditLogs)
-            .where(
-              and(
-                eq(backofficeAuditLogs.backofficeUserId, adminUserId),
-                eq(
-                  backofficeAuditLogs.eventType,
-                  "backoffice.user_password_reset",
+      await expect
+        .poll(
+          async () => {
+            const [row] = await db
+              .select({ count: sql<number>`count(*)` })
+              .from(backofficeAuditLogs)
+              .where(
+                and(
+                  eq(backofficeAuditLogs.backofficeUserId, adminUserId),
+                  eq(
+                    backofficeAuditLogs.eventType,
+                    "backoffice.user_password_reset",
+                  ),
                 ),
-              ),
-            );
-          return Number(row?.count ?? 0);
-        },
-        { timeout: 2_000, interval: 50 },
-      ).toBe(beforeCount + 1);
+              );
+            return Number(row?.count ?? 0);
+          },
+          { timeout: 2_000, interval: 50 },
+        )
+        .toBe(beforeCount + 1);
     });
 
     it("rejects password shorter than 16 chars", async () => {

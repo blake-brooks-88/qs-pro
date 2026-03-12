@@ -154,6 +154,7 @@ function TenantTable({
             {row.original.userCount}
           </span>
         ),
+        enableSorting: false,
         size: 70,
       },
       {
@@ -178,6 +179,7 @@ function TenantTable({
             {formatDate(row.original.lastActiveDate)}
           </span>
         ),
+        enableSorting: false,
         size: 120,
       },
     ],

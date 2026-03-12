@@ -9,7 +9,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 function getSeedSql(): postgres.Sql {
-  if (seedSql) return seedSql;
+  if (seedSql) {
+    return seedSql;
+  }
 
   const url =
     process.env.DATABASE_URL_MIGRATIONS ??
@@ -29,9 +31,10 @@ export function makeTestEid(prefix: string): string {
   return `test---${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export async function createTenant(
-  params?: { eid?: string; tssd?: string },
-): Promise<{ id: string; eid: string; tssd: string }> {
+export async function createTenant(params?: {
+  eid?: string;
+  tssd?: string;
+}): Promise<{ id: string; eid: string; tssd: string }> {
   const sql = getSeedSql();
   const eid = params?.eid ?? makeTestEid("backoffice-api");
   const tssd = params?.tssd ?? "test---tssd";
@@ -42,7 +45,9 @@ export async function createTenant(
     RETURNING id, eid, tssd
   `;
   const row = rows[0] as { id: string; eid: string; tssd: string } | undefined;
-  if (!row) throw new Error("Failed to create test tenant");
+  if (!row) {
+    throw new Error("Failed to create test tenant");
+  }
   return row;
 }
 
@@ -52,14 +57,16 @@ export async function createUsersForTenant(
 ): Promise<Array<{ id: string; sfUserId: string }>> {
   const sql = getSeedSql();
 
-  if (newUsers.length === 0) return [];
+  if (newUsers.length === 0) {
+    return [];
+  }
 
   const valuesSql = newUsers.map((u) => [
     u.sfUserId,
     tenantId,
     u.email ?? null,
     u.name ?? null,
-  ]);
+  ]) as unknown as postgres.EscapableArray[];
 
   const rows = await sql`
     INSERT INTO users (sf_user_id, tenant_id, email, name)
@@ -67,7 +74,7 @@ export async function createUsersForTenant(
     RETURNING id, sf_user_id
   `;
 
-  return (rows as Array<{ id: string; sf_user_id: string }>).map((r) => ({
+  return (rows as unknown as Array<{ id: string; sf_user_id: string }>).map((r) => ({
     id: r.id,
     sfUserId: r.sf_user_id,
   }));
@@ -79,7 +86,9 @@ export async function cleanupBackofficeAuditLogsForUser(userId: string) {
 }
 
 function isTenantCleanupRace(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false;
+  if (!err || typeof err !== "object") {
+    return false;
+  }
 
   const constraint = (err as { constraint?: unknown }).constraint;
   if (

@@ -17,15 +17,7 @@ export const TenantListQuerySchema = z.object({
     ])
     .optional(),
   sortBy: z
-    .enum([
-      "eid",
-      "companyName",
-      "tier",
-      "subscriptionStatus",
-      "userCount",
-      "signupDate",
-      "lastActiveDate",
-    ])
+    .enum(["eid", "companyName", "tier", "subscriptionStatus", "signupDate"])
     .optional(),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
   page: z.coerce.number().int().min(1).default(1),

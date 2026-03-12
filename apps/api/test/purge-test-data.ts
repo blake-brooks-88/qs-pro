@@ -198,6 +198,13 @@ export async function purgeTestData(): Promise<number> {
           SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
+        DELETE FROM credentials
+        WHERE user_id IN (
+          SELECT id FROM users WHERE tenant_id IN (
+            SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          )
+        )`;
+      await tx`
         DELETE FROM users
         WHERE tenant_id IN (
           SELECT id FROM tenants WHERE eid LIKE 'test---%' AND eid NOT IN ${tx(PRESERVED_EIDS)}

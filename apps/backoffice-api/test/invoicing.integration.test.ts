@@ -7,7 +7,15 @@ import {
   orgSubscriptions,
   stripeBillingBindings,
 } from "@qpp/database";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { createTestApp } from "./setup.js";
 import { cleanupTenant, createTenant } from "./test-data.js";
