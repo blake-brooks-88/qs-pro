@@ -53,7 +53,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_TSSD = 'test-cancel-endpoint-tssd';
+const TEST_TSSD = 'test---cancel-tssd';
 
 // MSW handlers for auth endpoints
 const defaultHandlers = [
@@ -73,7 +73,7 @@ const defaultHandlers = [
     () => {
       return HttpResponse.json({
         sub: 'cancel-test-user',
-        enterprise_id: 'cancel-test-eid',
+        enterprise_id: 'test---cancel-main',
         member_id: 'cancel-test-mid',
         email: 'cancel-test@example.com',
         name: 'Cancel Test User',
@@ -159,7 +159,7 @@ describe('Cancel Endpoint (integration)', () => {
 
     const payload = {
       user_id: 'cancel-test-user',
-      enterprise_id: 'cancel-test-eid',
+      enterprise_id: 'test---cancel-main',
       member_id: mid,
       stack: TEST_TSSD,
     };
@@ -392,7 +392,7 @@ describe('Cancel Endpoint (integration)', () => {
 
       const otherPayload = {
         user_id: 'other-user-id',
-        enterprise_id: 'other-eid',
+        enterprise_id: 'test---cancel-other',
         member_id: 'other-mid',
         stack: TEST_TSSD,
       };

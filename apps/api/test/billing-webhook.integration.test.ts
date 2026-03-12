@@ -134,9 +134,9 @@ describe('Billing Webhook (integration)', () => {
     eid: string;
     encryptedEid: string;
   }> {
-    const eid = `billing-integ-${suffix}-${Date.now()}`;
+    const eid = `test---billing-webhook-${suffix}-${Date.now()}`;
     const rows = await sqlClient`
-      INSERT INTO tenants (eid, tssd) VALUES (${eid}, 'test-tssd') RETURNING id
+      INSERT INTO tenants (eid, tssd) VALUES (${eid}, 'test---tssd') RETURNING id
     `;
     const row = rows[0];
     if (!row) {

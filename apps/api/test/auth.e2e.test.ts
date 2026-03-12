@@ -24,7 +24,7 @@ function getRequiredEnv(key: string): string {
 }
 
 const server = setupServer(
-  http.post('https://test-tssd.auth.marketingcloudapis.com/v2/token', () => {
+  http.post('https://test---tssd.auth.marketingcloudapis.com/v2/token', () => {
     return HttpResponse.json({
       access_token: 'e2e-access-token',
       refresh_token: 'e2e-refresh-token',
@@ -35,15 +35,18 @@ const server = setupServer(
       token_type: 'Bearer',
     });
   }),
-  http.get('https://test-tssd.auth.marketingcloudapis.com/v2/userinfo', () => {
-    return HttpResponse.json({
-      sub: 'sf-user-123',
-      enterprise_id: 'eid-123',
-      member_id: 'mid-123',
-      email: 'user@example.com',
-      name: 'Example User',
-    });
-  }),
+  http.get(
+    'https://test---tssd.auth.marketingcloudapis.com/v2/userinfo',
+    () => {
+      return HttpResponse.json({
+        sub: 'sf-user-123',
+        enterprise_id: 'test---auth-main',
+        member_id: 'mid-123',
+        email: 'user@example.com',
+        name: 'Example User',
+      });
+    },
+  ),
 );
 
 describe('Auth (e2e)', () => {
@@ -52,7 +55,7 @@ describe('Auth (e2e)', () => {
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
-    process.env.MCE_TSSD = 'test-tssd';
+    process.env.MCE_TSSD = 'test---tssd';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -91,9 +94,9 @@ describe('Auth (e2e)', () => {
 
     const payload = {
       user_id: 'sf-user-jwt',
-      enterprise_id: 'eid-jwt',
+      enterprise_id: 'test---auth-jwt',
       member_id: 'mid-jwt',
-      stack: 'test-tssd',
+      stack: 'test---tssd',
     };
 
     const jwt = await new jose.SignJWT(payload)
@@ -116,7 +119,7 @@ describe('Auth (e2e)', () => {
     const meResponse = await testAgent.get('/auth/me').expect(200);
 
     expect(meResponse.body.user.id).toBe(user?.id);
-    expect(meResponse.body.tenant.eid).toBe('eid-jwt');
+    expect(meResponse.body.tenant.eid).toBe('test---auth-jwt');
   });
 
   it('/auth/callback (GET) should save credentials and return user', async () => {
@@ -124,7 +127,7 @@ describe('Auth (e2e)', () => {
 
     const loginResponse = await testAgent
       .get('/auth/login')
-      .query({ tssd: 'test-tssd' })
+      .query({ tssd: 'test---tssd' })
       .expect(302);
 
     const redirectUrl = loginResponse.headers.location;
@@ -142,7 +145,7 @@ describe('Auth (e2e)', () => {
         code: 'any-code',
         state,
         sf_user_id: 'sf-user-123',
-        eid: 'eid-123',
+        eid: 'test---auth-main',
         mid: 'mid-123',
       })
       .expect(302);
@@ -154,7 +157,7 @@ describe('Auth (e2e)', () => {
     expect(meResponse.body.user.sfUserId).toBe('sf-user-123');
 
     const tenantRepo: ITenantRepository = app.get('TENANT_REPOSITORY');
-    const tenant = await tenantRepo.findByEid('eid-123');
+    const tenant = await tenantRepo.findByEid('test---auth-main');
     expect(tenant).toBeDefined();
   });
 
@@ -165,9 +168,9 @@ describe('Auth (e2e)', () => {
 
     const payload = {
       user_id: 'sf-user-refresh',
-      enterprise_id: 'eid-refresh',
+      enterprise_id: 'test---auth-refresh',
       member_id: 'mid-refresh',
-      stack: 'test-tssd',
+      stack: 'test---tssd',
     };
 
     const jwt = await new jose.SignJWT(payload)

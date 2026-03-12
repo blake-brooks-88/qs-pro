@@ -25,7 +25,7 @@ function getRequiredEnv(key: string): string {
 }
 
 const server = setupServer(
-  http.post('https://test-tssd.auth.marketingcloudapis.com/v2/token', () => {
+  http.post('https://test---tssd.auth.marketingcloudapis.com/v2/token', () => {
     return HttpResponse.json({
       access_token: 'rls-test-access-token',
       refresh_token: 'rls-test-refresh-token',
@@ -36,15 +36,18 @@ const server = setupServer(
       token_type: 'Bearer',
     });
   }),
-  http.get('https://test-tssd.auth.marketingcloudapis.com/v2/userinfo', () => {
-    return HttpResponse.json({
-      sub: 'rls-test-user',
-      enterprise_id: 'rls-test-eid',
-      member_id: 'rls-test-mid',
-      email: 'rls-test@example.com',
-      name: 'RLS Test User',
-    });
-  }),
+  http.get(
+    'https://test---tssd.auth.marketingcloudapis.com/v2/userinfo',
+    () => {
+      return HttpResponse.json({
+        sub: 'rls-test-user',
+        enterprise_id: 'test---rls-isolation',
+        member_id: 'rls-test-mid',
+        email: 'rls-test@example.com',
+        name: 'RLS Test User',
+      });
+    },
+  ),
 );
 
 describe('RLS Tenant Isolation (e2e)', () => {
@@ -69,7 +72,7 @@ describe('RLS Tenant Isolation (e2e)', () => {
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
-    process.env.MCE_TSSD = 'test-tssd';
+    process.env.MCE_TSSD = 'test---tssd';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -255,7 +258,7 @@ describe('RLS Tenant Isolation (e2e)', () => {
       user_id: sfUserId,
       enterprise_id: eid,
       member_id: mid,
-      stack: 'test-tssd',
+      stack: 'test---tssd',
     };
 
     const jwt = await new jose.SignJWT(payload)

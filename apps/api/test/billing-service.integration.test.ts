@@ -137,9 +137,9 @@ describe('BillingService (integration)', () => {
     id: string;
     eid: string;
   }> {
-    const eid = `billing-svc-integ-${suffix}-${Date.now()}`;
+    const eid = `test---billing-service-${suffix}-${Date.now()}`;
     const rows = await sqlClient`
-      INSERT INTO tenants (eid, tssd) VALUES (${eid}, 'test-tssd') RETURNING id
+      INSERT INTO tenants (eid, tssd) VALUES (${eid}, 'test---tssd') RETURNING id
     `;
     const row = rows[0];
     if (!row) {

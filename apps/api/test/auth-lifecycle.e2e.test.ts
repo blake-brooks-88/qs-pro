@@ -44,7 +44,7 @@ function getRequiredEnv(key: string): string {
  * - Proves identity mismatch attack is blocked
  */
 
-const TEST_TSSD = 'test-tssd';
+const TEST_TSSD = 'test---tssd';
 
 // Default MSW handlers for happy path
 const defaultHandlers = [
@@ -64,7 +64,7 @@ const defaultHandlers = [
     () => {
       return HttpResponse.json({
         sub: 'legitimate-user-123',
-        enterprise_id: 'eid-123',
+        enterprise_id: 'test---auth-lifecycle-main',
         member_id: 'mid-123',
         email: 'user@example.com',
         name: 'Example User',
@@ -145,7 +145,7 @@ describe('Auth Lifecycle (e2e)', () => {
           code: 'any-code',
           state,
           sf_user_id: 'legitimate-user-123',
-          eid: 'eid-123',
+          eid: 'test---auth-lifecycle-main',
           mid: 'mid-123',
         })
         .expect(302);
@@ -155,7 +155,7 @@ describe('Auth Lifecycle (e2e)', () => {
       // Step 3: Verify authenticated request works
       const meResponse = await testAgent.get('/auth/me').expect(200);
       expect(meResponse.body.user.sfUserId).toBe('legitimate-user-123');
-      expect(meResponse.body.tenant.eid).toBe('eid-123');
+      expect(meResponse.body.tenant.eid).toBe('test---auth-lifecycle-main');
       expect(meResponse.body.csrfToken).toBeDefined();
 
       // Step 4: Logout
@@ -200,7 +200,7 @@ describe('Auth Lifecycle (e2e)', () => {
           code: 'any-code',
           state,
           sf_user_id: 'attacker-user-id', // DIFFERENT from what userinfo returns
-          eid: 'eid-123',
+          eid: 'test---auth-lifecycle-main',
           mid: 'mid-123',
         })
         .expect(401);
@@ -235,7 +235,7 @@ describe('Auth Lifecycle (e2e)', () => {
           code: 'any-code',
           state,
           sf_user_id: 'legitimate-user-123',
-          eid: 'attacker-eid', // DIFFERENT from what userinfo returns
+          eid: 'test---auth-lifecycle-attacker', // DIFFERENT from what userinfo returns
           mid: 'mid-123',
         })
         .expect(401);
@@ -268,7 +268,7 @@ describe('Auth Lifecycle (e2e)', () => {
           code: 'any-code',
           state,
           sf_user_id: 'legitimate-user-123',
-          eid: 'eid-123',
+          eid: 'test---auth-lifecycle-main',
           mid: 'attacker-mid', // DIFFERENT from what userinfo returns
         })
         .expect(401);
@@ -318,7 +318,7 @@ describe('Auth Lifecycle (e2e)', () => {
           code: 'any-code',
           state,
           sf_user_id: 'legitimate-user-123',
-          eid: 'eid-123',
+          eid: 'test---auth-lifecycle-main',
           mid: 'mid-123',
         })
         .expect(401);
@@ -368,7 +368,7 @@ describe('Auth Lifecycle (e2e)', () => {
           code: 'any-code',
           state,
           sf_user_id: 'legitimate-user-123',
-          eid: 'eid-123',
+          eid: 'test---auth-lifecycle-main',
           mid: 'mid-123',
         })
         .expect(500);
@@ -444,7 +444,7 @@ describe('Auth Lifecycle (e2e)', () => {
 
       const payload = {
         user_id: 'sf-user-jwt',
-        enterprise_id: 'eid-jwt',
+        enterprise_id: 'test---auth-lifecycle-jwt',
         member_id: 'mid-jwt',
         stack: TEST_TSSD,
       };
@@ -471,7 +471,7 @@ describe('Auth Lifecycle (e2e)', () => {
 
       const payload = {
         user_id: 'sf-user-jwt',
-        enterprise_id: 'eid-jwt',
+        enterprise_id: 'test---auth-lifecycle-jwt',
         member_id: 'mid-jwt',
         stack: TEST_TSSD,
       };

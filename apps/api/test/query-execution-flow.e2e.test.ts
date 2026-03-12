@@ -88,7 +88,7 @@ let mceErrorMessage: string | null = null;
 // MSW server with MCE endpoint handlers
 const server = setupServer(
   // Auth endpoints
-  http.post('https://test-tssd.auth.marketingcloudapis.com/v2/token', () => {
+  http.post('https://test---tssd.auth.marketingcloudapis.com/v2/token', () => {
     return HttpResponse.json({
       access_token: 'e2e-access-token',
       refresh_token: 'e2e-refresh-token',
@@ -99,19 +99,22 @@ const server = setupServer(
       token_type: 'Bearer',
     });
   }),
-  http.get('https://test-tssd.auth.marketingcloudapis.com/v2/userinfo', () => {
-    return HttpResponse.json({
-      sub: 'sf-user-query-flow',
-      enterprise_id: 'eid-query-flow',
-      member_id: 'mid-query-flow',
-      email: 'user@example.com',
-      name: 'Query Flow Test User',
-    });
-  }),
+  http.get(
+    'https://test---tssd.auth.marketingcloudapis.com/v2/userinfo',
+    () => {
+      return HttpResponse.json({
+        sub: 'sf-user-query-flow',
+        enterprise_id: 'test---query-flow',
+        member_id: 'mid-query-flow',
+        email: 'user@example.com',
+        name: 'Query Flow Test User',
+      });
+    },
+  ),
 
   // SOAP endpoint for all MCE SOAP operations
   http.post(
-    'https://test-tssd.soap.marketingcloudapis.com/Service.asmx',
+    'https://test---tssd.soap.marketingcloudapis.com/Service.asmx',
     async ({ request }) => {
       const body = await request.text();
       const soapAction = request.headers.get('SOAPAction') ?? '';
@@ -355,7 +358,7 @@ const server = setupServer(
 
   // REST: Query validation
   http.post(
-    'https://test-tssd.rest.marketingcloudapis.com/data/v1/customobjectdata/validate',
+    'https://test---tssd.rest.marketingcloudapis.com/data/v1/customobjectdata/validate',
     () => {
       mceRequestLog.push({ type: 'REST', action: 'validate' });
       return HttpResponse.json({ valid: true });
@@ -364,7 +367,7 @@ const server = setupServer(
 
   // REST: Check isRunning
   http.get(
-    'https://test-tssd.rest.marketingcloudapis.com/automation/v1/queries/:id/status',
+    'https://test---tssd.rest.marketingcloudapis.com/automation/v1/queries/:id/status',
     () => {
       mceRequestLog.push({ type: 'REST', action: 'isRunning' });
       return HttpResponse.json({ isRunning: false });
@@ -373,7 +376,7 @@ const server = setupServer(
 
   // REST: Get rowset (results)
   http.get(
-    'https://test-tssd.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset',
+    'https://test---tssd.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset',
     ({ request }) => {
       mceRequestLog.push({ type: 'REST', action: 'rowset' });
 
@@ -450,14 +453,14 @@ async function cleanupTestPollution(): Promise<void> {
       SELECT t.id as tenant_id, t.eid, u.id as user_id
       FROM tenants t
       LEFT JOIN users u ON u.tenant_id = t.id
-      WHERE t.eid LIKE 'eid-query-flow%'
-        OR t.eid LIKE 'eid-rate-limit%'
+      WHERE t.eid LIKE 'test---query-flow%'
+        OR t.eid LIKE 'test---rate-limit%'
         OR t.eid LIKE 'eid-mce-%'
     `;
 
     // For each tenant/user, derive mid and clean up with proper RLS context
     for (const row of testTenants) {
-      // Derive mid from eid: eid-rate-limit-user-123 -> mid-rate-limit-user-123
+      // Derive mid from eid: test---rate-limit-user-123 -> mid-rate-limit-user-123
       const mid = row.eid.replace(/^eid-/, 'mid-');
 
       if (row.user_id) {
@@ -509,8 +512,8 @@ async function cleanupTestPollution(): Promise<void> {
     // Delete test tenants (no RLS)
     await tempSql`
       DELETE FROM tenants
-      WHERE eid LIKE 'eid-query-flow%'
-        OR eid LIKE 'eid-rate-limit%'
+      WHERE eid LIKE 'test---query-flow%'
+        OR eid LIKE 'test---rate-limit%'
         OR eid LIKE 'eid-mce-%'
     `;
   } finally {
@@ -541,7 +544,7 @@ describe('Query Execution Flow (e2e)', () => {
 
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
-    process.env.MCE_TSSD = 'test-tssd';
+    process.env.MCE_TSSD = 'test---tssd';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -1034,7 +1037,7 @@ describe('Query Execution Flow (e2e)', () => {
 
   async function createAuthenticatedAgent(
     sfUserId: string = 'sf-user-query-flow',
-    eid: string = 'eid-query-flow',
+    eid: string = 'test---query-flow',
     mid: string = 'mid-query-flow',
   ) {
     const testAgent = superagent(app.getHttpServer());
@@ -1045,7 +1048,7 @@ describe('Query Execution Flow (e2e)', () => {
       user_id: sfUserId,
       enterprise_id: eid,
       member_id: mid,
-      stack: 'test-tssd',
+      stack: 'test---tssd',
     };
 
     const jwt = await new jose.SignJWT(payload)
@@ -1468,7 +1471,7 @@ describe('Query Execution Flow (e2e)', () => {
       // Override to return malformed response
       server.use(
         http.get(
-          'https://test-tssd.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset',
+          'https://test---tssd.rest.marketingcloudapis.com/data/v1/customobjectdata/key/:key/rowset',
           () => {
             // Return valid JSON but with unexpected structure
             return HttpResponse.json({

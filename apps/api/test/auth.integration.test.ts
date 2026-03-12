@@ -56,8 +56,8 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_TSSD = 'auth-int-test-tssd';
-const TEST_EID = `auth-int-test-eid-${Date.now()}`;
+const TEST_TSSD = 'test---auth-int-tssd';
+const TEST_EID = `test---auth-int-${Date.now()}`;
 const TEST_SF_USER_ID = `auth-int-test-user-${Date.now()}`;
 const TEST_MID = `auth-int-test-mid-${Date.now()}`;
 
@@ -221,7 +221,7 @@ describe('AuthService (integration)', () => {
     }
 
     it('should create tenant and user on first login', async () => {
-      const uniqueEid = `first-login-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-first-login-${Date.now()}`;
       const uniqueSfUserId = `first-login-user-${Date.now()}`;
       const uniqueMid = `first-login-mid-${Date.now()}`;
 
@@ -260,7 +260,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should return existing user on repeat login', async () => {
-      const uniqueEid = `repeat-login-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-repeat-login-${Date.now()}`;
       const uniqueSfUserId = `repeat-login-user-${Date.now()}`;
       const uniqueMid = `repeat-login-mid-${Date.now()}`;
 
@@ -343,7 +343,7 @@ describe('AuthService (integration)', () => {
 
   describe('handleCallback', () => {
     it('should exchange code for tokens and store credentials', async () => {
-      const uniqueEid = `callback-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-callback-${Date.now()}`;
       const uniqueSfUserId = `callback-user-${Date.now()}`;
       const uniqueMid = `callback-mid-${Date.now()}`;
 
@@ -408,7 +408,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should try extracted auth_code first and fall back to full code on invalid_token', async () => {
-      const uniqueEid = `embedded-code-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-embedded-code-${Date.now()}`;
       const uniqueSfUserId = `embedded-code-user-${Date.now()}`;
       const uniqueMid = `embedded-code-mid-${Date.now()}`;
 
@@ -486,7 +486,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should derive identity from alternate userinfo response shapes', async () => {
-      const uniqueEid = `nested-userinfo-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-nested-userinfo-${Date.now()}`;
       const uniqueSfUserId = `nested-userinfo-user-${Date.now()}`;
       const uniqueMid = `nested-userinfo-mid-${Date.now()}`;
 
@@ -523,7 +523,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should detect identity mismatch when sfUserId differs', async () => {
-      const uniqueEid = `mismatch-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-mismatch-${Date.now()}`;
       const uniqueSfUserId = `mismatch-user-${Date.now()}`;
       const uniqueMid = `mismatch-mid-${Date.now()}`;
 
@@ -556,7 +556,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should detect identity mismatch when eid differs', async () => {
-      const uniqueEid = `eid-mismatch-${Date.now()}`;
+      const uniqueEid = `test---auth-int-eid-mismatch-${Date.now()}`;
       const uniqueSfUserId = `eid-mismatch-user-${Date.now()}`;
       const uniqueMid = `eid-mismatch-mid-${Date.now()}`;
 
@@ -588,7 +588,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should detect identity mismatch when mid differs', async () => {
-      const uniqueEid = `mid-mismatch-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-mid-mismatch-${Date.now()}`;
       const uniqueSfUserId = `mid-mismatch-user-${Date.now()}`;
       const uniqueMid = `mid-mismatch-mid-${Date.now()}`;
 
@@ -640,7 +640,7 @@ describe('AuthService (integration)', () => {
 
   describe('refreshToken', () => {
     it('should refresh tokens and update credentials in database', async () => {
-      const uniqueEid = `refresh-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-refresh-${Date.now()}`;
       const uniqueSfUserId = `refresh-user-${Date.now()}`;
       const uniqueMid = `refresh-mid-${Date.now()}`;
 
@@ -721,7 +721,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should handle expired refresh token (invalid_grant)', async () => {
-      const uniqueEid = `expired-refresh-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-expired-refresh-${Date.now()}`;
       const uniqueSfUserId = `expired-refresh-user-${Date.now()}`;
       const uniqueMid = `expired-refresh-mid-${Date.now()}`;
 
@@ -774,7 +774,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should handle access_denied error', async () => {
-      const uniqueEid = `access-denied-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-access-denied-${Date.now()}`;
       const uniqueSfUserId = `access-denied-user-${Date.now()}`;
       const uniqueMid = `access-denied-mid-${Date.now()}`;
 
@@ -827,7 +827,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should return valid cached token without calling MCE', async () => {
-      const uniqueEid = `cached-token-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-cached-token-${Date.now()}`;
       const uniqueSfUserId = `cached-token-user-${Date.now()}`;
       const uniqueMid = `cached-token-mid-${Date.now()}`;
 
@@ -889,7 +889,7 @@ describe('AuthService (integration)', () => {
     });
 
     it('should throw MCE_CREDENTIALS_MISSING when credentials not found', async () => {
-      const uniqueEid = `no-creds-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-no-creds-${Date.now()}`;
       const uniqueSfUserId = `no-creds-user-${Date.now()}`;
       const uniqueMid = `no-creds-mid-${Date.now()}`;
 
@@ -941,7 +941,7 @@ describe('AuthService (integration)', () => {
 
   describe('invalidateToken', () => {
     it('should invalidate credentials by setting expiry to epoch 0', async () => {
-      const uniqueEid = `invalidate-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-int-invalidate-${Date.now()}`;
       const uniqueSfUserId = `invalidate-user-${Date.now()}`;
       const uniqueMid = `invalidate-mid-${Date.now()}`;
 
@@ -1026,7 +1026,7 @@ describe('AuthService (integration)', () => {
     it('should extract TSSD from application_context.base_url if stack is missing', async () => {
       const jwt = await new jose.SignJWT({
         user_id: 'context-user',
-        enterprise_id: 'context-eid',
+        enterprise_id: 'test---auth-int-context',
         member_id: 'context-mid',
         application_context: {
           base_url: 'https://mc-xyz123.rest.marketingcloudapis.com/',
@@ -1043,7 +1043,7 @@ describe('AuthService (integration)', () => {
     it('should prefer stack over application_context', async () => {
       const jwt = await new jose.SignJWT({
         user_id: 'stack-user',
-        enterprise_id: 'stack-eid',
+        enterprise_id: 'test---auth-int-stack',
         member_id: 'stack-mid',
         stack: 's11',
         application_context: {

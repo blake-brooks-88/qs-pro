@@ -62,8 +62,8 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_TSSD = 'auth-endpoints-test-tssd';
-const TEST_EID = `auth-endpoints-eid-${Date.now()}`;
+const TEST_TSSD = 'test---auth-endpoints-tssd';
+const TEST_EID = `test---auth-endpoints-${Date.now()}`;
 const TEST_SF_USER_ID = `auth-endpoints-user-${Date.now()}`;
 const TEST_MID = `auth-endpoints-mid-${Date.now()}`;
 
@@ -258,7 +258,7 @@ describe('Auth endpoints (integration)', () => {
 
   describe('POST /auth/login variations', () => {
     it('should return JSON response when Accept: application/json', async () => {
-      const uniqueEid = `json-login-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-json-login-${Date.now()}`;
       const uniqueSfUserId = `json-login-user-${Date.now()}`;
       const uniqueMid = `json-login-mid-${Date.now()}`;
 
@@ -281,7 +281,7 @@ describe('Auth endpoints (integration)', () => {
     });
 
     it('should accept JWT in body.token', async () => {
-      const uniqueEid = `token-login-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-token-login-${Date.now()}`;
       const uniqueSfUserId = `token-login-user-${Date.now()}`;
       const uniqueMid = `token-login-mid-${Date.now()}`;
 
@@ -301,7 +301,7 @@ describe('Auth endpoints (integration)', () => {
     });
 
     it('should accept JWT in body.access_token', async () => {
-      const uniqueEid = `access-token-login-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-access-token-login-${Date.now()}`;
       const uniqueSfUserId = `access-token-login-user-${Date.now()}`;
       const uniqueMid = `access-token-login-mid-${Date.now()}`;
 
@@ -321,7 +321,7 @@ describe('Auth endpoints (integration)', () => {
     });
 
     it('should accept JWT in body.accessToken', async () => {
-      const uniqueEid = `accessToken-login-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-accessToken-login-${Date.now()}`;
       const uniqueSfUserId = `accessToken-login-user-${Date.now()}`;
       const uniqueMid = `accessToken-login-mid-${Date.now()}`;
 
@@ -341,7 +341,7 @@ describe('Auth endpoints (integration)', () => {
     });
 
     it('should accept JWT in body.JWT (uppercase)', async () => {
-      const uniqueEid = `JWT-upper-login-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-JWT-upper-login-${Date.now()}`;
       const uniqueSfUserId = `JWT-upper-login-user-${Date.now()}`;
       const uniqueMid = `JWT-upper-login-mid-${Date.now()}`;
 
@@ -363,7 +363,7 @@ describe('Auth endpoints (integration)', () => {
 
   describe('GET /auth/login edge cases', () => {
     it('should redirect to / if session already valid', async () => {
-      const uniqueEid = `valid-session-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-valid-session-${Date.now()}`;
       const uniqueSfUserId = `valid-session-user-${Date.now()}`;
       const uniqueMid = `valid-session-mid-${Date.now()}`;
 
@@ -389,7 +389,7 @@ describe('Auth endpoints (integration)', () => {
     });
 
     it('should create session from JWT in query string', async () => {
-      const uniqueEid = `query-jwt-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-query-jwt-${Date.now()}`;
       const uniqueSfUserId = `query-jwt-user-${Date.now()}`;
       const uniqueMid = `query-jwt-mid-${Date.now()}`;
 
@@ -493,7 +493,7 @@ describe('Auth endpoints (integration)', () => {
     });
 
     it('should return 401 with reauth_required when token refresh fails', async () => {
-      const uniqueEid = `reauth-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-reauth-${Date.now()}`;
       const uniqueSfUserId = `reauth-user-${Date.now()}`;
       const uniqueMid = `reauth-mid-${Date.now()}`;
 
@@ -620,7 +620,7 @@ describe('Auth endpoints (integration)', () => {
 
   describe('GET /auth/refresh', () => {
     it('should refresh token and return ok', async () => {
-      const uniqueEid = `refresh-ok-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-refresh-ok-${Date.now()}`;
       const uniqueSfUserId = `refresh-ok-user-${Date.now()}`;
       const uniqueMid = `refresh-ok-mid-${Date.now()}`;
 
@@ -707,7 +707,7 @@ describe('Auth endpoints (integration)', () => {
     });
 
     it('should throw error when token refresh fails', async () => {
-      const uniqueEid = `refresh-fail-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-endpoints-refresh-fail-${Date.now()}`;
       const uniqueSfUserId = `refresh-fail-user-${Date.now()}`;
       const uniqueMid = `refresh-fail-mid-${Date.now()}`;
 
