@@ -159,6 +159,15 @@ export {
 // Auth
 export { PasswordSchema } from "./auth.js";
 
+// Roles
+export type { AdminAction, OrgRole } from "./roles.js";
+export {
+  hasPermission,
+  OrgRoleSchema,
+  ROLE_PERMISSIONS,
+  ROLE_WEIGHT,
+} from "./roles.js";
+
 // Query Versions
 export type {
   UpdateVersionNameDto,
