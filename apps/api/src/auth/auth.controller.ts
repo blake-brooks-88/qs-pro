@@ -184,6 +184,8 @@ export class AuthController {
       };
     }
 
+    void this.authService.touchLastActive(userSession.userId);
+
     const csrfToken = req.session ? this.ensureCsrfToken(req.session) : null;
     return { user, tenant, csrfToken };
   }

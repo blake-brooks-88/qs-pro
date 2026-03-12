@@ -1,0 +1,27 @@
+import { BullModule } from '@nestjs/bullmq';
+import { Module } from '@nestjs/common';
+import { DrizzleSiemWebhookConfigRepository } from '@qpp/database';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+
+import { FeaturesModule } from '../features/features.module';
+import { SiemController } from './siem.controller';
+import { SIEM_WEBHOOK_CONFIG_REPOSITORY } from './siem.repository';
+import { SiemService } from './siem.service';
+import { SiemWebhookProducer } from './siem-webhook.producer';
+
+@Module({
+  imports: [BullModule.registerQueue({ name: 'siem-webhook' }), FeaturesModule],
+  controllers: [SiemController],
+  providers: [
+    {
+      provide: SIEM_WEBHOOK_CONFIG_REPOSITORY,
+      useFactory: (db: PostgresJsDatabase) =>
+        new DrizzleSiemWebhookConfigRepository(db),
+      inject: ['DATABASE'],
+    },
+    SiemService,
+    SiemWebhookProducer,
+  ],
+  exports: [SiemService, SiemWebhookProducer, SIEM_WEBHOOK_CONFIG_REPOSITORY],
+})
+export class SiemModule {}
