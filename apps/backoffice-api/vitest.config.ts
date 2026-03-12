@@ -6,7 +6,7 @@ export default defineConfig({
     name: 'backoffice-api',
     globals: true,
     environment: 'node',
-    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    include: ['src/**/*.test.ts'],
     exclude: ['**/*.e2e-spec.ts', '**/*.e2e.test.ts', 'node_modules/**'],
     root: './',
     testTimeout: 15000,

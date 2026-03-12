@@ -36,7 +36,7 @@ export type TenantListQuery = z.input<typeof TenantListQuerySchema>;
 
 export const ChangeTierSchema = z.object({
   tier: z.enum(["free", "pro", "enterprise"]),
-  interval: z.enum(["month", "year"]).optional(),
+  interval: z.enum(["month", "year", "monthly", "annual"]),
 });
 
 export type ChangeTierDto = z.infer<typeof ChangeTierSchema>;

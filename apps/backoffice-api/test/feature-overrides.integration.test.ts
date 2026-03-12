@@ -1,17 +1,30 @@
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
+import { and, eq, tenantFeatureOverrides } from "@qpp/database";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createTestApp } from "./setup.js";
+import { cleanupTenant, createTenant } from "./test-data.js";
 
 describe("Feature Overrides Controller (integration)", () => {
   let app: NestFastifyApplication;
+  let tenantId: string;
+  let db: Awaited<ReturnType<typeof createTestApp>>["db"];
 
   beforeAll(async () => {
-    ({ app } = await createTestApp());
+    const created = await createTestApp({
+      userId: "bo-admin-feature-overrides",
+      role: "admin",
+    });
+    app = created.app;
+    db = created.db;
+
+    const tenant = await createTenant({ tssd: "test---bo-feature-overrides" });
+    tenantId = tenant.id;
   });
 
   afterAll(async () => {
     await app.close();
+    await cleanupTenant(tenantId);
   });
 
   describe("PUT /tenants/:tenantId/feature-overrides/:featureKey", () => {
@@ -31,12 +44,22 @@ describe("Feature Overrides Controller (integration)", () => {
     it("passes Zod validation for boolean enabled", async () => {
       const response = await app.inject({
         method: "PUT",
-        url: "/tenants/00000000-0000-0000-0000-000000000000/feature-overrides/basicLinting",
+        url: `/tenants/${tenantId}/feature-overrides/basicLinting`,
         payload: { enabled: true },
       });
 
-      // Validation passes; may get 500 from FK constraint if tenant doesn't exist
-      expect([200, 500]).toContain(response.statusCode);
+      expect(response.statusCode).toBe(200);
+
+      const rows = await db
+        .select()
+        .from(tenantFeatureOverrides)
+        .where(
+          and(
+            eq(tenantFeatureOverrides.tenantId, tenantId),
+            eq(tenantFeatureOverrides.featureKey, "basicLinting"),
+          ),
+        );
+      expect(rows).toHaveLength(1);
     });
 
     it("rejects non-boolean enabled", async () => {
@@ -55,7 +78,7 @@ describe("Feature Overrides Controller (integration)", () => {
     it("rejects invalid feature key", async () => {
       const response = await app.inject({
         method: "PUT",
-        url: "/tenants/00000000-0000-0000-0000-000000000000/feature-overrides/nonExistentFeature",
+        url: `/tenants/${tenantId}/feature-overrides/nonExistentFeature`,
         payload: { enabled: true },
       });
 
@@ -69,7 +92,7 @@ describe("Feature Overrides Controller (integration)", () => {
     it("returns list for valid tenant ID", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/tenants/00000000-0000-0000-0000-000000000000/feature-overrides",
+        url: `/tenants/${tenantId}/feature-overrides`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -81,7 +104,7 @@ describe("Feature Overrides Controller (integration)", () => {
     it("returns 200 for valid feature key", async () => {
       const response = await app.inject({
         method: "DELETE",
-        url: "/tenants/00000000-0000-0000-0000-000000000000/feature-overrides/basicLinting",
+        url: `/tenants/${tenantId}/feature-overrides/basicLinting`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -93,7 +116,10 @@ describe("Feature Overrides Controller — role-based access (integration)", () 
   let viewerApp: NestFastifyApplication;
 
   beforeAll(async () => {
-    ({ app: viewerApp } = await createTestApp({ role: "viewer" }));
+    ({ app: viewerApp } = await createTestApp({
+      userId: "bo-viewer-feature-overrides",
+      role: "viewer",
+    }));
   });
 
   afterAll(async () => {

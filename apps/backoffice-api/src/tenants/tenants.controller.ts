@@ -91,10 +91,17 @@ export class TenantsController {
       );
     }
 
+    const interval =
+      body.interval === "month"
+        ? "monthly"
+        : body.interval === "year"
+          ? "annual"
+          : body.interval;
+
     await this.tierManagement.changeTier(
       id,
       body.tier,
-      body.interval as "monthly" | "annual",
+      interval,
       user.id,
       req.ip,
     );

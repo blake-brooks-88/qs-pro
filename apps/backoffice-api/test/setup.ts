@@ -1,11 +1,14 @@
-import { BadRequestException } from "@nestjs/common";
 import {
   FastifyAdapter,
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
-import { FeatureKeySchema } from "@qpp/shared-types";
+import type { PostgresJsDatabase } from "@qpp/database";
+import { boUsers, tenants } from "@qpp/database";
 import { vi } from "vitest";
+
+import { DRIZZLE_DB } from "../src/database/database.module.js";
+import { STRIPE_CLIENT } from "../src/stripe/stripe.provider.js";
 
 const mockGetSession = vi.fn();
 
@@ -67,78 +70,63 @@ vi.mock("../src/auth/auth.js", () => ({
   },
 }));
 
+function createDefaultStripeMock() {
+  return {
+    prices: {
+      list: vi.fn().mockResolvedValue({ data: [] }),
+    },
+    customers: {
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    subscriptions: {
+      create: vi.fn(),
+      retrieve: vi.fn(),
+      update: vi.fn(),
+      cancel: vi.fn(),
+    },
+    invoices: {
+      retrieve: vi.fn(),
+      update: vi.fn(),
+      list: vi.fn().mockResolvedValue({ data: [], has_more: false }),
+    },
+  };
+}
+
 export async function createTestApp(overrides?: {
   userId?: string;
   role?: string;
-}): Promise<{ app: NestFastifyApplication }> {
-  const userId = overrides?.userId ?? "test-admin-id";
+  stripe?: unknown;
+}): Promise<{
+  app: NestFastifyApplication;
+  db: PostgresJsDatabase;
+  stripe: ReturnType<typeof createDefaultStripeMock>;
+}> {
   const role = overrides?.role ?? "admin";
+  const userId =
+    overrides?.userId ??
+    `test-${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const stripe =
+    (overrides?.stripe as ReturnType<typeof createDefaultStripeMock>) ??
+    createDefaultStripeMock();
 
   mockGetSession.mockResolvedValue({
     user: {
       id: userId,
       role,
-      email: `${role}@test.com`,
+      email: `${userId}@test.com`,
       name: `Test ${role}`,
     },
     session: { id: "test-session" },
   });
 
   const { AppModule } = await import("../src/app.module.js");
-  const { BackofficeAuditService } =
-    await import("../src/audit/audit.service.js");
-  const { FeatureOverridesService } =
-    await import("../src/feature-overrides/feature-overrides.service.js");
-  const { InvoicingService } =
-    await import("../src/invoicing/invoicing.service.js");
-  const { TenantsService } = await import("../src/tenants/tenants.service.js");
 
   const module = await Test.createTestingModule({
     imports: [AppModule],
   })
-    .overrideProvider(BackofficeAuditService)
-    .useValue({ log: vi.fn().mockResolvedValue(undefined) })
-    .overrideProvider(FeatureOverridesService)
-    .useValue({
-      getOverridesForTenant: vi.fn().mockResolvedValue([]),
-      setOverride: vi
-        .fn()
-        .mockImplementation(async (_tenantId: string, key: string) => {
-          const result = FeatureKeySchema.safeParse(key);
-          if (!result.success) {
-            throw new BadRequestException(
-              `Invalid feature key: "${key}". Must be one of: ${FeatureKeySchema.options.join(", ")}`,
-            );
-          }
-        }),
-      removeOverride: vi.fn().mockResolvedValue(undefined),
-    })
-    .overrideProvider(InvoicingService)
-    .useValue({
-      createInvoicedSubscription: vi.fn().mockResolvedValue({
-        invoiceUrl: "https://invoice.test/1",
-        subscriptionId: "sub_test",
-        invoiceStatus: "open",
-        amount: 2500,
-        dueDate: null,
-        stripeInvoiceId: "in_test",
-      }),
-      listInvoicesForTenant: vi.fn().mockResolvedValue([]),
-      listAllInvoices: vi.fn().mockResolvedValue({
-        invoices: [],
-        hasMore: false,
-        nextCursor: null,
-      }),
-    })
-    .overrideProvider(TenantsService)
-    .useValue({
-      findAll: vi.fn().mockImplementation(async (query: unknown) => {
-        const q = query as { page?: number; limit?: number };
-        return { data: [], page: q.page ?? 1, limit: q.limit ?? 25, total: 0 };
-      }),
-      findById: vi.fn().mockResolvedValue(null),
-      lookupByEid: vi.fn().mockResolvedValue(null),
-    })
+    .overrideProvider(STRIPE_CLIENT)
+    .useValue(stripe)
     .compile();
 
   const app = module.createNestApplication<NestFastifyApplication>(
@@ -148,5 +136,27 @@ export async function createTestApp(overrides?: {
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  return { app };
+  const db = app.get<PostgresJsDatabase>(DRIZZLE_DB);
+  await db
+    .insert(boUsers)
+    .values({
+      id: userId,
+      name: `Test ${role}`,
+      email: `${userId}@test.com`,
+      role,
+    })
+    .onConflictDoUpdate({
+      target: boUsers.id,
+      set: {
+        name: `Test ${role}`,
+        email: `${userId}@test.com`,
+        role,
+      },
+    });
+
+  // Sanity: ensure the schema exists and connectivity is working for tests.
+  // Avoid asserting on row counts; just ensure a trivial query succeeds.
+  await db.select({ id: tenants.id }).from(tenants).limit(1);
+
+  return { app, db, stripe };
 }
