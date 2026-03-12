@@ -61,7 +61,7 @@ export function createMockShellQueryContext(
     tenantId: `tenant-${id}`,
     userId: `user-${id}`,
     mid: `mid-${id}`,
-    eid: `eid-${id}`,
+    eid: `test---factory-${id}`,
     accessToken: `token-${id}`,
     ...overrides,
   };
