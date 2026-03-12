@@ -47,7 +47,9 @@ describe("TenantsController", () => {
       tierManagement as never,
     );
 
-    await expect(controller.findById("missing")).rejects.toThrow(NotFoundException);
+    await expect(controller.findById("missing")).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it("returns a tenant when tenant lookup by id succeeds", async () => {
@@ -78,11 +80,9 @@ describe("TenantsController", () => {
     );
 
     await expect(
-      controller.lookupByEid(
-        "test---missing",
-        { id: "bo-user-1" },
-        { ip: "127.0.0.1" } as unknown as FastifyRequest,
-      ),
+      controller.lookupByEid("test---missing", { id: "bo-user-1" }, {
+        ip: "127.0.0.1",
+      } as unknown as FastifyRequest),
     ).rejects.toThrow(NotFoundException);
 
     expect(auditService.log).toHaveBeenCalledWith(
@@ -108,11 +108,9 @@ describe("TenantsController", () => {
     );
 
     await expect(
-      controller.lookupByEid(
-        "test---eid",
-        { id: "bo-user-1" },
-        { ip: "127.0.0.1" } as unknown as FastifyRequest,
-      ),
+      controller.lookupByEid("test---eid", { id: "bo-user-1" }, {
+        ip: "127.0.0.1",
+      } as unknown as FastifyRequest),
     ).resolves.toEqual({ tenantId: "t-1" });
   });
 

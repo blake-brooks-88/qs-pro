@@ -28,7 +28,9 @@ vi.mock("@/lib/api", () => ({
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
   };
 }
 
@@ -72,19 +74,31 @@ describe("backoffice user hooks", () => {
     });
     await role.result.current.mutateAsync({ userId: "u1", role: "admin" });
 
-    const ban = renderHook(() => useBanUser(), { wrapper: createWrapper(queryClient) });
+    const ban = renderHook(() => useBanUser(), {
+      wrapper: createWrapper(queryClient),
+    });
     await ban.result.current.mutateAsync({ userId: "u1" });
 
-    const unban = renderHook(() => useUnbanUser(), { wrapper: createWrapper(queryClient) });
+    const unban = renderHook(() => useUnbanUser(), {
+      wrapper: createWrapper(queryClient),
+    });
     await unban.result.current.mutateAsync({ userId: "u1" });
 
-    const reset = renderHook(() => useResetPassword(), { wrapper: createWrapper(queryClient) });
-    await reset.result.current.mutateAsync({ userId: "u1", newPassword: "ValidPassword123456" });
+    const reset = renderHook(() => useResetPassword(), {
+      wrapper: createWrapper(queryClient),
+    });
+    await reset.result.current.mutateAsync({
+      userId: "u1",
+      newPassword: "ValidPassword123456",
+    });
 
-    const del = renderHook(() => useDeleteUser(), { wrapper: createWrapper(queryClient) });
+    const del = renderHook(() => useDeleteUser(), {
+      wrapper: createWrapper(queryClient),
+    });
     await del.result.current.mutateAsync({ userId: "u1" });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["backoffice-users"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["backoffice-users"],
+    });
   });
 });
-

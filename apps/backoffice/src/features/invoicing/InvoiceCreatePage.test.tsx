@@ -26,8 +26,9 @@ describe("InvoiceCreatePage", () => {
       </MemoryRouter>,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /back to invoices/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /back to invoices/i }),
+    );
     expect(mocks.navigateMock).toHaveBeenCalledWith("/invoicing");
   });
 });
-

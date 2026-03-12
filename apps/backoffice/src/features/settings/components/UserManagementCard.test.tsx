@@ -23,7 +23,10 @@ vi.mock("@/hooks/use-session", () => ({
 }));
 
 vi.mock("../hooks/use-backoffice-users", () => ({
-  useChangeUserRole: () => ({ mutate: mocks.changeRoleMutate, isPending: false }),
+  useChangeUserRole: () => ({
+    mutate: mocks.changeRoleMutate,
+    isPending: false,
+  }),
   useBanUser: () => ({ mutate: mocks.banMutate, isPending: false }),
   useUnbanUser: () => ({ mutate: mocks.unbanMutate, isPending: false }),
   useResetPassword: () => ({ mutate: mocks.resetMutate, isPending: false }),
@@ -69,15 +72,25 @@ vi.mock("@/components/ui/select", () => ({
 }));
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  Badge: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
 }));
 
 vi.mock("@/components/ui/card", () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardHeader: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardTitle: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardDescription: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 describe("UserManagementCard", () => {
@@ -137,7 +150,9 @@ describe("UserManagementCard", () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Reset Password" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Reset Password" }),
+    );
     await userEvent.type(screen.getByLabelText("New Password"), "short");
     await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
 
@@ -168,7 +183,9 @@ describe("UserManagementCard", () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Reset Password" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Reset Password" }),
+    );
     await userEvent.type(
       screen.getByLabelText("New Password"),
       "ValidPassword123456",
@@ -176,7 +193,9 @@ describe("UserManagementCard", () => {
     await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
 
     expect(mocks.resetMutate).toHaveBeenCalled();
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Password reset successfully");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Password reset successfully",
+    );
   });
 
   it("deletes a user via confirmation dialog", async () => {

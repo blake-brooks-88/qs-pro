@@ -7,7 +7,9 @@ const drizzleMock = vi.fn(() => ({}));
 vi.mock("drizzle-orm/postgres-js", () => ({ drizzle: drizzleMock }));
 
 const drizzleAdapterMock = vi.fn(() => ({ adapter: "drizzle" }));
-vi.mock("better-auth/adapters/drizzle", () => ({ drizzleAdapter: drizzleAdapterMock }));
+vi.mock("better-auth/adapters/drizzle", () => ({
+  drizzleAdapter: drizzleAdapterMock,
+}));
 
 const adminPluginMock = vi.fn(() => ({ plugin: "admin" }));
 const twoFactorPluginMock = vi.fn(() => ({ plugin: "twoFactor" }));
@@ -22,10 +24,16 @@ vi.mock("better-auth", () => ({ betterAuth: betterAuthMock }));
 const assertSafeBackofficeDatabaseUrlMock = vi.fn();
 vi.mock("@qpp/backend-shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@qpp/backend-shared")>();
-  return { ...actual, assertSafeBackofficeDatabaseUrl: assertSafeBackofficeDatabaseUrlMock };
+  return {
+    ...actual,
+    assertSafeBackofficeDatabaseUrl: assertSafeBackofficeDatabaseUrlMock,
+  };
 });
 
-function withEnv(env: Record<string, string | undefined>, fn: () => Promise<void>) {
+function withEnv(
+  env: Record<string, string | undefined>,
+  fn: () => Promise<void>,
+) {
   const previous = { ...process.env };
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) {
@@ -91,7 +99,10 @@ describe("auth (Better Auth config)", () => {
         );
 
         expect(betterAuthMock).toHaveBeenCalledTimes(1);
-        const config = betterAuthMock.mock.calls[0]?.[0] as Record<string, unknown>;
+        const config = betterAuthMock.mock.calls[0]?.[0] as Record<
+          string,
+          unknown
+        >;
 
         expect(config).toMatchObject({
           appName: "QS Pro Backoffice",
@@ -111,4 +122,3 @@ describe("auth (Better Auth config)", () => {
     );
   });
 });
-

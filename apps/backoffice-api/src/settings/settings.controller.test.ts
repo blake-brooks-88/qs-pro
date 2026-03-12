@@ -1,5 +1,5 @@
-import type { FastifyRequest } from "fastify";
 import { BadRequestException } from "@nestjs/common";
+import type { FastifyRequest } from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -173,11 +173,10 @@ describe("SettingsController", () => {
     const controller = new SettingsController(auditService as never);
 
     await expect(
-      controller.banUser(
-        "admin-1",
-        { id: "admin-1" },
-        { ip: "127.0.0.1", headers: {} } as unknown as FastifyRequest,
-      ),
+      controller.banUser("admin-1", { id: "admin-1" }, {
+        ip: "127.0.0.1",
+        headers: {},
+      } as unknown as FastifyRequest),
     ).rejects.toThrow("Cannot ban yourself");
   });
 
@@ -187,11 +186,10 @@ describe("SettingsController", () => {
     const auditService = { log: vi.fn() };
     const controller = new SettingsController(auditService as never);
 
-    const result = await controller.banUser(
-      "user-2",
-      { id: "admin-1" },
-      { ip: "127.0.0.1", headers: {} } as unknown as FastifyRequest,
-    );
+    const result = await controller.banUser("user-2", { id: "admin-1" }, {
+      ip: "127.0.0.1",
+      headers: {},
+    } as unknown as FastifyRequest);
 
     expect(result).toEqual({ success: true });
     expect(mocks.banUserMock).toHaveBeenCalled();
@@ -208,11 +206,10 @@ describe("SettingsController", () => {
     const auditService = { log: vi.fn() };
     const controller = new SettingsController(auditService as never);
 
-    const result = await controller.unbanUser(
-      "user-2",
-      { id: "admin-1" },
-      { ip: "127.0.0.1", headers: {} } as unknown as FastifyRequest,
-    );
+    const result = await controller.unbanUser("user-2", { id: "admin-1" }, {
+      ip: "127.0.0.1",
+      headers: {},
+    } as unknown as FastifyRequest);
 
     expect(result).toEqual({ success: true });
     expect(mocks.unbanUserMock).toHaveBeenCalled();
@@ -250,11 +247,10 @@ describe("SettingsController", () => {
     const controller = new SettingsController(auditService as never);
 
     await expect(
-      controller.removeUser(
-        "admin-1",
-        { id: "admin-1" },
-        { ip: "127.0.0.1", headers: {} } as unknown as FastifyRequest,
-      ),
+      controller.removeUser("admin-1", { id: "admin-1" }, {
+        ip: "127.0.0.1",
+        headers: {},
+      } as unknown as FastifyRequest),
     ).rejects.toThrow("Cannot delete yourself");
   });
 
@@ -264,11 +260,10 @@ describe("SettingsController", () => {
     const auditService = { log: vi.fn() };
     const controller = new SettingsController(auditService as never);
 
-    const result = await controller.removeUser(
-      "user-2",
-      { id: "admin-1" },
-      { ip: "127.0.0.1", headers: {} } as unknown as FastifyRequest,
-    );
+    const result = await controller.removeUser("user-2", { id: "admin-1" }, {
+      ip: "127.0.0.1",
+      headers: {},
+    } as unknown as FastifyRequest);
 
     expect(result).toEqual({ success: true });
     expect(mocks.removeUserMock).toHaveBeenCalled();

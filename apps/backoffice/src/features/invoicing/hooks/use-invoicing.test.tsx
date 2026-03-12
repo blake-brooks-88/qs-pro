@@ -22,7 +22,9 @@ vi.mock("@/lib/api", () => ({
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
   };
 }
 
@@ -62,7 +64,9 @@ describe("invoicing hooks", () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(mocks.getMock).toHaveBeenCalledWith("/invoicing/tenants/t1/invoices");
+    expect(mocks.getMock).toHaveBeenCalledWith(
+      "/invoicing/tenants/t1/invoices",
+    );
   });
 
   it("creates invoiced subscription and invalidates invoices", async () => {

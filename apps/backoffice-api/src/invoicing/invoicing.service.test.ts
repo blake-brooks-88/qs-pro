@@ -399,9 +399,11 @@ describe("InvoicingService", () => {
     };
 
     const db = {
-      select: vi.fn().mockReturnValueOnce(
-        makeWhereSelectChain([{ stripeCustomerId: "cus_1", eid: "eid-1" }]),
-      ),
+      select: vi
+        .fn()
+        .mockReturnValueOnce(
+          makeWhereSelectChain([{ stripeCustomerId: "cus_1", eid: "eid-1" }]),
+        ),
       insert: vi.fn(),
     };
 

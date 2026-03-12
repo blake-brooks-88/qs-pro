@@ -49,10 +49,11 @@ describe("InvoiceListPage", () => {
       queryKey: ["invoices"],
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Create Invoice" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create Invoice" }),
+    );
     expect(mocks.navigateMock).toHaveBeenCalledWith("/invoicing/create");
 
     expect(screen.getByRole("button", { name: "Load More" })).toBeDisabled();
   });
 });
-

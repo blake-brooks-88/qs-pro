@@ -11,4 +11,3 @@ describe("useUiStore", () => {
     expect(useUiStore.getState().sidebarCollapsed).toBe(true);
   });
 });
-

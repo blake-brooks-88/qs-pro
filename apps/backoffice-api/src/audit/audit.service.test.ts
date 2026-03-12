@@ -140,7 +140,11 @@ describe("BackofficeAuditService", () => {
   it("should filter getAllLogs by eventType when provided", async () => {
     mockDb._selectChain.offset.mockResolvedValueOnce([]);
 
-    await service.getAllLogs({ eventType: "tenant.view", limit: 10, offset: 5 });
+    await service.getAllLogs({
+      eventType: "tenant.view",
+      limit: 10,
+      offset: 5,
+    });
 
     expect(mockDb._selectChain.where).toHaveBeenCalledTimes(1);
     expect(mockDb._selectChain.limit).toHaveBeenCalledWith(10);

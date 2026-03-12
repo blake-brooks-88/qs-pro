@@ -13,4 +13,3 @@ describe("AuthLayout", () => {
     expect(screen.getByText("Child")).toBeInTheDocument();
   });
 });
-

@@ -42,9 +42,7 @@ describe("api", () => {
     expect(onRejected).toBeTypeOf("function");
 
     await expect(
-      Promise.resolve(
-        onRejected?.({ response: { status: 401 } } as unknown),
-      ),
+      Promise.resolve(onRejected?.({ response: { status: 401 } } as unknown)),
     ).rejects.toBeDefined();
     expect(window.location.href).toBe("/login");
 
@@ -54,4 +52,3 @@ describe("api", () => {
     });
   });
 });
-

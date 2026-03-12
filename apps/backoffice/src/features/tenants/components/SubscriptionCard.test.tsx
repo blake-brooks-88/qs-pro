@@ -29,17 +29,15 @@ vi.mock("@/hooks/use-permissions", () => ({
 
 vi.mock("../hooks/use-tenant-detail", () => ({
   useChangeTier: () => ({ mutate: mocks.changeTierMutate, isPending: false }),
-  useCancelSubscription: () => ({ mutate: mocks.cancelMutate, isPending: false }),
+  useCancelSubscription: () => ({
+    mutate: mocks.cancelMutate,
+    isPending: false,
+  }),
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({
-    open,
-    children,
-  }: {
-    open: boolean;
-    children: React.ReactNode;
-  }) => (open ? <div>{children}</div> : null),
+  Dialog: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? <div>{children}</div> : null,
   DialogContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -64,14 +62,22 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  Badge: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
 }));
 
 vi.mock("@/components/ui/card", () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardHeader: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardTitle: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock("@/components/ui/select", () => ({
@@ -112,7 +118,9 @@ describe("SubscriptionCard", () => {
       "https://dashboard.stripe.com/subscriptions/sub_123",
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Create Invoice" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create Invoice" }),
+    );
     expect(mocks.navigateMock).toHaveBeenCalledWith(
       "/invoicing/create?eid=test---eid",
     );
@@ -189,7 +197,9 @@ describe("SubscriptionCard", () => {
       expect.objectContaining({ tenantId: "t-1" }),
       expect.any(Object),
     );
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Tier changed successfully");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Tier changed successfully",
+    );
   });
 
   it("calls cancel subscription mutation when confirming cancel", async () => {
@@ -231,7 +241,9 @@ describe("SubscriptionCard", () => {
     const confirmButtons = screen.getAllByRole("button", {
       name: "Cancel Subscription",
     });
-    await userEvent.click(confirmButtons[confirmButtons.length - 1] as HTMLElement);
+    await userEvent.click(
+      confirmButtons[confirmButtons.length - 1] as HTMLElement,
+    );
 
     expect(mocks.cancelMutate).toHaveBeenCalledWith(
       { tenantId: "t-1" },

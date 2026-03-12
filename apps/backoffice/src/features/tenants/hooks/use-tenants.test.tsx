@@ -19,13 +19,17 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false } },
   });
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
   };
 }
 
 describe("tenant hooks", () => {
   it("fetches tenants with params", async () => {
-    mocks.getMock.mockResolvedValueOnce({ data: { data: [], page: 1, limit: 25, total: 0 } });
+    mocks.getMock.mockResolvedValueOnce({
+      data: { data: [], page: 1, limit: 25, total: 0 },
+    });
 
     const { result } = renderHook(
       () => useTenants({ page: 1, limit: 25, search: "acme" }),
@@ -60,4 +64,3 @@ describe("tenant hooks", () => {
     expect(mocks.getMock).toHaveBeenCalledWith("/tenants/lookup/test---eid");
   });
 });
-

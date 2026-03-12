@@ -19,9 +19,9 @@ describe("StripeCatalogService", () => {
 
   it("throws when Stripe is not configured", async () => {
     const service = new StripeCatalogService(null);
-    await expect(service.resolveCheckoutPriceId("pro", "monthly")).rejects.toThrow(
-      ServiceUnavailableException,
-    );
+    await expect(
+      service.resolveCheckoutPriceId("pro", "monthly"),
+    ).rejects.toThrow(ServiceUnavailableException);
   });
 
   it("throws when the requested lookup key is missing", async () => {
@@ -47,9 +47,9 @@ describe("StripeCatalogService", () => {
     nowSpy.mockReturnValue(10_000);
 
     const service = new StripeCatalogService(stripe as never);
-    await expect(service.resolveCheckoutPriceId("pro", "monthly")).resolves.toBe(
-      "price_1",
-    );
+    await expect(
+      service.resolveCheckoutPriceId("pro", "monthly"),
+    ).resolves.toBe("price_1");
 
     nowSpy.mockReturnValue(20_000);
     await expect(service.resolveCheckoutPriceId("pro", "annual")).resolves.toBe(
@@ -70,4 +70,3 @@ describe("StripeCatalogService", () => {
     expect(stripe.prices.list).toHaveBeenCalledTimes(1);
   });
 });
-

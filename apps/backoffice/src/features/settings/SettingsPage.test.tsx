@@ -5,7 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "./SettingsPage";
 
 vi.mock("./hooks/use-backoffice-users", () => ({
-  useBackofficeUsers: () => ({ data: { users: [], total: 0 }, isLoading: false }),
+  useBackofficeUsers: () => ({
+    data: { users: [], total: 0 },
+    isLoading: false,
+  }),
 }));
 
 vi.mock("./components/UserManagementCard", () => ({
@@ -24,4 +27,3 @@ describe("SettingsPage", () => {
     expect(screen.getByText("Invite Dialog")).toBeInTheDocument();
   });
 });
-

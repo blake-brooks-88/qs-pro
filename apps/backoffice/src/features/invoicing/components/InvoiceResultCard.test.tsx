@@ -117,7 +117,9 @@ describe("InvoiceResultCard", () => {
       </QueryClientProvider>,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Create Another" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create Another" }),
+    );
     expect(onReset).toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: "View Tenant" }));

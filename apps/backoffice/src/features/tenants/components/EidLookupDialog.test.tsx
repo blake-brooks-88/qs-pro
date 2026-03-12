@@ -16,7 +16,9 @@ vi.mock("react-router-dom", async (importOriginal) => {
 });
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Dialog: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   DialogContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -44,7 +46,9 @@ vi.mock("@/components/ui/input", () => ({
 }));
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  Badge: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
 }));
 
 vi.mock("@/features/tenants/hooks/use-tenants", () => ({
@@ -71,7 +75,10 @@ describe("EidLookupDialog", () => {
     const onOpenChange = vi.fn();
     render(<EidLookupDialog open onOpenChange={onOpenChange} />);
 
-    await userEvent.type(screen.getByPlaceholderText("Enter EID..."), "test---eid");
+    await userEvent.type(
+      screen.getByPlaceholderText("Enter EID..."),
+      "test---eid",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Lookup" }));
     expect(mocks.refetchMock).toHaveBeenCalledTimes(1);
 
@@ -95,7 +102,8 @@ describe("EidLookupDialog", () => {
     await userEvent.type(screen.getByPlaceholderText("Enter EID..."), "x");
     await userEvent.click(screen.getByRole("button", { name: "Lookup" }));
 
-    expect(await screen.findByText(/No tenant found for EID/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/No tenant found for EID/i),
+    ).toBeInTheDocument();
   });
 });
-

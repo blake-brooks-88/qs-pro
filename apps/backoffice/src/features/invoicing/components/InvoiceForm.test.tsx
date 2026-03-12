@@ -126,7 +126,10 @@ describe("InvoiceForm", () => {
     };
     renderForm();
 
-    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
+    await userEvent.type(
+      screen.getByLabelText(/enterprise id/i),
+      mockLookupData.eid,
+    );
     const confirmBtn = screen.getByRole("button", { name: /confirm/i });
     await userEvent.click(confirmBtn);
 
@@ -150,7 +153,10 @@ describe("InvoiceForm", () => {
     };
     renderForm();
 
-    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
+    await userEvent.type(
+      screen.getByLabelText(/enterprise id/i),
+      mockLookupData.eid,
+    );
     const confirmBtn = screen.getByRole("button", { name: /confirm/i });
     await userEvent.click(confirmBtn);
 
@@ -202,10 +208,16 @@ describe("InvoiceForm", () => {
 
     renderForm();
 
-    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
+    await userEvent.type(
+      screen.getByLabelText(/enterprise id/i),
+      mockLookupData.eid,
+    );
     await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 
-    await userEvent.type(screen.getByLabelText(/customer email/i), "john@acme.com");
+    await userEvent.type(
+      screen.getByLabelText(/customer email/i),
+      "john@acme.com",
+    );
     await userEvent.type(screen.getByLabelText(/customer name/i), "John Doe");
 
     await userEvent.click(
@@ -214,7 +226,9 @@ describe("InvoiceForm", () => {
 
     expect(await screen.findByText("Subscription Created")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Create Another" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create Another" }),
+    );
     expect(screen.getByLabelText(/enterprise id/i)).toHaveValue("");
   });
 
@@ -231,10 +245,16 @@ describe("InvoiceForm", () => {
 
     renderForm();
 
-    await userEvent.type(screen.getByLabelText(/enterprise id/i), mockLookupData.eid);
+    await userEvent.type(
+      screen.getByLabelText(/enterprise id/i),
+      mockLookupData.eid,
+    );
     await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 
-    await userEvent.type(screen.getByLabelText(/customer email/i), "john@acme.com");
+    await userEvent.type(
+      screen.getByLabelText(/customer email/i),
+      "john@acme.com",
+    );
     await userEvent.type(screen.getByLabelText(/customer name/i), "John Doe");
 
     await userEvent.click(

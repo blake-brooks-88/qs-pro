@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import {
   FastifyAdapter,
   type NestFastifyApplication,
@@ -5,7 +6,6 @@ import {
 import { Test } from "@nestjs/testing";
 import { FeatureKeySchema } from "@qpp/shared-types";
 import { vi } from "vitest";
-import { BadRequestException } from "@nestjs/common";
 
 const mockGetSession = vi.fn();
 
@@ -40,16 +40,23 @@ vi.mock("../src/auth/auth.js", () => ({
     api: {
       getSession: mockGetSession,
       listUsers: vi.fn().mockResolvedValue({ users: [], total: 0 }),
-      createUser: vi.fn().mockImplementation(async (args: {
-        body: { email: string; name: string; password: string; role: string };
-      }) => ({
-        user: {
-          id: "new-user",
-          email: args.body.email,
-          name: args.body.name,
-          role: args.body.role,
-        },
-      })),
+      createUser: vi.fn().mockImplementation(
+        async (args: {
+          body: {
+            email: string;
+            name: string;
+            password: string;
+            role: string;
+          };
+        }) => ({
+          user: {
+            id: "new-user",
+            email: args.body.email,
+            name: args.body.name,
+            role: args.body.role,
+          },
+        }),
+      ),
       setRole: vi.fn().mockResolvedValue({}),
       banUser: vi.fn().mockResolvedValue({}),
       unbanUser: vi.fn().mockResolvedValue({}),
@@ -78,15 +85,12 @@ export async function createTestApp(overrides?: {
   });
 
   const { AppModule } = await import("../src/app.module.js");
-  const { BackofficeAuditService } = await import(
-    "../src/audit/audit.service.js"
-  );
-  const { FeatureOverridesService } = await import(
-    "../src/feature-overrides/feature-overrides.service.js"
-  );
-  const { InvoicingService } = await import(
-    "../src/invoicing/invoicing.service.js"
-  );
+  const { BackofficeAuditService } =
+    await import("../src/audit/audit.service.js");
+  const { FeatureOverridesService } =
+    await import("../src/feature-overrides/feature-overrides.service.js");
+  const { InvoicingService } =
+    await import("../src/invoicing/invoicing.service.js");
   const { TenantsService } = await import("../src/tenants/tenants.service.js");
 
   const module = await Test.createTestingModule({
@@ -97,14 +101,16 @@ export async function createTestApp(overrides?: {
     .overrideProvider(FeatureOverridesService)
     .useValue({
       getOverridesForTenant: vi.fn().mockResolvedValue([]),
-      setOverride: vi.fn().mockImplementation(async (_tenantId: string, key: string) => {
-        const result = FeatureKeySchema.safeParse(key);
-        if (!result.success) {
-          throw new BadRequestException(
-            `Invalid feature key: "${key}". Must be one of: ${FeatureKeySchema.options.join(", ")}`,
-          );
-        }
-      }),
+      setOverride: vi
+        .fn()
+        .mockImplementation(async (_tenantId: string, key: string) => {
+          const result = FeatureKeySchema.safeParse(key);
+          if (!result.success) {
+            throw new BadRequestException(
+              `Invalid feature key: "${key}". Must be one of: ${FeatureKeySchema.options.join(", ")}`,
+            );
+          }
+        }),
       removeOverride: vi.fn().mockResolvedValue(undefined),
     })
     .overrideProvider(InvoicingService)

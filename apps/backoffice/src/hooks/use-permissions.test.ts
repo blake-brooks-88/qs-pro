@@ -29,4 +29,3 @@ describe("usePermissions", () => {
     expect(admin.isAtLeast("editor")).toBe(true);
   });
 });
-

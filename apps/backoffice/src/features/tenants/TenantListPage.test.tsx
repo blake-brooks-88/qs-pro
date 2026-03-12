@@ -31,4 +31,3 @@ describe("TenantListPage", () => {
     expect(screen.getByText("EID Dialog")).toBeInTheDocument();
   });
 });
-

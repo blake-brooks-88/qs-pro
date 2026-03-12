@@ -48,20 +48,30 @@ describe("InvoicingController", () => {
     const result = await controller.listTenantInvoices("tenant-1");
 
     expect(result).toEqual([{ hostedUrl: "x" }]);
-    expect(invoicingService.listInvoicesForTenant).toHaveBeenCalledWith("tenant-1");
+    expect(invoicingService.listInvoicesForTenant).toHaveBeenCalledWith(
+      "tenant-1",
+    );
   });
 
   it("lists all invoices with query pass-through", async () => {
     const invoicingService = {
       createInvoicedSubscription: vi.fn(),
       listInvoicesForTenant: vi.fn(),
-      listAllInvoices: vi.fn().mockResolvedValue({ invoices: [], hasMore: false, nextCursor: null }),
+      listAllInvoices: vi
+        .fn()
+        .mockResolvedValue({ invoices: [], hasMore: false, nextCursor: null }),
     };
 
     const controller = new InvoicingController(invoicingService as never);
-    const result = await controller.listAllInvoices({ limit: 10, startingAfter: "in_1" });
+    const result = await controller.listAllInvoices({
+      limit: 10,
+      startingAfter: "in_1",
+    });
 
     expect(result).toEqual({ invoices: [], hasMore: false, nextCursor: null });
-    expect(invoicingService.listAllInvoices).toHaveBeenCalledWith({ limit: 10, startingAfter: "in_1" });
+    expect(invoicingService.listAllInvoices).toHaveBeenCalledWith({
+      limit: 10,
+      startingAfter: "in_1",
+    });
   });
 });

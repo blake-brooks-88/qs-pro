@@ -19,4 +19,3 @@ describe("generatePassword", () => {
     getRandomValues.mockRestore();
   });
 });
-

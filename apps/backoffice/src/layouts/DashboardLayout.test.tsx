@@ -41,7 +41,10 @@ function renderLayout() {
 
 describe("DashboardLayout", () => {
   it("hides Settings nav for non-admin roles", () => {
-    useSessionMock.mockReturnValue({ user: { name: "Viewer" }, role: "viewer" });
+    useSessionMock.mockReturnValue({
+      user: { name: "Viewer" },
+      role: "viewer",
+    });
     renderLayout();
 
     expect(screen.getByText("Tenants")).toBeInTheDocument();
