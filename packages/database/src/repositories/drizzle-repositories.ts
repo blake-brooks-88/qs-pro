@@ -8,6 +8,7 @@ import {
   ICredentialsRepository,
   IFeatureOverrideRepository,
   IOrgSubscriptionRepository,
+  ISiemWebhookConfigRepository,
   IStripeBillingBindingRepository,
   IStripeCheckoutSessionRepository,
   IStripeWebhookEventRepository,
@@ -15,11 +16,13 @@ import {
   IUserRepository,
   NewCredential,
   NewOrgSubscription,
+  NewSiemWebhookConfig,
   NewStripeBillingBinding,
   NewStripeCheckoutSession,
   NewTenant,
   NewUser,
   OrgSubscription,
+  SiemWebhookConfig,
   StripeBillingBinding,
   StripeCheckoutSession,
   Tenant,
@@ -29,6 +32,7 @@ import {
 import {
   credentials,
   orgSubscriptions,
+  siemWebhookConfigs,
   stripeBillingBindings,
   stripeCheckoutSessions,
   stripeWebhookEvents,
@@ -121,6 +125,39 @@ export class DrizzleUserRepository implements IUserRepository {
       );
     }
     return result;
+  }
+
+  async updateRole(
+    id: string,
+    role: "owner" | "admin" | "member",
+  ): Promise<void> {
+    await this.db.update(users).set({ role }).where(eq(users.id, id));
+  }
+
+  async findByTenantId(tenantId: string): Promise<User[]> {
+    return this.db
+      .select()
+      .from(users)
+      .where(eq(users.tenantId, tenantId))
+      .orderBy(users.name);
+  }
+
+  async updateLastActiveAt(id: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ lastActiveAt: sql`NOW()` })
+      .where(eq(users.id, id));
+  }
+
+  async countByTenantIdAndRole(
+    tenantId: string,
+    role: "owner" | "admin" | "member",
+  ): Promise<number> {
+    const [result] = await this.db
+      .select({ count: count() })
+      .from(users)
+      .where(and(eq(users.tenantId, tenantId), eq(users.role, role)));
+    return result?.count ?? 0;
   }
 }
 
@@ -520,5 +557,99 @@ export class DrizzleStripeWebhookEventRepository implements IStripeWebhookEventR
         errorMessage,
       })
       .where(eq(stripeWebhookEvents.id, eventId));
+  }
+}
+
+export class DrizzleSiemWebhookConfigRepository implements ISiemWebhookConfigRepository {
+  constructor(private db: PostgresJsDatabase) {}
+
+  async findByTenantId(
+    tenantId: string,
+  ): Promise<SiemWebhookConfig | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(siemWebhookConfigs)
+      .where(eq(siemWebhookConfigs.tenantId, tenantId));
+    return result;
+  }
+
+  async upsert(config: NewSiemWebhookConfig): Promise<SiemWebhookConfig> {
+    const [result] = await this.db
+      .insert(siemWebhookConfigs)
+      .values(config)
+      .onConflictDoUpdate({
+        target: siemWebhookConfigs.tenantId,
+        set: {
+          mid: config.mid,
+          webhookUrl: config.webhookUrl,
+          secretEncrypted: config.secretEncrypted,
+          enabled: config.enabled,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!result) {
+      throw new DatabaseError(
+        ErrorCode.DATABASE_ERROR,
+        "SIEM webhook config upsert failed to return a result",
+        { operation: "upsertSiemWebhookConfig" },
+      );
+    }
+    return result;
+  }
+
+  async updateStatus(
+    tenantId: string,
+    data: Partial<SiemWebhookConfig>,
+  ): Promise<void> {
+    const {
+      id: _id,
+      tenantId: _tenantId,
+      createdAt: _createdAt,
+      ...updateData
+    } = data;
+    await this.db
+      .update(siemWebhookConfigs)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(siemWebhookConfigs.tenantId, tenantId));
+  }
+
+  async incrementFailures(tenantId: string, reason: string): Promise<number> {
+    const [result] = await this.db
+      .update(siemWebhookConfigs)
+      .set({
+        consecutiveFailures: sql`${siemWebhookConfigs.consecutiveFailures} + 1`,
+        lastFailureAt: sql`NOW()`,
+        lastFailureReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(siemWebhookConfigs.tenantId, tenantId))
+      .returning({
+        consecutiveFailures: siemWebhookConfigs.consecutiveFailures,
+      });
+    return result?.consecutiveFailures ?? 0;
+  }
+
+  async resetFailures(tenantId: string): Promise<void> {
+    await this.db
+      .update(siemWebhookConfigs)
+      .set({
+        consecutiveFailures: 0,
+        lastSuccessAt: sql`NOW()`,
+        updatedAt: new Date(),
+      })
+      .where(eq(siemWebhookConfigs.tenantId, tenantId));
+  }
+
+  async disable(tenantId: string, reason: string): Promise<void> {
+    await this.db
+      .update(siemWebhookConfigs)
+      .set({
+        enabled: false,
+        disabledAt: sql`NOW()`,
+        disabledReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(siemWebhookConfigs.tenantId, tenantId));
   }
 }

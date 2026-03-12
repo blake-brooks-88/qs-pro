@@ -47,6 +47,12 @@ export const users = pgTable("users", {
   tenantId: uuid("tenant_id").references(() => tenants.id),
   email: varchar("email"),
   name: varchar("name"),
+  role: varchar("role")
+    .$type<"owner" | "admin" | "member">()
+    .default("member")
+    .notNull(),
+  lastActiveAt: timestamp("last_active_at"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export type StripeSubscriptionStatus =
@@ -470,7 +476,34 @@ export const boTwoFactors = pgTable("bo_two_factors", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// 14. Backoffice Audit Logs (Cross-tenant, no RLS — separate from tenant audit_logs)
+// 14. SIEM Webhook Configs (Tenant-level SIEM integration settings)
+export const siemWebhookConfigs = pgTable(
+  "siem_webhook_configs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull()
+      .unique(),
+    mid: varchar("mid").notNull(),
+    webhookUrl: text("webhook_url").notNull(),
+    secretEncrypted: text("secret_encrypted").notNull(),
+    enabled: boolean("enabled").default(true).notNull(),
+    consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+    lastSuccessAt: timestamp("last_success_at"),
+    lastFailureAt: timestamp("last_failure_at"),
+    lastFailureReason: text("last_failure_reason"),
+    disabledAt: timestamp("disabled_at"),
+    disabledReason: text("disabled_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    tenantIdIdx: index("siem_webhook_configs_tenant_id_idx").on(t.tenantId),
+  }),
+);
+
+// 15. Backoffice Audit Logs (Cross-tenant, no RLS — separate from tenant audit_logs)
 export const backofficeAuditLogs = pgTable("backoffice_audit_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   backofficeUserId: varchar("backoffice_user_id").references(() => boUsers.id, {
@@ -567,3 +600,8 @@ export const selectBackofficeAuditLogSchema =
   createSelectSchema(backofficeAuditLogs);
 export const insertBackofficeAuditLogSchema =
   createInsertSchema(backofficeAuditLogs);
+
+export const selectSiemWebhookConfigSchema =
+  createSelectSchema(siemWebhookConfigs);
+export const insertSiemWebhookConfigSchema =
+  createInsertSchema(siemWebhookConfigs);

@@ -1,6 +1,7 @@
 import {
   credentials,
   orgSubscriptions,
+  siemWebhookConfigs,
   stripeBillingBindings,
   stripeCheckoutSessions,
   stripeWebhookEvents,
@@ -35,6 +36,9 @@ export type NewStripeCheckoutSession =
 export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
 export type NewStripeWebhookEvent = typeof stripeWebhookEvents.$inferInsert;
 
+export type SiemWebhookConfig = typeof siemWebhookConfigs.$inferSelect;
+export type NewSiemWebhookConfig = typeof siemWebhookConfigs.$inferInsert;
+
 export interface ITenantRepository {
   findById(id: string): Promise<Tenant | undefined>;
   findByEid(eid: string): Promise<Tenant | undefined>;
@@ -46,6 +50,13 @@ export interface IUserRepository {
   findById(id: string): Promise<User | undefined>;
   findBySfUserId(sfUserId: string): Promise<User | undefined>;
   upsert(user: NewUser): Promise<User>;
+  updateRole(id: string, role: "owner" | "admin" | "member"): Promise<void>;
+  findByTenantId(tenantId: string): Promise<User[]>;
+  updateLastActiveAt(id: string): Promise<void>;
+  countByTenantIdAndRole(
+    tenantId: string,
+    role: "owner" | "admin" | "member",
+  ): Promise<number>;
 }
 
 export interface ICredentialsRepository {
@@ -102,4 +113,16 @@ export interface IStripeWebhookEventRepository {
   markProcessing(eventId: string, eventType: string): Promise<boolean>;
   markCompleted(eventId: string): Promise<void>;
   markFailed(eventId: string, errorMessage: string): Promise<void>;
+}
+
+export interface ISiemWebhookConfigRepository {
+  findByTenantId(tenantId: string): Promise<SiemWebhookConfig | undefined>;
+  upsert(config: NewSiemWebhookConfig): Promise<SiemWebhookConfig>;
+  updateStatus(
+    tenantId: string,
+    data: Partial<SiemWebhookConfig>,
+  ): Promise<void>;
+  incrementFailures(tenantId: string, reason: string): Promise<number>;
+  resetFailures(tenantId: string): Promise<void>;
+  disable(tenantId: string, reason: string): Promise<void>;
 }
