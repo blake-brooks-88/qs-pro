@@ -60,8 +60,8 @@ const TEST_SF_USER_ID_1 = `sf-sweeper-${crypto.randomUUID()}`;
 const TEST_SF_USER_ID_2 = `sf-sweeper-${crypto.randomUUID()}`;
 const TEST_MID_1 = "mid-sweeper-test-1";
 const TEST_MID_2 = "mid-sweeper-test-2";
-const TEST_EID_1 = `eid-sweeper-test-${crypto.randomUUID()}`;
-const TEST_EID_2 = `eid-sweeper-test-${crypto.randomUUID()}`;
+const TEST_EID_1 = `test---worker-sweeper-${crypto.randomUUID()}`;
+const TEST_EID_2 = `test---worker-sweeper-${crypto.randomUUID()}`;
 const TEST_FOLDER_ID_1 = 999001; // Unique folder IDs
 const TEST_FOLDER_ID_2 = 999002;
 

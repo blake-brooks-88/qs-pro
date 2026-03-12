@@ -52,7 +52,7 @@ const TEST_TSSD = 'rtf-integration-tssd';
 const TEST_TENANT_ID = crypto.randomUUID();
 const TEST_USER_ID = crypto.randomUUID();
 const TEST_MID = `mid-rtf-${Date.now()}`;
-const TEST_EID = `eid-rtf-${Date.now()}`;
+const TEST_EID = `test---worker-rtf-${Date.now()}`;
 
 // Track MSW requests for verification
 interface CapturedRequest {

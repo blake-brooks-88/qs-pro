@@ -59,7 +59,7 @@ const TEST_TSSD = 'cancel-test-tssd';
 const TEST_TENANT_ID = crypto.randomUUID();
 const TEST_USER_ID = crypto.randomUUID();
 const TEST_MID = `mid-cancel-test-${Date.now()}`;
-const TEST_EID = `eid-cancel-test-${Date.now()}`;
+const TEST_EID = `test---worker-cancel-${Date.now()}`;
 
 const server = setupServer();
 

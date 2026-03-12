@@ -52,7 +52,7 @@ const TEST_TSSD = 'rtt-integration-tssd';
 const TEST_TENANT_ID = crypto.randomUUID();
 const TEST_USER_ID = crypto.randomUUID();
 const TEST_MID = `mid-rtt-${Date.now()}`;
-const TEST_EID = `eid-rtt-${Date.now()}`;
+const TEST_EID = `test---worker-rtt-${Date.now()}`;
 
 // Track MSW requests for verification
 interface CapturedRequest {

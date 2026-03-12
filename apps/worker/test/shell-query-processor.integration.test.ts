@@ -58,7 +58,7 @@ const TEST_TSSD = 'processor-test-tssd';
 const TEST_TENANT_ID = randomUUID();
 const TEST_USER_ID = randomUUID();
 const TEST_MID = `mid-processor-${TEST_RUN_SUFFIX}`;
-const TEST_EID = `eid-processor-${TEST_RUN_SUFFIX}`;
+const TEST_EID = `test---worker-processor-${TEST_RUN_SUFFIX}`;
 const TEST_SF_USER_ID = `sf-user-proc-${TEST_RUN_SUFFIX}`;
 
 // Track MCE requests for verification

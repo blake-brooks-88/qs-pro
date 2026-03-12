@@ -55,7 +55,7 @@ const TEST_TSSD = 'status-events-tssd';
 const TEST_TENANT_ID = randomUUID();
 const TEST_USER_ID = randomUUID();
 const TEST_MID = `mid-status-${TEST_RUN_SUFFIX}`;
-const TEST_EID = `eid-status-${TEST_RUN_SUFFIX}`;
+const TEST_EID = `test---worker-status-${TEST_RUN_SUFFIX}`;
 const TEST_SF_USER_ID = `sf-user-status-${TEST_RUN_SUFFIX}`;
 
 // Stub auth provider
