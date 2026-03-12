@@ -6,6 +6,7 @@ import { useRole } from "@/hooks/use-role";
 import { useTenantFeatures } from "@/hooks/use-tenant-features";
 import { cn } from "@/lib/utils";
 
+import { AuditLogTab } from "./components/AuditLogTab";
 import { BillingTab } from "./components/BillingTab";
 import { MembersTab } from "./components/MembersTab";
 
@@ -73,11 +74,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       <div className="max-w-5xl mx-auto px-6 py-8">
         {activeTab === "members" && <MembersTab />}
         {activeTab === "billing" && isOwner ? <BillingTab /> : null}
-        {activeTab === "audit-log" && (
-          <div className="text-sm text-muted-foreground">
-            Audit Log coming in next plan
-          </div>
-        )}
+        {activeTab === "audit-log" && <AuditLogTab />}
       </div>
     </div>
   );
