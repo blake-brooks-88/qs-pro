@@ -28,7 +28,7 @@ if (!migrationConnectionString) {
   throw new Error("DATABASE_URL_MIGRATIONS environment variable is required");
 }
 
-const TEST_EID = "repo-test-eid-12345";
+const TEST_EID = "test---db-repo";
 const TEST_SF_USER_ID = "repo-test-user-789";
 const TEST_MID = "mid-123";
 
@@ -166,8 +166,8 @@ describe("Drizzle Repositories", () => {
   });
 });
 
-const RLS_TEST_EID_1 = "rls-test-tenant-1-eid";
-const RLS_TEST_EID_2 = "rls-test-tenant-2-eid";
+const RLS_TEST_EID_1 = "test---db-rls-1";
+const RLS_TEST_EID_2 = "test---db-rls-2";
 const RLS_TEST_SF_USER_1 = "rls-test-user-1";
 const RLS_TEST_SF_USER_2 = "rls-test-user-2";
 const RLS_TEST_MID_1 = "rls-mid-111";

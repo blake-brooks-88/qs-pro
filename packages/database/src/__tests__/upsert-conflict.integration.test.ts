@@ -18,7 +18,7 @@ if (!connectionString) {
 }
 
 // Use unique test identifiers to avoid conflicts with other test suites
-const TEST_EID_PREFIX = "upsert-conflict-test-";
+const TEST_EID_PREFIX = "test---db-upsert-";
 const TEST_SF_USER_ID = "upsert-conflict-sf-user-1";
 
 describe("Upsert Conflict Behavior", () => {

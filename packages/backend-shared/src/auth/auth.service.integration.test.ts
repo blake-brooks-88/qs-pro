@@ -53,13 +53,13 @@ import { AuthService } from "./auth.service";
 import { SeatLimitService } from "./seat-limit.service";
 
 // Test constants with unique prefixes to avoid conflicts with other test suites
-const AUTH_TEST_EID = "auth-integ-eid-unique-001";
+const AUTH_TEST_EID = "test---backend-auth-001";
 const AUTH_TEST_SF_USER_ID = "auth-integ-sf-user-001";
 const AUTH_TEST_TSSD = "auth-test-tssd";
 const AUTH_TEST_MID = "auth-integ-mid-123";
 
 // Secondary test identifiers for multi-user scenarios
-const AUTH_TEST_EID_2 = "auth-integ-eid-unique-002";
+const AUTH_TEST_EID_2 = "test---backend-auth-002";
 const AUTH_TEST_SF_USER_ID_2 = "auth-integ-sf-user-002";
 const AUTH_TEST_MID_2 = "auth-integ-mid-456";
 
@@ -194,7 +194,7 @@ describe("AuthService Integration", () => {
     // Clean up any leftover test data from previous runs
     await superuserClient`DELETE FROM credentials WHERE mid LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM users WHERE sf_user_id LIKE 'auth-integ-%'`;
-    await superuserClient`DELETE FROM tenants WHERE eid LIKE 'auth-integ-%'`;
+    await superuserClient`DELETE FROM tenants WHERE eid LIKE 'test---backend-auth-%'`;
 
     // Create db proxy that uses context-aware db when available (mimics DatabaseModule)
     dbProxy = createDbProxy(db);
@@ -265,7 +265,7 @@ describe("AuthService Integration", () => {
     // Clean up test data (qs_migrate user bypasses RLS)
     await superuserClient`DELETE FROM credentials WHERE mid LIKE 'auth-integ-%'`;
     await superuserClient`DELETE FROM users WHERE sf_user_id LIKE 'auth-integ-%'`;
-    await superuserClient`DELETE FROM tenants WHERE eid LIKE 'auth-integ-%'`;
+    await superuserClient`DELETE FROM tenants WHERE eid LIKE 'test---backend-auth-%'`;
 
     // Close connections
     server.close();
@@ -360,7 +360,7 @@ describe("AuthService Integration", () => {
     });
 
     it("should store encrypted tokens in credentials table", async () => {
-      const uniqueEid = "auth-integ-eid-encrypt-test";
+      const uniqueEid = "test---backend-auth-encrypt";
       const uniqueSfUserId = "auth-integ-sf-encrypt-test";
       const uniqueMid = "auth-integ-mid-encrypt";
 
@@ -406,7 +406,7 @@ describe("AuthService Integration", () => {
 
   describe("handleCallback", () => {
     it("should complete full OAuth callback flow", async () => {
-      const uniqueEid = "auth-integ-eid-callback-001";
+      const uniqueEid = "test---backend-auth-callback";
       const uniqueSfUserId = "auth-integ-sf-callback-001";
       const uniqueMid = "auth-integ-mid-callback";
 
@@ -533,7 +533,7 @@ describe("AuthService Integration", () => {
           async () => {
             return HttpResponse.json({
               sub: AUTH_TEST_SF_USER_ID,
-              enterprise_id: "userinfo-returned-eid",
+              enterprise_id: "test---backend-auth-userinfo",
               member_id: AUTH_TEST_MID,
             });
           },
@@ -546,7 +546,7 @@ describe("AuthService Integration", () => {
           AUTH_TEST_TSSD,
           "test-auth-code",
           undefined,
-          "provided-different-eid", // Mismatched!
+          "test---backend-auth-mismatch", // Mismatched!
           undefined,
           undefined,
           AUTH_TEST_MID,
@@ -589,7 +589,7 @@ describe("AuthService Integration", () => {
   describe("refreshToken", () => {
     it("should return cached token when not expired", async () => {
       // Create tenant, user, and valid credentials
-      const uniqueEid = "auth-integ-eid-refresh-cached";
+      const uniqueEid = "test---backend-auth-refresh-cached";
       const uniqueSfUserId = "auth-integ-sf-refresh-cached";
       const uniqueMid = "auth-integ-mid-refresh-cached";
 
@@ -660,7 +660,7 @@ describe("AuthService Integration", () => {
 
     it("should refresh token when expired", async () => {
       // Create tenant, user, and expired credentials
-      const uniqueEid = "auth-integ-eid-refresh-expired";
+      const uniqueEid = "test---backend-auth-refresh-expired";
       const uniqueSfUserId = "auth-integ-sf-refresh-expired";
       const uniqueMid = "auth-integ-mid-refresh-expired";
 
@@ -753,7 +753,7 @@ describe("AuthService Integration", () => {
 
     it("should throw MCE_AUTH_EXPIRED when refresh fails with invalid_grant", async () => {
       // Create tenant, user, and expired credentials
-      const uniqueEid = "auth-integ-eid-refresh-fail";
+      const uniqueEid = "test---backend-auth-refresh-fail";
       const uniqueSfUserId = "auth-integ-sf-refresh-fail";
       const uniqueMid = "auth-integ-mid-refresh-fail";
 
@@ -823,7 +823,7 @@ describe("AuthService Integration", () => {
 
     it("should throw MCE_CREDENTIALS_MISSING when no credentials exist", async () => {
       // Create tenant and user without credentials
-      const uniqueEid = "auth-integ-eid-no-creds";
+      const uniqueEid = "test---backend-auth-no-creds";
       const uniqueSfUserId = "auth-integ-sf-no-creds";
       const uniqueMid = "auth-integ-mid-no-creds";
 
@@ -853,7 +853,7 @@ describe("AuthService Integration", () => {
 
     it("should coalesce concurrent refresh requests into single MCE call", async () => {
       // Setup: user with expired credentials
-      const uniqueEid = "auth-integ-eid-concurrency";
+      const uniqueEid = "test---backend-auth-concurrency";
       const uniqueSfUserId = "auth-integ-sf-concurrency";
       const uniqueMid = "auth-integ-mid-concurrency";
 
@@ -952,7 +952,7 @@ describe("AuthService Integration", () => {
   describe("invalidateToken", () => {
     it("should set expiresAt to epoch when invalidating credentials", async () => {
       // Create tenant, user, and valid credentials
-      const uniqueEid = "auth-integ-eid-invalidate";
+      const uniqueEid = "test---backend-auth-invalidate";
       const uniqueSfUserId = "auth-integ-sf-invalidate";
       const uniqueMid = "auth-integ-mid-invalidate";
 
@@ -1033,7 +1033,7 @@ describe("AuthService Integration", () => {
 
     it("should do nothing when credentials do not exist", async () => {
       // Create tenant and user without credentials
-      const uniqueEid = "auth-integ-eid-invalidate-none";
+      const uniqueEid = "test---backend-auth-invalidate-none";
       const uniqueSfUserId = "auth-integ-sf-invalidate-none";
       const uniqueMid = "auth-integ-mid-invalidate-none";
 
@@ -1064,7 +1064,7 @@ describe("AuthService Integration", () => {
     it("should extract identity claims from valid JWT", async () => {
       const jwt = await createTestJwt({
         user_id: "verify-user-123",
-        enterprise_id: "verify-eid-456",
+        enterprise_id: "test---backend-auth-verify",
         member_id: "verify-mid-789",
         stack: "verify-tssd",
       });
@@ -1072,7 +1072,7 @@ describe("AuthService Integration", () => {
       const result = await authService.verifyMceJwt(jwt);
 
       expect(result.sfUserId).toBe("verify-user-123");
-      expect(result.eid).toBe("verify-eid-456");
+      expect(result.eid).toBe("test---backend-auth-verify");
       expect(result.mid).toBe("verify-mid-789");
       expect(result.tssd).toBe("verify-tssd");
     });
@@ -1085,7 +1085,7 @@ describe("AuthService Integration", () => {
 
       const invalidJwt = await new jose.SignJWT({
         user_id: "user-123",
-        enterprise_id: "eid-456",
+        enterprise_id: "test---backend-auth-456",
         member_id: "mid-789",
         stack: "tssd",
       })
@@ -1109,7 +1109,7 @@ describe("AuthService Integration", () => {
 
       // Create JWT missing user_id
       const incompleteJwt = await new jose.SignJWT({
-        enterprise_id: "eid-456",
+        enterprise_id: "test---backend-auth-456",
         member_id: "mid-789",
         stack: "tssd",
         // Missing user_id
@@ -1137,7 +1137,7 @@ describe("AuthService Integration", () => {
 
       const jwt = await new jose.SignJWT({
         user_id: "user-123",
-        enterprise_id: "eid-456",
+        enterprise_id: "test---backend-auth-456",
         member_id: "mid-789",
         application_context: {
           base_url: "https://mc-abc123.rest.marketingcloudapis.com/some/path",
