@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { LaunchInstructionsPage } from "@/features/auth/launch-instructions-page";
 import { EditorWorkspacePage } from "@/features/editor-workspace/EditorWorkspacePage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { usageQueryKeys } from "@/hooks/use-run-usage";
 import { featuresQueryKeys } from "@/hooks/use-tenant-features";
 import { useTrial } from "@/hooks/use-trial";
@@ -77,6 +78,9 @@ function App() {
   const [showLaunchHelp, setShowLaunchHelp] = useState(false);
   const [oauthRedirectAttempted, setOauthRedirectAttempted] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [currentView, setCurrentView] = useState<"editor" | "settings">(
+    "editor",
+  );
   const [pendingCheckoutActive, setPendingCheckoutActive] = useState(() =>
     hasPendingCheckout(),
   );
@@ -731,8 +735,13 @@ function App() {
         brandingExtra={
           import.meta.env.DEV ? <DevSubscriptionPanel /> : undefined
         }
+        onSettingsClick={() => setCurrentView("settings")}
       >
-        <EditorWorkspacePage />
+        {currentView === "editor" ? (
+          <EditorWorkspacePage />
+        ) : (
+          <SettingsPage onBack={() => setCurrentView("editor")} />
+        )}
         <Toaster />
       </AppShell>
       <PricingOverlay />

@@ -38,6 +38,7 @@ function createMockMeResponse() {
       sfUserId: "005xx000001234AAA",
       email: "test@example.com",
       name: "Test User",
+      role: "member" as const,
     },
     tenant: {
       id: "tenant-1",

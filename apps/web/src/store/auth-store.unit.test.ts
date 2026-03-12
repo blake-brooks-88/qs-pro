@@ -28,6 +28,7 @@ describe("useAuthStore", () => {
       sfUserId: "sf1",
       email: "test@test.com",
       name: "Test",
+      role: "member" as const,
     };
     const tenant = { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" };
 
@@ -47,6 +48,7 @@ describe("useAuthStore", () => {
       sfUserId: "sf1",
       email: "test@test.com",
       name: "Test",
+      role: "member" as const,
     };
     const tenant = { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" };
 
@@ -67,6 +69,7 @@ describe("useAuthStore", () => {
       sfUserId: "sf1",
       email: "test@test.com",
       name: "Test",
+      role: "member" as const,
     };
     const tenant = { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" };
 
@@ -90,13 +93,17 @@ describe("useAuthStore", () => {
   it("removes persisted auth state on logout", async () => {
     const { useAuthStore, storageKey } = await importAuthStore();
 
-    useAuthStore
-      .getState()
-      .setAuth(
-        { id: "u1", sfUserId: "sf1", email: null, name: null },
-        { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" },
-        "csrf-123",
-      );
+    useAuthStore.getState().setAuth(
+      {
+        id: "u1",
+        sfUserId: "sf1",
+        email: null,
+        name: null,
+        role: "member" as const,
+      },
+      { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" },
+      "csrf-123",
+    );
 
     expect(sessionStorage.getItem(storageKey)).not.toBeNull();
 

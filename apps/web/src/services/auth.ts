@@ -7,6 +7,7 @@ export interface MeResponseDto {
     sfUserId: string;
     email: string | null;
     name: string | null;
+    role: "owner" | "admin" | "member";
   };
   tenant: {
     id: string;
