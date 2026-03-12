@@ -31,7 +31,7 @@ function getRequiredEnv(key: string): string {
 }
 
 const server = setupServer(
-  http.post('https://test-tssd.auth.marketingcloudapis.com/v2/token', () => {
+  http.post('https://test---tssd.auth.marketingcloudapis.com/v2/token', () => {
     return HttpResponse.json({
       access_token: 'billing-test-access-token',
       refresh_token: 'billing-test-refresh-token',
@@ -42,15 +42,18 @@ const server = setupServer(
       token_type: 'Bearer',
     });
   }),
-  http.get('https://test-tssd.auth.marketingcloudapis.com/v2/userinfo', () => {
-    return HttpResponse.json({
-      sub: 'billing-test-user',
-      enterprise_id: 'billing-test-eid',
-      member_id: 'billing-test-mid',
-      email: 'billing-test@example.com',
-      name: 'Billing Test User',
-    });
-  }),
+  http.get(
+    'https://test---tssd.auth.marketingcloudapis.com/v2/userinfo',
+    () => {
+      return HttpResponse.json({
+        sub: 'billing-test-user',
+        enterprise_id: 'test---billing-endpoints',
+        member_id: 'billing-test-mid',
+        email: 'billing-test@example.com',
+        name: 'Billing Test User',
+      });
+    },
+  ),
 );
 
 function createBillingServiceMock() {
@@ -74,7 +77,7 @@ describe('Billing endpoints (integration)', () => {
 
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
-    process.env.MCE_TSSD = 'test-tssd';
+    process.env.MCE_TSSD = 'test---tssd';
 
     billingServiceMock = createBillingServiceMock();
 
@@ -125,9 +128,9 @@ describe('Billing endpoints (integration)', () => {
 
     const jwt = await new jose.SignJWT({
       user_id: `billing-user-${uniqueSuffix}`,
-      enterprise_id: `billing-eid-${uniqueSuffix}`,
+      enterprise_id: `test---billing-endpoints-${uniqueSuffix}`,
       member_id: `billing-mid-${uniqueSuffix}`,
-      stack: 'test-tssd',
+      stack: 'test---tssd',
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('1h')

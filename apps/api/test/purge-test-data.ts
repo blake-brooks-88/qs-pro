@@ -22,6 +22,18 @@ import postgres from 'postgres';
 const PRESERVED_EIDS = ['534019240', '10978264'];
 
 /**
+ * Legacy test EIDs from old test code that didn't follow the `test---` convention.
+ * These are explicitly targeted for cleanup since they don't match the `test---%` pattern.
+ */
+const LEGACY_TEST_EIDS = [
+  'csrf-eid',
+  'other-eid',
+  'eid-123',
+  'eid-jwt',
+  'eid-refresh',
+];
+
+/**
  * Parses a dotenv-style file into key-value pairs.
  * Handles CRLF/LF line endings, comments, and blank lines.
  */
@@ -50,8 +62,9 @@ function parseDotenv(content: string): Record<string, string> {
  *
  * Reads credentials from (in priority order):
  *   1. PURGE_DATABASE_URL env var (explicit override for CI)
- *   2. .env file at the repo root (local dev — reads POSTGRES_USER/PASSWORD)
- *   3. DATABASE_URL with user swapped to qs_migrate (table owner, bypasses RLS)
+ *   2. .env file at the repo root (prefers DATABASE_URL_MIGRATIONS)
+ *   3. DATABASE_URL_MIGRATIONS (CI sets this to the qs_migrate role)
+ *   4. DATABASE_URL with user swapped to qs_migrate (table owner, bypasses RLS)
  */
 function getPrivilegedUrl(): string {
   if (process.env.PURGE_DATABASE_URL?.trim()) {
@@ -63,25 +76,32 @@ function getPrivilegedUrl(): string {
   try {
     const vars = parseDotenv(readFileSync(envPath, 'utf-8'));
 
+    // Prefer an explicit migrations URL if present (supports non-localhost hosts).
+    const migrationsUrlFromFile = vars.DATABASE_URL_MIGRATIONS;
+    if (migrationsUrlFromFile?.trim()) {
+      return migrationsUrlFromFile;
+    }
+
+    const runtimeUrlFromFile = vars.DATABASE_URL;
+
     // Prefer the migration user (table owner → bypasses RLS)
     const migrateUser = vars.QS_DB_MIGRATE_USER;
     const migratePassword = vars.QS_DB_MIGRATE_PASSWORD;
-    const db = vars.POSTGRES_DB ?? 'qs_pro';
-    if (migrateUser && migratePassword) {
-      return `postgres://${migrateUser}:${migratePassword}@127.0.0.1:5432/${db}`;
+    if (runtimeUrlFromFile?.trim() && migrateUser && migratePassword) {
+      const url = new URL(runtimeUrlFromFile);
+      url.username = migrateUser;
+      url.password = migratePassword;
+      return url.toString();
     }
 
-    // Fall back to the postgres superuser
-    const user = vars.POSTGRES_USER ?? 'postgres';
-    const password = vars.POSTGRES_PASSWORD;
-    if (password) {
-      return `postgres://${user}:${password}@127.0.0.1:5432/${db}`;
+    if (runtimeUrlFromFile?.trim()) {
+      return runtimeUrlFromFile;
     }
   } catch {
     // .env doesn't exist (CI) — fall through
   }
 
-  // Try DATABASE_URL_MIGRATIONS (CI sets this to the qs_migrate role)
+  // Try DATABASE_URL_MIGRATIONS (CI should set this to the qs_migrate role)
   const migrationsUrl = process.env.DATABASE_URL_MIGRATIONS;
   if (migrationsUrl?.trim()) {
     return migrationsUrl;
@@ -111,7 +131,7 @@ export async function purgeTestData(): Promise<number> {
   try {
     const [{ count }] = await sql<[{ count: number }]>`
       SELECT count(*)::int AS count FROM tenants
-      WHERE eid LIKE '%-%-%'
+      WHERE (eid LIKE 'test---%' OR eid IN ${sql(LEGACY_TEST_EIDS)})
         AND eid NOT IN ${sql(PRESERVED_EIDS)}
     `;
 
@@ -123,47 +143,47 @@ export async function purgeTestData(): Promise<number> {
       await tx`
         DELETE FROM shell_query_runs
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM query_publish_events
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM query_versions
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM credentials
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM saved_queries
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM folders
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM snippets
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM tenant_feature_overrides
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM tenant_settings
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
 
       // org_subscriptions: FORCE RLS blocks the table owner (qs_migrate).
@@ -173,7 +193,7 @@ export async function purgeTestData(): Promise<number> {
       await tx`
         DELETE FROM org_subscriptions
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`ALTER TABLE org_subscriptions FORCE ROW LEVEL SECURITY`;
 
@@ -187,19 +207,36 @@ export async function purgeTestData(): Promise<number> {
       await tx`
         DELETE FROM audit_logs
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_delete`;
       await tx`ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY`;
 
       await tx`
+        DELETE FROM credentials
+        WHERE tenant_id IN (
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        )`;
+      await tx`
+        DELETE FROM credentials
+        WHERE user_id IN (
+          SELECT id FROM users WHERE tenant_id IN (
+            SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          )
+        )`;
+      await tx`
         DELETE FROM users
         WHERE tenant_id IN (
-          SELECT id FROM tenants WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        )`;
+      await tx`
+        DELETE FROM backoffice_audit_logs
+        WHERE target_tenant_id IN (
+          SELECT id FROM tenants WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
         )`;
       await tx`
         DELETE FROM tenants
-        WHERE eid LIKE '%-%-%' AND eid NOT IN ${tx(PRESERVED_EIDS)}
+        WHERE (eid LIKE 'test---%' OR eid IN ${tx(LEGACY_TEST_EIDS)}) AND eid NOT IN ${tx(PRESERVED_EIDS)}
       `;
     });
 

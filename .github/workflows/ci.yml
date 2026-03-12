@@ -42,6 +42,7 @@ jobs:
       # Application runtime uses DATABASE_URL (qs_runtime) and must NOT use qs_migrate.
       DATABASE_URL_MIGRATIONS: postgresql://qs_migrate:migrate_pass@localhost:5432/qs_pro_test
       DATABASE_URL: postgresql://qs_runtime:runtime_pass@localhost:5432/qs_pro_test
+      DATABASE_URL_BACKOFFICE: postgresql://qs_backoffice:backoffice_pass@localhost:5432/qs_pro_test
       REDIS_URL: redis://localhost:6379
 
     steps:
@@ -63,22 +64,30 @@ jobs:
           -- Application runtime must use a non-BYPASSRLS role (qs_runtime).
           CREATE ROLE qs_migrate LOGIN PASSWORD 'migrate_pass' BYPASSRLS;
           CREATE ROLE qs_runtime LOGIN PASSWORD 'runtime_pass';
+          CREATE ROLE qs_backoffice LOGIN PASSWORD 'backoffice_pass';
 
           -- Harden role attributes explicitly.
           ALTER ROLE qs_migrate BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
           ALTER ROLE qs_runtime NOBYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+          ALTER ROLE qs_backoffice BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
 
           GRANT CONNECT ON DATABASE qs_pro_test TO qs_migrate;
           GRANT CONNECT ON DATABASE qs_pro_test TO qs_runtime;
+          GRANT CONNECT ON DATABASE qs_pro_test TO qs_backoffice;
           GRANT CREATE ON DATABASE qs_pro_test TO qs_migrate;
 
           GRANT USAGE, CREATE ON SCHEMA public TO qs_migrate;
           GRANT USAGE ON SCHEMA public TO qs_runtime;
+          GRANT USAGE ON SCHEMA public TO qs_backoffice;
 
           ALTER DEFAULT PRIVILEGES FOR ROLE qs_migrate IN SCHEMA public
             GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO qs_runtime;
           ALTER DEFAULT PRIVILEGES FOR ROLE qs_migrate IN SCHEMA public
             GRANT USAGE, SELECT ON SEQUENCES TO qs_runtime;
+          ALTER DEFAULT PRIVILEGES FOR ROLE qs_migrate IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO qs_backoffice;
+          ALTER DEFAULT PRIVILEGES FOR ROLE qs_migrate IN SCHEMA public
+            GRANT USAGE, SELECT ON SEQUENCES TO qs_backoffice;
           SQL
 
       - name: Validate DATABASE_URL uses runtime role

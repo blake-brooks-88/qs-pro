@@ -61,7 +61,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-blast-int';
+const TEST_EID = 'test---qa-blast-int';
 const TEST_TSSD = 'test-blast-int';
 const TEST_MID = 'mid-blast-int';
 const TEST_QA_OBJECT_ID = 'qa-obj-blast-test';

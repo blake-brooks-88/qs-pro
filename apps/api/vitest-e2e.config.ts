@@ -4,10 +4,15 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     name: 'api-e2e',
-    include: ['**/*.e2e.test.ts'],
     globals: true,
-    root: './',
     environment: 'node',
+    include: ['test/**/*.e2e.test.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**'],
+    root: './',
+    env: {
+      NODE_ENV: 'test',
+      LOG_FORMAT: 'text',
+    },
     globalSetup: ['./test/global-setup.ts'],
     setupFiles: ['./test/vitest-e2e.setup.ts'],
     hookTimeout: 180000, // 180s for beforeAll/afterAll (app init + cleanup can be slow under coverage)

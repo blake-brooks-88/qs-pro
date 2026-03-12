@@ -129,11 +129,53 @@ export class WebhookHandlerService {
   }
 
   private getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
-    const sub = invoice.parent?.subscription_details?.subscription;
-    if (!sub) {
-      return null;
+    const direct = getStripeId(
+      (invoice as Stripe.Invoice & { subscription?: unknown }).subscription,
+    );
+    if (direct) {
+      return direct;
     }
-    return typeof sub === 'string' ? sub : sub.id;
+
+    const subscriptionDetails = (
+      invoice as Stripe.Invoice & { subscription_details?: unknown }
+    ).subscription_details;
+    if (isRecord(subscriptionDetails)) {
+      const fromDetails = getStripeId(subscriptionDetails.subscription);
+      if (fromDetails) {
+        return fromDetails;
+      }
+    }
+
+    const parent = (invoice as Stripe.Invoice & { parent?: unknown }).parent;
+    if (isRecord(parent)) {
+      const parentDetails = (parent as Record<string, unknown>)
+        .subscription_details;
+      if (isRecord(parentDetails)) {
+        const fromParentDetails = getStripeId(parentDetails.subscription);
+        if (fromParentDetails) {
+          return fromParentDetails;
+        }
+      }
+    }
+
+    const legacyParentSub = getStripeId(
+      invoice.parent?.subscription_details?.subscription,
+    );
+    if (legacyParentSub) {
+      return legacyParentSub;
+    }
+
+    const lines = invoice.lines?.data ?? [];
+    for (const line of lines) {
+      const fromLine = getStripeId(
+        (line as unknown as Record<string, unknown>).subscription,
+      );
+      if (fromLine) {
+        return fromLine;
+      }
+    }
+
+    return null;
   }
 
   private async resolveTenant(params: {
@@ -142,13 +184,22 @@ export class WebhookHandlerService {
     stripeSubscriptionId?: string | null;
     eventType: string;
   }): Promise<Tenant | null> {
+    let encryptedEidError: string | null = null;
     if (params.encryptedEid) {
-      const eid = this.decryptEidToken(params.encryptedEid);
-      const tenant = await this.tenantRepo.findByEid(eid);
-      if (!tenant) {
-        throw new Error(`Tenant not found for pricing token`);
+      try {
+        const eid = this.decryptEidToken(params.encryptedEid);
+        const tenant = await this.tenantRepo.findByEid(eid);
+        if (!tenant) {
+          throw new Error(`Tenant not found for pricing token`);
+        }
+        return tenant;
+      } catch (error) {
+        encryptedEidError =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `${params.eventType}: invalid metadata.eid token; attempting binding resolution`,
+        );
       }
-      return tenant;
     }
 
     if (params.stripeSubscriptionId) {
@@ -167,6 +218,12 @@ export class WebhookHandlerService {
       if (binding) {
         return (await this.tenantRepo.findById(binding.tenantId)) ?? null;
       }
+    }
+
+    if (encryptedEidError) {
+      throw new Error(
+        `${params.eventType}: failed to resolve tenant from metadata.eid token and no bindings found`,
+      );
     }
 
     this.logger.warn(`${params.eventType}: could not resolve tenant`);
@@ -369,10 +426,10 @@ export class WebhookHandlerService {
           );
           break;
         case 'invoice.paid':
-          await this.handleInvoicePaid(
-            event.data.object as Stripe.Invoice,
-            eventCreatedAt,
-          );
+          await this.handleInvoicePaid(event.data.object as Stripe.Invoice);
+          break;
+        case 'invoice.payment_succeeded':
+          await this.handleInvoicePaid(event.data.object as Stripe.Invoice);
           break;
         case 'invoice.payment_failed':
           await this.handleInvoicePaymentFailed(
@@ -633,10 +690,7 @@ export class WebhookHandlerService {
     });
   }
 
-  private async handleInvoicePaid(
-    invoice: Stripe.Invoice,
-    eventCreatedAt: Date | null,
-  ): Promise<void> {
+  private async handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
     const subscriptionId = this.getInvoiceSubscriptionId(invoice);
     if (!subscriptionId) {
       return;
@@ -653,7 +707,7 @@ export class WebhookHandlerService {
     const stripeSubscriptionId = subscription.id;
 
     const tenant = await this.resolveTenant({
-      encryptedEid: subscription.metadata?.eid ?? null,
+      encryptedEid: subscription.metadata?.eid ?? invoice.metadata?.eid ?? null,
       stripeCustomerId,
       stripeSubscriptionId,
       eventType: 'invoice.paid',
@@ -692,7 +746,6 @@ export class WebhookHandlerService {
       seatLimit: item.quantity ?? null,
       lastInvoicePaidAt: new Date(),
       trialEndsAt: null,
-      stripeStateUpdatedAt: eventCreatedAt,
     });
 
     await this.auditService.log({
@@ -726,7 +779,8 @@ export class WebhookHandlerService {
       const stripeSubscriptionId = subscription.id;
 
       const tenant = await this.resolveTenant({
-        encryptedEid: subscription.metadata?.eid ?? null,
+        encryptedEid:
+          subscription.metadata?.eid ?? invoice.metadata?.eid ?? null,
         stripeCustomerId,
         stripeSubscriptionId,
         eventType: 'invoice.payment_failed',

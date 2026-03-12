@@ -40,7 +40,7 @@ function createTestJob(overrides: Partial<ShellQueryJob> = {}): ShellQueryJob {
     tenantId: "tenant-1",
     userId: "user-1",
     mid: "mid-1",
-    eid: "eid-1",
+    eid: "test---web-rtt-strategy",
     sqlText: "SELECT SubscriberKey FROM _Subscribers",
     targetDeCustomerKey: "TargetDEKey",
     snippetName: "Test Query",

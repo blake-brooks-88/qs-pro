@@ -122,8 +122,8 @@ describe('RLS Isolation Regression Suite', () => {
     await sql`
       INSERT INTO tenants (id, eid, tssd)
       VALUES
-        (${tenantAId}::uuid, ${'rls-reg-eid-a'}, ${'rls-reg-tssd-a'}),
-        (${tenantBId}::uuid, ${'rls-reg-eid-b'}, ${'rls-reg-tssd-b'})
+        (${tenantAId}::uuid, ${'test---rls-isolation-int-a'}, ${'test---rls-isolation-int-tssd-a'}),
+        (${tenantBId}::uuid, ${'test---rls-isolation-int-b'}, ${'test---rls-isolation-int-tssd-b'})
     `;
     await sql`
       INSERT INTO users (id, sf_user_id, tenant_id)

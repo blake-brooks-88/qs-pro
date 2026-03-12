@@ -1,0 +1,52 @@
+{
+  "name": "backoffice-api",
+  "version": "0.0.1",
+  "description": "QS Pro Backoffice API",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "start:dev": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ./node_modules/@nestjs/cli/bin/nest.js start --watch",
+    "start:prod": "node dist/main",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"{src,test}/**/*.ts\" --fix",
+    "seed:admin": "tsx src/scripts/seed-admin.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.3",
+    "@nest-lab/throttler-storage-redis": "^1.2.0",
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/platform-fastify": "^11.1.11",
+    "@nestjs/throttler": "^6.5.0",
+    "@qpp/backend-shared": "workspace:^",
+    "@qpp/database": "workspace:^",
+    "@qpp/shared-types": "workspace:^",
+    "@sentry/nestjs": "^10.38.0",
+    "better-auth": "^1.2.8",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.7.4",
+    "ioredis": "^5.9.0",
+    "nestjs-pino": "^4.5.0",
+    "pino-loki": "^3.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "stripe": "^20.3.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.1",
+    "@types/node": "^22.10.7",
+    "drizzle-orm": "^0.45.1",
+    "postgres": "^3.4.3",
+    "typescript": "^5.7.3",
+    "unplugin-swc": "^1.5.9",
+    "tsx": "^4.21.0",
+    "vitest": "^3.0.0"
+  }
+}

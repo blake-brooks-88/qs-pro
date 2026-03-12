@@ -120,8 +120,8 @@ describe('FeaturesController (integration)', () => {
   });
 
   it('returns merged tier features with multiple overrides applied', async () => {
-    const eid = `features-int-eid-${Date.now()}`;
-    const tssd = 'features-int-tssd';
+    const eid = `test---features-int-${Date.now()}`;
+    const tssd = 'test---features-int-tssd';
 
     const tenantRows =
       await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, ${tssd}) RETURNING id`;
@@ -175,8 +175,8 @@ describe('FeaturesController (integration)', () => {
   });
 
   it('returns free features when a Stripe subscription has expired unpaid access', async () => {
-    const eid = `features-expired-sub-eid-${Date.now()}`;
-    const tssd = 'features-expired-sub-tssd';
+    const eid = `test---features-expired-sub-${Date.now()}`;
+    const tssd = 'test---features-expired-sub-tssd';
 
     const tenantRows =
       await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, ${tssd}) RETURNING id`;

@@ -62,7 +62,7 @@ const defaultHandlers = [
     () => {
       return HttpResponse.json({
         sub: 'sf-folders-int',
-        enterprise_id: 'eid-folders-int',
+        enterprise_id: 'test---folders-int',
         member_id: 'mid-folders-int',
         email: 'folders-int@example.com',
         name: 'Folders Integration User',
@@ -82,7 +82,7 @@ describe('FoldersService (integration)', () => {
   let testTenantId: string;
   let testUserId: string;
   const testMid = 'mid-folders-int';
-  const testEid = 'eid-folders-int';
+  const testEid = 'test---folders-int';
 
   // Track created entities for cleanup
   const createdFolderIds: string[] = [];

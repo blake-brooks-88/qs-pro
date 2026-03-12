@@ -52,7 +52,9 @@ coverage-*/
 .docker/
 
 # Documentation
-/docs/
+/docs/*
+!/docs/runbooks/
+!/docs/runbooks/**
 
 # Misc
 .temp/

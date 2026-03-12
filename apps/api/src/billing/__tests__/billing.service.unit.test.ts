@@ -73,7 +73,7 @@ describe('BillingService', () => {
     tenantRepo = {
       findById: vi.fn().mockResolvedValue({
         id: 'tenant-1',
-        eid: 'eid-1',
+        eid: 'test---billing-unit',
       }),
     };
     orgSubscriptionRepo = {
@@ -87,8 +87,8 @@ describe('BillingService', () => {
       markExpired: vi.fn().mockResolvedValue(undefined),
     };
     encryptionService = {
-      encrypt: vi.fn().mockReturnValue('encrypted-eid'),
-      decrypt: vi.fn().mockReturnValue('eid-1'),
+      encrypt: vi.fn().mockReturnValue('test---billing-unit-encrypted'),
+      decrypt: vi.fn().mockReturnValue('test---billing-unit'),
     };
     rlsContext = {
       runWithTenantContext: vi
@@ -192,7 +192,7 @@ describe('BillingService', () => {
         id: 'cs_expired',
         status: 'expired',
         expires_at: Math.floor(Date.now() / 1000) - 5,
-        metadata: { eid: 'encrypted-eid' },
+        metadata: { eid: 'test---billing-unit-encrypted' },
       });
 
       await expect(
@@ -209,7 +209,7 @@ describe('BillingService', () => {
         status: 'open',
         payment_status: 'unpaid',
         expires_at: Math.floor(Date.now() / 1000) + 30,
-        metadata: { eid: 'encrypted-eid' },
+        metadata: { eid: 'test---billing-unit-encrypted' },
       });
 
       await expect(
@@ -217,6 +217,21 @@ describe('BillingService', () => {
       ).resolves.toEqual({
         status: 'pending',
       });
+    });
+
+    it('rejects when the checkout session metadata does not match the tenant', async () => {
+      encryptionService.decrypt.mockReturnValue('test---other-tenant');
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        id: 'cs_other',
+        status: 'open',
+        payment_status: 'unpaid',
+        expires_at: Math.floor(Date.now() / 1000) + 30,
+        metadata: { eid: 'test---billing-unit-encrypted' },
+      });
+
+      await expect(
+        service.confirmCheckoutSession('tenant-1', 'cs_other'),
+      ).rejects.toThrow('Checkout session does not belong to this tenant');
     });
   });
 

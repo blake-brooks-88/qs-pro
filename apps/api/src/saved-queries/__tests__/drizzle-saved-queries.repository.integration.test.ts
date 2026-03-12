@@ -42,7 +42,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-repo-int';
+const TEST_EID = 'test---sq-repo-int';
 const TEST_TSSD = 'test-repo-int';
 const TEST_MID = 'mid-repo-int';
 

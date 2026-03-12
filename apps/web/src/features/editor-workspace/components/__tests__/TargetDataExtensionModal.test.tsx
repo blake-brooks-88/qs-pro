@@ -138,7 +138,7 @@ describe("TargetDataExtensionModal", () => {
   const defaultProps = {
     isOpen: true,
     tenantId: "tenant-123",
-    eid: "eid-456",
+    eid: "test---web-target-de-modal",
     dataExtensions: createMockDataExtensions(),
     folders: createMockFolders(),
     queryClient: {} as never,

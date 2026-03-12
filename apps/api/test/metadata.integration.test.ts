@@ -30,7 +30,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_TSSD = 'test-metadata-tssd';
+const TEST_TSSD = 'test---metadata-tssd';
 
 // Track SOAP call counts for caching tests
 let folderSoapCallCount = 0;
@@ -176,7 +176,7 @@ const defaultHandlers = [
     () => {
       return HttpResponse.json({
         sub: 'metadata-test-user',
-        enterprise_id: 'metadata-test-eid',
+        enterprise_id: 'test---metadata',
         member_id: 'metadata-test-mid',
         email: 'metadata-test@example.com',
         name: 'Metadata Test User',
@@ -320,7 +320,7 @@ describe('Metadata Endpoints (integration)', () => {
 
     const payload = {
       user_id: 'metadata-test-user',
-      enterprise_id: 'metadata-test-eid',
+      enterprise_id: 'test---metadata',
       member_id: 'metadata-test-mid',
       stack: TEST_TSSD,
     };
@@ -375,7 +375,7 @@ describe('Metadata Endpoints (integration)', () => {
 
     it('should handle SOAP error gracefully', async () => {
       // Use unique eid to bypass cache
-      const uniqueEid = `error-test-eid-${Date.now()}`;
+      const uniqueEid = `test---metadata-error-${Date.now()}`;
 
       // Override SOAP handler to return error
       server.use(
@@ -412,7 +412,7 @@ describe('Metadata Endpoints (integration)', () => {
 
     it('should handle empty folder response', async () => {
       // Use unique eid to bypass cache
-      const uniqueEid = `empty-test-eid-${Date.now()}`;
+      const uniqueEid = `test---metadata-empty-${Date.now()}`;
 
       // Override SOAP handler to return empty results
       server.use(
@@ -673,7 +673,7 @@ describe('Metadata Endpoints (integration)', () => {
   describe('Caching behavior', () => {
     it('should cache folder response within same test', async () => {
       // Use unique eid to ensure fresh cache key
-      const uniqueEid = `cache-test-eid-${Date.now()}`;
+      const uniqueEid = `test---metadata-cache-${Date.now()}`;
 
       // Reset counter before first call
       folderSoapCallCount = 0;

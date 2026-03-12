@@ -21,7 +21,7 @@ export function createTestIds(overrides: Partial<TestIds> = {}): TestIds {
     tenantId: randomUUID(),
     userId: randomUUID(),
     mid: `mid-${id}`,
-    eid: `eid-${id}`,
+    eid: `test---factory-${id}`,
     sfUserId: `sf-user-${id}`,
     ...overrides,
   };

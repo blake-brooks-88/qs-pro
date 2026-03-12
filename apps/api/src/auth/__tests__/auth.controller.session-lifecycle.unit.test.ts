@@ -80,7 +80,11 @@ function encodeOAuthState(payload: OAuthStatePayload): string {
 }
 
 const MOCK_USER = { id: 'user-1', sfUserId: 'sf-user-1' };
-const MOCK_TENANT = { id: 'tenant-1', eid: 'eid-1', tssd: 'test-tssd' };
+const MOCK_TENANT = {
+  id: 'tenant-1',
+  eid: 'test---auth-session-unit',
+  tssd: 'test-tssd',
+};
 const MOCK_MID = 'mid-1';
 const FIXED_NOW = 1700000000000;
 

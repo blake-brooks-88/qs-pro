@@ -32,9 +32,9 @@ describe('Trial Lifecycle (integration)', () => {
     id: string;
     eid: string;
   }> {
-    const eid = `trial-int-${eidSuffix}-${Date.now()}`;
+    const eid = `test---trial-lifecycle-${eidSuffix}-${Date.now()}`;
     const rows =
-      await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, 'test-tssd') RETURNING id`;
+      await sqlClient`INSERT INTO tenants (eid, tssd) VALUES (${eid}, 'test---tssd') RETURNING id`;
     const row = rows[0];
     if (!row) {
       throw new Error('Failed to insert test tenant');

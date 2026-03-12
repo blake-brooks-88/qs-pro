@@ -64,7 +64,7 @@ const defaultHandlers = [
     () => {
       return HttpResponse.json({
         sub: 'oauth-expiry-test-user',
-        enterprise_id: 'oauth-expiry-test-eid',
+        enterprise_id: 'test---oauth-expiry-eid',
         member_id: 'oauth-expiry-test-mid',
         email: 'oauth-expiry@example.com',
         name: 'OAuth Expiry Test User',

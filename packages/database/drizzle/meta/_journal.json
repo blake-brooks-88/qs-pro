@@ -260,6 +260,34 @@
       "when": 1772908200000,
       "tag": "0036_stripe_webhook_freshness",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1773005439106,
+      "tag": "0037_massive_cobalt_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1773196800000,
+      "tag": "0038_backoffice_role_separation",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1773196900000,
+      "tag": "0039_backoffice_two_factor_enabled_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1773542400000,
+      "tag": "0040_audit_logs_user_fk_set_null",
+      "breakpoints": true
     }
   ]
 }

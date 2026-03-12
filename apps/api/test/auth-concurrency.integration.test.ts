@@ -41,7 +41,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_TSSD = 'auth-concurrency-test-tssd';
+const TEST_TSSD = 'test---auth-concurrency-tssd';
 
 // Default MSW handlers
 const defaultHandlers = [
@@ -61,7 +61,7 @@ const defaultHandlers = [
     () => {
       return HttpResponse.json({
         sub: 'concurrency-test-user',
-        enterprise_id: 'concurrency-test-eid',
+        enterprise_id: 'test---auth-concurrency',
         member_id: 'concurrency-test-mid',
         email: 'concurrency-test@example.com',
         name: 'Concurrency Test User',
@@ -189,7 +189,7 @@ describe('Auth Concurrency (integration)', () => {
 
   describe('refreshToken race condition', () => {
     it('should deduplicate concurrent refresh requests - only 1 MCE token request occurs', async () => {
-      const uniqueEid = `race-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-concurrency-race-${Date.now()}`;
       const uniqueSfUserId = `race-user-${Date.now()}`;
       const uniqueMid = `race-mid-${Date.now()}`;
 
@@ -285,7 +285,7 @@ describe('Auth Concurrency (integration)', () => {
     });
 
     it('should use cached token when not forcing refresh and token is valid', async () => {
-      const uniqueEid = `cached-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-concurrency-cached-${Date.now()}`;
       const uniqueSfUserId = `cached-user-${Date.now()}`;
       const uniqueMid = `cached-mid-${Date.now()}`;
 
@@ -362,7 +362,7 @@ describe('Auth Concurrency (integration)', () => {
     });
 
     it('should refresh sequentially when token expires between calls', async () => {
-      const uniqueEid = `sequential-eid-${Date.now()}`;
+      const uniqueEid = `test---auth-concurrency-sequential-${Date.now()}`;
       const uniqueSfUserId = `sequential-user-${Date.now()}`;
       const uniqueMid = `sequential-mid-${Date.now()}`;
 

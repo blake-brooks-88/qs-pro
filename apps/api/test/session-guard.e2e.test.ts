@@ -36,7 +36,7 @@ describe('Session Guard (e2e)', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    process.env.MCE_TSSD = 'test-tssd';
+    process.env.MCE_TSSD = 'test---tssd';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -139,7 +139,7 @@ describe('Session Guard (e2e)', () => {
     it('should reject GET /metadata/data-extensions without session with 401', async () => {
       const response = await request(app.getHttpServer())
         .get('/metadata/data-extensions')
-        .query({ eid: 'test-eid' })
+        .query({ eid: 'test---session-guard' })
         .expect(401);
 
       expect(response.body.detail).toBe('Not authenticated');
@@ -178,7 +178,7 @@ describe('Session Guard (e2e)', () => {
     it('should allow GET /auth/login without session (redirects to OAuth)', async () => {
       const response = await request(app.getHttpServer())
         .get('/auth/login')
-        .query({ tssd: 'test-tssd' })
+        .query({ tssd: 'test---tssd' })
         .expect(302);
 
       // Should redirect to OAuth authorize URL

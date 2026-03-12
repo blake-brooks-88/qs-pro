@@ -39,7 +39,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-saved-queries-int';
+const TEST_EID = 'test---saved-queries-int';
 const TEST_TSSD = 'test-saved-queries-int';
 const TEST_MID = 'mid-saved-queries-int';
 

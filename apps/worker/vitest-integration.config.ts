@@ -15,6 +15,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['test/**/*.integration.test.ts', 'src/**/*.integration.test.ts'],
+    globalSetup: ['../api/test/global-setup.ts'],
     setupFiles: ['./test/vitest-integration.setup.ts'],
     hookTimeout: 60000, // 60s for beforeAll (app initialization with DB)
     testTimeout: 30000, // 30s for individual tests

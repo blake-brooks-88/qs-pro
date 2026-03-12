@@ -52,8 +52,8 @@ describe("Feature Flags Schema", () => {
     const [created] = await db
       .insert(tenants)
       .values({
-        eid: `feature-flag-test-eid-${uniqueId}`,
-        tssd: `test-subdomain-${uniqueId}`,
+        eid: `test---feature-flags-${uniqueId}`,
+        tssd: `test---feature-flags-tssd-${uniqueId}`,
       })
       .returning();
     if (!created) {
@@ -62,8 +62,8 @@ describe("Feature Flags Schema", () => {
     tenantId = created.id;
 
     expect(created.id).toBeDefined();
-    expect(created.eid).toBe(`feature-flag-test-eid-${uniqueId}`);
-    expect(created.tssd).toBe(`test-subdomain-${uniqueId}`);
+    expect(created.eid).toBe(`test---feature-flags-${uniqueId}`);
+    expect(created.tssd).toBe(`test---feature-flags-tssd-${uniqueId}`);
     expect(created.auditRetentionDays).toBe(365);
     expect(created.installedAt).toBeDefined();
   });

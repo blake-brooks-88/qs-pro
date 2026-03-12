@@ -65,7 +65,7 @@ export function createMockJob(
     tenantId: "tenant-1",
     userId: "user-1",
     mid: "mid-1",
-    eid: "eid-1",
+    eid: "test---factory-default",
     sqlText: DEFAULT_ENCRYPTED_SQL_TEXT,
     snippetName: "Test Query",
     ...overrides,

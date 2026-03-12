@@ -49,7 +49,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-usage-int';
+const TEST_EID = 'test---usage-int';
 const TEST_TSSD = 'test-usage-int';
 const TEST_MID = 'mid-usage-int';
 

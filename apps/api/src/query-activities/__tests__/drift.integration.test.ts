@@ -55,7 +55,7 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_EID = 'eid-drift-int';
+const TEST_EID = 'test---qa-drift-int';
 const TEST_TSSD = 'test-drift-int';
 const TEST_MID = 'mid-drift-int';
 

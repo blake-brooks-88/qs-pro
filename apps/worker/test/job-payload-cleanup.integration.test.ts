@@ -57,7 +57,7 @@ const TEST_TSSD = 'payload-cleanup-tssd';
 const TEST_TENANT_ID = randomUUID();
 const TEST_USER_ID = randomUUID();
 const TEST_MID = `mid-cleanup-${TEST_RUN_SUFFIX}`;
-const TEST_EID = `eid-cleanup-${TEST_RUN_SUFFIX}`;
+const TEST_EID = `test---worker-cleanup-${TEST_RUN_SUFFIX}`;
 const TEST_SF_USER_ID = `sf-user-cleanup-${TEST_RUN_SUFFIX}`;
 
 function createStubAuthProvider(): MceAuthProvider {

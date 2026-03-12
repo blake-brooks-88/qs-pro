@@ -24,7 +24,7 @@ function getRequiredEnv(key: string): string {
 }
 
 const server = setupServer(
-  http.post('https://test-tssd.auth.marketingcloudapis.com/v2/token', () => {
+  http.post('https://test---tssd.auth.marketingcloudapis.com/v2/token', () => {
     return HttpResponse.json({
       access_token: 'csrf-test-access-token',
       refresh_token: 'csrf-test-refresh-token',
@@ -35,15 +35,18 @@ const server = setupServer(
       token_type: 'Bearer',
     });
   }),
-  http.get('https://test-tssd.auth.marketingcloudapis.com/v2/userinfo', () => {
-    return HttpResponse.json({
-      sub: 'csrf-test-user',
-      enterprise_id: 'csrf-test-eid',
-      member_id: 'csrf-test-mid',
-      email: 'csrf-test@example.com',
-      name: 'CSRF Test User',
-    });
-  }),
+  http.get(
+    'https://test---tssd.auth.marketingcloudapis.com/v2/userinfo',
+    () => {
+      return HttpResponse.json({
+        sub: 'csrf-test-user',
+        enterprise_id: 'test---csrf-guard',
+        member_id: 'csrf-test-mid',
+        email: 'csrf-test@example.com',
+        name: 'CSRF Test User',
+      });
+    },
+  ),
 );
 
 /**
@@ -68,7 +71,7 @@ describe('CSRF Guard (e2e)', () => {
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: externalOnlyOnUnhandledRequest() });
 
-    process.env.MCE_TSSD = 'test-tssd';
+    process.env.MCE_TSSD = 'test---tssd';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -110,9 +113,9 @@ describe('CSRF Guard (e2e)', () => {
 
     const payload = {
       user_id: 'csrf-user-id',
-      enterprise_id: 'csrf-eid',
+      enterprise_id: 'test---csrf-guard',
       member_id: 'csrf-mid',
-      stack: 'test-tssd',
+      stack: 'test---tssd',
     };
 
     const jwt = await new jose.SignJWT(payload)

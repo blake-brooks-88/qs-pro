@@ -39,9 +39,9 @@ function getRequiredEnv(key: string): string {
   return value;
 }
 
-const TEST_TSSD = 'test-shell-query-endpoints-tssd';
+const TEST_TSSD = 'test---shell-query-endpoints-tssd';
 const TEST_SF_USER_ID = 'sf-shell-query-endpoints-user';
-const TEST_EID = 'eid-shell-query-endpoints';
+const TEST_EID = 'test---shell-query-endpoints';
 const TEST_MID = 'mid-shell-query-endpoints';
 
 const server = setupServer(
