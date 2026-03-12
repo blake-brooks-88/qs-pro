@@ -71,3 +71,4 @@ export const Sun = createIcon("Sun");
 export const TrashBinMinimalistic = createIcon("TrashBinMinimalistic");
 export const TrashBinTrash = createIcon("TrashBinTrash");
 export const UsersGroupRounded = createIcon("UsersGroupRounded");
+export const ShieldCheck = createIcon("ShieldCheck");
