@@ -19,7 +19,9 @@ export function exportAuditLogCsv(
   const headers = ["Timestamp", "Actor", "Action", "Resource", "IP Address"];
   const rows = items.map((item) => [
     escapeCsvCell(item.createdAt),
-    escapeCsvCell(item.actorId ?? "System"),
+    escapeCsvCell(
+      item.actorName ?? item.actorEmail ?? item.actorId ?? "System",
+    ),
     escapeCsvCell(item.eventType),
     escapeCsvCell(item.targetId ?? ""),
     escapeCsvCell(item.ipAddress ?? ""),

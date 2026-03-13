@@ -88,13 +88,29 @@ const columns: ColumnDef<AuditLogItem, unknown>[] = [
   {
     accessorKey: "actorId",
     header: "Actor",
-    cell: ({ row }) => (
-      <span className="text-sm text-foreground">
-        {row.original.actorType === "system"
-          ? "System"
-          : (row.original.actorId ?? "Unknown")}
-      </span>
-    ),
+    cell: ({ row }) => {
+      if (row.original.actorType === "system") {
+        return <span className="text-sm text-foreground">System</span>;
+      }
+      const name = row.original.actorName;
+      const email = row.original.actorEmail;
+      if (name) {
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm text-foreground">{name}</span>
+            {email ? (
+              <span className="text-xs text-muted-foreground">{email}</span>
+            ) : null}
+          </div>
+        );
+      }
+      const id = row.original.actorId ?? "Unknown";
+      return (
+        <span className="text-sm text-muted-foreground">
+          {id.slice(0, 8)}...
+        </span>
+      );
+    },
   },
   {
     accessorKey: "eventType",
@@ -108,11 +124,34 @@ const columns: ColumnDef<AuditLogItem, unknown>[] = [
   {
     accessorKey: "targetId",
     header: "Resource",
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">
-        {row.original.targetId ?? "\u2014"}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const targetId = row.original.targetId;
+      const targetName = row.original.targetName;
+      const targetEmail = row.original.targetEmail;
+      if (targetName) {
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm text-foreground">{targetName}</span>
+            {targetEmail ? (
+              <span className="text-xs text-muted-foreground">
+                {targetEmail}
+              </span>
+            ) : null}
+          </div>
+        );
+      }
+      if (!targetId) {
+        return (
+          <span className="text-sm text-muted-foreground">{"\u2014"}</span>
+        );
+      }
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(targetId);
+      return (
+        <span className="text-sm text-muted-foreground" title={targetId}>
+          {isUuid ? `${targetId.slice(0, 8)}...` : targetId}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "ipAddress",
@@ -144,7 +183,7 @@ export function AuditLogTab() {
     () => ({
       page: pagination.pageIndex + 1,
       pageSize: pagination.pageSize,
-      eventType: eventTypeFilter || undefined,
+      eventType: eventTypeFilter ? `${eventTypeFilter}.*` : undefined,
       search: searchFilter || undefined,
       dateFrom: dateRange.from,
       dateTo: dateRange.to,

@@ -21,7 +21,11 @@ export interface AuditLogItem {
   eventType: string;
   actorType: "user" | "system";
   actorId: string | null;
+  actorName: string | null;
+  actorEmail: string | null;
   targetId: string | null;
+  targetName: string | null;
+  targetEmail: string | null;
   metadata: Record<string, unknown> | null;
   ipAddress: string | null;
   userAgent: string | null;

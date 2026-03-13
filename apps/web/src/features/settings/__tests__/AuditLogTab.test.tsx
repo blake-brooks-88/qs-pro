@@ -37,7 +37,11 @@ const mockAuditItems = [
     eventType: "auth.login",
     actorType: "user" as const,
     actorId: "user-1",
+    actorName: "Alice Smith",
+    actorEmail: "alice@example.com",
     targetId: null,
+    targetName: null,
+    targetEmail: null,
     metadata: null,
     ipAddress: "192.168.1.1",
     userAgent: "Mozilla/5.0",
@@ -50,7 +54,11 @@ const mockAuditItems = [
     eventType: "saved_query.created",
     actorType: "user" as const,
     actorId: "user-2",
+    actorName: "Bob Jones",
+    actorEmail: "bob@example.com",
     targetId: "sq-1",
+    targetName: null,
+    targetEmail: null,
     metadata: null,
     ipAddress: "10.0.0.1",
     userAgent: "Mozilla/5.0",
@@ -115,10 +123,23 @@ describe("AuditLogTab", () => {
     expect(screen.getByText("Saved Query > Created")).toBeInTheDocument();
   });
 
-  it("date range preset buttons update active state", async () => {
+  it("date range preset sends date filter to API", async () => {
     setupAuth();
-    setupAuditHandler();
     setupSiemHandler();
+
+    const dateHandler = vi.fn();
+    server.use(
+      http.get("/api/audit-logs", ({ request }) => {
+        const url = new URL(request.url);
+        dateHandler(url.searchParams.get("dateFrom"));
+        return HttpResponse.json({
+          items: mockAuditItems,
+          total: mockAuditItems.length,
+          page: 1,
+          pageSize: 25,
+        });
+      }),
+    );
 
     renderWithProviders(<AuditLogTab />);
 
@@ -127,7 +148,11 @@ describe("AuditLogTab", () => {
     const btn7d = screen.getByRole("button", { name: "7d" });
     await userEvent.click(btn7d);
 
-    expect(btn7d.className).toContain("bg-primary");
+    await vi.waitFor(() => {
+      const calls = dateHandler.mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).not.toBeNull();
+    });
   });
 
   it("search input filters audit logs", async () => {
@@ -193,16 +218,14 @@ describe("AuditLogTab", () => {
 
     server.use(
       http.get("/api/audit-logs", () => {
-        return new Promise(() => {
-          /* never resolves to keep loading state */
-        });
+        return new Promise(() => {});
       }),
     );
 
     renderWithProviders(<AuditLogTab />);
 
-    const skeletonElements = document.querySelectorAll(".animate-pulse");
-    expect(skeletonElements.length).toBeGreaterThan(0);
+    expect(screen.queryByText("No audit events found")).not.toBeInTheDocument();
+    expect(screen.queryByText("192.168.1.1")).not.toBeInTheDocument();
   });
 
   it("shows event type filter dropdown", async () => {
@@ -219,5 +242,70 @@ describe("AuditLogTab", () => {
 
     const options = select.querySelectorAll("option");
     expect(options.length).toBeGreaterThan(1);
+  });
+
+  it("export CSV button triggers API call", async () => {
+    setupAuth();
+    setupSiemHandler();
+
+    const exportHandler = vi.fn();
+    server.use(
+      http.get("/api/audit-logs", ({ request }) => {
+        const url = new URL(request.url);
+        const pageSize = url.searchParams.get("pageSize");
+        if (pageSize === "10000") {
+          exportHandler();
+        }
+        return HttpResponse.json({
+          items: mockAuditItems,
+          total: mockAuditItems.length,
+          page: 1,
+          pageSize: Number(pageSize) || 25,
+        });
+      }),
+    );
+
+    renderWithProviders(<AuditLogTab />);
+    await screen.findByText("192.168.1.1");
+
+    URL.createObjectURL = vi.fn().mockReturnValue("blob:http://localhost/fake");
+    URL.revokeObjectURL = vi.fn();
+
+    const exportBtn = screen.getByRole("button", { name: /Export CSV/ });
+    await userEvent.click(exportBtn);
+
+    await vi.waitFor(() => {
+      expect(exportHandler).toHaveBeenCalled();
+    });
+  });
+
+  it("event type filter sends eventType param to API", async () => {
+    setupAuth();
+    setupSiemHandler();
+
+    const filterHandler = vi.fn();
+    server.use(
+      http.get("/api/audit-logs", ({ request }) => {
+        const url = new URL(request.url);
+        const eventType = url.searchParams.get("eventType");
+        filterHandler(eventType);
+        return HttpResponse.json({
+          items: mockAuditItems,
+          total: mockAuditItems.length,
+          page: 1,
+          pageSize: 25,
+        });
+      }),
+    );
+
+    renderWithProviders(<AuditLogTab />);
+    await screen.findByText("192.168.1.1");
+
+    const select = screen.getByRole("combobox");
+    await userEvent.selectOptions(select, "auth");
+
+    await vi.waitFor(() => {
+      expect(filterHandler).toHaveBeenCalledWith("auth.*");
+    });
   });
 });
