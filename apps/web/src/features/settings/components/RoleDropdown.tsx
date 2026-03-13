@@ -43,7 +43,11 @@ export function RoleDropdown({
         <Tooltip>
           <TooltipTrigger asChild>
             <div>
-              <Select value={currentRole} disabled className="h-8 w-28 text-xs">
+              <Select
+                value={currentRole}
+                disabled
+                className="h-8 w-28 py-1 text-xs"
+              >
                 <option value="admin">Admin</option>
                 <option value="member">Member</option>
               </Select>
@@ -62,7 +66,7 @@ export function RoleDropdown({
         onRoleChange(userId, e.target.value as "admin" | "member")
       }
       disabled={isDisabled}
-      className="h-8 w-28 text-xs"
+      className="h-8 w-28 py-1 text-xs"
     >
       <option value="admin">Admin</option>
       <option value="member">Member</option>

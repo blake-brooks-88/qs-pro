@@ -1,7 +1,6 @@
 import { Settings } from "@solar-icons/react";
 import type { ReactNode } from "react";
 
-import { BillingLink } from "@/components/header/BillingLink";
 import { TierBadge } from "@/components/header/TierBadge";
 import { UpgradeButton } from "@/components/header/UpgradeButton";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -40,7 +39,6 @@ export function AppShell({
         </div>
         <div className="flex items-center gap-2">
           <UpgradeButton />
-          <BillingLink />
           {isAdmin && onSettingsClick ? (
             <button
               type="button"
