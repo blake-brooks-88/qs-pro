@@ -100,14 +100,26 @@ function SetupView() {
   const [secret, setSecret] = useState("");
   const [showSecret, setShowSecret] = useState(false);
   const [urlError, setUrlError] = useState("");
+  const [secretError, setSecretError] = useState("");
   const upsertMutation = useUpsertSiemConfig();
 
   const handleSave = useCallback(() => {
+    let hasError = false;
     if (!webhookUrl.startsWith("https://")) {
       setUrlError("Webhook URL must use HTTPS");
+      hasError = true;
+    } else {
+      setUrlError("");
+    }
+    if (secret.length < 16) {
+      setSecretError("Secret must be at least 16 characters");
+      hasError = true;
+    } else {
+      setSecretError("");
+    }
+    if (hasError) {
       return;
     }
-    setUrlError("");
     upsertMutation.mutate({ webhookUrl, secret });
   }, [webhookUrl, secret, upsertMutation]);
 
@@ -148,7 +160,12 @@ function SetupView() {
             type={showSecret ? "text" : "password"}
             placeholder="Minimum 16 characters"
             value={secret}
-            onChange={(e) => setSecret(e.target.value)}
+            onChange={(e) => {
+              setSecret(e.target.value);
+              if (secretError) {
+                setSecretError("");
+              }
+            }}
           />
           <button
             type="button"
@@ -158,6 +175,9 @@ function SetupView() {
             <span className="text-xs">{showSecret ? "Hide" : "Show"}</span>
           </button>
         </div>
+        {secretError ? (
+          <p className="text-xs text-destructive ml-1">{secretError}</p>
+        ) : null}
       </div>
       <Button
         onClick={handleSave}
