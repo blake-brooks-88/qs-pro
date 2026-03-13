@@ -3,6 +3,8 @@ import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import type { AuditLogQueryParams } from '@qpp/shared-types';
 import { AuditLogQueryParamsSchema } from '@qpp/shared-types';
 
+import { RequireRole } from '../admin/require-role.decorator';
+import { RolesGuard } from '../admin/roles.guard';
 import {
   CurrentUser,
   type UserSession,
@@ -13,7 +15,7 @@ import { AuditService } from './audit.service';
 import type { AuditLogRowResolved } from './drizzle-audit-log.repository';
 
 @Controller('audit-logs')
-@UseGuards(SessionGuard)
+@UseGuards(SessionGuard, RolesGuard)
 export class AuditController {
   constructor(
     private readonly auditService: AuditService,
@@ -21,6 +23,7 @@ export class AuditController {
   ) {}
 
   @Get()
+  @RequireRole('owner', 'admin')
   async findAll(
     @CurrentUser() user: UserSession,
     @Query(new ZodValidationPipe(AuditLogQueryParamsSchema))
