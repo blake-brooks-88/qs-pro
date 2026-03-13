@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -274,6 +274,83 @@ describe("SiemWebhookConfig", () => {
       expect(
         screen.getByText(/Too many consecutive failures/),
       ).toBeInTheDocument();
+    });
+
+    it("confirming delete fires delete mutation", async () => {
+      setupAuth();
+      setupConfigHandler();
+
+      const deleteHandler = vi.fn();
+      server.use(
+        http.delete("/api/admin/siem/config", () => {
+          deleteHandler();
+          return HttpResponse.json({});
+        }),
+      );
+
+      renderWithProviders(<SiemWebhookConfig />);
+
+      const deleteBtn = await screen.findByRole("button", { name: /Delete/ });
+      await userEvent.click(deleteBtn);
+
+      const dialog = screen.getByRole("dialog");
+      const confirmDeleteBtn = within(dialog).getByRole("button", {
+        name: /^Delete$/,
+      });
+      await userEvent.click(confirmDeleteBtn);
+
+      await vi.waitFor(() => {
+        expect(deleteHandler).toHaveBeenCalled();
+      });
+    });
+
+    it("update configuration button fires upsert mutation", async () => {
+      setupAuth();
+      setupConfigHandler();
+
+      const upsertHandler = vi.fn();
+      server.use(
+        http.put("/api/admin/siem/config", async ({ request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          upsertHandler(body);
+          return HttpResponse.json(mockConfig);
+        }),
+      );
+
+      renderWithProviders(<SiemWebhookConfig />);
+
+      await screen.findByRole("button", { name: "Test Webhook" });
+
+      const updateBtn = screen.getByRole("button", {
+        name: /Update Configuration/,
+      });
+      await userEvent.click(updateBtn);
+
+      await vi.waitFor(() => {
+        expect(upsertHandler).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("Setup mode validation", () => {
+    it("save button is disabled when secret is shorter than 16 characters", async () => {
+      setupAuth();
+      setupNoConfigHandler();
+
+      renderWithProviders(<SiemWebhookConfig />);
+
+      const urlInput = await screen.findByPlaceholderText(
+        "https://your-siem-endpoint.com/webhook",
+      );
+      const secretInput = screen.getByPlaceholderText("Minimum 16 characters");
+
+      await userEvent.type(urlInput, "https://example.com/hook");
+      await userEvent.type(secretInput, "short");
+
+      const saveBtn = screen.getByRole("button", {
+        name: /Save Configuration/,
+      });
+      expect(saveBtn).toBeDisabled();
     });
   });
 });

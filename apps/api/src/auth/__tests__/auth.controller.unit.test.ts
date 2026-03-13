@@ -79,6 +79,7 @@ function createMockAuthService() {
     refreshToken: vi.fn(),
     getAuthUrl: vi.fn(),
     handleCallback: vi.fn(),
+    touchLastActive: vi.fn(),
   };
 }
 

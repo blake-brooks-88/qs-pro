@@ -212,6 +212,36 @@ describe('AdminService', () => {
         code: ErrorCode.VALIDATION_ERROR,
       });
     });
+
+    it('rejects when actor is a member', async () => {
+      await expect(
+        service.changeRole({
+          ...baseParams,
+          actorRole: 'member' as 'admin',
+          actorId: 'actor-1',
+          targetUserId: 'target-1',
+          newRole: 'admin',
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+    });
+
+    it('rejects owner self-demotion', async () => {
+      userRepo.findById.mockResolvedValue({
+        id: 'actor-1',
+        role: 'owner',
+        tenantId: TENANT_ID,
+      });
+
+      await expect(
+        service.changeRole({
+          ...baseParams,
+          actorId: 'actor-1',
+          actorRole: 'owner',
+          targetUserId: 'actor-1',
+          newRole: 'member',
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+    });
   });
 
   describe('transferOwnership', () => {
@@ -273,6 +303,24 @@ describe('AdminService', () => {
 
       await expect(service.transferOwnership(baseParams)).rejects.toMatchObject(
         { code: ErrorCode.RESOURCE_NOT_FOUND },
+      );
+    });
+
+    it('rejects cross-tenant target user', async () => {
+      userRepo.findById
+        .mockResolvedValueOnce({
+          id: 'owner-1',
+          role: 'owner',
+          tenantId: TENANT_ID,
+        })
+        .mockResolvedValueOnce({
+          id: 'user-2',
+          role: 'admin',
+          tenantId: 'other-tenant',
+        });
+
+      await expect(service.transferOwnership(baseParams)).rejects.toMatchObject(
+        { code: ErrorCode.VALIDATION_ERROR },
       );
     });
   });

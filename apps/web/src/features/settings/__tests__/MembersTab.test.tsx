@@ -142,7 +142,7 @@ describe("MembersTab", () => {
     await screen.findByText("Bob Admin");
 
     const selects = screen.getAllByRole("combobox");
-    expect(selects.length).toBeGreaterThan(0);
+    expect(selects).toHaveLength(2);
   });
 
   it("fires mutation when role is changed", async () => {
@@ -184,7 +184,7 @@ describe("MembersTab", () => {
     const buttons = screen.getAllByRole("button", {
       name: "Transfer Ownership",
     });
-    expect(buttons.length).toBeGreaterThan(0);
+    expect(buttons).toHaveLength(2);
   });
 
   it("hides Transfer Ownership button for admin actors", async () => {
@@ -224,5 +224,38 @@ describe("MembersTab", () => {
     renderWithProviders(<MembersTab />);
 
     expect(await screen.findByText("No members found")).toBeInTheDocument();
+  });
+
+  it("confirms transfer ownership and fires mutation", async () => {
+    setupMockAuth("owner");
+    setupMembersHandler();
+
+    const transferHandler = vi.fn();
+    server.use(
+      http.post("/api/admin/transfer-ownership", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        transferHandler(body);
+        return HttpResponse.json({});
+      }),
+    );
+
+    renderWithProviders(<MembersTab />);
+    await screen.findByText("Bob Admin");
+
+    const bobRow = screen.getByText("Bob Admin").closest("tr") as HTMLElement;
+    const transferBtn = within(bobRow).getByRole("button", {
+      name: "Transfer Ownership",
+    });
+    await userEvent.click(transferBtn);
+
+    const dialog = screen.getByRole("dialog");
+    const confirmBtn = within(dialog).getByRole("button", {
+      name: /Transfer Ownership/,
+    });
+    await userEvent.click(confirmBtn);
+
+    await vi.waitFor(() => {
+      expect(transferHandler).toHaveBeenCalledWith({ newOwnerId: "user-2" });
+    });
   });
 });

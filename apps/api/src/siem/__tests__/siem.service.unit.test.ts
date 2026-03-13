@@ -1,10 +1,16 @@
+import { ErrorCode } from '@qpp/backend-shared';
 import type {
   ISiemWebhookConfigRepository,
   SiemWebhookConfig,
 } from '@qpp/database';
+import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SiemService } from '../siem.service';
+
+vi.mock('axios', () => ({
+  default: { post: vi.fn() },
+}));
 
 const mockSiemRepo: ISiemWebhookConfigRepository = {
   findByTenantId: vi.fn(),
@@ -53,7 +59,7 @@ describe('SiemService', () => {
   let service: SiemService;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     service = new SiemService(
       mockSiemRepo,
       mockRlsContext as never,
@@ -119,7 +125,7 @@ describe('SiemService', () => {
           webhookUrl: 'http://insecure.example.com/hook',
           secret: 'my-secret',
         }),
-      ).rejects.toThrow('Invalid input. Please check your request.');
+      ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
     });
   });
 
@@ -141,9 +147,45 @@ describe('SiemService', () => {
     it('throws when no config exists', async () => {
       vi.mocked(mockSiemRepo.findByTenantId).mockResolvedValue(undefined);
 
-      await expect(service.testWebhook('tenant-1', '12345')).rejects.toThrow(
-        'The requested resource was not found.',
-      );
+      await expect(
+        service.testWebhook('tenant-1', '12345'),
+      ).rejects.toMatchObject({ code: ErrorCode.RESOURCE_NOT_FOUND });
+    });
+
+    it('returns success with status code for successful webhook test', async () => {
+      vi.mocked(mockSiemRepo.findByTenantId).mockResolvedValue(buildConfig());
+      vi.mocked(axios.post).mockResolvedValue({ status: 200 });
+
+      const result = await service.testWebhook('tenant-1', '12345');
+
+      expect(result).toEqual({ success: true, statusCode: 200 });
+    });
+
+    it('returns failure for non-2xx status', async () => {
+      vi.mocked(mockSiemRepo.findByTenantId).mockResolvedValue(buildConfig());
+      vi.mocked(axios.post).mockResolvedValue({ status: 500 });
+
+      const result = await service.testWebhook('tenant-1', '12345');
+
+      expect(result).toEqual({ success: false, statusCode: 500 });
+    });
+
+    it('returns failure with error message on network error', async () => {
+      vi.mocked(mockSiemRepo.findByTenantId).mockResolvedValue(buildConfig());
+      vi.mocked(axios.post).mockRejectedValue(new Error('ECONNREFUSED'));
+
+      const result = await service.testWebhook('tenant-1', '12345');
+
+      expect(result).toEqual({ success: false, error: 'ECONNREFUSED' });
+    });
+
+    it('throws INTERNAL_ERROR when decryption fails', async () => {
+      vi.mocked(mockSiemRepo.findByTenantId).mockResolvedValue(buildConfig());
+      mockEncryptionService.decrypt.mockReturnValueOnce(null);
+
+      await expect(
+        service.testWebhook('tenant-1', '12345'),
+      ).rejects.toMatchObject({ code: ErrorCode.INTERNAL_ERROR });
     });
   });
 
