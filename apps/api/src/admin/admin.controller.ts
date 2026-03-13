@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Req,
@@ -50,7 +51,7 @@ export class AdminController {
   @Audited('role.changed', { targetIdParam: 'id' })
   async changeRole(
     @CurrentUser() user: UserSession,
-    @Param('id') targetUserId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) targetUserId: string,
     @Body(new ZodValidationPipe(ChangeRoleSchema))
     body: z.infer<typeof ChangeRoleSchema>,
     @Req() req: FastifyRequest,
