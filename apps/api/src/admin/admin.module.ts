@@ -16,6 +16,6 @@ import { RolesGuard } from './roles.guard';
       inject: ['DATABASE'],
     },
   ],
-  exports: [AdminService, RolesGuard],
+  exports: [AdminService, RolesGuard, 'USER_REPOSITORY'],
 })
 export class AdminModule {}

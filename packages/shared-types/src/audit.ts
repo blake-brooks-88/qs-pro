@@ -119,7 +119,7 @@ export type AuditLogListResponse = z.infer<typeof AuditLogListResponseSchema>;
 
 export const AuditLogQueryParamsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(10_000).default(25),
   eventType: z.string().max(100).optional(),
   actorId: z.string().uuid().optional(),
   targetId: z.string().max(255).optional(),

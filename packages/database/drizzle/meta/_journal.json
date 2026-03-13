@@ -288,6 +288,20 @@
       "when": 1773542400000,
       "tag": "0040_audit_logs_user_fk_set_null",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1773628800000,
+      "tag": "0041_add_user_role_and_siem_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1773715200000,
+      "tag": "0042_rls_siem_webhook_configs",
+      "breakpoints": true
     }
   ]
 }

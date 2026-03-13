@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 
 import { FeaturesModule } from '../features/features.module';
+import { SiemModule } from '../siem/siem.module';
 import { AuditController } from './audit.controller';
 import { AuditInterceptor } from './audit.interceptor';
 import { AUDIT_LOG_REPOSITORY } from './audit.repository';
@@ -10,7 +11,7 @@ import { DrizzleAuditLogRepository } from './drizzle-audit-log.repository';
 
 @Global()
 @Module({
-  imports: [FeaturesModule],
+  imports: [FeaturesModule, SiemModule],
   controllers: [AuditController],
   providers: [
     {
