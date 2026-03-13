@@ -10,7 +10,7 @@ import {
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from '../features/features.service';
 import { AuditService } from './audit.service';
-import type { AuditLogRow } from './drizzle-audit-log.repository';
+import type { AuditLogRowResolved } from './drizzle-audit-log.repository';
 
 @Controller('audit-logs')
 @UseGuards(SessionGuard)
@@ -52,7 +52,7 @@ export class AuditController {
   }
 }
 
-function toResponse(row: AuditLogRow) {
+function toResponse(row: AuditLogRowResolved) {
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -60,7 +60,11 @@ function toResponse(row: AuditLogRow) {
     eventType: row.eventType,
     actorType: row.actorType,
     actorId: row.actorId,
+    actorName: row.actorName,
+    actorEmail: row.actorEmail,
     targetId: row.targetId,
+    targetName: row.targetName,
+    targetEmail: row.targetEmail,
     metadata: row.metadata,
     ipAddress: row.ipAddress,
     userAgent: row.userAgent,

@@ -5,7 +5,7 @@ import type { UserSession } from '../../common/decorators/current-user.decorator
 import type { FeaturesService } from '../../features/features.service';
 import { AuditController } from '../audit.controller';
 import type { AuditService } from '../audit.service';
-import type { AuditLogRow } from '../drizzle-audit-log.repository';
+import type { AuditLogRowResolved } from '../drizzle-audit-log.repository';
 
 const mockUser: UserSession = {
   userId: 'user-1',
@@ -13,14 +13,18 @@ const mockUser: UserSession = {
   mid: '12345',
 };
 
-const mockAuditLogRow: AuditLogRow = {
+const mockAuditLogRow: AuditLogRowResolved = {
   id: 'log-1',
   tenantId: 'tenant-1',
   mid: '12345',
   eventType: 'saved_query.created',
   actorType: 'user' as const,
   actorId: 'user-1',
+  actorName: 'Test User',
+  actorEmail: 'test@example.com',
   targetId: 'sq-1',
+  targetName: null,
+  targetEmail: null,
   metadata: { name: 'My Query' },
   ipAddress: '127.0.0.1',
   userAgent: 'TestAgent',
@@ -56,7 +60,7 @@ describe('AuditController', () => {
   describe('GET /audit-logs (findAll)', () => {
     it('returns paginated response with items mapped through toResponse', async () => {
       // Arrange
-      const secondRow: AuditLogRow = {
+      const secondRow: AuditLogRowResolved = {
         ...mockAuditLogRow,
         id: 'log-2',
         eventType: 'folder.created',
@@ -88,7 +92,11 @@ describe('AuditController', () => {
             eventType: 'saved_query.created',
             actorType: 'user',
             actorId: 'user-1',
+            actorName: 'Test User',
+            actorEmail: 'test@example.com',
             targetId: 'sq-1',
+            targetName: null,
+            targetEmail: null,
             metadata: { name: 'My Query' },
             ipAddress: '127.0.0.1',
             userAgent: 'TestAgent',
@@ -101,7 +109,11 @@ describe('AuditController', () => {
             eventType: 'folder.created',
             actorType: 'user',
             actorId: 'user-1',
+            actorName: 'Test User',
+            actorEmail: 'test@example.com',
             targetId: 'folder-1',
+            targetName: null,
+            targetEmail: null,
             metadata: null,
             ipAddress: '127.0.0.1',
             userAgent: 'TestAgent',
@@ -166,10 +178,14 @@ describe('AuditController', () => {
 
     it('maps AuditLogRow to response format correctly', async () => {
       // Arrange — row with nullable fields set to null
-      const nullableRow: AuditLogRow = {
+      const nullableRow: AuditLogRowResolved = {
         ...mockAuditLogRow,
         actorId: null,
+        actorName: null,
+        actorEmail: null,
         targetId: null,
+        targetName: null,
+        targetEmail: null,
         metadata: null,
         ipAddress: null,
         userAgent: null,
@@ -197,7 +213,11 @@ describe('AuditController', () => {
         eventType: mockAuditLogRow.eventType,
         actorType: mockAuditLogRow.actorType,
         actorId: null,
+        actorName: null,
+        actorEmail: null,
         targetId: null,
+        targetName: null,
+        targetEmail: null,
         metadata: null,
         ipAddress: null,
         userAgent: null,

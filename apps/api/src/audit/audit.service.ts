@@ -11,7 +11,7 @@ import {
   AUDIT_LOG_REPOSITORY,
   type IAuditLogRepository,
 } from './audit.repository';
-import type { AuditLogRow } from './drizzle-audit-log.repository';
+import type { AuditLogRowResolved } from './drizzle-audit-log.repository';
 
 export interface AuditLogEntry {
   eventType: AuditEventType;
@@ -59,14 +59,14 @@ export class AuditService {
             ipAddress: entry.ipAddress ?? null,
             userAgent: entry.userAgent ?? null,
           });
+
+          this.enqueueSiemWebhook(entry).catch((err) => {
+            this.logger.warn(
+              `SIEM webhook enqueue failed for event=${entry.eventType}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
         },
       );
-
-      this.enqueueSiemWebhook(entry).catch((err) => {
-        this.logger.warn(
-          `SIEM webhook enqueue failed for event=${entry.eventType}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
     } catch (error) {
       this.logger.error(
         `Failed to write audit log event=${entry.eventType}`,
@@ -79,7 +79,7 @@ export class AuditService {
     tenantId: string,
     mid: string,
     params: AuditLogQueryParams,
-  ): Promise<{ items: AuditLogRow[]; total: number }> {
+  ): Promise<{ items: AuditLogRowResolved[]; total: number }> {
     return this.rlsContext.runWithTenantContext(tenantId, mid, () =>
       this.auditLogRepo.findAll(params),
     );
