@@ -181,6 +181,26 @@
 }
 
 /* Monaco Editor Semantic Decorations - must override Monaco's inline token styles */
+/* Visible scrollbar for dark-theme containers */
+.scrollbar-visible::-webkit-scrollbar {
+  width: 8px;
+}
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.5);
+}
+/* Firefox */
+.scrollbar-visible {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
 .monaco-editor .monaco-de-name {
   color: var(--syntax-table) !important;
 }

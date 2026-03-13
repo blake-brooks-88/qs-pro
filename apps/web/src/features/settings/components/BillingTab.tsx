@@ -27,70 +27,64 @@ export function BillingTab() {
   const hasPaidTier = tier !== "free";
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Current Plan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {tierLabel(tier)}
-              </span>
-            </div>
-
-            {isTrialActive && daysRemaining !== null ? (
-              <p className="text-xs text-muted-foreground">
-                Trial ends in {String(daysRemaining)} day
-                {daysRemaining === 1 ? "" : "s"}
-              </p>
-            ) : null}
-
-            {isTrialExpired ? (
-              <p className="text-xs text-destructive">Trial expired</p>
-            ) : null}
-
-            {hasPaidTier && currentPeriodEnds ? (
-              <p className="text-xs text-muted-foreground">
-                Current period ends{" "}
-                {new Date(currentPeriodEnds).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-            ) : null}
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-semibold">Current Plan</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">
+              {tierLabel(tier)}
+            </span>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-3">
-            {hasPaidTier ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => portalSession.mutate()}
-                disabled={portalSession.isPending}
-              >
-                Manage Billing
-              </Button>
-            ) : null}
+          {isTrialActive && daysRemaining !== null ? (
+            <p className="text-xs text-muted-foreground">
+              Trial ends in {String(daysRemaining)} day
+              {daysRemaining === 1 ? "" : "s"}
+            </p>
+          ) : null}
 
-            {tier !== "enterprise" && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => openPricing("settings_billing")}
-              >
-                {tier === "free" ? "Upgrade Plan" : "Upgrade to Enterprise"}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          {isTrialExpired ? (
+            <p className="text-xs text-destructive">Trial expired</p>
+          ) : null}
+
+          {hasPaidTier && currentPeriodEnds ? (
+            <p className="text-xs text-muted-foreground">
+              Current period ends{" "}
+              {new Date(currentPeriodEnds).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex gap-3 pt-4 border-t border-border/50 mt-4">
+          {hasPaidTier ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => portalSession.mutate()}
+              disabled={portalSession.isPending}
+            >
+              Manage Billing
+            </Button>
+          ) : null}
+
+          {tier !== "enterprise" && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => openPricing("settings_billing")}
+            >
+              {tier === "free" ? "Upgrade Plan" : "Upgrade to Enterprise"}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

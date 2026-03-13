@@ -38,7 +38,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   const visibleTabs = tabs.filter((t) => t.visible);
 
   return (
-    <div className="flex-1 overflow-auto bg-background">
+    <div className="flex-1 overflow-auto bg-background scrollbar-visible">
       <div className="border-b border-border bg-card px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <h1 className="font-display text-xl font-bold tracking-tight">

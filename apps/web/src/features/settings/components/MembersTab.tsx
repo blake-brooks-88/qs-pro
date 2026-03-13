@@ -2,6 +2,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useCallback, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table/DataTable";
 import {
   Dialog,
@@ -185,21 +186,28 @@ export function MembersTab() {
 
   return (
     <div>
-      <div className="mb-4">
-        <Input
-          placeholder="Search members..."
-          className="max-w-sm"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Team Members</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Input
+              placeholder="Search members..."
+              className="max-w-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
-      <DataTable
-        columns={columns}
-        data={filteredMembers}
-        isLoading={isLoading}
-        emptyMessage="No members found"
-      />
+          <DataTable
+            columns={columns}
+            data={filteredMembers}
+            isLoading={isLoading}
+            emptyMessage="No members found"
+          />
+        </CardContent>
+      </Card>
 
       <Dialog
         open={transferTarget !== null}

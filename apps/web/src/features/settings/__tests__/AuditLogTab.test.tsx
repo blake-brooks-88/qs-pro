@@ -150,8 +150,8 @@ describe("AuditLogTab", () => {
 
     await vi.waitFor(() => {
       const calls = dateHandler.mock.calls;
-      const lastCall = calls[calls.length - 1];
-      expect(lastCall[0]).not.toBeNull();
+      const lastCall = calls[calls.length - 1] as [unknown] | undefined;
+      expect(lastCall?.[0]).not.toBeNull();
     });
   });
 

@@ -7,6 +7,7 @@ import type {
 import { useCallback, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table/DataTable";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -230,64 +231,68 @@ export function AuditLogTab() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 flex-wrap mb-4">
-        <Select
-          className="w-40"
-          value={eventTypeFilter}
-          onChange={handleEventTypeChange}
-        >
-          {EVENT_TYPE_CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {cat.label}
-            </option>
-          ))}
-        </Select>
-
-        <Input
-          placeholder="Search..."
-          className="w-48"
-          value={searchFilter}
-          onChange={handleSearchChange}
-        />
-
-        <div className="flex gap-1">
-          {(["24h", "7d", "30d", "all"] as const).map((preset) => (
-            <Button
-              key={preset}
-              variant={datePreset === preset ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleDatePreset(preset)}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <Select
+              className="w-40"
+              value={eventTypeFilter}
+              onChange={handleEventTypeChange}
             >
-              {preset === "all" ? "All Time" : preset}
-            </Button>
-          ))}
-        </div>
+              {EVENT_TYPE_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </Select>
 
-        <div className="ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void exportCsv()}
-            disabled={isExporting}
-          >
-            <Download size={14} className="mr-1.5" />
-            {isExporting ? "Exporting..." : "Export CSV"}
-          </Button>
-        </div>
-      </div>
+            <Input
+              placeholder="Search..."
+              className="w-48"
+              value={searchFilter}
+              onChange={handleSearchChange}
+            />
 
-      <DataTable
-        columns={columns}
-        data={data?.items ?? []}
-        pageCount={pageCount}
-        pagination={pagination}
-        onPaginationChange={setPagination}
-        sorting={sorting}
-        onSortingChange={setSorting}
-        isLoading={isLoading}
-        emptyMessage="No audit events found"
-        totalItems={data?.total}
-      />
+            <div className="flex gap-1">
+              {(["24h", "7d", "30d", "all"] as const).map((preset) => (
+                <Button
+                  key={preset}
+                  variant={datePreset === preset ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleDatePreset(preset)}
+                >
+                  {preset === "all" ? "All Time" : preset}
+                </Button>
+              ))}
+            </div>
+
+            <div className="ml-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void exportCsv()}
+                disabled={isExporting}
+              >
+                <Download size={14} className="mr-1.5" />
+                {isExporting ? "Exporting..." : "Export CSV"}
+              </Button>
+            </div>
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={data?.items ?? []}
+            pageCount={pageCount}
+            pagination={pagination}
+            onPaginationChange={setPagination}
+            sorting={sorting}
+            onSortingChange={setSorting}
+            isLoading={isLoading}
+            emptyMessage="No audit events found"
+            totalItems={data?.total}
+          />
+        </CardContent>
+      </Card>
 
       <div className="border-t border-border mt-8 pt-8">
         <SiemWebhookConfig />
