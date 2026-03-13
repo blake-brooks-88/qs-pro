@@ -1,5 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
+import { EncryptionModule } from '@qpp/backend-shared';
 import { DrizzleSiemWebhookConfigRepository } from '@qpp/database';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
@@ -13,6 +14,7 @@ import { SiemWebhookProducer } from './siem-webhook.producer';
 @Module({
   imports: [
     BullModule.registerQueue({ name: 'siem-webhook' }),
+    EncryptionModule,
     FeaturesModule,
     AdminModule,
   ],

@@ -24,6 +24,8 @@ describe('AuditModule', () => {
     })
       .overrideProvider(ConfigService)
       .useValue({ get: vi.fn() })
+      .overrideProvider(EncryptionService)
+      .useValue(encryptionStub)
       .overrideProvider('SQL_CLIENT')
       .useValue({})
       .overrideProvider('DATABASE')
