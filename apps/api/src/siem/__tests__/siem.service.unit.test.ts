@@ -181,7 +181,9 @@ describe('SiemService', () => {
 
     it('throws INTERNAL_ERROR when decryption fails', async () => {
       vi.mocked(mockSiemRepo.findByTenantId).mockResolvedValue(buildConfig());
-      mockEncryptionService.decrypt.mockReturnValueOnce(null);
+      mockEncryptionService.decrypt.mockReturnValueOnce(
+        null as unknown as string,
+      );
 
       await expect(
         service.testWebhook('tenant-1', '12345'),
