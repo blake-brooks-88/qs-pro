@@ -158,11 +158,25 @@ const columns: ColumnDef<AuditLogItem, unknown>[] = [
     accessorKey: "ipAddress",
     header: "IP Address",
     size: 130,
-    cell: ({ row }) => (
-      <span className="text-xs font-mono text-muted-foreground">
-        {row.original.ipAddress ?? "\u2014"}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const ip = row.original.ipAddress;
+      if (!ip) {
+        return (
+          <span className="text-xs font-mono text-muted-foreground">
+            {"\u2014"}
+          </span>
+        );
+      }
+      const shouldTruncate = ip.length > 15;
+      return (
+        <span
+          className="text-xs font-mono text-muted-foreground truncate block max-w-[120px]"
+          title={ip}
+        >
+          {shouldTruncate ? `${ip.slice(0, 15)}...` : ip}
+        </span>
+      );
+    },
   },
 ];
 

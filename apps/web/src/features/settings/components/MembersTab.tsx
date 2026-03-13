@@ -169,9 +169,9 @@ export function MembersTab() {
           }
           return (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs border-amber-500/50 text-amber-600 hover:bg-amber-500/10 hover:text-amber-500 dark:text-amber-400 dark:border-amber-400/50 dark:hover:bg-amber-400/10 dark:hover:text-amber-300"
               onClick={() => setTransferTarget(row.original)}
             >
               Transfer Ownership
