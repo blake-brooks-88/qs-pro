@@ -34,6 +34,14 @@ function createMockAuditService(): { log: ReturnType<typeof vi.fn> } {
   return { log: vi.fn().mockResolvedValue(undefined) };
 }
 
+function createMockTenantDeletionService() {
+  return { softDeleteTenant: vi.fn().mockResolvedValue(undefined) };
+}
+
+function createMockUserDeletionService() {
+  return { deleteUser: vi.fn().mockResolvedValue(undefined) };
+}
+
 const TENANT_ID = 'tenant-1';
 const MID = 'mid-1';
 
@@ -52,6 +60,8 @@ describe('AdminService', () => {
       userRepo as unknown as IUserRepository,
       rlsContext as never,
       auditService as unknown as AuditService,
+      createMockTenantDeletionService() as never,
+      createMockUserDeletionService() as never,
     );
   });
 

@@ -11,6 +11,8 @@ function createMockAdminService(): {
     listMembers: vi.fn(),
     changeRole: vi.fn(),
     transferOwnership: vi.fn(),
+    softDeleteTenant: vi.fn(),
+    deleteUser: vi.fn(),
   };
 }
 
