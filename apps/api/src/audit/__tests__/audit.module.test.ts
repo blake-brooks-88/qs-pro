@@ -1,3 +1,4 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -17,10 +18,17 @@ const encryptionStub = { encrypt: vi.fn(), decrypt: vi.fn() };
 })
 class StubEncryptionModule {}
 
+@Global()
+@Module({
+  providers: [{ provide: 'REDIS_CLIENT', useValue: {} }],
+  exports: ['REDIS_CLIENT'],
+})
+class StubRedisModule {}
+
 describe('AuditModule', () => {
   it('compiles with all providers wired correctly', async () => {
     const module = await Test.createTestingModule({
-      imports: [StubEncryptionModule, AuditModule],
+      imports: [StubEncryptionModule, StubRedisModule, AuditModule],
     })
       .overrideProvider(ConfigService)
       .useValue({ get: vi.fn() })
@@ -34,6 +42,10 @@ describe('AuditModule', () => {
       .useValue(() => ({}))
       .overrideProvider(RlsContextService)
       .useValue({ runWithTenantContext: vi.fn() })
+      .overrideProvider('STRIPE_CLIENT')
+      .useValue(null)
+      .overrideProvider(getQueueToken('siem-webhook'))
+      .useValue({ add: vi.fn() })
       .overrideProvider('USER_REPOSITORY')
       .useValue({})
       .compile();

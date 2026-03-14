@@ -78,9 +78,9 @@ describe("AuthController", () => {
     const headerMock = reply.header as unknown as {
       mock: { calls: unknown[][] };
     };
-    expect(headerMock.mock.calls.filter((call) => call[0] === "set-cookie")).toHaveLength(
-      1,
-    );
+    expect(
+      headerMock.mock.calls.filter((call) => call[0] === "set-cookie"),
+    ).toHaveLength(1);
     expect(reply.send).toHaveBeenCalledWith(JSON.stringify({ ok: true }));
   });
 

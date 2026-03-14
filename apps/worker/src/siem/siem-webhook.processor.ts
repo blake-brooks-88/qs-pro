@@ -55,7 +55,9 @@ export class SiemWebhookProcessor extends WorkerHost {
 
     const secret = this.encryptionService.decrypt(secretEncrypted);
     if (!secret) {
-      this.logger.error(`Failed to decrypt SIEM webhook secret for tenant ${tenantId}`);
+      this.logger.error(
+        `Failed to decrypt SIEM webhook secret for tenant ${tenantId}`,
+      );
       throw new Error("Failed to decrypt webhook secret");
     }
 
@@ -82,7 +84,9 @@ export class SiemWebhookProcessor extends WorkerHost {
         await this.siemRepo.resetFailures(tenantId);
       });
 
-      this.logger.debug(`SIEM webhook delivered for tenant ${tenantId}, event ${payload.event.type}`);
+      this.logger.debug(
+        `SIEM webhook delivered for tenant ${tenantId}, event ${payload.event.type}`,
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

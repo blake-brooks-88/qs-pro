@@ -1,6 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { RlsContextService } from '@qpp/backend-shared';
-import { AppError, ErrorCode } from '@qpp/backend-shared';
+import {
+  AppError,
+  ErrorCode,
+  getReservedSqlFromContext,
+  RlsContextService,
+} from '@qpp/backend-shared';
 import type { IUserRepository } from '@qpp/database';
 import type { createDatabaseFromClient } from '@qpp/database';
 import {
@@ -87,6 +91,14 @@ export class UserDeletionService {
 
         const ownerId = owner.id;
 
+        const reservedSql = getReservedSqlFromContext();
+
+        // Set app.user_id to the owner so folder RLS WITH CHECK passes
+        // for personal "Archived Users" folders created on the owner's behalf.
+        if (reservedSql) {
+          await reservedSql`SELECT set_config('app.user_id', ${ownerId}, false)`;
+        }
+
         const archiveRootFolderId = await this.findOrCreateArchiveRoot(
           tenantId,
           mid,
@@ -100,6 +112,12 @@ export class UserDeletionService {
           archiveRootFolderId,
           targetUser.name ?? targetUser.sfUserId,
         );
+
+        // Enable admin bypass so migrateContent can see AND update the
+        // target user's personal folders across user boundaries.
+        if (reservedSql) {
+          await reservedSql`SELECT set_config('app.admin_action', 'true', true)`;
+        }
 
         await this.migrateContent(
           tenantId,

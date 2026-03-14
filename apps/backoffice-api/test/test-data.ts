@@ -74,10 +74,12 @@ export async function createUsersForTenant(
     RETURNING id, sf_user_id
   `;
 
-  return (rows as unknown as Array<{ id: string; sf_user_id: string }>).map((r) => ({
-    id: r.id,
-    sfUserId: r.sf_user_id,
-  }));
+  return (rows as unknown as Array<{ id: string; sf_user_id: string }>).map(
+    (r) => ({
+      id: r.id,
+      sfUserId: r.sf_user_id,
+    }),
+  );
 }
 
 export async function cleanupBackofficeAuditLogsForUser(userId: string) {

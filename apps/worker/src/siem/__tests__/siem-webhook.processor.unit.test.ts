@@ -6,8 +6,8 @@ import type { Job } from "bullmq";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  SiemWebhookProcessor,
   type SiemWebhookJobData,
+  SiemWebhookProcessor,
 } from "../siem-webhook.processor";
 
 vi.mock("axios");
@@ -27,8 +27,8 @@ const mockSiemRepo: ISiemWebhookConfigRepository = {
 };
 
 const mockRlsContext = {
-  runWithTenantContext: vi.fn(
-    (_t: string, _m: string, fn: () => unknown) => fn(),
+  runWithTenantContext: vi.fn((_t: string, _m: string, fn: () => unknown) =>
+    fn(),
   ),
 };
 
@@ -173,7 +173,9 @@ describe("SiemWebhookProcessor", () => {
     });
 
     it("throws when secret decryption fails", async () => {
-      vi.mocked(mockEncryptionService.decrypt).mockReturnValue(null as unknown as string);
+      vi.mocked(mockEncryptionService.decrypt).mockReturnValue(
+        null as unknown as string,
+      );
 
       await expect(processor.process(buildJob())).rejects.toThrow(
         "Failed to decrypt webhook secret",

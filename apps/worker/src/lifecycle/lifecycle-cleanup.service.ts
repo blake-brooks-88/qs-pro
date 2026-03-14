@@ -53,13 +53,16 @@ export class LifecycleCleanupService {
           ),
         );
 
-      this.logger.log(`Found ${expired.length} tenants past 30-day grace period`);
+      this.logger.log(
+        `Found ${expired.length} tenants past 30-day grace period`,
+      );
 
       for (const tenant of expired) {
         try {
           await this.processExpiredTenant(tenant);
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : "Unknown error";
+          const message =
+            error instanceof Error ? error.message : "Unknown error";
           this.logger.error(
             `Failed to hard-delete tenant ${tenant.id} (eid: ${tenant.eid}): ${message}`,
           );
@@ -76,13 +79,17 @@ export class LifecycleCleanupService {
     eid: string;
     deletionMetadata: Record<string, unknown> | null;
   }): Promise<void> {
-    const [sub] = await this.db
-      .select({ stripeCustomerId: orgSubscriptions.stripeCustomerId })
-      .from(orgSubscriptions)
-      .where(eq(orgSubscriptions.tenantId, tenant.id))
-      .limit(1);
-
-    const stripeCustomerId = sub?.stripeCustomerId ?? null;
+    const stripeCustomerId = await this.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`,
+      );
+      const [sub] = await tx
+        .select({ stripeCustomerId: orgSubscriptions.stripeCustomerId })
+        .from(orgSubscriptions)
+        .where(eq(orgSubscriptions.tenantId, tenant.id))
+        .limit(1);
+      return sub?.stripeCustomerId ?? null;
+    });
 
     if (stripeCustomerId && this.stripe) {
       try {
@@ -131,9 +138,7 @@ export class LifecycleCleanupService {
 
     await this.db.delete(tenants).where(eq(tenants.id, tenant.id));
 
-    this.logger.log(
-      `Hard-deleted tenant ${tenant.id} (eid: ${tenant.eid})`,
-    );
+    this.logger.log(`Hard-deleted tenant ${tenant.id} (eid: ${tenant.eid})`);
   }
 
   private async purgeExpiredAuditLogs(): Promise<void> {
@@ -150,15 +155,23 @@ export class LifecycleCleanupService {
 
       for (const tenant of tenantsWithRetention) {
         const retentionDays = tenant.auditRetentionDays!;
-        const deleted = await this.db
-          .delete(auditLogs)
-          .where(
-            and(
-              eq(auditLogs.tenantId, tenant.id),
-              sql`${auditLogs.createdAt} < now() - make_interval(days => ${retentionDays})`,
-            ),
-          )
-          .returning({ id: auditLogs.id });
+        const deleted = await this.db.transaction(async (tx) => {
+          await tx.execute(
+            sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`,
+          );
+          await tx.execute(
+            sql`SELECT set_config('app.audit_retention_purge', 'on', true)`,
+          );
+          return tx
+            .delete(auditLogs)
+            .where(
+              and(
+                eq(auditLogs.tenantId, tenant.id),
+                sql`${auditLogs.createdAt} < now() - make_interval(days => ${retentionDays})`,
+              ),
+            )
+            .returning({ id: auditLogs.id });
+        });
 
         totalPurged += deleted.length;
       }

@@ -1,5 +1,11 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { deletionLedger, eq, orgSubscriptions, tenants } from '@qpp/database';
+import {
+  deletionLedger,
+  eq,
+  orgSubscriptions,
+  sql,
+  tenants,
+} from '@qpp/database';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type Stripe from 'stripe';
 
@@ -41,14 +47,20 @@ export class TenantDeletionService {
       | { stripeSubscriptionId: string | null; stripeCustomerId: string | null }
       | undefined;
     try {
-      const [sub] = await this.db
-        .select({
-          stripeSubscriptionId: orgSubscriptions.stripeSubscriptionId,
-          stripeCustomerId: orgSubscriptions.stripeCustomerId,
-        })
-        .from(orgSubscriptions)
-        .where(eq(orgSubscriptions.tenantId, tenantId))
-        .limit(1);
+      const sub = await this.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`,
+        );
+        const [row] = await tx
+          .select({
+            stripeSubscriptionId: orgSubscriptions.stripeSubscriptionId,
+            stripeCustomerId: orgSubscriptions.stripeCustomerId,
+          })
+          .from(orgSubscriptions)
+          .where(eq(orgSubscriptions.tenantId, tenantId))
+          .limit(1);
+        return row;
+      });
 
       subscription = sub;
 

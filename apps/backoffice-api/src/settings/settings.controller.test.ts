@@ -30,12 +30,7 @@ describe("SettingsController", () => {
     const req = { headers: {}, ip: "127.0.0.1" } as unknown as FastifyRequest;
 
     await expect(
-      controller.changeUserRole(
-        "me",
-        { role: "viewer" },
-        { id: "me" },
-        req,
-      ),
+      controller.changeUserRole("me", { role: "viewer" }, { id: "me" }, req),
     ).rejects.toThrow(BadRequestException);
   });
 
