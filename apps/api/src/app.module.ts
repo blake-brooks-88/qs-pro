@@ -23,6 +23,7 @@ import { SessionThrottlerGuard } from './common/guards/session-throttler.guard';
 import { DevToolsModule } from './dev-tools/dev-tools.module';
 import { FeaturesModule } from './features/features.module';
 import { FoldersModule } from './folders/folders.module';
+import { GdprModule } from './gdpr/gdpr.module';
 import { MceModule } from './mce/mce.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { QueryActivitiesModule } from './query-activities/query-activities.module';
@@ -87,6 +88,7 @@ import { UsageModule } from './usage/usage.module';
     ShellQueryModule,
     BillingModule,
     FeaturesModule,
+    GdprModule,
     FoldersModule,
     SavedQueriesModule,
     QueryActivitiesModule,
