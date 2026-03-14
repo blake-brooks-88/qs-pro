@@ -5,6 +5,7 @@ import type { IUserRepository } from '@qpp/database';
 import type { OrgRole } from '@qpp/shared-types';
 
 import { AuditService } from '../audit/audit.service';
+import { TenantDeletionService } from '../gdpr/tenant-deletion.service';
 
 export interface MemberListItem {
   id: string;
@@ -44,6 +45,7 @@ export class AdminService {
     private readonly userRepo: IUserRepository,
     private readonly rlsContext: RlsContextService,
     private readonly auditService: AuditService,
+    private readonly tenantDeletionService: TenantDeletionService,
   ) {}
 
   async getUserRole(userId: string): Promise<OrgRole> {
@@ -211,5 +213,9 @@ export class AdminService {
       ipAddress,
       userAgent,
     });
+  }
+
+  async softDeleteTenant(tenantId: string, actorId: string): Promise<void> {
+    await this.tenantDeletionService.softDeleteTenant(tenantId, actorId);
   }
 }

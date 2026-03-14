@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -92,6 +93,15 @@ export class AdminController {
     });
 
     return { ok: true };
+  }
+
+  @Delete('tenant')
+  @UseGuards(RolesGuard)
+  @RequireRole('owner')
+  @Audited('tenant.soft_deleted')
+  async softDeleteTenant(@CurrentUser() user: UserSession) {
+    await this.adminService.softDeleteTenant(user.tenantId, user.userId);
+    return { ok: true, gracePeriodDays: 30 };
   }
 
   @Get('me/role')
