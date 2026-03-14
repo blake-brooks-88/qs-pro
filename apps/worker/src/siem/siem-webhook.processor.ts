@@ -2,7 +2,11 @@ import { createHmac } from "node:crypto";
 
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Logger } from "@nestjs/common";
-import { EncryptionService, RlsContextService } from "@qpp/backend-shared";
+import {
+  assertPublicHostname,
+  EncryptionService,
+  RlsContextService,
+} from "@qpp/backend-shared";
 import type { ISiemWebhookConfigRepository } from "@qpp/database";
 import axios from "axios";
 import type { Job } from "bullmq";
@@ -60,6 +64,8 @@ export class SiemWebhookProcessor extends WorkerHost {
       );
       throw new Error("Failed to decrypt webhook secret");
     }
+
+    await assertPublicHostname(webhookUrl);
 
     const body = JSON.stringify(payload);
     const timestamp = Math.floor(Date.now() / 1000);

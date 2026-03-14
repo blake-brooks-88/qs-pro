@@ -29,7 +29,9 @@ export class RolesGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const sessionUser = request.user as { userId?: string } | undefined;
+    const sessionUser = request.user as
+      | { userId?: string; tenantId?: string }
+      | undefined;
 
     if (!sessionUser?.userId) {
       throw new ForbiddenException('Insufficient permissions');
@@ -38,6 +40,10 @@ export class RolesGuard implements CanActivate {
     const user = await this.userRepo.findById(sessionUser.userId);
 
     if (!user) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
+    if (user.tenantId !== sessionUser.tenantId) {
       throw new ForbiddenException('Insufficient permissions');
     }
 

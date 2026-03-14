@@ -154,7 +154,7 @@ export class LifecycleCleanupService {
       let totalPurged = 0;
 
       for (const tenant of tenantsWithRetention) {
-        const retentionDays = tenant.auditRetentionDays!;
+        const retentionDays = tenant.auditRetentionDays ?? 90;
         const deleted = await this.db.transaction(async (tx) => {
           await tx.execute(
             sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`,

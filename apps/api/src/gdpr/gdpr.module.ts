@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule, EncryptionModule } from '@qpp/backend-shared';
-import { DrizzleUserRepository } from '@qpp/database';
+import type { PostgresJsDatabase } from '@qpp/database';
+import {
+  DrizzleCredentialsRepository,
+  DrizzleUserRepository,
+} from '@qpp/database';
 
 import { RolesGuard } from '../admin/roles.guard';
 import { StripeProvider } from '../billing/stripe.provider';
@@ -27,6 +31,12 @@ import { UserDeletionService } from './user-deletion.service';
     {
       provide: 'USER_REPOSITORY',
       useFactory: (db: unknown) => new DrizzleUserRepository(db as never),
+      inject: ['DATABASE'],
+    },
+    {
+      provide: 'CREDENTIALS_REPOSITORY',
+      useFactory: (db: PostgresJsDatabase) =>
+        new DrizzleCredentialsRepository(db),
       inject: ['DATABASE'],
     },
   ],

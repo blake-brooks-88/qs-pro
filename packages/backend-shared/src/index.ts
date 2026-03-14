@@ -17,6 +17,11 @@ export {
   type ValidationViolation,
   ValidationViolations,
 } from "./common/errors";
+export {
+  assertPublicHostname,
+  isPrivateHostname,
+  validateWebhookUrl,
+} from "./common/ssrf-guard";
 export * from "./database/database.module";
 export * from "./database/db-context";
 export * from "./database/db-url.guard";

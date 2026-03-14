@@ -134,6 +134,20 @@ export class DrizzleUserRepository implements IUserRepository {
     await this.db.update(users).set({ role }).where(eq(users.id, id));
   }
 
+  async assignOwnerIfNone(userId: string, tenantId: string): Promise<boolean> {
+    const result = await this.db.execute(
+      sql`UPDATE users SET role = 'owner'
+          WHERE id = ${userId}::uuid
+            AND tenant_id = ${tenantId}::uuid
+            AND NOT EXISTS (
+              SELECT 1 FROM users
+              WHERE tenant_id = ${tenantId}::uuid AND role = 'owner'
+            )
+          RETURNING id`,
+    );
+    return result.length > 0;
+  }
+
   async findByTenantId(tenantId: string): Promise<User[]> {
     return this.db
       .select()
@@ -182,10 +196,15 @@ export class DrizzleCredentialsRepository implements ICredentialsRepository {
     return result;
   }
 
+  async findDistinctMidsByTenantId(tenantId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ mid: credentials.mid })
+      .from(credentials)
+      .where(eq(credentials.tenantId, tenantId));
+    return rows.map((r) => r.mid);
+  }
+
   async upsert(credential: NewCredential): Promise<Credential> {
-    // Check if it already exists to determine if we should update or insert
-    // Drizzle onConflict for multiple columns can be tricky depending on constraints
-    // For now, we'll use a simple approach or assuming a unique constraint exists on (user_id, tenant_id)
     const [result] = await this.db
       .insert(credentials)
       .values(credential)

@@ -184,9 +184,11 @@ export class AuthService {
     });
 
     if (!existingUser) {
-      const userCount = await this.tenantRepo.countUsersByTenantId(tenant.id);
-      if (userCount === 1) {
-        await this.userRepo.updateRole(user.id, "owner");
+      const promoted = await this.userRepo.assignOwnerIfNone(
+        user.id,
+        tenant.id,
+      );
+      if (promoted) {
         user = { ...user, role: "owner" as const };
         this.logger.log(
           `First user for tenant=${tenant.id} assigned owner role userId=${user.id}`,
@@ -616,9 +618,11 @@ export class AuthService {
     );
 
     if (!existingUser) {
-      const userCount = await this.tenantRepo.countUsersByTenantId(tenant.id);
-      if (userCount === 1) {
-        await this.userRepo.updateRole(user.id, "owner");
+      const promoted = await this.userRepo.assignOwnerIfNone(
+        user.id,
+        tenant.id,
+      );
+      if (promoted) {
         user = { ...user, role: "owner" as const };
         this.logger.log(
           `First user for tenant=${tenant.id} assigned owner role userId=${user.id}`,

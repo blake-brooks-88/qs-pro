@@ -9,7 +9,12 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
+import {
+  AppError,
+  ErrorCode,
+  isPrivateHostname,
+  SessionGuard,
+} from '@qpp/backend-shared';
 import { z } from 'zod';
 
 import { RequireRole } from '../admin/require-role.decorator';
@@ -24,7 +29,21 @@ import { FeaturesService } from '../features/features.service';
 import { SiemService } from './siem.service';
 
 const UpsertSiemConfigSchema = z.object({
-  webhookUrl: z.string().url().startsWith('https://'),
+  webhookUrl: z
+    .string()
+    .url()
+    .startsWith('https://')
+    .refine(
+      (url) => {
+        try {
+          const { hostname } = new URL(url);
+          return !isPrivateHostname(hostname);
+        } catch {
+          return false;
+        }
+      },
+      { message: 'Webhook URL must not target private or internal networks' },
+    ),
   secret: z.string().min(16).max(512),
 });
 

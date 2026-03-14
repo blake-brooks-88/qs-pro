@@ -51,6 +51,7 @@ export interface IUserRepository {
   findBySfUserId(sfUserId: string): Promise<User | undefined>;
   upsert(user: NewUser): Promise<User>;
   updateRole(id: string, role: "owner" | "admin" | "member"): Promise<void>;
+  assignOwnerIfNone(userId: string, tenantId: string): Promise<boolean>;
   findByTenantId(tenantId: string): Promise<User[]>;
   updateLastActiveAt(id: string): Promise<void>;
   countByTenantIdAndRole(
@@ -65,6 +66,7 @@ export interface ICredentialsRepository {
     tenantId: string,
     mid: string,
   ): Promise<Credential | undefined>;
+  findDistinctMidsByTenantId(tenantId: string): Promise<string[]>;
   upsert(credential: NewCredential): Promise<Credential>;
 }
 

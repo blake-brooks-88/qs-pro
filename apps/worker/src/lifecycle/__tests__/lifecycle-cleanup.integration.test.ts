@@ -44,7 +44,7 @@ const stripeMock = {
 describe("LifecycleCleanupService (integration)", () => {
   let module: TestingModule;
   let service: LifecycleCleanupService;
-  let sqlClient: Sql;
+  let _sqlClient: Sql;
   let privSql: Sql;
 
   const trackedTenantIds: string[] = [];
@@ -79,13 +79,14 @@ describe("LifecycleCleanupService (integration)", () => {
     trackedTenantIds.push(tenantId);
 
     if (opts?.stripeCustomerId) {
+      const stripeId = opts.stripeCustomerId;
       await privSql.begin(async (tx) => {
         await tx`ALTER TABLE org_subscriptions NO FORCE ROW LEVEL SECURITY`;
         await tx`
           INSERT INTO org_subscriptions (tenant_id, tier, stripe_customer_id)
-          VALUES (${tenantId}::uuid, 'free', ${opts.stripeCustomerId!})
+          VALUES (${tenantId}::uuid, 'free', ${stripeId})
           ON CONFLICT (tenant_id) DO UPDATE
-            SET stripe_customer_id = ${opts.stripeCustomerId!}
+            SET stripe_customer_id = ${stripeId}
         `;
         await tx`ALTER TABLE org_subscriptions FORCE ROW LEVEL SECURITY`;
       });
@@ -131,7 +132,7 @@ describe("LifecycleCleanupService (integration)", () => {
     }).compile();
 
     service = module.get(LifecycleCleanupService);
-    sqlClient = module.get<Sql>("SQL_CLIENT");
+    _sqlClient = module.get<Sql>("SQL_CLIENT");
   }, 60_000);
 
   afterAll(async () => {
@@ -262,8 +263,8 @@ describe("LifecycleCleanupService (integration)", () => {
       RETURNING id
     `;
 
-    let oldLogId: string;
-    let recentLogId: string;
+    let oldLogId = "";
+    let recentLogId = "";
 
     await privSql.begin(async (tx) => {
       await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
@@ -285,17 +286,17 @@ describe("LifecycleCleanupService (integration)", () => {
     });
 
     await privSql`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_update`;
-    await privSql`UPDATE audit_logs SET created_at = now() - interval '100 days' WHERE id = ${oldLogId!}::uuid`;
+    await privSql`UPDATE audit_logs SET created_at = now() - interval '100 days' WHERE id = ${oldLogId}::uuid`;
     await privSql`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_update`;
 
     await service.handleDailyCleanup();
 
     const oldRows =
-      await privSql`SELECT id FROM audit_logs WHERE id = ${oldLogId!}::uuid`;
+      await privSql`SELECT id FROM audit_logs WHERE id = ${oldLogId}::uuid`;
     expect(oldRows).toHaveLength(0);
 
     const recentRows =
-      await privSql`SELECT id FROM audit_logs WHERE id = ${recentLogId!}::uuid`;
+      await privSql`SELECT id FROM audit_logs WHERE id = ${recentLogId}::uuid`;
     expect(recentRows).toHaveLength(1);
   });
 
