@@ -101,7 +101,10 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
       .query({ tssd: TEST_TSSD })
       .expect(302);
 
-    const redirectUrl = loginResp.headers.location;
+    const redirectUrl = loginResp.headers.location as string | undefined;
+    if (!redirectUrl) {
+      throw new Error('Missing location header in OAuth redirect');
+    }
     const state = new URL(redirectUrl).searchParams.get('state');
     if (!state) {
       throw new Error('Missing state in OAuth redirect');
@@ -309,7 +312,10 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
         .query({ tssd: TEST_TSSD })
         .expect(302);
 
-      const redirectUrl = loginResp.headers.location;
+      const redirectUrl = loginResp.headers.location as string | undefined;
+      if (!redirectUrl) {
+        throw new Error('Missing location header in OAuth redirect');
+      }
       const state = new URL(redirectUrl).searchParams.get('state');
       if (!state) {
         throw new Error('Missing state');

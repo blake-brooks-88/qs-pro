@@ -13,6 +13,7 @@ function createMockUserRepo(): {
     findBySfUserId: vi.fn(),
     upsert: vi.fn(),
     updateRole: vi.fn(),
+    assignOwnerIfNone: vi.fn(),
     findByTenantId: vi.fn(),
     updateLastActiveAt: vi.fn(),
     countByTenantIdAndRole: vi.fn(),

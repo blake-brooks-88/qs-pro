@@ -34,7 +34,7 @@ import {
   vi,
 } from "vitest";
 
-import { getPrivilegedUrl } from "../../../../api/test/helpers/privileged-db-url";
+import { getPrivilegedUrl } from "../../test-helpers/privileged-db-url";
 import { LifecycleCleanupService } from "../lifecycle-cleanup.service";
 
 const stripeMock = {
@@ -44,7 +44,6 @@ const stripeMock = {
 describe("LifecycleCleanupService (integration)", () => {
   let module: TestingModule;
   let service: LifecycleCleanupService;
-  let _sqlClient: Sql;
   let privSql: Sql;
 
   const trackedTenantIds: string[] = [];
@@ -103,7 +102,7 @@ describe("LifecycleCleanupService (integration)", () => {
     if (opts?.deletionMetadata) {
       await privSql`
         UPDATE tenants
-        SET deletion_metadata = ${privSql.json(opts.deletionMetadata)}
+        SET deletion_metadata = ${JSON.stringify(opts.deletionMetadata)}::jsonb
         WHERE id = ${tenantId}::uuid
       `;
     }
@@ -132,7 +131,6 @@ describe("LifecycleCleanupService (integration)", () => {
     }).compile();
 
     service = module.get(LifecycleCleanupService);
-    _sqlClient = module.get<Sql>("SQL_CLIENT");
   }, 60_000);
 
   afterAll(async () => {
@@ -232,8 +230,8 @@ describe("LifecycleCleanupService (integration)", () => {
       WHERE entity_id = ${tenantId}::uuid
     `;
     expect(rows).toHaveLength(1);
-    expect(rows[0].deleted_by).toBe("system:hard-delete-job");
-    expect(rows[0].entity_type).toBe("tenant");
+    expect(rows[0]?.deleted_by).toBe("system:hard-delete-job");
+    expect(rows[0]?.entity_type).toBe("tenant");
   });
 
   it("should increment stripeAttempts on Stripe failure and skip deletion", async () => {
@@ -249,7 +247,11 @@ describe("LifecycleCleanupService (integration)", () => {
     const rows =
       await privSql`SELECT id, deletion_metadata FROM tenants WHERE id = ${tenantId}::uuid`;
     expect(rows).toHaveLength(1);
-    expect(Number(rows[0].deletion_metadata.stripeAttempts)).toBe(3);
+    expect(
+      Number(
+        (rows[0]?.deletion_metadata as Record<string, unknown>)?.stripeAttempts,
+      ),
+    ).toBe(3);
   });
 
   it("should purge audit logs past tenant retention period", async () => {
@@ -262,6 +264,9 @@ describe("LifecycleCleanupService (integration)", () => {
       VALUES (${"sf-lifecycle-audit"}, ${tenantId}::uuid, 'audit@test.lifecycle', 'Audit Test User')
       RETURNING id
     `;
+    if (!user) {
+      throw new Error("Failed to insert test user");
+    }
 
     let oldLogId = "";
     let recentLogId = "";
@@ -275,6 +280,9 @@ describe("LifecycleCleanupService (integration)", () => {
         VALUES (${tenantId}::uuid, 'mid-lifecycle', 'lifecycle.test_old', 'user', ${user.id}::uuid, '127.0.0.1', 'test-agent')
         RETURNING id
       `;
+      if (!oldRow) {
+        throw new Error("Failed to insert old audit log");
+      }
       oldLogId = oldRow.id;
 
       const [recentRow] = await tx`
@@ -282,6 +290,9 @@ describe("LifecycleCleanupService (integration)", () => {
         VALUES (${tenantId}::uuid, 'mid-lifecycle', 'lifecycle.test_recent', 'user', ${user.id}::uuid, '127.0.0.1', 'test-agent')
         RETURNING id
       `;
+      if (!recentRow) {
+        throw new Error("Failed to insert recent audit log");
+      }
       recentLogId = recentRow.id;
     });
 
@@ -306,6 +317,9 @@ describe("LifecycleCleanupService (integration)", () => {
       VALUES ('lifecycle.test_old', '{}'::jsonb, '127.0.0.1')
       RETURNING id
     `;
+    if (!oldRow) {
+      throw new Error("Failed to insert old backoffice audit log");
+    }
     const oldId = oldRow.id as string;
     trackedBackofficeAuditLogIds.push(oldId);
 
@@ -314,6 +328,9 @@ describe("LifecycleCleanupService (integration)", () => {
       VALUES ('lifecycle.test_recent', '{}'::jsonb, '127.0.0.1')
       RETURNING id
     `;
+    if (!recentRow) {
+      throw new Error("Failed to insert recent backoffice audit log");
+    }
     const recentId = recentRow.id as string;
     trackedBackofficeAuditLogIds.push(recentId);
 

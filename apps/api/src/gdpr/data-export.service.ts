@@ -75,7 +75,7 @@ export class DataExportService {
 
   async exportUserData(
     tenantId: string,
-    _mid: string,
+    callerMid: string,
     userId: string,
   ): Promise<GdprDataExport> {
     // Fetch user outside RLS context (users table has no RLS)
@@ -96,9 +96,9 @@ export class DataExportService {
     // credentials rows (e.g. data seeded without a login credential).
     const discoveredMids =
       await this.credRepo.findDistinctMidsByTenantId(tenantId);
-    const mids = discoveredMids.includes(_mid)
+    const mids = discoveredMids.includes(callerMid)
       ? discoveredMids
-      : [_mid, ...discoveredMids];
+      : [callerMid, ...discoveredMids];
 
     const allQueries: GdprDataExport['savedQueries'] = [];
     const allFolders: GdprDataExport['folders'] = [];
@@ -204,7 +204,7 @@ export class DataExportService {
     // Snippets are tenant-scoped (no mid column), query without MID RLS
     const userSnippets = await this.rlsContext.runWithIsolatedTenantContext(
       tenantId,
-      mids[0] ?? _mid,
+      mids[0] ?? callerMid,
       async () => {
         return this.db
           .select({
