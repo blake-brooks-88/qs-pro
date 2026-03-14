@@ -11,6 +11,13 @@ import {
 } from "../siem-webhook.processor";
 
 vi.mock("axios");
+vi.mock("@qpp/backend-shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@qpp/backend-shared")>();
+  return {
+    ...actual,
+    assertPublicHostname: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 const mockEncryptionService = {
   encrypt: vi.fn((v: string) => `enc:${v}`),

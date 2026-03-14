@@ -91,8 +91,14 @@ export class DataExportService {
       });
     }
 
-    // Collect data across all MIDs for complete GDPR export
-    const mids = await this.credRepo.findDistinctMidsByTenantId(tenantId);
+    // Collect data across all MIDs for complete GDPR export.
+    // Always include the caller's MID as fallback in case there are no
+    // credentials rows (e.g. data seeded without a login credential).
+    const discoveredMids =
+      await this.credRepo.findDistinctMidsByTenantId(tenantId);
+    const mids = discoveredMids.includes(_mid)
+      ? discoveredMids
+      : [_mid, ...discoveredMids];
 
     const allQueries: GdprDataExport['savedQueries'] = [];
     const allFolders: GdprDataExport['folders'] = [];
