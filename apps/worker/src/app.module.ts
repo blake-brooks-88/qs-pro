@@ -15,6 +15,7 @@ import { BullMQOtel } from "bullmq-otel";
 
 import { AdminAuthMiddleware } from "./common/middleware/admin-auth.middleware";
 import { HealthModule } from "./health/health.module";
+import { LifecycleModule } from "./lifecycle/lifecycle.module";
 import { MetricsModule } from "./metrics/metrics.module";
 import { RedisModule } from "./redis/redis.module";
 import { ShellQueryModule } from "./shell-query/shell-query.module";
@@ -51,6 +52,7 @@ import { SiemModule } from "./siem/siem.module";
     SiemModule,
     RedisModule,
     MetricsModule,
+    LifecycleModule,
   ],
   providers: [AdminAuthMiddleware],
 })
