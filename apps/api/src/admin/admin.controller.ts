@@ -10,7 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { SessionGuard } from '@qpp/backend-shared';
+import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -92,6 +92,28 @@ export class AdminController {
       userAgent: req.headers['user-agent'],
     });
 
+    return { ok: true };
+  }
+
+  @Delete('members/:id')
+  @UseGuards(RolesGuard)
+  @RequireRole('owner', 'admin')
+  @Audited('user.deleted', { targetIdParam: 'id' })
+  async deleteUser(
+    @CurrentUser() user: UserSession,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) targetUserId: string,
+  ) {
+    if (user.userId === targetUserId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+        reason: 'Cannot delete yourself.',
+      });
+    }
+    await this.adminService.deleteUser({
+      actorId: user.userId,
+      targetUserId,
+      tenantId: user.tenantId,
+      mid: user.mid,
+    });
     return { ok: true };
   }
 
