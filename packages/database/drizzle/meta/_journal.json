@@ -302,6 +302,27 @@
       "when": 1773715200000,
       "tag": "0042_rls_siem_webhook_configs",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1773801600000,
+      "tag": "0043_add_tenant_soft_delete_and_deletion_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1773801700000,
+      "tag": "0044_add_cascade_to_tenant_fks",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1773801800000,
+      "tag": "0045_add_set_null_to_user_fks",
+      "breakpoints": true
     }
   ]
 }
