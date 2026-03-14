@@ -1,4 +1,4 @@
-import { UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionGuard } from "./session.guard";
@@ -31,20 +31,28 @@ function createContext(request: {
   } as never;
 }
 
+function createMockDb(deletedAt: Date | null = null) {
+  const limitFn = vi.fn().mockResolvedValue([{ deletedAt }]);
+  const whereFn = vi.fn().mockReturnValue({ limit: limitFn });
+  const fromFn = vi.fn().mockReturnValue({ where: whereFn });
+  const selectFn = vi.fn().mockReturnValue({ from: fromFn });
+  return { select: selectFn } as never;
+}
+
 describe("SessionGuard", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("throws 401 when no session exists on request", () => {
+  it("throws 401 when no session exists on request", async () => {
     const guard = new SessionGuard();
 
-    expect(() => guard.canActivate(createContext({}))).toThrow(
+    await expect(guard.canActivate(createContext({}))).rejects.toThrow(
       UnauthorizedException,
     );
   });
 
-  it("rejects non-string session values", () => {
+  it("rejects non-string session values", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: 123,
@@ -52,12 +60,12 @@ describe("SessionGuard", () => {
       mid: "mid-1",
     });
 
-    expect(() => guard.canActivate(createContext({ session }))).toThrow(
+    await expect(guard.canActivate(createContext({ session }))).rejects.toThrow(
       UnauthorizedException,
     );
   });
 
-  it("rejects empty session values", () => {
+  it("rejects empty session values", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "",
@@ -65,12 +73,12 @@ describe("SessionGuard", () => {
       mid: "mid-1",
     });
 
-    expect(() => guard.canActivate(createContext({ session }))).toThrow(
+    await expect(guard.canActivate(createContext({ session }))).rejects.toThrow(
       UnauthorizedException,
     );
   });
 
-  it("decorates request.user with { userId, tenantId, mid } and resets idle timer", () => {
+  it("decorates request.user with { userId, tenantId, mid } and resets idle timer", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -80,7 +88,7 @@ describe("SessionGuard", () => {
     });
     const request: { session: TestSession; user?: unknown } = { session };
 
-    const allowed = guard.canActivate(createContext(request));
+    const allowed = await guard.canActivate(createContext(request));
 
     expect(allowed).toBe(true);
     expect(request.user).toEqual({
@@ -91,7 +99,7 @@ describe("SessionGuard", () => {
     expect(session.touch).toHaveBeenCalledOnce();
   });
 
-  it("calls session.touch() on successful authentication", () => {
+  it("calls session.touch() on successful authentication", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -100,12 +108,12 @@ describe("SessionGuard", () => {
       createdAt: Date.now(),
     });
 
-    guard.canActivate(createContext({ session }));
+    await guard.canActivate(createContext({ session }));
 
     expect(session.touch).toHaveBeenCalledOnce();
   });
 
-  it("rejects session exceeding absolute timeout", () => {
+  it("rejects session exceeding absolute timeout", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -117,7 +125,7 @@ describe("SessionGuard", () => {
       session,
     };
 
-    expect(() => guard.canActivate(createContext(request))).toThrow(
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
       new UnauthorizedException("Session expired"),
     );
     expect(session.delete).toHaveBeenCalledOnce();
@@ -129,7 +137,7 @@ describe("SessionGuard", () => {
     });
   });
 
-  it("accepts session within absolute timeout", () => {
+  it("accepts session within absolute timeout", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -138,13 +146,13 @@ describe("SessionGuard", () => {
       createdAt: Date.now() - ABSOLUTE_TIMEOUT_MS + 60_000,
     });
 
-    const allowed = guard.canActivate(createContext({ session }));
+    const allowed = await guard.canActivate(createContext({ session }));
 
     expect(allowed).toBe(true);
     expect(session.delete).not.toHaveBeenCalled();
   });
 
-  it("backfills createdAt on legacy sessions missing it", () => {
+  it("backfills createdAt on legacy sessions missing it", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -153,7 +161,7 @@ describe("SessionGuard", () => {
     });
 
     const before = Date.now();
-    const allowed = guard.canActivate(createContext({ session }));
+    const allowed = await guard.canActivate(createContext({ session }));
     const after = Date.now();
 
     expect(allowed).toBe(true);
@@ -165,7 +173,7 @@ describe("SessionGuard", () => {
     expect(session.touch).toHaveBeenCalledOnce();
   });
 
-  it("does not call touch() when session is expired", () => {
+  it("does not call touch() when session is expired", async () => {
     const guard = new SessionGuard();
     const session = createSession({
       userId: "user-1",
@@ -174,7 +182,59 @@ describe("SessionGuard", () => {
       createdAt: Date.now() - ABSOLUTE_TIMEOUT_MS - 1,
     });
 
-    expect(() => guard.canActivate(createContext({ session }))).toThrow();
+    await expect(
+      guard.canActivate(createContext({ session })),
+    ).rejects.toThrow();
     expect(session.touch).not.toHaveBeenCalled();
+  });
+
+  describe("soft-deleted tenant blocking", () => {
+    it("allows active tenant when db is injected", async () => {
+      const db = createMockDb(null);
+      const guard = new SessionGuard(db);
+      const session = createSession({
+        userId: "user-1",
+        tenantId: "tenant-1",
+        mid: "mid-1",
+        createdAt: Date.now(),
+      });
+
+      const allowed = await guard.canActivate(createContext({ session }));
+
+      expect(allowed).toBe(true);
+      expect(session.touch).toHaveBeenCalledOnce();
+      expect(session.delete).not.toHaveBeenCalled();
+    });
+
+    it("blocks soft-deleted tenant with 403 and destroys session", async () => {
+      const db = createMockDb(new Date("2025-01-01"));
+      const guard = new SessionGuard(db);
+      const session = createSession({
+        userId: "user-1",
+        tenantId: "tenant-1",
+        mid: "mid-1",
+        createdAt: Date.now(),
+      });
+
+      await expect(
+        guard.canActivate(createContext({ session })),
+      ).rejects.toThrow(ForbiddenException);
+      expect(session.delete).toHaveBeenCalledOnce();
+      expect(session.touch).not.toHaveBeenCalled();
+    });
+
+    it("skips soft-delete check when db is not injected", async () => {
+      const guard = new SessionGuard();
+      const session = createSession({
+        userId: "user-1",
+        tenantId: "tenant-1",
+        mid: "mid-1",
+        createdAt: Date.now(),
+      });
+
+      const allowed = await guard.canActivate(createContext({ session }));
+
+      expect(allowed).toBe(true);
+    });
   });
 });
