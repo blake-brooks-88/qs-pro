@@ -107,6 +107,25 @@ describe('DataExportService (integration)', () => {
       code: 'SELECT 1 FROM _Job',
     });
 
+    // Ensure credential exists for primary MID so discoveredMids includes it
+    await sqlClient`
+      INSERT INTO credentials (tenant_id, user_id, mid, access_token, refresh_token, expires_at)
+      VALUES (${tenantId}::uuid, ${userId}::uuid, ${TEST_MID}, 'tok', 'ref', NOW() + INTERVAL '1 hour')
+      ON CONFLICT DO NOTHING
+    `;
+
+    // Create a second MID with its own snippet for cross-MID export test
+    await sqlClient`
+      INSERT INTO credentials (tenant_id, user_id, mid, access_token, refresh_token, expires_at)
+      VALUES (${tenantId}::uuid, ${userId}::uuid, 'mid-gdpr-export-2', 'tok', 'ref', NOW() + INTERVAL '1 hour')
+      ON CONFLICT DO NOTHING
+    `;
+
+    await createTestSnippet(sqlClient, tenantId, 'mid-gdpr-export-2', userId, {
+      title: 'Second MID Snippet',
+      code: 'SELECT 2 FROM _Bounce',
+    });
+
     await createTestShellQueryRun(
       sqlClient,
       tenantId,
@@ -173,6 +192,19 @@ describe('DataExportService (integration)', () => {
     const snippet = result.snippets.find((s) => s.title === 'Export Snippet');
     expect(snippet).toBeDefined();
     expect(snippet?.code).toBe('SELECT 1 FROM _Job');
+  });
+
+  it('should include snippets from multiple MIDs', async () => {
+    const result = await dataExportService.exportUserData(
+      tenantId,
+      TEST_MID,
+      userId,
+    );
+
+    const titles = result.snippets.map((s) => s.title);
+    expect(titles).toContain('Export Snippet');
+    expect(titles).toContain('Second MID Snippet');
+    expect(result.snippets.length).toBeGreaterThanOrEqual(2);
   });
 
   it('should include execution history with decrypted SQL', async () => {
