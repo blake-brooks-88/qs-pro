@@ -72,6 +72,7 @@ describe("getPrivilegedUrl", () => {
     mockReadFileSync.mockImplementationOnce(() => {
       throw new Error("missing");
     });
+    delete process.env.DATABASE_URL_MIGRATIONS;
     process.env.DATABASE_URL = "postgres://runtime:runtimepass@db/runtime";
     process.env.QS_DB_MIGRATE_PASSWORD = "secret";
 
