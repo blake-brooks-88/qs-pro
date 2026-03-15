@@ -47,36 +47,38 @@ export class UserDeletionService {
   ) {}
 
   async deleteUser(params: DeleteUserParams): Promise<void> {
-    const { tenantId, mid, targetUserId, actorId } = params;
+    const { tenantId, mid: callerMid, targetUserId, actorId } = params;
+
+    const targetUser = await this.userRepo.findById(targetUserId);
+    if (!targetUser) {
+      throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
+        reason: `User not found: ${targetUserId}`,
+      });
+    }
+
+    if (targetUser.tenantId !== tenantId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+        reason: 'Target user does not belong to your organization.',
+      });
+    }
+
+    if (targetUser.role === 'owner') {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+        reason: 'Cannot delete the tenant owner. Transfer ownership first.',
+      });
+    }
+
+    if (targetUserId === actorId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+        reason: 'Cannot delete yourself.',
+      });
+    }
 
     await this.rlsContext.runWithIsolatedTenantContext(
       tenantId,
-      mid,
+      callerMid,
       async () => {
-        const targetUser = await this.userRepo.findById(targetUserId);
-        if (!targetUser) {
-          throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, undefined, {
-            reason: `User not found: ${targetUserId}`,
-          });
-        }
-
-        if (targetUser.tenantId !== tenantId) {
-          throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
-            reason: 'Target user does not belong to your organization.',
-          });
-        }
-
-        if (targetUser.role === 'owner') {
-          throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
-            reason: 'Cannot delete the tenant owner. Transfer ownership first.',
-          });
-        }
-
-        if (targetUserId === actorId) {
-          throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
-            reason: 'Cannot delete yourself.',
-          });
-        }
+        const reservedSql = getReservedSqlFromContext();
 
         const [owner] = await this.db
           .select()
@@ -91,41 +93,62 @@ export class UserDeletionService {
 
         const ownerId = owner.id;
 
-        const reservedSql = getReservedSqlFromContext();
-
-        // Set app.user_id to the owner so folder RLS WITH CHECK passes
-        // for personal "Archived Users" folders created on the owner's behalf.
-        if (reservedSql) {
-          await reservedSql`SELECT set_config('app.user_id', ${ownerId}, false)`;
-        }
-
-        const archiveRootFolderId = await this.findOrCreateArchiveRoot(
-          tenantId,
-          mid,
-          ownerId,
-        );
-
-        const archiveSubfolderId = await this.createUserArchiveSubfolder(
-          tenantId,
-          mid,
-          ownerId,
-          archiveRootFolderId,
-          targetUser.name ?? targetUser.sfUserId,
-        );
-
-        // Enable admin bypass so migrateContent can see AND update the
-        // target user's personal folders across user boundaries.
         if (reservedSql) {
           await reservedSql`SELECT set_config('app.admin_action', 'true', true)`;
+          await reservedSql`SELECT set_config('app.user_id', ${ownerId}, true)`;
         }
 
-        await this.migrateContent(
-          tenantId,
-          mid,
-          targetUserId,
-          ownerId,
-          archiveSubfolderId,
-        );
+        const midRows = await this.db
+          .selectDistinct({ mid: credentials.mid })
+          .from(credentials)
+          .where(
+            and(
+              eq(credentials.tenantId, tenantId),
+              eq(credentials.userId, targetUserId),
+            ),
+          );
+        const discoveredMids = midRows.map((r) => r.mid);
+        const mids = discoveredMids.includes(callerMid)
+          ? discoveredMids
+          : [callerMid, ...discoveredMids];
+
+        const archivedFolderIds: Record<string, string> = {};
+
+        for (const mid of mids) {
+          if (reservedSql) {
+            await reservedSql`SELECT set_config('app.mid', ${mid}, true)`;
+            await reservedSql`SELECT set_config('app.user_id', ${ownerId}, true)`;
+          }
+
+          const archiveRootFolderId = await this.findOrCreateArchiveRoot(
+            tenantId,
+            mid,
+            ownerId,
+          );
+
+          const archiveSubfolderId = await this.createUserArchiveSubfolder(
+            tenantId,
+            mid,
+            ownerId,
+            archiveRootFolderId,
+            targetUser.name ?? targetUser.sfUserId,
+          );
+          archivedFolderIds[mid] = archiveSubfolderId;
+
+          await this.migrateContent(
+            tenantId,
+            mid,
+            targetUserId,
+            ownerId,
+            archiveSubfolderId,
+          );
+
+          await this.auditAnonymizationService.anonymizeForUser(
+            targetUserId,
+            tenantId,
+            mid,
+          );
+        }
 
         await this.handleSnippets(targetUserId, ownerId);
 
@@ -135,12 +158,6 @@ export class UserDeletionService {
           .delete(credentials)
           .where(eq(credentials.userId, targetUserId));
 
-        const anonymizedCount =
-          await this.auditAnonymizationService.anonymizeForUser(
-            targetUserId,
-            tenantId,
-          );
-
         await this.db.delete(users).where(eq(users.id, targetUserId));
 
         await this.db.insert(deletionLedger).values({
@@ -148,11 +165,11 @@ export class UserDeletionService {
           entityId: targetUserId,
           entityIdentifier: null,
           deletedBy: `admin:${actorId}`,
-          metadata: { tenantId, archivedFolderId: archiveSubfolderId },
+          metadata: { tenantId, archivedFolderIds },
         });
 
         this.logger.log(
-          `User deleted: userId=${targetUserId} tenant=${tenantId} archivedTo=${archiveSubfolderId} auditAnonymized=${anonymizedCount}`,
+          `User deleted: userId=${targetUserId} tenant=${tenantId} mids=${mids.join(',')} archivedFolderIds=${JSON.stringify(archivedFolderIds)}`,
         );
       },
     );
