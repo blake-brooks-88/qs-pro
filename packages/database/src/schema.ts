@@ -208,6 +208,14 @@ export const snippets = pgTable("snippets", {
   code: text("code").notNull(),
   isShared: boolean("is_shared").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  triggerPrefix: varchar("trigger_prefix").notNull().default(""),
+  description: text("description"),
+  mid: varchar("mid").notNull().default("0"),
+  scope: varchar("scope").notNull().default("bu"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
 });
 
 // 6. Shell Query Runs
