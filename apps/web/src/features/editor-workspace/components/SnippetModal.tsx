@@ -1,5 +1,9 @@
 import Editor from "@monaco-editor/react";
-import type { CreateSnippetDto, SnippetScope, UpdateSnippetDto } from "@qpp/shared-types";
+import type {
+  CreateSnippetDto,
+  SnippetScope,
+  UpdateSnippetDto,
+} from "@qpp/shared-types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,7 +20,11 @@ import {
   useCreateSnippet,
   useUpdateSnippet,
 } from "@/features/editor-workspace/hooks/use-snippets";
-import { MONACO_THEME_NAME, applyMonacoTheme, getEditorOptions } from "@/features/editor-workspace/utils/monaco-options";
+import {
+  applyMonacoTheme,
+  getEditorOptions,
+  MONACO_THEME_NAME,
+} from "@/features/editor-workspace/utils/monaco-options";
 
 export interface SnippetModalProps {
   open: boolean;
@@ -44,12 +52,16 @@ function detectBracketedNames(code: string): DetectedPlaceholder[] {
   // Match [SomeName] patterns that appear after FROM, JOIN keywords (or anywhere in SQL)
   const bracketPattern = /\[([A-Za-z_][A-Za-z0-9_ ]*)\]/g;
   let match: RegExpExecArray | null;
-  // eslint-disable-next-line security/detect-object-injection -- regex exec loop is safe
+
   while ((match = bracketPattern.exec(code)) !== null) {
-    const name = match[1];
+    const name = match[1] as string;
     if (!seen.has(name)) {
       seen.add(name);
-      results.push({ original: name, index: results.length + 1, converted: false });
+      results.push({
+        original: name,
+        index: results.length + 1,
+        converted: false,
+      });
     }
   }
   return results;
@@ -58,8 +70,12 @@ function detectBracketedNames(code: string): DetectedPlaceholder[] {
 const TRIGGER_PREFIX_REGEX = /^[a-zA-Z][a-zA-Z0-9]*$/;
 
 function validateTriggerPrefix(value: string): string | null {
-  if (!value) return "Trigger prefix is required";
-  if (value.length > 50) return "Trigger prefix must be 50 characters or less";
+  if (!value) {
+    return "Trigger prefix is required";
+  }
+  if (value.length > 50) {
+    return "Trigger prefix must be 50 characters or less";
+  }
   if (!TRIGGER_PREFIX_REGEX.test(value)) {
     return "Must start with a letter and contain only alphanumeric characters";
   }
@@ -77,8 +93,12 @@ export function SnippetModal({
   const updateSnippet = useUpdateSnippet();
 
   const [title, setTitle] = useState(initialData?.title ?? "");
-  const [triggerPrefix, setTriggerPrefix] = useState(initialData?.triggerPrefix ?? "");
-  const [description, setDescription] = useState(initialData?.description ?? "");
+  const [triggerPrefix, setTriggerPrefix] = useState(
+    initialData?.triggerPrefix ?? "",
+  );
+  const [description, setDescription] = useState(
+    initialData?.description ?? "",
+  );
   const [code, setCode] = useState(initialData?.code ?? "");
   const [scope, setScope] = useState<SnippetScope>(initialData?.scope ?? "bu");
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -109,23 +129,30 @@ export function SnippetModal({
 
   const dialogTitle = useMemo(() => {
     switch (mode) {
+      case "create":
+        return "New Snippet";
       case "edit":
         return "Edit Snippet";
       case "duplicate":
         return "Duplicate Snippet";
-      default:
-        return "New Snippet";
     }
   }, [mode]);
 
   const handleConvertPlaceholder = useCallback(
     (placeholder: DetectedPlaceholder) => {
-      if (placeholder.converted) return;
+      if (placeholder.converted) {
+        return;
+      }
 
       const nextN = placeholders.filter((p) => p.converted).length + 1;
       const replacement = `\${${nextN}:${placeholder.original}}`;
+      const escapedName = placeholder.original.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+
       const updatedCode = code.replace(
-        new RegExp(`\\[${placeholder.original.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "g"),
+        new RegExp(`\\[${escapedName}\\]`, "g"),
         replacement,
       );
       setCode(updatedCode);
@@ -169,7 +196,9 @@ export function SnippetModal({
   }, [title, triggerPrefix, code]);
 
   const handleSave = useCallback(async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      return;
+    }
 
     try {
       if (mode === "edit" && snippetId) {
@@ -191,7 +220,9 @@ export function SnippetModal({
           scope,
         };
         await createSnippet.mutateAsync(createData);
-        toast.success(mode === "duplicate" ? "Snippet duplicated" : "Snippet created");
+        toast.success(
+          mode === "duplicate" ? "Snippet duplicated" : "Snippet created",
+        );
       }
       onOpenChange(false);
     } catch {
@@ -243,7 +274,10 @@ export function SnippetModal({
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground" htmlFor="snippet-title">
+            <label
+              className="text-sm font-medium text-foreground"
+              htmlFor="snippet-title"
+            >
               Title <span className="text-destructive">*</span>
             </label>
             <Input
@@ -251,7 +285,9 @@ export function SnippetModal({
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
-                if (titleError) setTitleError(null);
+                if (titleError) {
+                  setTitleError(null);
+                }
               }}
               placeholder="e.g. Subscriber KEY JOIN"
               className={titleError ? "border-destructive" : ""}
@@ -263,7 +299,10 @@ export function SnippetModal({
 
           {/* Trigger Prefix */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground" htmlFor="snippet-prefix">
+            <label
+              className="text-sm font-medium text-foreground"
+              htmlFor="snippet-prefix"
+            >
               Trigger Prefix <span className="text-destructive">*</span>
             </label>
             <Input
@@ -271,7 +310,9 @@ export function SnippetModal({
               value={triggerPrefix}
               onChange={(e) => {
                 setTriggerPrefix(e.target.value);
-                if (prefixError) setPrefixError(null);
+                if (prefixError) {
+                  setPrefixError(null);
+                }
               }}
               placeholder="e.g. mysel"
               className={`font-mono ${prefixError ? "border-destructive" : ""}`}
@@ -287,7 +328,10 @@ export function SnippetModal({
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground" htmlFor="snippet-description">
+            <label
+              className="text-sm font-medium text-foreground"
+              htmlFor="snippet-description"
+            >
               Description
             </label>
             <textarea
@@ -332,9 +376,9 @@ export function SnippetModal({
 
           {/* Code Editor */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">
+            <span className="text-sm font-medium text-foreground">
               SQL Code <span className="text-destructive">*</span>
-            </label>
+            </span>
             <div
               className={`rounded-md border overflow-hidden ${codeError ? "border-destructive" : "border-border"}`}
               style={{ minHeight: "300px" }}
@@ -346,7 +390,9 @@ export function SnippetModal({
                 value={code}
                 onChange={(v) => {
                   setCode(v ?? "");
-                  if (codeError) setCodeError(null);
+                  if (codeError) {
+                    setCodeError(null);
+                  }
                   if (mode === "create") {
                     setPlaceholders(detectBracketedNames(v ?? ""));
                   }
@@ -365,8 +411,11 @@ export function SnippetModal({
           {/* Placeholder helper */}
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Use <code className="font-mono bg-muted px-1 rounded">{"${1:name}"}</code> syntax for tab-stop
-              placeholders
+              Use{" "}
+              <code className="font-mono bg-muted px-1 rounded">
+                {"${1:name}"}
+              </code>{" "}
+              syntax for tab-stop placeholders
             </p>
             {unconvertedPlaceholders.length > 0 ? (
               <div className="space-y-1.5">
@@ -398,10 +447,7 @@ export function SnippetModal({
           >
             Cancel
           </Button>
-          <Button
-            onClick={() => void handleSave()}
-            disabled={isPending}
-          >
+          <Button onClick={() => void handleSave()} disabled={isPending}>
             {isPending ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

@@ -48,6 +48,10 @@ export type AuditEventType =
   // SIEM
   | "siem.config_updated"
   | "siem.config_deleted"
+  // Snippets
+  | "snippet.created"
+  | "snippet.updated"
+  | "snippet.deleted"
   // GDPR / Lifecycle
   | "tenant.soft_deleted"
   | "tenant.restored"
@@ -97,6 +101,9 @@ export const AUDIT_EVENT_TYPES: AuditEventType[] = [
   "role.ownership_transferred",
   "siem.config_updated",
   "siem.config_deleted",
+  "snippet.created",
+  "snippet.updated",
+  "snippet.deleted",
   "tenant.soft_deleted",
   "tenant.restored",
   "tenant.hard_deleted",
