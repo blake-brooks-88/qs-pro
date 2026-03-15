@@ -12,10 +12,24 @@ describe('SiemWebhookProducer', () => {
 
     const jobData: SiemWebhookJobData = {
       tenantId: 'tenant-1',
-      mid: '12345',
-      eventType: 'audit.event',
-      payload: { id: 'evt-1' },
-      deliveredAt: null,
+      webhookUrl: 'https://example.com/webhook',
+      secretEncrypted: 'encrypted-secret',
+      payload: {
+        id: 'evt-1',
+        timestamp: '2026-01-01T00:00:00.000Z',
+        version: '1.0',
+        tenantId: 'tenant-1',
+        mid: '12345',
+        event: {
+          type: 'audit.event',
+          actorType: 'user',
+          actorId: 'user-1',
+          actorEmail: 'user@example.com',
+          targetId: null,
+          ipAddress: null,
+          metadata: null,
+        },
+      },
     };
 
     await producer.enqueue(jobData);

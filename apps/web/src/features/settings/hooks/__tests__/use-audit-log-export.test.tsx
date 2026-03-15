@@ -97,12 +97,12 @@ describe("useAuditLogExport", () => {
 
     const { result } = renderHook(() =>
       useAuditLogExport({
-        eventType: null,
-        dateFrom: null,
-        dateTo: null,
-        search: null,
-        sortBy: null,
-        sortDir: null,
+        eventType: undefined,
+        dateFrom: undefined,
+        dateTo: undefined,
+        search: undefined,
+        sortBy: undefined,
+        sortDir: undefined,
       }),
     );
 

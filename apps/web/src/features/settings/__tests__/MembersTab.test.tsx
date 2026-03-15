@@ -311,7 +311,7 @@ describe("MembersTab", () => {
     setupMockAuth("owner");
     setupMembersHandler();
 
-    let resolveRequest: (() => void) | null = null;
+    let resolveRequest: (() => void) | undefined;
     server.use(
       http.post("/api/admin/transfer-ownership", async ({ request }) => {
         await new Promise<void>((resolve) => {
