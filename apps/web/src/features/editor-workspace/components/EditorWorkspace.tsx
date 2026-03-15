@@ -86,7 +86,7 @@ export function EditorWorkspace({
   onDeploy: _onDeploy,
   onCreateQueryActivity: _onCreateQueryActivity,
   onSelectQuery,
-  onSelectDE,
+  onSelectDE: _onSelectDE,
   onToggleSidebar: _onToggleSidebar,
   onPageChange,
   onViewInContactBuilder,
@@ -640,6 +640,33 @@ export function EditorWorkspace({
     editor.focus();
   }, []);
 
+  const handleSelectDE = useCallback(
+    (deId: string) => {
+      const editor = activeEditorRef.current;
+      if (!editor) {
+        return;
+      }
+
+      const de = dataExtensions.find((d) => d.id === deId);
+      if (!de) {
+        return;
+      }
+
+      const selection = editor.getSelection();
+      if (selection) {
+        editor.executeEdits("de-insert", [
+          {
+            range: selection,
+            text: `[${de.name}]`,
+            forceMoveMarkers: true,
+          },
+        ]);
+      }
+      editor.focus();
+    },
+    [dataExtensions],
+  );
+
   const handleOpenCreateSnippetModal = useCallback(() => {
     setSnippetModalState({ open: true, mode: "create" });
   }, []);
@@ -769,7 +796,7 @@ export function EditorWorkspace({
                   requestOpenSavedQuery(id);
                   onSelectQuery?.(id);
                 }}
-                onSelectDE={onSelectDE}
+                onSelectDE={handleSelectDE}
                 onCreateDE={handleCreateDE}
                 onViewQueryHistory={handleViewQueryHistory}
                 onViewVersionHistory={(queryId) =>
