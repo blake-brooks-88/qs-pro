@@ -409,4 +409,148 @@ describe('UserDeletionService (integration)', () => {
       expect(ledgerRows[0]?.metadata).toHaveProperty('archivedFolderId');
     });
   });
+
+  describe('Multi-BU deletion (GDPR cross-BU erasure)', () => {
+    const MID_A = 'mid-gdpr-multi-a';
+    const MID_B = 'mid-gdpr-multi-b';
+
+    it('should delete user data across multiple BUs', async () => {
+      const encryptFn = (s: string) => encryptionService.encrypt(s) as string;
+
+      const user = await createTestUser(sqlClient, tenantId, {
+        sfUserId: `sf-gdpr-multi-${Date.now()}`,
+        role: 'member',
+        name: 'Multi-BU Target',
+      });
+      const targetId = user.userId;
+
+      const folderA = await createTestFolder(
+        sqlClient,
+        tenantId,
+        MID_A,
+        targetId,
+        { name: 'Personal A', visibility: 'personal' },
+      );
+      await createTestSavedQuery(
+        sqlClient,
+        tenantId,
+        MID_A,
+        targetId,
+        encryptFn,
+        {
+          name: 'Query A',
+          folderId: folderA.folderId,
+        },
+      );
+      await createTestCredential(sqlClient, tenantId, MID_A, targetId);
+      const auditA = await createTestAuditLog(
+        sqlClient,
+        tenantId,
+        MID_A,
+        targetId,
+      );
+
+      await createTestFolder(sqlClient, tenantId, MID_B, targetId, {
+        name: 'Personal B',
+        visibility: 'personal',
+      });
+      await createTestCredential(sqlClient, tenantId, MID_B, targetId);
+      const auditB = await createTestAuditLog(
+        sqlClient,
+        tenantId,
+        MID_B,
+        targetId,
+      );
+
+      await userDeletionService.deleteUser({
+        tenantId,
+        mid: MID_A,
+        targetUserId: targetId,
+        actorId: ownerId,
+      });
+
+      const userRows = await sqlClient`
+        SELECT id FROM users WHERE id = ${targetId}::uuid
+      `;
+      expect(userRows).toHaveLength(0);
+
+      for (const mid of [MID_A, MID_B]) {
+        const reserved = await sqlClient.reserve();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+          await reserved`SELECT set_config('app.mid', ${mid}, false)`;
+          const credRows = await reserved`
+            SELECT id FROM credentials
+            WHERE user_id = ${targetId}::uuid
+          `;
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+          expect(credRows, `credentials in ${mid}`).toHaveLength(0);
+        } finally {
+          reserved.release();
+        }
+      }
+
+      for (const mid of [MID_A, MID_B]) {
+        const reserved = await sqlClient.reserve();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+          await reserved`SELECT set_config('app.mid', ${mid}, false)`;
+          await reserved`SELECT set_config('app.user_id', ${ownerId}, false)`;
+          const archiveRows = await reserved`
+            SELECT id FROM folders
+            WHERE name = 'Archived Users'
+              AND user_id = ${ownerId}::uuid
+              AND tenant_id = ${tenantId}::uuid
+              AND mid = ${mid}
+          `;
+          expect(archiveRows.length, `archive root in ${mid}`).toBeGreaterThan(
+            0,
+          );
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+          await reserved`RESET app.user_id`;
+        } finally {
+          reserved.release();
+        }
+      }
+
+      for (const { auditLogId, mid } of [
+        { auditLogId: auditA.auditLogId, mid: MID_A },
+        { auditLogId: auditB.auditLogId, mid: MID_B },
+      ]) {
+        const reserved = await sqlClient.reserve();
+        try {
+          await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+          await reserved`SELECT set_config('app.mid', ${mid}, false)`;
+          const auditRows = await reserved`
+            SELECT actor_id, ip_address, user_agent
+            FROM audit_logs WHERE id = ${auditLogId}::uuid
+          `;
+          await reserved`RESET app.tenant_id`;
+          await reserved`RESET app.mid`;
+          expect(auditRows).toHaveLength(1);
+          expect(
+            auditRows[0]?.actor_id,
+            `audit anonymized in ${mid}`,
+          ).toBeNull();
+          expect(auditRows[0]?.ip_address).toBeNull();
+          expect(auditRows[0]?.user_agent).toBeNull();
+        } finally {
+          reserved.release();
+        }
+      }
+
+      const ledgerRows = await sqlClient`
+        SELECT metadata FROM deletion_ledger
+        WHERE entity_id = ${targetId}::uuid
+      `;
+      expect(ledgerRows).toHaveLength(1);
+      const metadata = ledgerRows[0]?.metadata as Record<string, unknown>;
+      expect(metadata).toHaveProperty('archivedFolderIds');
+      const folderIds = metadata.archivedFolderIds as Record<string, string>;
+      expect(folderIds).toHaveProperty(MID_A);
+      expect(folderIds).toHaveProperty(MID_B);
+    });
+  });
 });
