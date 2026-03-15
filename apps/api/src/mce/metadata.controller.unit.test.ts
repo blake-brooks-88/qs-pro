@@ -22,6 +22,7 @@ describe('MetadataController', () => {
           provide: MetadataService,
           useValue: mockService,
         },
+        { provide: 'DATABASE', useValue: {} },
       ],
     }).compile();
 

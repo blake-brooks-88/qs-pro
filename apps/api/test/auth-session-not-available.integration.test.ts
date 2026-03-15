@@ -31,6 +31,7 @@ describe('AuthController session infrastructure errors (integration)', () => {
           provide: LastActiveService,
           useValue: { touchLastActive: vi.fn().mockResolvedValue(undefined) },
         },
+        { provide: 'DATABASE', useValue: {} },
       ],
     }).compile();
 
