@@ -469,7 +469,7 @@ describe('Trial Lifecycle (integration)', () => {
         advancedAutocomplete: false,
         querySharing: false,
         createDataExtension: false,
-        teamSnippets: true,
+        teamSnippets: false,
         teamCollaboration: false,
         auditLogs: false,
         deployToAutomation: false,
