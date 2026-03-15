@@ -1,13 +1,16 @@
 import Editor, { type OnMount } from "@monaco-editor/react";
+import type { SnippetListItem } from "@qpp/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import type * as Monaco from "monaco-editor";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+import { BUILT_IN_SNIPPETS } from "@/features/editor-workspace/constants/built-in-snippets";
 import {
   buildFieldsQueryOptions,
   metadataQueryKeys,
 } from "@/features/editor-workspace/hooks/use-metadata";
+import { useSnippets } from "@/features/editor-workspace/hooks/use-snippets";
 import type {
   DataExtension,
   DataExtensionField,
@@ -21,6 +24,7 @@ import {
 import { getSharedFolderIds } from "@/features/editor-workspace/utils/sql-context";
 import type { SqlDiagnostic } from "@/features/editor-workspace/utils/sql-diagnostics";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useFeature } from "@/hooks/use-feature";
 import { cn } from "@/lib/utils";
 
 import { applySqlDecorations } from "./monaco/apply-sql-decorations";
@@ -90,6 +94,19 @@ export function MonacoQueryEditor({
   const onRunRequestRef = useRef(onRunRequest);
   const onFormatRef = useRef(onFormat);
   const queryClient = useQueryClient();
+  const { data: snippetsData } = useSnippets();
+  const { enabled: isTeamSnippetsEnabled } = useFeature("teamSnippets");
+
+  const snippetsRef = useRef<SnippetListItem[]>([]);
+  const isTeamSnippetsEnabledRef = useRef(isTeamSnippetsEnabled);
+
+  useEffect(() => {
+    snippetsRef.current = snippetsData ?? [];
+  }, [snippetsData]);
+
+  useEffect(() => {
+    isTeamSnippetsEnabledRef.current = isTeamSnippetsEnabled;
+  }, [isTeamSnippetsEnabled]);
 
   const debouncedValue = useDebouncedValue(value, 150);
 
@@ -284,6 +301,24 @@ export function MonacoQueryEditor({
         getDataExtensions: () => dataExtensionsRef.current,
         getSharedFolderIds: () => sharedFolderIdsRef.current,
         getBracketReplacementRange,
+        getSnippets: () => {
+          const isPro = isTeamSnippetsEnabledRef.current;
+          const userSnippets = snippetsRef.current.map((s) => ({
+            triggerPrefix: s.triggerPrefix,
+            title: s.title,
+            body: s.code,
+            isBuiltin: false as const,
+          }));
+          const builtInSnippets = BUILT_IN_SNIPPETS.filter(
+            (s) => isPro || s.category === "free",
+          ).map((s) => ({
+            triggerPrefix: s.triggerPrefix,
+            title: s.title,
+            body: s.body,
+            isBuiltin: true as const,
+          }));
+          return [...userSnippets, ...builtInSnippets];
+        },
       });
 
       inlineCompletionDisposableRef.current?.dispose();
@@ -397,7 +432,8 @@ export function MonacoQueryEditor({
         run: (ed) => {
           const selection = ed.getSelection();
           if (selection) {
-            const selectedText = ed.getModel()?.getValueInRange(selection) ?? "";
+            const selectedText =
+              ed.getModel()?.getValueInRange(selection) ?? "";
             if (selectedText.trim()) {
               onSaveAsSnippetRef.current?.(selectedText);
             }

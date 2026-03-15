@@ -51,6 +51,13 @@ export interface SqlCompletionItem {
   replaceOffsets: OffsetRange;
 }
 
+export interface SnippetCompletionSource {
+  triggerPrefix: string;
+  title: string;
+  body: string;
+  isBuiltin?: boolean;
+}
+
 export async function buildSqlCompletions(options: {
   text: string;
   cursorIndex: number;
@@ -70,6 +77,7 @@ export async function buildSqlCompletions(options: {
   hasTenant: () => boolean;
   dataExtensions: DataExtension[];
   sharedFolderIds: Set<string>;
+  getSnippets?: () => SnippetCompletionSource[];
 }): Promise<SqlCompletionItem[]> {
   const {
     text,
@@ -84,6 +92,7 @@ export async function buildSqlCompletions(options: {
     hasTenant,
     dataExtensions,
     sharedFolderIds,
+    getSnippets,
   } = options;
 
   if (isInsideString(text, cursorIndex) || isInsideComment(text, cursorIndex)) {
@@ -299,7 +308,15 @@ export async function buildSqlCompletions(options: {
   if (sqlContext.isAfterSelect) {
     const primaryTable = getPrimaryTable(sqlContext.tablesInScope);
     if (!primaryTable) {
-      return keywordSuggestions;
+      return [
+        ...buildSnippetCompletions(
+          getSnippets,
+          isExplicitTrigger,
+          sqlContext.currentWord,
+          wordRange,
+        ),
+        ...keywordSuggestions,
+      ];
     }
 
     let fields: DataExtensionField[] = [];
@@ -338,5 +355,45 @@ export async function buildSqlCompletions(options: {
     return [...fieldSuggestions, ...keywordSuggestions];
   }
 
-  return keywordSuggestions;
+  const snippetCompletions = buildSnippetCompletions(
+    getSnippets,
+    isExplicitTrigger,
+    sqlContext.currentWord,
+    wordRange,
+  );
+  return [...snippetCompletions, ...keywordSuggestions];
+}
+
+function buildSnippetCompletions(
+  getSnippets: (() => SnippetCompletionSource[]) | undefined,
+  isExplicitTrigger: boolean,
+  currentWord: string | undefined,
+  wordRange: OffsetRange,
+): SqlCompletionItem[] {
+  if (!getSnippets) {
+    return [];
+  }
+
+  const snippets = getSnippets();
+  const typedPrefix = (currentWord ?? "").toLowerCase();
+
+  const shouldShowSnippets = isExplicitTrigger || typedPrefix.length >= 1;
+  if (!shouldShowSnippets) {
+    return [];
+  }
+
+  return snippets
+    .filter((s) => s.triggerPrefix.toLowerCase().startsWith(typedPrefix))
+    .map(
+      (s): SqlCompletionItem => ({
+        label: s.triggerPrefix,
+        insertText: s.body,
+        kind: "snippet",
+        detail: s.title,
+        documentation: s.body.replace(/\$\{\d+:([^}]+)\}/g, "$1"),
+        insertAsSnippet: true,
+        sortText: `1-${s.triggerPrefix}`,
+        replaceOffsets: wordRange,
+      }),
+    );
 }
