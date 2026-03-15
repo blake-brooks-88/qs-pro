@@ -162,6 +162,14 @@ export const handlers = [
     });
   }),
 
+  http.get("/api/snippets", () => {
+    return HttpResponse.json([]);
+  }),
+
+  http.get("/api/admin/me/role", () => {
+    return HttpResponse.json({ role: "owner" });
+  }),
+
   http.get("/api/billing/prices", () => {
     return HttpResponse.json({
       pro: { monthly: 2900, annual: 24900 },
