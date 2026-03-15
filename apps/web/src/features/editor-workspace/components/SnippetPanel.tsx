@@ -1,8 +1,8 @@
-import type { SnippetListItem } from "@qpp/shared-types";
+import type { SnippetListItem, SnippetScope } from "@qpp/shared-types";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { AddSquare, AltArrowLeft, CodeFile } from "@solar-icons/react";
 import Fuse from "fuse.js";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import { FeatureGate } from "@/components/FeatureGate";
 import type { BuiltInSnippet } from "@/features/editor-workspace/constants/built-in-snippets";
@@ -17,9 +17,16 @@ import { cn } from "@/lib/utils";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { SidebarSearch } from "./SidebarSearch";
+import type { SnippetModalProps } from "./SnippetModal";
+import { SnippetModal } from "./SnippetModal";
 
 interface SnippetPanelProps {
   onInsertSnippet?: (snippetBody: string) => void;
+  snippetModalState?: Pick<SnippetModalProps, "open" | "mode" | "initialData" | "snippetId"> | null;
+  onOpenCreateModal?: () => void;
+  onOpenEditModal?: (snippetId: string, data: SnippetModalProps["initialData"]) => void;
+  onOpenDuplicateModal?: (data: SnippetModalProps["initialData"]) => void;
+  onSnippetModalOpenChange?: (open: boolean) => void;
 }
 
 type UserSnippetItem = SnippetListItem & { isBuiltin: false };
@@ -40,7 +47,14 @@ function SectionHeader({ children }: { children: ReactNode }) {
   );
 }
 
-export function SnippetPanel({ onInsertSnippet }: SnippetPanelProps) {
+export function SnippetPanel({
+  onInsertSnippet,
+  snippetModalState,
+  onOpenCreateModal,
+  onOpenEditModal,
+  onOpenDuplicateModal,
+  onSnippetModalOpenChange,
+}: SnippetPanelProps) {
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { enabled: isTeamSnippetsEnabled } = useFeature("teamSnippets");
 
@@ -233,6 +247,7 @@ export function SnippetPanel({ onInsertSnippet }: SnippetPanelProps) {
                     onClick={() => handleSingleClick(snippet.id)}
                     onDoubleClick={() => handleDoubleClick(snippet.code)}
                     onDelete={(id, title) => setDeleteTarget({ id, title })}
+                    onEdit={(id, data) => onOpenEditModal?.(id, data)}
                   />
                 ))}
               </div>
@@ -250,6 +265,7 @@ export function SnippetPanel({ onInsertSnippet }: SnippetPanelProps) {
                 isSelected={selectedSnippetId === snippet.id}
                 onClick={() => handleSingleClick(snippet.id)}
                 onDoubleClick={() => handleDoubleClick(snippet.body)}
+                onDuplicate={(data) => onOpenDuplicateModal?.(data)}
               />
             ))}
           </div>
@@ -269,6 +285,7 @@ export function SnippetPanel({ onInsertSnippet }: SnippetPanelProps) {
           <div className="border-t border-border p-2">
             <button
               type="button"
+              onClick={onOpenCreateModal}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-colors"
             >
               <AddSquare size={14} />
@@ -288,6 +305,17 @@ export function SnippetPanel({ onInsertSnippet }: SnippetPanelProps) {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDeleteConfirm}
       />
+
+      {/* Snippet create/edit/duplicate modal */}
+      {snippetModalState ? (
+        <SnippetModal
+          open={snippetModalState.open}
+          onOpenChange={onSnippetModalOpenChange ?? (() => {})}
+          mode={snippetModalState.mode}
+          initialData={snippetModalState.initialData}
+          snippetId={snippetModalState.snippetId}
+        />
+      ) : null}
     </>
   );
 }
@@ -298,12 +326,14 @@ function UserSnippetRow({
   onClick,
   onDoubleClick,
   onDelete,
+  onEdit,
 }: {
   snippet: UserSnippetItem;
   isSelected: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
   onDelete: (id: string, title: string) => void;
+  onEdit: (id: string, data: { title: string; triggerPrefix: string; code: string; description?: string; scope: SnippetScope }) => void;
 }) {
   return (
     <ContextMenu.Root>
@@ -334,9 +364,15 @@ function UserSnippetRow({
         <ContextMenu.Content className="min-w-[140px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
           <ContextMenu.Item
             className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
-            onSelect={() => {
-              /* Edit — wired in Plan 04 */
-            }}
+            onSelect={() =>
+              onEdit(snippet.id, {
+                title: snippet.title,
+                triggerPrefix: snippet.triggerPrefix,
+                code: snippet.code,
+                description: snippet.description ?? undefined,
+                scope: snippet.scope,
+              })
+            }
           >
             Edit
           </ContextMenu.Item>
@@ -358,11 +394,13 @@ function BuiltInSnippetRow({
   isSelected,
   onClick,
   onDoubleClick,
+  onDuplicate,
 }: {
   snippet: BuiltInSnippetItem;
   isSelected: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
+  onDuplicate: (data: { title: string; triggerPrefix: string; code: string; description?: string }) => void;
 }) {
   return (
     <ContextMenu.Root>
@@ -398,9 +436,14 @@ function BuiltInSnippetRow({
         <ContextMenu.Content className="min-w-[140px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
           <ContextMenu.Item
             className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
-            onSelect={() => {
-              /* Duplicate — wired in Plan 04 */
-            }}
+            onSelect={() =>
+              onDuplicate({
+                title: `${snippet.title} (copy)`,
+                triggerPrefix: snippet.triggerPrefix,
+                code: snippet.body,
+                description: snippet.description,
+              })
+            }
           >
             Duplicate
           </ContextMenu.Item>

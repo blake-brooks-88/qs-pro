@@ -61,6 +61,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
+import type { SnippetModalProps } from "./SnippetModal";
 import { SnippetPanel } from "./SnippetPanel";
 import { QueryTabBar } from "./QueryTabBar";
 import { StaleWarningDialog } from "./StaleWarningDialog";
@@ -106,6 +107,14 @@ export function EditorWorkspace({
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
   const [isTargetDEModalOpen, setIsTargetDEModalOpen] = useState(false);
   const openPricing = usePricingOverlayStore((s) => s.open);
+  const { enabled: isTeamSnippetsEnabled } = useFeature("teamSnippets");
+
+  const [snippetModalState, setSnippetModalState] = useState<{
+    open: boolean;
+    mode: "create" | "edit" | "duplicate";
+    initialData?: SnippetModalProps["initialData"];
+    snippetId?: string;
+  }>({ open: false, mode: "create" });
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkTargetQueryId, setLinkTargetQueryId] = useState<string | null>(
@@ -610,6 +619,42 @@ export function EditorWorkspace({
     editor.focus();
   }, []);
 
+  const handleOpenCreateSnippetModal = useCallback(() => {
+    setSnippetModalState({ open: true, mode: "create" });
+  }, []);
+
+  const handleOpenEditSnippetModal = useCallback(
+    (
+      snippetId: string,
+      data: SnippetModalProps["initialData"],
+    ) => {
+      setSnippetModalState({ open: true, mode: "edit", initialData: data, snippetId });
+    },
+    [],
+  );
+
+  const handleOpenDuplicateSnippetModal = useCallback(
+    (data: SnippetModalProps["initialData"]) => {
+      setSnippetModalState({ open: true, mode: "duplicate", initialData: data });
+    },
+    [],
+  );
+
+  const handleSaveAsSnippet = useCallback(
+    (selectedCode: string) => {
+      if (!isTeamSnippetsEnabled) {
+        openPricing("feature_gate");
+        return;
+      }
+      setSnippetModalState({
+        open: true,
+        mode: "create",
+        initialData: { code: selectedCode },
+      });
+    },
+    [isTeamSnippetsEnabled, openPricing],
+  );
+
   const handleHistoryCopySql = useCallback((sql: string) => {
     void copyToClipboard(sql).then((didCopy) => {
       if (didCopy) {
@@ -667,7 +712,16 @@ export function EditorWorkspace({
           <>
             {/* Sidebar Panel */}
             {activeView === "snippets" ? (
-              <SnippetPanel onInsertSnippet={handleInsertSnippet} />
+              <SnippetPanel
+                onInsertSnippet={handleInsertSnippet}
+                snippetModalState={snippetModalState}
+                onOpenCreateModal={handleOpenCreateSnippetModal}
+                onOpenEditModal={handleOpenEditSnippetModal}
+                onOpenDuplicateModal={handleOpenDuplicateSnippetModal}
+                onSnippetModalOpenChange={(open) =>
+                  setSnippetModalState((s) => ({ ...s, open }))
+                }
+              />
             ) : activeView !== null ? (
               <WorkspaceSidebar
                 activeView={activeView as "dataExtensions" | "queries"}
@@ -781,6 +835,7 @@ export function EditorWorkspace({
                           onEditorMount={(editor) => {
                             activeEditorRef.current = editor;
                           }}
+                          onSaveAsSnippet={handleSaveAsSnippet}
                           diagnostics={sqlDiagnostics}
                           dataExtensions={dataExtensions}
                           folders={folders}

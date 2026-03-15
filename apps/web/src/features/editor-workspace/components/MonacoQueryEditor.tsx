@@ -48,6 +48,7 @@ interface MonacoQueryEditorProps {
   onFormat?: () => void;
   onCursorPositionChange?: (position: number) => void;
   onEditorMount?: (editor: Monaco.editor.IStandaloneCodeEditor) => void;
+  onSaveAsSnippet?: (selectedCode: string) => void;
   diagnostics: SqlDiagnostic[];
   dataExtensions: DataExtension[];
   folders: Folder[];
@@ -64,6 +65,7 @@ export function MonacoQueryEditor({
   onFormat,
   onCursorPositionChange,
   onEditorMount,
+  onSaveAsSnippet,
   diagnostics,
   dataExtensions,
   folders,
@@ -250,6 +252,11 @@ export function MonacoQueryEditor({
     onEditorMountRef.current = onEditorMount;
   }, [onEditorMount]);
 
+  const onSaveAsSnippetRef = useRef(onSaveAsSnippet);
+  useEffect(() => {
+    onSaveAsSnippetRef.current = onSaveAsSnippet;
+  }, [onSaveAsSnippet]);
+
   const handleEditorMount: OnMount = useCallback(
     (editorInstance, monacoInstance) => {
       editorRef.current = editorInstance;
@@ -378,6 +385,23 @@ export function MonacoQueryEditor({
         editor: editorInstance,
         onCursorPositionChange: (offset) => {
           onCursorPositionChangeRef.current?.(offset);
+        },
+      });
+
+      editorInstance.addAction({
+        id: "save-as-snippet",
+        label: "Save as Snippet",
+        contextMenuGroupId: "9_cutcopypaste",
+        contextMenuOrder: 10,
+        precondition: "editorHasSelection",
+        run: (ed) => {
+          const selection = ed.getSelection();
+          if (selection) {
+            const selectedText = ed.getModel()?.getValueInRange(selection) ?? "";
+            if (selectedText.trim()) {
+              onSaveAsSnippetRef.current?.(selectedText);
+            }
+          }
         },
       });
     },
