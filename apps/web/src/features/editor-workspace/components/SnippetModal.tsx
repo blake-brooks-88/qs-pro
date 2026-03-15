@@ -150,8 +150,8 @@ export function SnippetModal({
       setPrefixError(null);
       setCodeError(null);
 
-      // Auto-detect placeholders for create mode with pre-filled code
-      if (mode === "create" && initialData?.code) {
+      // Auto-detect placeholders from pre-filled code
+      if (initialData?.code) {
         setPlaceholders(detectBracketedNames(initialData.code));
         setColumnRefs(detectColumnReferences(initialData.code));
       } else {
@@ -232,6 +232,65 @@ export function SnippetModal({
     },
     [code, placeholders, columnRefs],
   );
+
+  const handleConvertAllColumnRefs = useCallback(() => {
+    const unconverted = columnRefs.filter((p) => !p.converted);
+    if (unconverted.length === 0) {
+      return;
+    }
+
+    let baseN =
+      placeholders.filter((p) => p.converted).length +
+      columnRefs.filter((p) => p.converted).length +
+      1;
+    let updatedCode = code;
+
+    for (const colRef of unconverted) {
+      const columnName = colRef.original.split(".")[1] ?? colRef.original;
+      const replacement = `\${${baseN}:${columnName}}`;
+      const escapedFull = colRef.original.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+      updatedCode = updatedCode.replace(
+        new RegExp(`\\b${escapedFull}\\b`, "g"),
+        replacement,
+      );
+      baseN++;
+    }
+
+    setCode(updatedCode);
+    setColumnRefs((prev) => prev.map((p) => ({ ...p, converted: true })));
+  }, [code, placeholders, columnRefs]);
+
+  const handleConvertAllPlaceholders = useCallback(() => {
+    const unconverted = placeholders.filter((p) => !p.converted);
+    if (unconverted.length === 0) {
+      return;
+    }
+
+    let baseN =
+      placeholders.filter((p) => p.converted).length +
+      columnRefs.filter((p) => p.converted).length +
+      1;
+    let updatedCode = code;
+
+    for (const placeholder of unconverted) {
+      const replacement = `\${${baseN}:${placeholder.original}}`;
+      const escapedName = placeholder.original.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+      updatedCode = updatedCode.replace(
+        new RegExp(`\\[${escapedName}\\]`, "g"),
+        replacement,
+      );
+      baseN++;
+    }
+
+    setCode(updatedCode);
+    setPlaceholders((prev) => prev.map((p) => ({ ...p, converted: true })));
+  }, [code, placeholders, columnRefs]);
 
   const validate = useCallback(() => {
     let valid = true;
@@ -333,6 +392,7 @@ export function SnippetModal({
       lineDecorationsWidth: 0,
       lineNumbersMinChars: 0,
       glyphMargin: false,
+      fixedOverflowWidgets: false,
     }),
     [],
   );
@@ -466,10 +526,8 @@ export function SnippetModal({
                   if (codeError) {
                     setCodeError(null);
                   }
-                  if (mode === "create") {
-                    setPlaceholders(detectBracketedNames(v ?? ""));
-                    setColumnRefs(detectColumnReferences(v ?? ""));
-                  }
+                  setPlaceholders(detectBracketedNames(v ?? ""));
+                  setColumnRefs(detectColumnReferences(v ?? ""));
                 }}
                 options={editorOptions}
                 onMount={(_, monacoInstance) => {
@@ -493,9 +551,20 @@ export function SnippetModal({
             </p>
             {unconvertedPlaceholders.length > 0 ? (
               <div className="space-y-1.5">
-                <p className="text-xs font-medium text-foreground">
-                  Detected bracketed names — click to convert to placeholders:
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-foreground">
+                    Detected bracketed names — click to convert to placeholders:
+                  </p>
+                  {unconvertedPlaceholders.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={handleConvertAllPlaceholders}
+                      className="text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      Convert all
+                    </button>
+                  ) : null}
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {unconvertedPlaceholders.map((p) => (
                     <button
@@ -512,9 +581,20 @@ export function SnippetModal({
             ) : null}
             {unconvertedColumnRefs.length > 0 ? (
               <div className="space-y-1.5">
-                <p className="text-xs font-medium text-foreground">
-                  Column references — click to convert to placeholders:
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-foreground">
+                    Column references — click to convert to placeholders:
+                  </p>
+                  {unconvertedColumnRefs.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={handleConvertAllColumnRefs}
+                      className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors"
+                    >
+                      Convert all
+                    </button>
+                  ) : null}
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {unconvertedColumnRefs.map((p) => (
                     <button
