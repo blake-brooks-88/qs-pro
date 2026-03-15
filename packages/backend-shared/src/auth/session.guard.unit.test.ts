@@ -45,7 +45,7 @@ describe("SessionGuard", () => {
   });
 
   it("throws 401 when no session exists on request", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
 
     await expect(guard.canActivate(createContext({}))).rejects.toThrow(
       UnauthorizedException,
@@ -53,7 +53,7 @@ describe("SessionGuard", () => {
   });
 
   it("rejects non-string session values", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: 123,
       tenantId: "tenant-1",
@@ -66,7 +66,7 @@ describe("SessionGuard", () => {
   });
 
   it("rejects empty session values", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: "",
       tenantId: "tenant-1",
@@ -79,7 +79,7 @@ describe("SessionGuard", () => {
   });
 
   it("decorates request.user with { userId, tenantId, mid } and resets idle timer", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -100,7 +100,7 @@ describe("SessionGuard", () => {
   });
 
   it("calls session.touch() on successful authentication", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -114,7 +114,7 @@ describe("SessionGuard", () => {
   });
 
   it("rejects session exceeding absolute timeout", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -138,7 +138,7 @@ describe("SessionGuard", () => {
   });
 
   it("accepts session within absolute timeout", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -153,7 +153,7 @@ describe("SessionGuard", () => {
   });
 
   it("backfills createdAt on legacy sessions missing it", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -174,7 +174,7 @@ describe("SessionGuard", () => {
   });
 
   it("does not call touch() when session is expired", async () => {
-    const guard = new SessionGuard();
+    const guard = new SessionGuard(createMockDb());
     const session = createSession({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -189,7 +189,7 @@ describe("SessionGuard", () => {
   });
 
   describe("soft-deleted tenant blocking", () => {
-    it("allows active tenant when db is injected", async () => {
+    it("allows active tenant", async () => {
       const db = createMockDb(null);
       const guard = new SessionGuard(db);
       const session = createSession({
@@ -221,20 +221,6 @@ describe("SessionGuard", () => {
       ).rejects.toThrow(ForbiddenException);
       expect(session.delete).toHaveBeenCalledOnce();
       expect(session.touch).not.toHaveBeenCalled();
-    });
-
-    it("skips soft-delete check when db is not injected", async () => {
-      const guard = new SessionGuard();
-      const session = createSession({
-        userId: "user-1",
-        tenantId: "tenant-1",
-        mid: "mid-1",
-        createdAt: Date.now(),
-      });
-
-      const allowed = await guard.canActivate(createContext({ session }));
-
-      expect(allowed).toBe(true);
     });
   });
 });

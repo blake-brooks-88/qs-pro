@@ -4,7 +4,6 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
 import { eq, tenants } from "@qpp/database";
@@ -22,9 +21,8 @@ type Session = {
 @Injectable()
 export class SessionGuard implements CanActivate {
   constructor(
-    @Optional()
     @Inject("DATABASE")
-    private readonly db?: PostgresJsDatabase,
+    private readonly db: PostgresJsDatabase,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -68,17 +66,15 @@ export class SessionGuard implements CanActivate {
       throw new UnauthorizedException("Session expired");
     }
 
-    if (this.db) {
-      const [tenant] = await this.db
-        .select({ deletedAt: tenants.deletedAt })
-        .from(tenants)
-        .where(eq(tenants.id, tenantId))
-        .limit(1);
+    const [tenant] = await this.db
+      .select({ deletedAt: tenants.deletedAt })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
 
-      if (tenant?.deletedAt) {
-        session.delete();
-        throw new ForbiddenException("This account has been deactivated.");
-      }
+    if (tenant?.deletedAt) {
+      session.delete();
+      throw new ForbiddenException("This account has been deactivated.");
     }
 
     session.touch();
