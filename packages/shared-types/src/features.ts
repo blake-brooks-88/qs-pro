@@ -46,6 +46,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, readonly FeatureKey[]> = {
     "minimap",
     "advancedAutocomplete",
     "querySharing",
+    "teamSnippets",
     "createDataExtension",
     "deployToAutomation",
     "systemDataViews",
