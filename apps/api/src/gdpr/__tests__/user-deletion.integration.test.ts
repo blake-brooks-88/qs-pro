@@ -406,7 +406,10 @@ describe('UserDeletionService (integration)', () => {
       expect(ledgerRows[0]?.entity_type).toBe('user');
       expect(ledgerRows[0]?.entity_identifier).toBeNull();
       expect(ledgerRows[0]?.deleted_by).toMatch(/^admin:/);
-      expect(ledgerRows[0]?.metadata).toHaveProperty('archivedFolderId');
+      expect(ledgerRows[0]?.metadata).toHaveProperty('archivedFolderIds');
+      const folderIds = (ledgerRows[0]?.metadata as Record<string, unknown>)
+        .archivedFolderIds as Record<string, string>;
+      expect(folderIds).toHaveProperty(TEST_MID);
     });
   });
 
