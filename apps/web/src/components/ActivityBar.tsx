@@ -1,5 +1,5 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ClockCircle, Database, Folder2 } from "@solar-icons/react";
+import { ClockCircle, CodeFile, Database, Folder2 } from "@solar-icons/react";
 
 import {
   type ActivityView,
@@ -15,6 +15,7 @@ const items: {
   { view: "dataExtensions", label: "Data Extensions", Icon: Database },
   { view: "queries", label: "Queries", Icon: Folder2 },
   { view: "history", label: "Execution History", Icon: ClockCircle },
+  { view: "snippets", label: "Snippets", Icon: CodeFile },
 ];
 
 export function ActivityBar() {

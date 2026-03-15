@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ActivityView = "dataExtensions" | "queries" | "history";
+export type ActivityView = "dataExtensions" | "queries" | "history" | "snippets";
 
 interface ActivityBarState {
   activeView: ActivityView | null;
