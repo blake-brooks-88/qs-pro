@@ -47,6 +47,7 @@ interface MonacoQueryEditorProps {
   onRunRequest?: () => void;
   onFormat?: () => void;
   onCursorPositionChange?: (position: number) => void;
+  onEditorMount?: (editor: Monaco.editor.IStandaloneCodeEditor) => void;
   diagnostics: SqlDiagnostic[];
   dataExtensions: DataExtension[];
   folders: Folder[];
@@ -62,6 +63,7 @@ export function MonacoQueryEditor({
   onRunRequest,
   onFormat,
   onCursorPositionChange,
+  onEditorMount,
   diagnostics,
   dataExtensions,
   folders,
@@ -243,10 +245,17 @@ export function MonacoQueryEditor({
     onFormatRef.current = onFormat;
   }, [onFormat]);
 
+  const onEditorMountRef = useRef(onEditorMount);
+  useEffect(() => {
+    onEditorMountRef.current = onEditorMount;
+  }, [onEditorMount]);
+
   const handleEditorMount: OnMount = useCallback(
     (editorInstance, monacoInstance) => {
       editorRef.current = editorInstance;
       monacoRef.current = monacoInstance;
+
+      onEditorMountRef.current?.(editorInstance);
 
       editorInstance.focus();
 

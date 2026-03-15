@@ -1,6 +1,7 @@
 import type { LinkQueryResponse } from "@qpp/shared-types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { useQueryClient } from "@tanstack/react-query";
+import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -60,6 +61,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
+import { SnippetPanel } from "./SnippetPanel";
 import { QueryTabBar } from "./QueryTabBar";
 import { StaleWarningDialog } from "./StaleWarningDialog";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
@@ -182,6 +184,7 @@ export function EditorWorkspace({
     undefined,
   );
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const activeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const {
     isResultsOpen,
     resultsHeight,
@@ -600,6 +603,13 @@ export function EditorWorkspace({
     ],
   );
 
+  const handleInsertSnippet = useCallback((snippetBody: string) => {
+    const editor = activeEditorRef.current;
+    if (!editor) return;
+    editor.trigger("snippet", "editor.action.insertSnippet", { snippet: snippetBody });
+    editor.focus();
+  }, []);
+
   const handleHistoryCopySql = useCallback((sql: string) => {
     void copyToClipboard(sql).then((didCopy) => {
       if (didCopy) {
@@ -656,9 +666,11 @@ export function EditorWorkspace({
         ) : (
           <>
             {/* Sidebar Panel */}
-            {activeView !== null ? (
+            {activeView === "snippets" ? (
+              <SnippetPanel onInsertSnippet={handleInsertSnippet} />
+            ) : activeView !== null ? (
               <WorkspaceSidebar
-                activeView={activeView}
+                activeView={activeView as "dataExtensions" | "queries"}
                 tenantId={tenantId}
                 folders={folders}
                 savedQueries={savedQueries}
@@ -766,6 +778,9 @@ export function EditorWorkspace({
                           onRunRequest={handleRunRequest}
                           onFormat={handleFormat}
                           onCursorPositionChange={setCursorPosition}
+                          onEditorMount={(editor) => {
+                            activeEditorRef.current = editor;
+                          }}
                           diagnostics={sqlDiagnostics}
                           dataExtensions={dataExtensions}
                           folders={folders}
