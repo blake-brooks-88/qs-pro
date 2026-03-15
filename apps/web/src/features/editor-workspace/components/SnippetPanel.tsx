@@ -1,8 +1,15 @@
 import type { SnippetListItem, SnippetScope } from "@qpp/shared-types";
 import * as ContextMenu from "@radix-ui/react-context-menu";
+import * as Popover from "@radix-ui/react-popover";
 import { AddSquare, AltArrowLeft, CodeFile } from "@solar-icons/react";
 import Fuse from "fuse.js";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { FeatureGate } from "@/components/FeatureGate";
 import type { BuiltInSnippet } from "@/features/editor-workspace/constants/built-in-snippets";
@@ -14,6 +21,7 @@ import {
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import { useFeature } from "@/hooks/use-feature";
 import { cn } from "@/lib/utils";
+import { usePricingOverlayStore } from "@/store/pricing-overlay-store";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { SidebarSearch } from "./SidebarSearch";
@@ -22,9 +30,15 @@ import { SnippetModal } from "./SnippetModal";
 
 interface SnippetPanelProps {
   onInsertSnippet?: (snippetBody: string) => void;
-  snippetModalState?: Pick<SnippetModalProps, "open" | "mode" | "initialData" | "snippetId"> | null;
+  snippetModalState?: Pick<
+    SnippetModalProps,
+    "open" | "mode" | "initialData" | "snippetId"
+  > | null;
   onOpenCreateModal?: () => void;
-  onOpenEditModal?: (snippetId: string, data: SnippetModalProps["initialData"]) => void;
+  onOpenEditModal?: (
+    snippetId: string,
+    data: SnippetModalProps["initialData"],
+  ) => void;
   onOpenDuplicateModal?: (data: SnippetModalProps["initialData"]) => void;
   onSnippetModalOpenChange?: (open: boolean) => void;
 }
@@ -57,6 +71,7 @@ export function SnippetPanel({
 }: SnippetPanelProps) {
   const setActiveView = useActivityBarStore((s) => s.setActiveView);
   const { enabled: isTeamSnippetsEnabled } = useFeature("teamSnippets");
+  const openPricing = usePricingOverlayStore((s) => s.open);
 
   const { data: userSnippets = [] } = useSnippets();
   const deleteSnippet = useDeleteSnippet();
@@ -68,9 +83,7 @@ export function SnippetPanel({
   const [isResizing, setIsResizing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSnippetId, setSelectedSnippetId] = useState<string | null>(
-    null,
-  );
+  const [previewSnippetId, setPreviewSnippetId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     title: string;
@@ -91,10 +104,7 @@ export function SnippetPanel({
         const newWidth = e.clientX;
         if (newWidth >= 200 && newWidth <= 600) {
           setWidth(newWidth);
-          localStorage.setItem(
-            "workspace-sidebar-width",
-            newWidth.toString(),
-          );
+          localStorage.setItem("workspace-sidebar-width", newWidth.toString());
         }
       }
     },
@@ -111,11 +121,8 @@ export function SnippetPanel({
   }, [resize, stopResizing]);
 
   const visibleBuiltIns = useMemo<BuiltInSnippetItem[]>(() => {
-    const source = isTeamSnippetsEnabled
-      ? BUILT_IN_SNIPPETS
-      : BUILT_IN_SNIPPETS.filter((s) => s.category === "free");
-    return source.map((s) => ({ ...s, isBuiltin: true as const }));
-  }, [isTeamSnippetsEnabled]);
+    return BUILT_IN_SNIPPETS.map((s) => ({ ...s, isBuiltin: true as const }));
+  }, []);
 
   const userSnippetItems = useMemo<UserSnippetItem[]>(
     () => userSnippets.map((s) => ({ ...s, isBuiltin: false as const })),
@@ -139,27 +146,21 @@ export function SnippetPanel({
   }, [allSnippets, searchQuery]);
 
   const filteredUserSnippets = useMemo(
-    () =>
-      filteredSnippets.filter((s): s is UserSnippetItem => !s.isBuiltin),
+    () => filteredSnippets.filter((s): s is UserSnippetItem => !s.isBuiltin),
     [filteredSnippets],
   );
   const filteredBuiltInSnippets = useMemo(
-    () =>
-      filteredSnippets.filter((s): s is BuiltInSnippetItem => s.isBuiltin),
+    () => filteredSnippets.filter((s): s is BuiltInSnippetItem => s.isBuiltin),
     [filteredSnippets],
   );
 
-  const selectedSnippet = useMemo(
-    () => allSnippets.find((s) => s.id === selectedSnippetId) ?? null,
-    [allSnippets, selectedSnippetId],
-  );
-
   const handleSingleClick = useCallback((id: string) => {
-    setSelectedSnippetId(id);
+    setPreviewSnippetId((prev) => (prev === id ? null : id));
   }, []);
 
   const handleDoubleClick = useCallback(
     (body: string) => {
+      setPreviewSnippetId(null);
       onInsertSnippet?.(body);
     },
     [onInsertSnippet],
@@ -172,13 +173,9 @@ export function SnippetPanel({
     setDeleteTarget(null);
   }, [deleteTarget, deleteSnippet]);
 
-  const selectedPreview = useMemo(() => {
-    if (!selectedSnippet) return null;
-    if (selectedSnippet.isBuiltin) {
-      return stripTabStops(selectedSnippet.body);
-    }
-    return selectedSnippet.code;
-  }, [selectedSnippet]);
+  const handleLockedClick = useCallback(() => {
+    openPricing("feature_gate");
+  }, [openPricing]);
 
   return (
     <>
@@ -228,7 +225,10 @@ export function SnippetPanel({
         </div>
 
         {/* Content area */}
-        <div className="flex-1 overflow-y-auto flex flex-col" style={{ minHeight: 0 }}>
+        <div
+          className="flex-1 overflow-y-auto flex flex-col"
+          style={{ minHeight: 0 }}
+        >
           {/* My Snippets Section */}
           <SectionHeader>My Snippets</SectionHeader>
 
@@ -243,7 +243,9 @@ export function SnippetPanel({
                   <UserSnippetRow
                     key={snippet.id}
                     snippet={snippet}
-                    isSelected={selectedSnippetId === snippet.id}
+                    isSelected={previewSnippetId === snippet.id}
+                    isPreviewOpen={previewSnippetId === snippet.id}
+                    previewContent={snippet.code}
                     onClick={() => handleSingleClick(snippet.id)}
                     onDoubleClick={() => handleDoubleClick(snippet.code)}
                     onDelete={(id, title) => setDeleteTarget({ id, title })}
@@ -258,26 +260,37 @@ export function SnippetPanel({
           <SectionHeader>Built-in</SectionHeader>
 
           <div className="px-1 space-y-0.5">
-            {filteredBuiltInSnippets.map((snippet) => (
-              <BuiltInSnippetRow
-                key={snippet.id}
-                snippet={snippet}
-                isSelected={selectedSnippetId === snippet.id}
-                onClick={() => handleSingleClick(snippet.id)}
-                onDoubleClick={() => handleDoubleClick(snippet.body)}
-                onDuplicate={(data) => onOpenDuplicateModal?.(data)}
-              />
-            ))}
+            {filteredBuiltInSnippets.map((snippet) => {
+              const isLocked =
+                !isTeamSnippetsEnabled && snippet.category === "pro";
+              const previewContent = stripTabStops(snippet.body);
+              return (
+                <BuiltInSnippetRow
+                  key={snippet.id}
+                  snippet={snippet}
+                  isSelected={previewSnippetId === snippet.id}
+                  isPreviewOpen={!isLocked && previewSnippetId === snippet.id}
+                  previewContent={previewContent}
+                  isLocked={isLocked}
+                  onClick={() => {
+                    if (isLocked) {
+                      handleLockedClick();
+                    } else {
+                      handleSingleClick(snippet.id);
+                    }
+                  }}
+                  onDoubleClick={() => {
+                    if (isLocked) {
+                      handleLockedClick();
+                    } else {
+                      handleDoubleClick(snippet.body);
+                    }
+                  }}
+                  onDuplicate={(data) => onOpenDuplicateModal?.(data)}
+                />
+              );
+            })}
           </div>
-
-          {/* Code preview */}
-          {selectedPreview ? (
-            <div className="mt-3 mx-2 mb-2 shrink-0">
-              <pre className="rounded border border-border bg-muted/30 p-2 font-mono text-xs text-foreground/80 whitespace-pre-wrap break-all leading-relaxed">
-                {selectedPreview}
-              </pre>
-            </div>
-          ) : null}
         </div>
 
         {/* Footer: New Snippet button (Pro only) */}
@@ -323,6 +336,8 @@ export function SnippetPanel({
 function UserSnippetRow({
   snippet,
   isSelected,
+  isPreviewOpen,
+  previewContent,
   onClick,
   onDoubleClick,
   onDelete,
@@ -330,125 +345,193 @@ function UserSnippetRow({
 }: {
   snippet: UserSnippetItem;
   isSelected: boolean;
+  isPreviewOpen: boolean;
+  previewContent: string;
   onClick: () => void;
   onDoubleClick: () => void;
   onDelete: (id: string, title: string) => void;
-  onEdit: (id: string, data: { title: string; triggerPrefix: string; code: string; description?: string; scope: SnippetScope }) => void;
+  onEdit: (
+    id: string,
+    data: {
+      title: string;
+      triggerPrefix: string;
+      code: string;
+      description?: string;
+      scope: SnippetScope;
+    },
+  ) => void;
 }) {
   return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors text-left",
-            isSelected
-              ? "bg-surface-hover text-foreground font-medium"
-              : "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
-          )}
-          onClick={onClick}
-          onDoubleClick={onDoubleClick}
-          title={snippet.description ?? snippet.title}
+    <Popover.Root open={isPreviewOpen}>
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors text-left",
+                isSelected
+                  ? "bg-surface-hover text-foreground font-medium"
+                  : "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
+              )}
+              onClick={onClick}
+              onDoubleClick={onDoubleClick}
+              title={snippet.description ?? snippet.title}
+            >
+              <CodeFile
+                size={14}
+                className="shrink-0 text-primary/60 group-hover:text-primary"
+              />
+              <span className="font-mono text-xs text-primary shrink-0">
+                {snippet.triggerPrefix}
+              </span>
+              <span className="truncate">{snippet.title}</span>
+            </button>
+          </Popover.Trigger>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content className="min-w-[140px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              onSelect={() =>
+                onEdit(snippet.id, {
+                  title: snippet.title,
+                  triggerPrefix: snippet.triggerPrefix,
+                  code: snippet.code,
+                  description: snippet.description ?? undefined,
+                  scope: snippet.scope,
+                })
+              }
+            >
+              Edit
+            </ContextMenu.Item>
+            <ContextMenu.Separator className="h-px bg-border my-1" />
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none text-destructive"
+              onSelect={() => onDelete(snippet.id, snippet.title)}
+            >
+              Delete
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
+      <Popover.Portal>
+        <Popover.Content
+          side="right"
+          sideOffset={8}
+          align="start"
+          className="z-50 max-w-sm max-h-64 overflow-auto rounded border border-border bg-popover shadow-lg p-2"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <CodeFile
-            size={14}
-            className="shrink-0 text-primary/60 group-hover:text-primary"
-          />
-          <span className="font-mono text-xs text-primary shrink-0">
-            {snippet.triggerPrefix}
-          </span>
-          <span className="truncate">{snippet.title}</span>
-        </button>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content className="min-w-[140px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
-          <ContextMenu.Item
-            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
-            onSelect={() =>
-              onEdit(snippet.id, {
-                title: snippet.title,
-                triggerPrefix: snippet.triggerPrefix,
-                code: snippet.code,
-                description: snippet.description ?? undefined,
-                scope: snippet.scope,
-              })
-            }
-          >
-            Edit
-          </ContextMenu.Item>
-          <ContextMenu.Separator className="h-px bg-border my-1" />
-          <ContextMenu.Item
-            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none text-destructive"
-            onSelect={() => onDelete(snippet.id, snippet.title)}
-          >
-            Delete
-          </ContextMenu.Item>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
+          <pre className="font-mono text-xs text-foreground/80 whitespace-pre-wrap break-all leading-relaxed">
+            {previewContent}
+          </pre>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
 function BuiltInSnippetRow({
   snippet,
   isSelected,
+  isPreviewOpen,
+  previewContent,
+  isLocked,
   onClick,
   onDoubleClick,
   onDuplicate,
 }: {
   snippet: BuiltInSnippetItem;
   isSelected: boolean;
+  isPreviewOpen: boolean;
+  previewContent: string;
+  isLocked: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
-  onDuplicate: (data: { title: string; triggerPrefix: string; code: string; description?: string }) => void;
+  onDuplicate: (data: {
+    title: string;
+    triggerPrefix: string;
+    code: string;
+    description?: string;
+  }) => void;
 }) {
+  const button = (
+    <button
+      type="button"
+      className={cn(
+        "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors text-left",
+        isLocked ? "relative overflow-hidden" : null,
+        isSelected && !isLocked
+          ? "bg-surface-hover text-foreground font-medium"
+          : "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
+      )}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      title={snippet.description}
+    >
+      {isLocked ? (
+        <div className="absolute inset-0 bg-background/30 backdrop-blur-[1px] rounded pointer-events-none" />
+      ) : null}
+      <CodeFile
+        size={14}
+        className="shrink-0 text-muted-foreground/60 group-hover:text-primary/70"
+      />
+      <span className="font-mono text-xs text-primary/80 shrink-0">
+        {snippet.triggerPrefix}
+      </span>
+      <span className="truncate">{snippet.title}</span>
+      {snippet.category === "pro" ? (
+        <span className="ml-auto shrink-0 text-[9px] font-bold uppercase text-primary/50 bg-primary/10 px-1 rounded">
+          pro
+        </span>
+      ) : null}
+    </button>
+  );
+
+  if (isLocked) {
+    return button;
+  }
+
   return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded group transition-colors text-left",
-            isSelected
-              ? "bg-surface-hover text-foreground font-medium"
-              : "text-foreground/80 hover:text-foreground hover:bg-surface-hover",
-          )}
-          onClick={onClick}
-          onDoubleClick={onDoubleClick}
-          title={snippet.description}
+    <Popover.Root open={isPreviewOpen}>
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>
+          <Popover.Trigger asChild>{button}</Popover.Trigger>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content className="min-w-[140px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
+            <ContextMenu.Item
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
+              onSelect={() =>
+                onDuplicate({
+                  title: `${snippet.title} (copy)`,
+                  triggerPrefix: snippet.triggerPrefix,
+                  code: snippet.body,
+                  description: snippet.description,
+                })
+              }
+            >
+              Duplicate
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
+      <Popover.Portal>
+        <Popover.Content
+          side="right"
+          sideOffset={8}
+          align="start"
+          className="z-50 max-w-sm max-h-64 overflow-auto rounded border border-border bg-popover shadow-lg p-2"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <CodeFile
-            size={14}
-            className="shrink-0 text-muted-foreground/60 group-hover:text-primary/70"
-          />
-          <span className="font-mono text-xs text-primary/80 shrink-0">
-            {snippet.triggerPrefix}
-          </span>
-          <span className="truncate">{snippet.title}</span>
-          {snippet.category === "pro" ? (
-            <span className="ml-auto shrink-0 text-[9px] font-bold uppercase text-primary/50 bg-primary/10 px-1 rounded">
-              pro
-            </span>
-          ) : null}
-        </button>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content className="min-w-[140px] bg-popover border border-border rounded-md shadow-lg p-1 z-50">
-          <ContextMenu.Item
-            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-surface-hover cursor-pointer outline-none"
-            onSelect={() =>
-              onDuplicate({
-                title: `${snippet.title} (copy)`,
-                triggerPrefix: snippet.triggerPrefix,
-                code: snippet.body,
-                description: snippet.description,
-              })
-            }
-          >
-            Duplicate
-          </ContextMenu.Item>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
+          <pre className="font-mono text-xs text-foreground/80 whitespace-pre-wrap break-all leading-relaxed">
+            {previewContent}
+          </pre>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
