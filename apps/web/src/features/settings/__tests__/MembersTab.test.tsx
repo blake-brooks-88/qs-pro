@@ -258,4 +258,94 @@ describe("MembersTab", () => {
       expect(transferHandler).toHaveBeenCalledWith({ newOwnerId: "user-2" });
     });
   });
+
+  it("renders relative minute label for recent lastActiveAt values", async () => {
+    const nowSpy = vi
+      .spyOn(Date, "now")
+      .mockReturnValue(new Date("2026-03-01T00:10:00.000Z").getTime());
+    try {
+      setupMockAuth("owner");
+      setupMembersHandler([
+        {
+          id: "user-1",
+          name: "Alice Owner",
+          email: "alice@example.com",
+          role: "owner",
+          lastActiveAt: "2026-03-01T00:05:00.000Z",
+          joinedAt: "2024-01-01T00:00:00Z",
+        },
+      ]);
+
+      renderWithProviders(<MembersTab />);
+
+      expect(await screen.findByText("Alice Owner")).toBeInTheDocument();
+      expect(screen.getByText("5 min ago")).toBeInTheDocument();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("closes the transfer ownership dialog on Escape", async () => {
+    setupMockAuth("owner");
+    setupMembersHandler();
+
+    renderWithProviders(<MembersTab />);
+
+    await screen.findByText("Bob Admin");
+
+    const bobRow = screen.getByText("Bob Admin").closest("tr") as HTMLElement;
+    await userEvent.click(
+      within(bobRow).getByRole("button", { name: "Transfer Ownership" }),
+    );
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows a pending state while transferring ownership", async () => {
+    setupMockAuth("owner");
+    setupMembersHandler();
+
+    let resolveRequest: (() => void) | null = null;
+    server.use(
+      http.post("/api/admin/transfer-ownership", async ({ request }) => {
+        await new Promise<void>((resolve) => {
+          resolveRequest = resolve;
+        });
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(body);
+      }),
+    );
+
+    renderWithProviders(<MembersTab />);
+    await screen.findByText("Bob Admin");
+
+    const bobRow = screen.getByText("Bob Admin").closest("tr") as HTMLElement;
+    await userEvent.click(
+      within(bobRow).getByRole("button", { name: "Transfer Ownership" }),
+    );
+
+    const dialog = screen.getByRole("dialog");
+    const confirmBtn = within(dialog).getByRole("button", {
+      name: "Transfer Ownership",
+    });
+    await userEvent.click(confirmBtn);
+
+    expect(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Transferring...",
+      }),
+    ).toBeInTheDocument();
+
+    resolveRequest?.();
+
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
 });

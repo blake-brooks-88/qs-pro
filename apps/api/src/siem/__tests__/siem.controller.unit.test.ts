@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserSession } from '../../common/decorators/current-user.decorator';
-import { SiemController } from '../siem.controller';
+import { SiemController, UpsertSiemConfigSchema } from '../siem.controller';
 import type { SiemWebhookConfigResponse } from '../siem.types';
 
 const mockSiemService = {
@@ -145,5 +145,30 @@ describe('SiemController', () => {
         'This feature is not enabled for your subscription.',
       );
     });
+  });
+});
+
+describe('UpsertSiemConfigSchema', () => {
+  it('rejects private or internal network webhook targets', () => {
+    const result = UpsertSiemConfigSchema.safeParse({
+      webhookUrl: 'https://127.0.0.1/webhook',
+      secret: 'my-long-secret-key',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.webhookUrl?.[0]).toContain(
+        'Webhook URL must not target private or internal networks',
+      );
+    }
+  });
+
+  it('accepts a valid HTTPS webhook URL', () => {
+    const result = UpsertSiemConfigSchema.safeParse({
+      webhookUrl: 'https://siem.example.com/hook',
+      secret: 'my-long-secret-key',
+    });
+
+    expect(result.success).toBe(true);
   });
 });

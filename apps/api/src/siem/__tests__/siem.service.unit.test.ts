@@ -1,16 +1,27 @@
-import { ErrorCode } from '@qpp/backend-shared';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@qpp/backend-shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@qpp/backend-shared')>();
+  return {
+    ...actual,
+    assertPublicHostname: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+import { assertPublicHostname, ErrorCode } from '@qpp/backend-shared';
 import type {
   ISiemWebhookConfigRepository,
   SiemWebhookConfig,
 } from '@qpp/database';
 import axios from 'axios';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SiemService } from '../siem.service';
 
 vi.mock('axios', () => ({
   default: { post: vi.fn() },
 }));
+
+const mockAssertPublicHostname = vi.mocked(assertPublicHostname);
 
 const mockSiemRepo: ISiemWebhookConfigRepository = {
   findByTenantId: vi.fn(),
@@ -60,6 +71,7 @@ describe('SiemService', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    mockAssertPublicHostname.mockResolvedValue(undefined);
     service = new SiemService(
       mockSiemRepo,
       mockRlsContext as never,
@@ -127,6 +139,15 @@ describe('SiemService', () => {
         }),
       ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
     });
+
+    it('rejects private/internal webhook hostname', async () => {
+      await expect(
+        service.upsertConfig('tenant-1', '12345', {
+          webhookUrl: 'https://localhost/hook',
+          secret: 'my-secret',
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+    });
   });
 
   describe('deleteConfig', () => {
@@ -159,6 +180,18 @@ describe('SiemService', () => {
       const result = await service.testWebhook('tenant-1', '12345');
 
       expect(result).toEqual({ success: true, statusCode: 200 });
+    });
+
+    it('returns failure when SSRF guard blocks the hostname', async () => {
+      vi.mocked(mockSiemRepo.findByTenantId).mockResolvedValue(buildConfig());
+      mockAssertPublicHostname.mockRejectedValueOnce(
+        new Error('SSRF blocked: test'),
+      );
+
+      const result = await service.testWebhook('tenant-1', '12345');
+
+      expect(result).toEqual({ success: false, error: 'SSRF blocked: test' });
+      expect(axios.post).not.toHaveBeenCalled();
     });
 
     it('returns failure for non-2xx status', async () => {

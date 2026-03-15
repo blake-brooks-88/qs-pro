@@ -5,12 +5,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   DrizzleCredentialsRepository,
+  DrizzleSiemWebhookConfigRepository,
   DrizzleTenantRepository,
   DrizzleUserRepository,
 } from "../repositories/drizzle-repositories";
 import {
   credentials,
   shellQueryRuns,
+  siemWebhookConfigs,
   snippets,
   tenantFeatureOverrides,
   tenants,
@@ -40,6 +42,7 @@ describe("Drizzle Repositories", () => {
   let tenantRepo: DrizzleTenantRepository;
   let userRepo: DrizzleUserRepository;
   let credRepo: DrizzleCredentialsRepository;
+  let siemRepo: DrizzleSiemWebhookConfigRepository;
   let testTenantId: string;
   let testUserId: string;
 
@@ -66,6 +69,9 @@ describe("Drizzle Repositories", () => {
     await cleanupDb.delete(credentials).where(or(...credentialConditions));
 
     if (tenantIds.length > 0) {
+      await cleanupDb
+        .delete(siemWebhookConfigs)
+        .where(inArray(siemWebhookConfigs.tenantId, tenantIds));
       await cleanupDb
         .delete(snippets)
         .where(inArray(snippets.tenantId, tenantIds));
@@ -99,6 +105,7 @@ describe("Drizzle Repositories", () => {
     tenantRepo = new DrizzleTenantRepository(db);
     userRepo = new DrizzleUserRepository(db);
     credRepo = new DrizzleCredentialsRepository(db);
+    siemRepo = new DrizzleSiemWebhookConfigRepository(db);
 
     cleanupClient = postgres(migrationConnectionString, { max: 1 });
     cleanupDb = drizzle(cleanupClient);
@@ -135,9 +142,68 @@ describe("Drizzle Repositories", () => {
     const savedUser = await userRepo.upsert(userData);
     testUserId = savedUser.id;
     expect(savedUser.sfUserId).toBe(userData.sfUserId);
+    expect(savedUser.role).toBe("owner");
 
     const foundUser = await userRepo.findBySfUserId(userData.sfUserId);
     expect(foundUser?.id).toBe(savedUser.id);
+    expect(foundUser?.role).toBe("owner");
+  });
+
+  it("should update role and support owner assignment + lastActive + tenant queries", async () => {
+    const secondUser = await userRepo.upsert({
+      sfUserId: "repo-test-user-790",
+      tenantId: testTenantId,
+      email: "second@example.com",
+      name: "Zed Second",
+    });
+
+    await userRepo.updateRole(secondUser.id, "admin");
+    const updated = await userRepo.findById(secondUser.id);
+    expect(updated?.role).toBe("admin");
+
+    // Remove the owner role from the original user, then verify the repository
+    // can promote another user to restore the invariant.
+    await userRepo.updateRole(testUserId, "admin");
+
+    const promoted = await userRepo.assignOwnerIfNone(
+      secondUser.id,
+      testTenantId,
+    );
+    expect(promoted).toBe(true);
+    const afterPromotion = await userRepo.findById(secondUser.id);
+    expect(afterPromotion?.role).toBe("owner");
+
+    const thirdUser = await userRepo.upsert({
+      sfUserId: "repo-test-user-791",
+      tenantId: testTenantId,
+      email: "third@example.com",
+      name: "Amy Third",
+    });
+    const promotedSecond = await userRepo.assignOwnerIfNone(
+      thirdUser.id,
+      testTenantId,
+    );
+    expect(promotedSecond).toBe(false);
+
+    const byTenant = await userRepo.findByTenantId(testTenantId);
+    expect(byTenant.map((u) => u.id)).toEqual(
+      expect.arrayContaining([secondUser.id, thirdUser.id]),
+    );
+
+    // Uses an ORDER BY in the repo; verify the ordering at the boundary.
+    expect(byTenant.map((u) => u.name)).toEqual(
+      [...byTenant.map((u) => u.name)].sort(),
+    );
+
+    await userRepo.updateLastActiveAt(thirdUser.id);
+    const afterLastActive = await userRepo.findById(thirdUser.id);
+    expect(afterLastActive?.lastActiveAt).toBeTruthy();
+
+    const ownerCount = await userRepo.countByTenantIdAndRole(
+      testTenantId,
+      "owner",
+    );
+    expect(ownerCount).toBeGreaterThanOrEqual(1);
   });
 
   it("should upsert and find credentials", async () => {
@@ -163,6 +229,93 @@ describe("Drizzle Repositories", () => {
       mid,
     );
     expect(foundCred?.id).toBe(savedCred.id);
+  });
+
+  it("should find distinct MIDs for a tenant", async () => {
+    const midA = TEST_MID;
+    const midB = "mid-456";
+    const otherUser = await userRepo.upsert({
+      sfUserId: "repo-test-user-792",
+      tenantId: testTenantId,
+      email: "other@example.com",
+      name: "Other User",
+    });
+
+    await client`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
+    await client`SELECT set_config('app.mid', ${midA}, false)`;
+    await credRepo.upsert({
+      tenantId: testTenantId,
+      userId: testUserId,
+      mid: midA,
+      accessToken: "access-a",
+      refreshToken: "refresh-a",
+      expiresAt: new Date(Date.now() + 3600000),
+    });
+
+    await client`SELECT set_config('app.mid', ${midB}, false)`;
+    await credRepo.upsert({
+      tenantId: testTenantId,
+      userId: otherUser.id,
+      mid: midB,
+      accessToken: "access-b",
+      refreshToken: "refresh-b",
+      expiresAt: new Date(Date.now() + 3600000),
+    });
+
+    // Credentials are protected by tenant + mid RLS. This repo method therefore returns
+    // only the mids visible under the current `app.mid` context.
+    await client`SELECT set_config('app.mid', ${midA}, false)`;
+    expect(await credRepo.findDistinctMidsByTenantId(testTenantId)).toEqual([
+      midA,
+    ]);
+
+    await client`SELECT set_config('app.mid', ${midB}, false)`;
+    expect(await credRepo.findDistinctMidsByTenantId(testTenantId)).toEqual([
+      midB,
+    ]);
+
+    await client`SELECT set_config('app.mid', ${"mid-does-not-exist"}, false)`;
+    expect(await credRepo.findDistinctMidsByTenantId(testTenantId)).toEqual([]);
+  });
+
+  it("should upsert and manage SIEM webhook config lifecycle", async () => {
+    await client`SELECT set_config('app.tenant_id', ${testTenantId}, false)`;
+    await client`SELECT set_config('app.mid', ${TEST_MID}, false)`;
+
+    expect(await siemRepo.findByTenantId(testTenantId)).toBeUndefined();
+
+    const created = await siemRepo.upsert({
+      tenantId: testTenantId,
+      mid: TEST_MID,
+      webhookUrl: "https://siem.example.test/webhook",
+      secretEncrypted: "enc-secret",
+      enabled: true,
+    });
+    expect(created.tenantId).toBe(testTenantId);
+    expect(created.webhookUrl).toBe("https://siem.example.test/webhook");
+
+    await siemRepo.updateStatus(testTenantId, {
+      enabled: false,
+      disabledReason: "manual",
+    });
+    const afterDisable = await siemRepo.findByTenantId(testTenantId);
+    expect(afterDisable?.enabled).toBe(false);
+    expect(afterDisable?.disabledReason).toBe("manual");
+
+    const failures = await siemRepo.incrementFailures(testTenantId, "boom");
+    expect(failures).toBeGreaterThanOrEqual(1);
+    const afterFailure = await siemRepo.findByTenantId(testTenantId);
+    expect(afterFailure?.lastFailureReason).toBe("boom");
+
+    await siemRepo.resetFailures(testTenantId);
+    const afterReset = await siemRepo.findByTenantId(testTenantId);
+    expect(afterReset?.consecutiveFailures).toBe(0);
+    expect(afterReset?.lastSuccessAt).toBeTruthy();
+
+    await siemRepo.disable(testTenantId, "too many failures");
+    const afterDisableCall = await siemRepo.findByTenantId(testTenantId);
+    expect(afterDisableCall?.enabled).toBe(false);
+    expect(afterDisableCall?.disabledReason).toBe("too many failures");
   });
 });
 

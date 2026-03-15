@@ -164,8 +164,17 @@ describe('RLS Isolation Regression Suite', () => {
         VALUES (${auditLogAId}::uuid, ${tenantAId}::uuid, ${ctxA.mid}, 'test.rls_check', 'user', ${userA1Id}::uuid)
       `;
       await conn`
-        INSERT INTO snippets (id, user_id, tenant_id, title, code)
-        VALUES (${snippetAId}::uuid, ${userA1Id}::uuid, ${tenantAId}::uuid, 'RLS Test Snippet', 'SELECT 1')
+        INSERT INTO snippets (id, user_id, tenant_id, mid, scope, title, code, is_shared)
+        VALUES (
+          ${snippetAId}::uuid,
+          ${userA1Id}::uuid,
+          ${tenantAId}::uuid,
+          ${ctxA.mid},
+          'tenant',
+          'RLS Test Snippet',
+          'SELECT 1',
+          false
+        )
       `;
       await conn`
         INSERT INTO tenant_feature_overrides (id, tenant_id, feature_key, enabled)
@@ -545,8 +554,17 @@ describe('RLS Isolation Regression Suite', () => {
         withRlsContext(ctxB, async (conn) => {
           const id = crypto.randomUUID();
           await conn`
-            INSERT INTO snippets (id, user_id, tenant_id, title, code)
-            VALUES (${id}::uuid, ${userA1Id}::uuid, ${tenantAId}::uuid, 'Bad Snippet', 'SELECT 1')
+            INSERT INTO snippets (id, user_id, tenant_id, mid, scope, title, code, is_shared)
+            VALUES (
+              ${id}::uuid,
+              ${userA1Id}::uuid,
+              ${tenantAId}::uuid,
+              ${ctxA.mid},
+              'tenant',
+              'Bad Snippet',
+              'SELECT 1',
+              false
+            )
           `;
         }),
       ).rejects.toThrow(/new row violates row-level security/);

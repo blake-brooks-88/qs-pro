@@ -22,6 +22,7 @@ import { AuditService } from '../audit/audit.service';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { TrialService } from '../trial/trial.service';
+import { LastActiveService } from './last-active.service';
 
 type SecureSession = {
   get(key: string): unknown;
@@ -53,6 +54,7 @@ export class AuthController {
     private configService: ConfigService,
     private readonly auditService: AuditService,
     private readonly trialService: TrialService,
+    private readonly lastActiveService: LastActiveService,
   ) {}
 
   private clearAuthSession(session: SecureSession | undefined): void {
@@ -184,7 +186,7 @@ export class AuthController {
       };
     }
 
-    void this.authService.touchLastActive(userSession.userId);
+    void this.lastActiveService.touchLastActive(userSession.userId);
 
     const csrfToken = req.session ? this.ensureCsrfToken(req.session) : null;
     return { user, tenant, csrfToken };

@@ -65,9 +65,7 @@ describe('FeaturesController', () => {
         getRequest: () => ({}),
       }),
     } as unknown as ExecutionContext;
-    await expect(guard.canActivate(mockContext)).rejects.toThrow(
-      UnauthorizedException,
-    );
+    expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException);
   });
 
   it('returns correct features for authenticated tenant', async () => {

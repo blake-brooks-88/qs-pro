@@ -124,6 +124,14 @@ export class DrizzleUserRepository implements IUserRepository {
         { operation: "upsertUser" },
       );
     }
+
+    if (result.role !== "owner" && result.tenantId) {
+      const promoted = await this.assignOwnerIfNone(result.id, result.tenantId);
+      if (promoted) {
+        return { ...result, role: "owner" as const };
+      }
+    }
+
     return result;
   }
 

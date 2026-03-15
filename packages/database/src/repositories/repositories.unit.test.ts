@@ -22,6 +22,7 @@ function createMockDrizzleDb() {
   let selectResult: unknown[] = [];
   let insertResult: unknown[] = [];
   let insertError: Error | null = null;
+  let executeResult: unknown[] = [];
   const capturedWhereArgs: unknown[][] = [];
   const capturedInsertValues: unknown[] = [];
 
@@ -81,11 +82,14 @@ function createMockDrizzleDb() {
     set: mockSet,
   });
 
+  const mockExecute = vi.fn().mockImplementation(async () => executeResult);
+
   return {
     select: mockSelect,
     insert: mockInsert,
     delete: mockDelete,
     update: mockUpdate,
+    execute: mockExecute,
     // Helpers for test configuration
     setSelectResult: (result: unknown[]) => {
       selectResult = result;
@@ -96,6 +100,9 @@ function createMockDrizzleDb() {
     setInsertError: (error: Error | null) => {
       insertError = error;
     },
+    setExecuteResult: (result: unknown[]) => {
+      executeResult = result;
+    },
     getCapturedWhereArgs: () => capturedWhereArgs,
     getCapturedInsertValues: () => capturedInsertValues,
     getCapturedSetArgs: () => capturedSetArgs,
@@ -104,6 +111,7 @@ function createMockDrizzleDb() {
       capturedInsertValues.length = 0;
       capturedSetArgs.length = 0;
       insertError = null;
+      executeResult = [];
     },
     // Access to mocks for assertions
     mocks: {
@@ -119,6 +127,7 @@ function createMockDrizzleDb() {
       update: mockUpdate,
       set: mockSet,
       updateWhere: mockUpdateWhere,
+      execute: mockExecute,
     },
   };
 }

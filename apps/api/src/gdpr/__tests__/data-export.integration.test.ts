@@ -102,7 +102,7 @@ describe('DataExportService (integration)', () => {
       { name: 'Export Query', sqlText: PLAIN_SQL_QUERY, folderId },
     );
 
-    await createTestSnippet(sqlClient, tenantId, userId, {
+    await createTestSnippet(sqlClient, tenantId, TEST_MID, userId, {
       title: 'Export Snippet',
       code: 'SELECT 1 FROM _Job',
     });

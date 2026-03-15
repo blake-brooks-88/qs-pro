@@ -154,28 +154,29 @@ export async function createTestSavedQuery(
 export async function createTestSnippet(
   sql: Sql,
   tenantId: string,
+  mid: string,
   userId: string,
   opts?: { title?: string; code?: string; isShared?: boolean },
 ): Promise<{ snippetId: string }> {
   const title = opts?.title ?? 'GDPR Test Snippet';
   const code = opts?.code ?? 'SELECT 1';
   const isShared = opts?.isShared ?? false;
-  const reserved = await sql.reserve();
-  try {
-    await reserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
-    const [row] = await reserved`
-      INSERT INTO snippets (tenant_id, user_id, title, code, is_shared)
-      VALUES (${tenantId}::uuid, ${userId}::uuid, ${title}, ${code}, ${isShared})
+  const row = await sql.begin(async (tx) => {
+    await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+    await tx`SELECT set_config('app.mid', ${mid}, true)`;
+    const [created] = await tx`
+      INSERT INTO snippets (tenant_id, mid, scope, user_id, title, code, is_shared)
+      VALUES (${tenantId}::uuid, ${mid}, 'bu', ${userId}::uuid, ${title}, ${code}, ${isShared})
       RETURNING id
     `;
-    await reserved`RESET app.tenant_id`;
-    if (!row) {
-      throw new Error('Failed to insert test snippet');
-    }
-    return { snippetId: row.id };
-  } finally {
-    reserved.release();
+    return created;
+  });
+
+  if (!row) {
+    throw new Error('Failed to insert test snippet');
   }
+
+  return { snippetId: row.id };
 }
 
 export async function createTestAuditLog(

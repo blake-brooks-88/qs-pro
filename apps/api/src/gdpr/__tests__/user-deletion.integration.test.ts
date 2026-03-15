@@ -222,7 +222,7 @@ describe('UserDeletionService (integration)', () => {
       );
       savedQueryId = savedQuery.savedQueryId;
 
-      await createTestSnippet(sqlClient, tenantId, freshUserId, {
+      await createTestSnippet(sqlClient, tenantId, TEST_MID, freshUserId, {
         title: 'Personal Snip',
         isShared: false,
       });
@@ -230,6 +230,7 @@ describe('UserDeletionService (integration)', () => {
       const sharedSnippet = await createTestSnippet(
         sqlClient,
         tenantId,
+        TEST_MID,
         freshUserId,
         { title: 'Shared Snip', isShared: true },
       );
@@ -344,10 +345,12 @@ describe('UserDeletionService (integration)', () => {
       const snippetReserved = await sqlClient.reserve();
       try {
         await snippetReserved`SELECT set_config('app.tenant_id', ${tenantId}, false)`;
+        await snippetReserved`SELECT set_config('app.mid', ${TEST_MID}, false)`;
         const sharedSnippetRows = await snippetReserved`
           SELECT user_id FROM snippets WHERE id = ${sharedSnippetId}::uuid
         `;
         await snippetReserved`RESET app.tenant_id`;
+        await snippetReserved`RESET app.mid`;
         expect(sharedSnippetRows[0]?.user_id).toBeNull();
       } finally {
         snippetReserved.release();

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from '@qpp/database';
-import { shellQueryRuns, users } from '@qpp/database';
+import { users } from '@qpp/database';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type Redis from 'ioredis';
 
@@ -19,20 +19,11 @@ export class RedisCleanupService {
       .from(users)
       .where(eq(users.tenantId, tenantId));
 
-    const tenantRuns = await this.db
-      .select({ id: shellQueryRuns.id })
-      .from(shellQueryRuns)
-      .where(eq(shellQueryRuns.tenantId, tenantId));
-
     const keys: string[] = [];
 
     for (const user of tenantUsers) {
       keys.push(`sse-limit:${user.id}`);
       keys.push(user.id); // throttler rate-limit key
-    }
-
-    for (const run of tenantRuns) {
-      keys.push(`run-status:last:${run.id}`);
     }
 
     if (keys.length === 0) {

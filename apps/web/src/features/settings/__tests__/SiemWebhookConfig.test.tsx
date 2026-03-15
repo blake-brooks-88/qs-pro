@@ -145,6 +145,60 @@ describe("SiemWebhookConfig", () => {
         });
       });
     });
+
+    it("clears URL validation error after the URL is edited", async () => {
+      setupAuth();
+      setupNoConfigHandler();
+
+      renderWithProviders(<SiemWebhookConfig />);
+
+      const urlInput = await screen.findByPlaceholderText(
+        "https://your-siem-endpoint.com/webhook",
+      );
+      const secretInput = screen.getByPlaceholderText("Minimum 16 characters");
+
+      await userEvent.type(urlInput, "http://insecure.com/webhook");
+      await userEvent.type(secretInput, "a-secret-that-is-long-enough");
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Save Configuration" }),
+      );
+
+      expect(
+        screen.getByText("Webhook URL must use HTTPS"),
+      ).toBeInTheDocument();
+
+      await userEvent.clear(urlInput);
+      await userEvent.type(urlInput, "https://secure.example.com/webhook");
+
+      expect(
+        screen.queryByText("Webhook URL must use HTTPS"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("enables save once the secret reaches 16 characters", async () => {
+      setupAuth();
+      setupNoConfigHandler();
+
+      renderWithProviders(<SiemWebhookConfig />);
+
+      const urlInput = await screen.findByPlaceholderText(
+        "https://your-siem-endpoint.com/webhook",
+      );
+      const secretInput = screen.getByPlaceholderText("Minimum 16 characters");
+
+      await userEvent.type(urlInput, "https://secure.example.com/webhook");
+      await userEvent.type(secretInput, "short");
+
+      const saveBtn = screen.getByRole("button", {
+        name: "Save Configuration",
+      });
+      expect(saveBtn).toBeDisabled();
+
+      await userEvent.type(secretInput, "a-secret-that-is-long-enough");
+
+      expect(saveBtn).toBeEnabled();
+    });
   });
 
   describe("Management mode (config exists)", () => {
@@ -302,6 +356,10 @@ describe("SiemWebhookConfig", () => {
       await vi.waitFor(() => {
         expect(deleteHandler).toHaveBeenCalled();
       });
+
+      await vi.waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
     });
 
     it("update configuration button fires upsert mutation", async () => {
@@ -329,6 +387,67 @@ describe("SiemWebhookConfig", () => {
       await vi.waitFor(() => {
         expect(upsertHandler).toHaveBeenCalled();
       });
+    });
+
+    it("shows and clears URL validation error when updating configuration", async () => {
+      setupAuth();
+      setupConfigHandler();
+
+      renderWithProviders(<SiemWebhookConfig />);
+
+      const urlInput = await screen.findByPlaceholderText(
+        "https://your-siem-endpoint.com/webhook",
+      );
+
+      await userEvent.clear(urlInput);
+      await userEvent.type(urlInput, "http://insecure.example.com/webhook");
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Update Configuration" }),
+      );
+
+      expect(
+        screen.getByText("Webhook URL must use HTTPS"),
+      ).toBeInTheDocument();
+
+      await userEvent.clear(urlInput);
+      await userEvent.type(urlInput, "https://secure.example.com/webhook");
+
+      expect(
+        screen.queryByText("Webhook URL must use HTTPS"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders a 'Never' last success label when no success timestamp exists", async () => {
+      setupAuth();
+      setupConfigHandler({ ...mockConfig, lastSuccessAt: null });
+
+      renderWithProviders(<SiemWebhookConfig />);
+
+      expect(
+        await screen.findByText(/Last success:\s*Never/i),
+      ).toBeInTheDocument();
+    });
+
+    it("renders a relative minute label for last success time within the hour", async () => {
+      const nowSpy = vi
+        .spyOn(Date, "now")
+        .mockReturnValue(new Date("2026-03-01T00:10:00.000Z").getTime());
+      try {
+        setupAuth();
+        setupConfigHandler({
+          ...mockConfig,
+          lastSuccessAt: "2026-03-01T00:05:00.000Z",
+        });
+
+        renderWithProviders(<SiemWebhookConfig />);
+
+        expect(
+          await screen.findByText(/Last success:\s*5 min ago/i),
+        ).toBeInTheDocument();
+      } finally {
+        nowSpy.mockRestore();
+      }
     });
   });
 

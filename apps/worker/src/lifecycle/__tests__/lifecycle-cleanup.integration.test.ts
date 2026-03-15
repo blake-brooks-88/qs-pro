@@ -247,11 +247,91 @@ describe("LifecycleCleanupService (integration)", () => {
     const rows =
       await privSql`SELECT id, deletion_metadata FROM tenants WHERE id = ${tenantId}::uuid`;
     expect(rows).toHaveLength(1);
-    expect(
-      Number(
-        (rows[0]?.deletion_metadata as Record<string, unknown>)?.stripeAttempts,
-      ),
-    ).toBe(3);
+    const rawMetadata = rows[0]?.deletion_metadata;
+    const metadata =
+      typeof rawMetadata === "string"
+        ? (JSON.parse(rawMetadata) as Record<string, unknown>)
+        : (rawMetadata as Record<string, unknown> | null);
+    expect(metadata?.stripeAttempts).toBe(3);
+  });
+
+  it("handles scalar deletion_metadata values when incrementing stripeAttempts", async () => {
+    stripeMock.customers.del.mockRejectedValue(new Error("Stripe API error"));
+
+    const tenantId = await createExpiredTenant("stripe-retry-scalar", 31, {
+      stripeCustomerId: "cus_lifecycle_retry_scalar",
+    });
+
+    await privSql`
+      UPDATE tenants
+      SET deletion_metadata = to_jsonb('{"stripeAttempts": 4}'::text)
+      WHERE id = ${tenantId}::uuid
+    `;
+
+    await service.handleDailyCleanup();
+
+    const rows =
+      await privSql`SELECT deletion_metadata FROM tenants WHERE id = ${tenantId}::uuid`;
+    expect(rows).toHaveLength(1);
+
+    const rawMetadata = rows[0]?.deletion_metadata;
+    const metadata =
+      typeof rawMetadata === "string"
+        ? (JSON.parse(rawMetadata) as Record<string, unknown>)
+        : (rawMetadata as Record<string, unknown> | null);
+
+    expect(metadata?.stripeAttempts).toBe(5);
+  });
+
+  it("treats invalid JSON deletion_metadata strings as 0 stripe attempts", async () => {
+    stripeMock.customers.del.mockRejectedValue(new Error("Stripe API error"));
+
+    const tenantId = await createExpiredTenant("stripe-retry-invalid-json", 31, {
+      stripeCustomerId: "cus_lifecycle_retry_invalid_json",
+    });
+
+    await privSql`
+      UPDATE tenants
+      SET deletion_metadata = to_jsonb('not-json'::text)
+      WHERE id = ${tenantId}::uuid
+    `;
+
+    await service.handleDailyCleanup();
+
+    const rows =
+      await privSql`SELECT deletion_metadata FROM tenants WHERE id = ${tenantId}::uuid`;
+    expect(rows).toHaveLength(1);
+
+    const rawMetadata = rows[0]?.deletion_metadata;
+    const metadata =
+      typeof rawMetadata === "string"
+        ? (JSON.parse(rawMetadata) as Record<string, unknown>)
+        : (rawMetadata as Record<string, unknown> | null);
+
+    expect(metadata?.stripeAttempts).toBe(1);
+  });
+
+  it("treats non-number stripeAttempts as 0 attempts when incrementing", async () => {
+    stripeMock.customers.del.mockRejectedValue(new Error("Stripe API error"));
+
+    const tenantId = await createExpiredTenant("stripe-retry-non-number", 31, {
+      stripeCustomerId: "cus_lifecycle_retry_non_number",
+      deletionMetadata: { stripeAttempts: "3" },
+    });
+
+    await service.handleDailyCleanup();
+
+    const rows =
+      await privSql`SELECT deletion_metadata FROM tenants WHERE id = ${tenantId}::uuid`;
+    expect(rows).toHaveLength(1);
+
+    const rawMetadata = rows[0]?.deletion_metadata;
+    const metadata =
+      typeof rawMetadata === "string"
+        ? (JSON.parse(rawMetadata) as Record<string, unknown>)
+        : (rawMetadata as Record<string, unknown> | null);
+
+    expect(metadata?.stripeAttempts).toBe(1);
   });
 
   it("should purge audit logs past tenant retention period", async () => {

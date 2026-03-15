@@ -3,6 +3,8 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Queue } from 'bullmq';
+import type Redis from 'ioredis';
 import type { Sql } from 'postgres';
 import {
   afterAll,
@@ -18,12 +20,11 @@ import {
   cleanupGdprTestData,
   createTestOrgSubscription,
   createTestTenant,
+  createTestUser,
 } from '../../../test/helpers/gdpr-test-data';
 import { AppModule } from '../../app.module';
 import { STRIPE_CLIENT } from '../../billing/stripe.provider';
 import { configureApp } from '../../configure-app';
-import { BullmqCleanupService } from '../bullmq-cleanup.service';
-import { RedisCleanupService } from '../redis-cleanup.service';
 import { TenantDeletionService } from '../tenant-deletion.service';
 
 function getRequiredEnv(key: string): string {
@@ -43,23 +44,14 @@ describe('TenantDeletionService (integration)', () => {
   let app: NestFastifyApplication;
   let tenantDeletionService: TenantDeletionService;
   let sqlClient: Sql;
-  let redisMock: { purgeForTenant: ReturnType<typeof vi.fn> };
-  let bullmqMock: { removeJobsForTenant: ReturnType<typeof vi.fn> };
 
   let tenantId: string;
   let eid: string;
 
   beforeAll(async () => {
-    redisMock = { purgeForTenant: vi.fn() };
-    bullmqMock = { removeJobsForTenant: vi.fn() };
-
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      .overrideProvider(RedisCleanupService)
-      .useValue(redisMock)
-      .overrideProvider(BullmqCleanupService)
-      .useValue(bullmqMock)
       .overrideProvider(STRIPE_CLIENT)
       .useValue(stripeMock)
       .compile();
@@ -139,16 +131,61 @@ describe('TenantDeletionService (integration)', () => {
     expect(row?.deleted_at).not.toBeNull();
   });
 
-  it('should call RedisCleanupService.purgeForTenant', async () => {
-    await tenantDeletionService.softDeleteTenant(tenantId, 'actor-1');
+  it('should purge tenant Redis keys and queued BullMQ jobs', async () => {
+    const redis = app.get<Redis>('REDIS_CLIENT');
 
-    expect(redisMock.purgeForTenant).toHaveBeenCalledWith(tenantId);
-  });
+    const { userId } = await createTestUser(sqlClient, tenantId, {
+      sfUserId: `sf-gdpr-tenant-del-${crypto.randomUUID()}`,
+      role: 'member',
+    });
 
-  it('should call BullmqCleanupService.removeJobsForTenant', async () => {
-    await tenantDeletionService.softDeleteTenant(tenantId, 'actor-1');
+    const userSseKey = `sse-limit:${userId}`;
+    const userThrottleKey = userId;
 
-    expect(bullmqMock.removeJobsForTenant).toHaveBeenCalledWith(tenantId);
+    await redis.set(userSseKey, '1');
+    await redis.set(userThrottleKey, '1');
+
+    const bullConnection = redis.duplicate();
+    const shellQueue = new Queue('shell-query', {
+      connection: bullConnection as never,
+    });
+    const siemQueue = new Queue('siem-webhook', {
+      connection: bullConnection as never,
+    });
+
+    try {
+      const shellJob = await shellQueue.add('execute-shell-query', {
+        tenantId,
+      });
+      const siemJob = await siemQueue.add('deliver-webhook', { tenantId });
+
+      await tenantDeletionService.softDeleteTenant(tenantId, 'actor-1');
+
+      expect(await redis.get(userSseKey)).toBeNull();
+      expect(await redis.get(userThrottleKey)).toBeNull();
+
+      const shellJobs = await shellQueue.getJobs([
+        'waiting',
+        'delayed',
+        'active',
+        'completed',
+        'failed',
+      ]);
+      expect(shellJobs.some((job) => job.id === shellJob.id)).toBe(false);
+
+      const siemJobs = await siemQueue.getJobs([
+        'waiting',
+        'delayed',
+        'active',
+        'completed',
+        'failed',
+      ]);
+      expect(siemJobs.some((job) => job.id === siemJob.id)).toBe(false);
+    } finally {
+      await shellQueue.close();
+      await siemQueue.close();
+      await bullConnection.quit();
+    }
   });
 
   it('should create deletion ledger entry', async () => {

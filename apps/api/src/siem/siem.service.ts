@@ -3,9 +3,11 @@ import { createHmac } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AppError,
+  assertPublicHostname,
   EncryptionService,
   ErrorCode,
   RlsContextService,
+  validateWebhookUrl,
 } from '@qpp/backend-shared';
 import type {
   ISiemWebhookConfigRepository,
@@ -87,6 +89,13 @@ export class SiemService {
       });
     }
 
+    const ssrfError = validateWebhookUrl(data.webhookUrl);
+    if (ssrfError) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+        reason: ssrfError,
+      });
+    }
+
     const secretEncrypted = this.encryptionService.encrypt(data.secret);
     if (!secretEncrypted) {
       throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
@@ -163,6 +172,8 @@ export class SiemService {
     const { signature, timestamp } = signPayload(body, secret);
 
     try {
+      await assertPublicHostname(config.webhookUrl);
+
       const response = await axios.post(config.webhookUrl, body, {
         headers: {
           'Content-Type': 'application/json',

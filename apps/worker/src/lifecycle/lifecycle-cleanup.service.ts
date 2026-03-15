@@ -77,7 +77,7 @@ export class LifecycleCleanupService {
   private async processExpiredTenant(tenant: {
     id: string;
     eid: string;
-    deletionMetadata: Record<string, unknown> | null;
+    deletionMetadata: unknown;
   }): Promise<void> {
     const stripeCustomerId = await this.db.transaction(async (tx) => {
       await tx.execute(
@@ -98,21 +98,48 @@ export class LifecycleCleanupService {
           `Deleted Stripe customer ${stripeCustomerId} for tenant ${tenant.id}`,
         );
       } catch {
-        const currentAttempts =
-          ((tenant.deletionMetadata as Record<string, unknown>)
-            ?.stripeAttempts as number) ?? 0;
+        const currentAttempts = (() => {
+          const metadata = tenant.deletionMetadata;
+          if (!metadata) return 0;
+
+          const readAttemptsFromObject = (value: unknown): number => {
+            if (!value || typeof value !== "object" || Array.isArray(value)) {
+              return 0;
+            }
+            const attempts = (value as Record<string, unknown>).stripeAttempts;
+            return typeof attempts === "number" ? attempts : 0;
+          };
+
+          if (typeof metadata === "string") {
+            try {
+              return readAttemptsFromObject(JSON.parse(metadata));
+            } catch {
+              return 0;
+            }
+          }
+
+          return readAttemptsFromObject(metadata);
+        })();
         const newAttempts = currentAttempts + 1;
 
-        await this.db
-          .update(tenants)
-          .set({
-            deletionMetadata: sql`jsonb_set(
-              COALESCE(${tenants.deletionMetadata}, '{}'),
-              '{stripeAttempts}',
-              to_jsonb(${newAttempts}::int)
-            )`,
-          })
-          .where(eq(tenants.id, tenant.id));
+        await this.db.transaction(async (tx) => {
+          await tx.execute(
+            sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`,
+          );
+          await tx
+            .update(tenants)
+            .set({
+              deletionMetadata: sql`jsonb_set(
+                CASE
+                  WHEN jsonb_typeof(${tenants.deletionMetadata}) = 'object' THEN ${tenants.deletionMetadata}
+                  ELSE '{}'::jsonb
+                END,
+                '{stripeAttempts}',
+                to_jsonb(${newAttempts}::int)
+              , true)`,
+            })
+            .where(eq(tenants.id, tenant.id));
+        });
 
         if (newAttempts >= 5) {
           this.logger.error(
@@ -128,15 +155,19 @@ export class LifecycleCleanupService {
       }
     }
 
-    await this.db.insert(deletionLedger).values({
-      entityType: "tenant",
-      entityId: tenant.id,
-      entityIdentifier: tenant.eid,
-      deletedBy: "system:hard-delete-job",
-      metadata: { stripeCustomerId },
-    });
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
 
-    await this.db.delete(tenants).where(eq(tenants.id, tenant.id));
+      await tx.insert(deletionLedger).values({
+        entityType: "tenant",
+        entityId: tenant.id,
+        entityIdentifier: tenant.eid,
+        deletedBy: "system:hard-delete-job",
+        metadata: { stripeCustomerId },
+      });
+
+      await tx.delete(tenants).where(eq(tenants.id, tenant.id));
+    });
 
     this.logger.log(`Hard-deleted tenant ${tenant.id} (eid: ${tenant.eid})`);
   }

@@ -178,23 +178,10 @@ export class AuthService {
       await this.seatLimitService.checkSeatLimit(tenant.id);
     }
 
-    let user = await this.userRepo.upsert({
+    const user = await this.userRepo.upsert({
       sfUserId,
       tenantId: tenant.id,
     });
-
-    if (!existingUser) {
-      const promoted = await this.userRepo.assignOwnerIfNone(
-        user.id,
-        tenant.id,
-      );
-      if (promoted) {
-        user = { ...user, role: "owner" as const };
-        this.logger.log(
-          `First user for tenant=${tenant.id} assigned owner role userId=${user.id}`,
-        );
-      }
-    }
 
     await this.saveTokens(tenant.id, user.id, mid, tokenData);
 
@@ -203,26 +190,6 @@ export class AuthService {
 
   async findUserById(id: string) {
     return this.userRepo.findById(id);
-  }
-
-  private readonly lastActiveCache = new Map<string, number>();
-  private static readonly LAST_ACTIVE_DEBOUNCE_MS = 5 * 60 * 1000;
-
-  async touchLastActive(userId: string): Promise<void> {
-    const now = Date.now();
-    const lastTouch = this.lastActiveCache.get(userId);
-    if (lastTouch && now - lastTouch < AuthService.LAST_ACTIVE_DEBOUNCE_MS) {
-      return;
-    }
-    this.lastActiveCache.set(userId, now);
-    try {
-      await this.userRepo.updateLastActiveAt(userId);
-    } catch (error) {
-      this.logger.warn(
-        `Failed to update lastActiveAt for user=${userId}`,
-        error instanceof Error ? error.message : String(error),
-      );
-    }
   }
 
   async findTenantById(id: string) {
@@ -607,7 +574,7 @@ export class AuthService {
 
     const userUpsertStartedAt = Date.now();
     this.logger.log("OAuth callback user upsert starting");
-    let user = await this.userRepo.upsert({
+    const user = await this.userRepo.upsert({
       sfUserId: effectiveSfUserId,
       tenantId: tenant.id,
       email: effectiveEmail,
@@ -616,19 +583,6 @@ export class AuthService {
     this.logger.log(
       `OAuth callback user upsert completed durationMs=${Date.now() - userUpsertStartedAt}`,
     );
-
-    if (!existingUser) {
-      const promoted = await this.userRepo.assignOwnerIfNone(
-        user.id,
-        tenant.id,
-      );
-      if (promoted) {
-        user = { ...user, role: "owner" as const };
-        this.logger.log(
-          `First user for tenant=${tenant.id} assigned owner role userId=${user.id}`,
-        );
-      }
-    }
 
     const saveTokensStartedAt = Date.now();
     this.logger.log(

@@ -187,7 +187,7 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
       name: 'Member Personal Folder',
       visibility: 'personal',
     });
-    await createTestSnippet(sqlClient, tenantId, memberId, {
+    await createTestSnippet(sqlClient, tenantId, MID, memberId, {
       title: 'Member Snippet',
       code: 'SELECT 1',
     });

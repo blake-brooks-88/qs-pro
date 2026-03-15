@@ -1,9 +1,11 @@
 import { Settings } from "@solar-icons/react";
 import type { ReactNode } from "react";
+import { useCallback, useState } from "react";
 
 import { TierBadge } from "@/components/header/TierBadge";
 import { UpgradeButton } from "@/components/header/UpgradeButton";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { useRole } from "@/hooks/use-role";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +23,19 @@ export function AppShell({
   onSettingsClick,
 }: AppShellProps) {
   const { isAdmin } = useRole();
+  const [showSettings, setShowSettings] = useState(false);
+
+  const handleSettingsClick = useCallback(() => {
+    if (onSettingsClick) {
+      onSettingsClick();
+      return;
+    }
+    setShowSettings(true);
+  }, [onSettingsClick]);
+
+  const handleBackToEditor = useCallback(() => {
+    setShowSettings(false);
+  }, []);
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground font-sans">
@@ -39,10 +54,10 @@ export function AppShell({
         </div>
         <div className="flex items-center gap-2">
           <UpgradeButton />
-          {isAdmin && onSettingsClick ? (
+          {isAdmin ? (
             <button
               type="button"
-              onClick={onSettingsClick}
+              onClick={handleSettingsClick}
               title="Settings"
               className={cn(
                 "h-8 w-8 flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground transition-colors",
@@ -57,7 +72,7 @@ export function AppShell({
       </header>
       {topNotice ?? null}
       <main className="flex-1 flex flex-col min-h-0 relative z-20">
-        {children}
+        {showSettings ? <SettingsPage onBack={handleBackToEditor} /> : children}
       </main>
     </div>
   );

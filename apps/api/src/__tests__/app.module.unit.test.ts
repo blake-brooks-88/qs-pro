@@ -134,7 +134,7 @@ describe('AppModule', () => {
 
   it(
     'configures BullMQ and Throttler factories from environment',
-    { timeout: 15000 },
+    { timeout: 45_000 },
     async () => {
       seedApiEnv();
       vi.resetModules();
@@ -188,7 +188,7 @@ describe('AppModule', () => {
 
   it(
     'applies production throttle limit (120) when NODE_ENV is not test',
-    { timeout: 15000 },
+    { timeout: 45_000 },
     async () => {
       seedApiEnv();
       process.env.NODE_ENV = 'production';

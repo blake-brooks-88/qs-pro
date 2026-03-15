@@ -111,4 +111,33 @@ describe("useAuthStore", () => {
 
     expect(sessionStorage.getItem(storageKey)).toBeNull();
   });
+
+  it("does not throw when sessionStorage is unavailable (SSR)", async () => {
+    const { useAuthStore } = await importAuthStore();
+
+    const originalSessionStorage = globalThis.sessionStorage;
+    try {
+      vi.stubGlobal("sessionStorage", undefined);
+
+      expect(() => {
+        useAuthStore.getState().setAuth(
+          {
+            id: "u1",
+            sfUserId: "sf1",
+            email: null,
+            name: null,
+            role: "member" as const,
+          },
+          { id: "t1", eid: "test---web-auth-store", tssd: "tssd1" },
+          "csrf-123",
+        );
+      }).not.toThrow();
+
+      expect(() => {
+        useAuthStore.getState().logout();
+      }).not.toThrow();
+    } finally {
+      vi.stubGlobal("sessionStorage", originalSessionStorage);
+    }
+  });
 });

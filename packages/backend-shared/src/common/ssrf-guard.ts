@@ -1,4 +1,5 @@
 import { promises as dns } from "node:dns";
+import { isIP } from "node:net";
 import { URL } from "node:url";
 
 const PRIVATE_HOSTNAME_PATTERNS = [
@@ -20,25 +21,59 @@ const PRIVATE_IP_RANGES = [
   { prefix: "127.", mask: 8 },
   { prefix: "10.", mask: 8 },
   { prefix: "0.", mask: 8 },
+  // Carrier-grade NAT (RFC 6598)
+  { prefix: "100.64.", mask: 10 },
   { prefix: "169.254.", mask: 16 },
   { prefix: "192.168.", mask: 16 },
 ];
 
+function normalizeIp(address: string): string {
+  // Strip IPv6 zone index (e.g. "fe80::1%lo0")
+  const withoutZone = address.split("%")[0] ?? address;
+  // Normalize IPv4-mapped IPv6 ("::ffff:10.0.0.1")
+  if (withoutZone.toLowerCase().startsWith("::ffff:")) {
+    return withoutZone.slice("::ffff:".length);
+  }
+  return withoutZone;
+}
+
 function isPrivateIp(ip: string): boolean {
-  if (ip === "::1" || ip.startsWith("fe80:") || ip.startsWith("fd")) {
+  const normalized = normalizeIp(ip);
+
+  if (normalized === "::" || normalized === "::1") {
+    return true;
+  }
+
+  if (normalized.toLowerCase().startsWith("fe80:")) {
+    return true;
+  }
+
+  // Unique local addresses (fc00::/7)
+  if (
+    normalized.toLowerCase().startsWith("fc") ||
+    normalized.toLowerCase().startsWith("fd")
+  ) {
     return true;
   }
 
   for (const range of PRIVATE_IP_RANGES) {
-    if (ip.startsWith(range.prefix)) {
+    if (normalized.startsWith(range.prefix)) {
       return true;
     }
   }
 
   // 172.16.0.0/12
-  if (ip.startsWith("172.")) {
-    const second = parseInt(ip.split(".")[1] ?? "", 10);
+  if (normalized.startsWith("172.")) {
+    const second = parseInt(normalized.split(".")[1] ?? "", 10);
     if (second >= 16 && second <= 31) {
+      return true;
+    }
+  }
+
+  // Validate CGNAT range precisely (100.64.0.0/10) when normalized looks like IPv4.
+  if (normalized.startsWith("100.")) {
+    const second = parseInt(normalized.split(".")[1] ?? "", 10);
+    if (second >= 64 && second <= 127) {
       return true;
     }
   }
@@ -84,11 +119,17 @@ export async function assertPublicHostname(url: string): Promise<void> {
     );
   }
 
-  const { address } = await dns.lookup(hostname);
+  const records = await dns.lookup(hostname, { all: true });
 
-  if (isPrivateIp(address)) {
-    throw new Error(
-      `SSRF blocked: hostname '${hostname}' resolves to private IP ${address}`,
-    );
+  for (const { address } of records) {
+    const normalized = normalizeIp(address);
+    if (isIP(normalized) === 0) {
+      continue;
+    }
+    if (isPrivateIp(normalized)) {
+      throw new Error(
+        `SSRF blocked: hostname '${hostname}' resolves to private IP ${address}`,
+      );
+    }
   }
 }

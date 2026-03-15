@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditService } from '../../audit/audit.service';
 import { TrialService } from '../../trial/trial.service';
 import { AuthController } from '../auth.controller';
+import { LastActiveService } from '../last-active.service';
 
 type MockFn = ReturnType<typeof vi.fn>;
 
@@ -108,6 +109,10 @@ describe('AuthController session lifecycle', () => {
         {
           provide: TrialService,
           useValue: { activateTrial: vi.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: LastActiveService,
+          useValue: { touchLastActive: vi.fn().mockResolvedValue(undefined) },
         },
       ],
     })

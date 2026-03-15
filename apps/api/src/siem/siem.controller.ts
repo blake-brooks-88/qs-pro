@@ -28,7 +28,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from '../features/features.service';
 import { SiemService } from './siem.service';
 
-const UpsertSiemConfigSchema = z.object({
+export const UpsertSiemConfigSchema = z.object({
   webhookUrl: z
     .string()
     .url()
