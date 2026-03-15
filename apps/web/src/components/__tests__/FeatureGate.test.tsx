@@ -106,7 +106,7 @@ describe("FeatureGate", () => {
 
     expect(screen.getByText("Team Snippets Content")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /enterprise feature/i }),
+      screen.getByRole("button", { name: /pro feature/i }),
     ).toBeInTheDocument();
   });
 
