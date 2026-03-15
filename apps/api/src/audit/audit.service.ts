@@ -60,7 +60,7 @@ export class AuditService {
             userAgent: entry.userAgent ?? null,
           });
 
-          this.enqueueSiemWebhook(entry).catch((err) => {
+          await this.enqueueSiemWebhook(entry).catch((err) => {
             this.logger.warn(
               `SIEM webhook enqueue failed for event=${entry.eventType}: ${err instanceof Error ? err.message : String(err)}`,
             );
