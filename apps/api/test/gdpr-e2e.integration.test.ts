@@ -68,6 +68,7 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
   let app: NestFastifyApplication;
   let sqlClient: Sql;
   let ownerAgent: Agent;
+  let ownerCsrfToken: string;
 
   let tenantId: string;
   let ownerId: string;
@@ -77,7 +78,7 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
     sfUserId: string,
     eid: string,
     mid: string,
-  ): Promise<Agent> {
+  ): Promise<{ agent: Agent; csrfToken: string }> {
     const ag = superagent(app.getHttpServer());
 
     // Override MSW userinfo to return this user's identity
@@ -121,11 +122,11 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
       })
       .expect(302);
 
-    // Verify session established
+    // Verify session established and get CSRF token
     const meResp = await ag.get('/auth/me').expect(200);
     expect(meResp.body.user.sfUserId).toBe(sfUserId);
 
-    return ag;
+    return { agent: ag, csrfToken: meResp.body.csrfToken };
   }
 
   beforeAll(async () => {
@@ -194,7 +195,9 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
     await createTestAuditLog(sqlClient, tenantId, MID, memberId);
 
     // Login as owner via full HTTP OAuth flow
-    ownerAgent = await loginAs('gdpr-owner-sf', t.eid, MID);
+    const ownerLogin = await loginAs('gdpr-owner-sf', t.eid, MID);
+    ownerAgent = ownerLogin.agent;
+    ownerCsrfToken = ownerLogin.csrfToken;
   }, 60_000);
 
   afterAll(async () => {
@@ -212,13 +215,16 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
     // (since soft-delete will block all further requests for this tenant)
 
     it('should reject non-owner (member) with 403', async () => {
-      const memberAgent = await loginAs(
+      const { agent: memberAgent, csrfToken: memberCsrfToken } = await loginAs(
         'gdpr-member-sf',
         `test---gdpr-e2e-http`,
         MID,
       );
 
-      const resp = await memberAgent.delete('/admin/tenant').expect(403);
+      const resp = await memberAgent
+        .delete('/admin/tenant')
+        .set('x-csrf-token', memberCsrfToken)
+        .expect(403);
 
       expect(resp.body).toBeDefined();
     });
@@ -232,13 +238,17 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
     it('should prevent self-deletion with 400', async () => {
       const resp = await ownerAgent
         .delete(`/admin/members/${ownerId}`)
+        .set('x-csrf-token', ownerCsrfToken)
         .expect(400);
 
       expect(resp.body).toBeDefined();
     });
 
     it('should reject invalid UUID param with 400', async () => {
-      await ownerAgent.delete('/admin/members/not-a-uuid').expect(400);
+      await ownerAgent
+        .delete('/admin/members/not-a-uuid')
+        .set('x-csrf-token', ownerCsrfToken)
+        .expect(400);
     });
   });
 
@@ -275,13 +285,17 @@ describe('GDPR Endpoints (HTTP E2E)', () => {
     it('should delete member via HTTP', async () => {
       const resp = await ownerAgent
         .delete(`/admin/members/${memberId}`)
+        .set('x-csrf-token', ownerCsrfToken)
         .expect(200);
 
       expect(resp.body.ok).toBe(true);
     });
 
     it('should soft-delete tenant and return gracePeriodDays', async () => {
-      const resp = await ownerAgent.delete('/admin/tenant').expect(200);
+      const resp = await ownerAgent
+        .delete('/admin/tenant')
+        .set('x-csrf-token', ownerCsrfToken)
+        .expect(200);
 
       expect(resp.body.ok).toBe(true);
       expect(resp.body.gracePeriodDays).toBe(30);
