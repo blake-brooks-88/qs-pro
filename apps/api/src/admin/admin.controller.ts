@@ -14,6 +14,7 @@ import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { CsrfGuard } from '../auth/csrf.guard';
 import { Audited } from '../common/decorators/audited.decorator';
 import type { UserSession } from '../common/decorators/current-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -49,6 +50,7 @@ export class AdminController {
   @Patch('members/:id/role')
   @UseGuards(RolesGuard)
   @RequireRole('owner', 'admin')
+  @UseGuards(CsrfGuard)
   @Audited('role.changed', { targetIdParam: 'id' })
   async changeRole(
     @CurrentUser() user: UserSession,
@@ -76,6 +78,7 @@ export class AdminController {
   @Post('transfer-ownership')
   @UseGuards(RolesGuard)
   @RequireRole('owner')
+  @UseGuards(CsrfGuard)
   @Audited('role.ownership_transferred')
   async transferOwnership(
     @CurrentUser() user: UserSession,
@@ -98,6 +101,7 @@ export class AdminController {
   @Delete('members/:id')
   @UseGuards(RolesGuard)
   @RequireRole('owner', 'admin')
+  @UseGuards(CsrfGuard)
   @Audited('user.deleted', { targetIdParam: 'id' })
   async deleteUser(
     @CurrentUser() user: UserSession,
@@ -120,6 +124,7 @@ export class AdminController {
   @Delete('tenant')
   @UseGuards(RolesGuard)
   @RequireRole('owner')
+  @UseGuards(CsrfGuard)
   @Audited('tenant.soft_deleted')
   async softDeleteTenant(@CurrentUser() user: UserSession) {
     await this.adminService.softDeleteTenant(user.tenantId, user.userId);
