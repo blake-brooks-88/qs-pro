@@ -19,6 +19,7 @@ import { z } from 'zod';
 
 import { RequireRole } from '../admin/require-role.decorator';
 import { RolesGuard } from '../admin/roles.guard';
+import { CsrfGuard } from '../auth/csrf.guard';
 import { Audited } from '../common/decorators/audited.decorator';
 import {
   CurrentUser,
@@ -79,6 +80,7 @@ export class SiemController {
   }
 
   @Put('config')
+  @UseGuards(CsrfGuard)
   @Audited('siem.config_updated')
   async upsertConfig(
     @CurrentUser() user: UserSession,
@@ -90,6 +92,7 @@ export class SiemController {
   }
 
   @Delete('config')
+  @UseGuards(CsrfGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @Audited('siem.config_deleted')
   async deleteConfig(@CurrentUser() user: UserSession) {
@@ -98,6 +101,7 @@ export class SiemController {
   }
 
   @Post('test')
+  @UseGuards(CsrfGuard)
   async testWebhook(@CurrentUser() user: UserSession) {
     await this.assertEnterpriseTier(user.tenantId);
     return this.siemService.testWebhook(user.tenantId, user.mid);

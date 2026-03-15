@@ -5,6 +5,7 @@ import { DrizzleSiemWebhookConfigRepository } from '@qpp/database';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { AdminModule } from '../admin/admin.module';
+import { CsrfGuard } from '../auth/csrf.guard';
 import { FeaturesModule } from '../features/features.module';
 import { SiemController } from './siem.controller';
 import { SIEM_WEBHOOK_CONFIG_REPOSITORY } from './siem.repository';
@@ -28,6 +29,7 @@ import { SiemWebhookProducer } from './siem-webhook.producer';
     },
     SiemService,
     SiemWebhookProducer,
+    CsrfGuard,
   ],
   exports: [SiemService, SiemWebhookProducer, SIEM_WEBHOOK_CONFIG_REPOSITORY],
 })
