@@ -14,11 +14,17 @@ export class AuditAnonymizationService {
     private readonly db: Database,
   ) {}
 
-  async anonymizeForUser(userId: string, tenantId: string): Promise<number> {
+  async anonymizeForUser(
+    userId: string,
+    tenantId: string,
+    mid: string,
+  ): Promise<number> {
     const reservedSql = getReservedSqlFromContext();
     if (reservedSql) {
       // Inside an RLS reserved connection with an open transaction —
       // set the flag as transaction-local so it cannot leak to other requests.
+      await reservedSql`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await reservedSql`SELECT set_config('app.mid', ${mid}, true)`;
       await reservedSql`SELECT set_config('app.audit_anonymize', 'on', true)`;
 
       const rows = await this.db
@@ -34,7 +40,7 @@ export class AuditAnonymizationService {
         .returning({ id: auditLogs.id });
 
       this.logger.log(
-        `Anonymized ${rows.length} audit log entries for user=${userId} tenant=${tenantId}`,
+        `Anonymized ${rows.length} audit log entries for user=${userId} tenant=${tenantId} mid=${mid}`,
       );
       return rows.length;
     }
@@ -43,7 +49,11 @@ export class AuditAnonymizationService {
     // update share the same connection and the flag is auto-cleared on commit.
     return this.db.transaction(async (tx) => {
       await tx.execute(
-        sql`SELECT set_config('app.audit_anonymize', 'on', true)`,
+        sql`SELECT
+          set_config('app.tenant_id', ${tenantId}, true),
+          set_config('app.mid', ${mid}, true),
+          set_config('app.audit_anonymize', 'on', true)
+        `,
       );
 
       const rows = await tx
@@ -59,7 +69,7 @@ export class AuditAnonymizationService {
         .returning({ id: auditLogs.id });
 
       this.logger.log(
-        `Anonymized ${rows.length} audit log entries for user=${userId} tenant=${tenantId}`,
+        `Anonymized ${rows.length} audit log entries for user=${userId} tenant=${tenantId} mid=${mid}`,
       );
       return rows.length;
     });
