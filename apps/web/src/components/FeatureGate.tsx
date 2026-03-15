@@ -45,8 +45,8 @@ const FEATURE_CONFIG: Record<
   teamSnippets: {
     title: "Team Snippets",
     description:
-      "Stop rewriting common queries. Share and reuse SQL snippets across your team.",
-    tier: "enterprise",
+      "Save, share, and reuse SQL snippets across your team with VS Code-style tab-stop placeholders.",
+    tier: "pro",
   },
   auditLogs: {
     title: "Audit Logs",

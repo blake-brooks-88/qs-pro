@@ -32,6 +32,7 @@ import { RedisModule } from './redis/redis.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { ShellQueryModule } from './shell-query/shell-query.module';
 import { SiemModule } from './siem/siem.module';
+import { SnippetsModule } from './snippets/snippets.module';
 import { TrialModule } from './trial/trial.module';
 import { UsageModule } from './usage/usage.module';
 
@@ -91,6 +92,7 @@ import { UsageModule } from './usage/usage.module';
     GdprModule,
     FoldersModule,
     SavedQueriesModule,
+    SnippetsModule,
     QueryActivitiesModule,
     QueryVersionsModule,
     TrialModule,

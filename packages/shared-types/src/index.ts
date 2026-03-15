@@ -181,3 +181,19 @@ export {
   VersionListItemSchema,
   VersionListResponseSchema,
 } from "./query-versions.js";
+
+// Snippets
+export type {
+  CreateSnippetDto,
+  SnippetListItem,
+  SnippetResponse,
+  SnippetScope,
+  UpdateSnippetDto,
+} from "./snippets.js";
+export {
+  CreateSnippetSchema,
+  SnippetListItemSchema,
+  SnippetResponseSchema,
+  SnippetScopeSchema,
+  UpdateSnippetSchema,
+} from "./snippets.js";

@@ -5,7 +5,10 @@ import type {
   DataExtensionField,
 } from "@/features/editor-workspace/types";
 
-import type { BracketReplacementRange } from "./build-sql-completions";
+import type {
+  BracketReplacementRange,
+  SnippetCompletionSource,
+} from "./build-sql-completions";
 import { buildSqlCompletions } from "./build-sql-completions";
 
 export type { BracketReplacementRange } from "./build-sql-completions";
@@ -28,6 +31,7 @@ export function registerSqlCompletionProvider(options: {
     model: Monaco.editor.ITextModel,
     position: Monaco.Position,
   ) => BracketReplacementRange;
+  getSnippets: () => SnippetCompletionSource[];
 }): Monaco.IDisposable {
   const {
     monaco,
@@ -38,6 +42,7 @@ export function registerSqlCompletionProvider(options: {
     getDataExtensions,
     getSharedFolderIds,
     getBracketReplacementRange,
+    getSnippets,
   } = options;
 
   return monaco.languages.registerCompletionItemProvider("sql", {
@@ -68,6 +73,7 @@ export function registerSqlCompletionProvider(options: {
         hasTenant,
         dataExtensions: getDataExtensions(),
         sharedFolderIds: getSharedFolderIds(),
+        getSnippets,
       });
 
       const suggestions = normalized.map((item) => {

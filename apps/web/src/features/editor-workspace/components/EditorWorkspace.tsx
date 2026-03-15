@@ -1,6 +1,7 @@
 import type { LinkQueryResponse } from "@qpp/shared-types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { useQueryClient } from "@tanstack/react-query";
+import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -61,6 +62,8 @@ import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
 import { QueryTabBar } from "./QueryTabBar";
+import type { SnippetModalProps } from "./SnippetModal";
+import { SnippetPanel } from "./SnippetPanel";
 import { StaleWarningDialog } from "./StaleWarningDialog";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { VersionHistoryWarningDialog } from "./VersionHistoryWarningDialog";
@@ -83,7 +86,7 @@ export function EditorWorkspace({
   onDeploy: _onDeploy,
   onCreateQueryActivity: _onCreateQueryActivity,
   onSelectQuery,
-  onSelectDE,
+  onSelectDE: _onSelectDE,
   onToggleSidebar: _onToggleSidebar,
   onPageChange,
   onViewInContactBuilder,
@@ -104,6 +107,14 @@ export function EditorWorkspace({
   const [isRunBlockedOpen, setIsRunBlockedOpen] = useState(false);
   const [isTargetDEModalOpen, setIsTargetDEModalOpen] = useState(false);
   const openPricing = usePricingOverlayStore((s) => s.open);
+  const { enabled: isTeamSnippetsEnabled } = useFeature("teamSnippets");
+
+  const [snippetModalState, setSnippetModalState] = useState<{
+    open: boolean;
+    mode: "create" | "edit" | "duplicate";
+    initialData?: SnippetModalProps["initialData"];
+    snippetId?: string;
+  }>({ open: false, mode: "create" });
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkTargetQueryId, setLinkTargetQueryId] = useState<string | null>(
@@ -182,6 +193,9 @@ export function EditorWorkspace({
     undefined,
   );
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const activeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(
+    null,
+  );
   const {
     isResultsOpen,
     resultsHeight,
@@ -600,6 +614,101 @@ export function EditorWorkspace({
     ],
   );
 
+  const handleInsertSnippet = useCallback((snippetBody: string) => {
+    const editor = activeEditorRef.current;
+    if (!editor) {
+      return;
+    }
+
+    const contribution = editor.getContribution<{
+      insert(snippet: string): void;
+      dispose(): void;
+    }>("snippetController2");
+    if (contribution) {
+      contribution.insert(snippetBody);
+    } else {
+      const selection = editor.getSelection();
+      if (selection) {
+        const plainText = snippetBody
+          .replace(/\$\{\d+:([^}]*)\}/g, "$1")
+          .replace(/\$\d+/g, "");
+        editor.executeEdits("snippet", [
+          { range: selection, text: plainText, forceMoveMarkers: true },
+        ]);
+      }
+    }
+    editor.focus();
+  }, []);
+
+  const handleSelectDE = useCallback(
+    (deId: string) => {
+      const editor = activeEditorRef.current;
+      if (!editor) {
+        return;
+      }
+
+      const de = dataExtensions.find((d) => d.id === deId);
+      if (!de) {
+        return;
+      }
+
+      const selection = editor.getSelection();
+      if (selection) {
+        editor.executeEdits("de-insert", [
+          {
+            range: selection,
+            text: `[${de.name}]`,
+            forceMoveMarkers: true,
+          },
+        ]);
+      }
+      editor.focus();
+    },
+    [dataExtensions],
+  );
+
+  const handleOpenCreateSnippetModal = useCallback(() => {
+    setSnippetModalState({ open: true, mode: "create" });
+  }, []);
+
+  const handleOpenEditSnippetModal = useCallback(
+    (snippetId: string, data: SnippetModalProps["initialData"]) => {
+      setSnippetModalState({
+        open: true,
+        mode: "edit",
+        initialData: data,
+        snippetId,
+      });
+    },
+    [],
+  );
+
+  const handleOpenDuplicateSnippetModal = useCallback(
+    (data: SnippetModalProps["initialData"]) => {
+      setSnippetModalState({
+        open: true,
+        mode: "duplicate",
+        initialData: data,
+      });
+    },
+    [],
+  );
+
+  const handleSaveAsSnippet = useCallback(
+    (selectedCode: string) => {
+      if (!isTeamSnippetsEnabled) {
+        openPricing("feature_gate");
+        return;
+      }
+      setSnippetModalState({
+        open: true,
+        mode: "create",
+        initialData: { code: selectedCode },
+      });
+    },
+    [isTeamSnippetsEnabled, openPricing],
+  );
+
   const handleHistoryCopySql = useCallback((sql: string) => {
     void copyToClipboard(sql).then((didCopy) => {
       if (didCopy) {
@@ -656,9 +765,20 @@ export function EditorWorkspace({
         ) : (
           <>
             {/* Sidebar Panel */}
-            {activeView !== null ? (
+            {activeView === "snippets" ? (
+              <SnippetPanel
+                onInsertSnippet={handleInsertSnippet}
+                snippetModalState={snippetModalState}
+                onOpenCreateModal={handleOpenCreateSnippetModal}
+                onOpenEditModal={handleOpenEditSnippetModal}
+                onOpenDuplicateModal={handleOpenDuplicateSnippetModal}
+                onSnippetModalOpenChange={(open) =>
+                  setSnippetModalState((s) => ({ ...s, open }))
+                }
+              />
+            ) : activeView !== null ? (
               <WorkspaceSidebar
-                activeView={activeView}
+                activeView={activeView as "dataExtensions" | "queries"}
                 tenantId={tenantId}
                 folders={folders}
                 savedQueries={savedQueries}
@@ -676,7 +796,7 @@ export function EditorWorkspace({
                   requestOpenSavedQuery(id);
                   onSelectQuery?.(id);
                 }}
-                onSelectDE={onSelectDE}
+                onSelectDE={handleSelectDE}
                 onCreateDE={handleCreateDE}
                 onViewQueryHistory={handleViewQueryHistory}
                 onViewVersionHistory={(queryId) =>
@@ -766,6 +886,10 @@ export function EditorWorkspace({
                           onRunRequest={handleRunRequest}
                           onFormat={handleFormat}
                           onCursorPositionChange={setCursorPosition}
+                          onEditorMount={(editor) => {
+                            activeEditorRef.current = editor;
+                          }}
+                          onSaveAsSnippet={handleSaveAsSnippet}
                           diagnostics={sqlDiagnostics}
                           dataExtensions={dataExtensions}
                           folders={folders}
