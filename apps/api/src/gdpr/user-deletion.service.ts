@@ -5,7 +5,7 @@ import {
   getReservedSqlFromContext,
   RlsContextService,
 } from '@qpp/backend-shared';
-import type { IUserRepository } from '@qpp/database';
+import type { ICredentialsRepository, IUserRepository } from '@qpp/database';
 import type { createDatabaseFromClient } from '@qpp/database';
 import {
   and,
@@ -42,6 +42,8 @@ export class UserDeletionService {
     private readonly db: Database,
     @Inject('USER_REPOSITORY')
     private readonly userRepo: IUserRepository,
+    @Inject('CREDENTIALS_REPOSITORY')
+    private readonly credRepo: ICredentialsRepository,
     private readonly rlsContext: RlsContextService,
     private readonly auditAnonymizationService: AuditAnonymizationService,
   ) {}
@@ -98,16 +100,8 @@ export class UserDeletionService {
           await reservedSql`SELECT set_config('app.user_id', ${ownerId}, true)`;
         }
 
-        const midRows = await this.db
-          .selectDistinct({ mid: credentials.mid })
-          .from(credentials)
-          .where(
-            and(
-              eq(credentials.tenantId, tenantId),
-              eq(credentials.userId, targetUserId),
-            ),
-          );
-        const discoveredMids = midRows.map((r) => r.mid);
+        const discoveredMids =
+          await this.credRepo.findDistinctMidsByTenantId(tenantId);
         const mids = discoveredMids.includes(callerMid)
           ? discoveredMids
           : [callerMid, ...discoveredMids];
