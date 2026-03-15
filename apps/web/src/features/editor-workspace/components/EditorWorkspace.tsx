@@ -61,9 +61,9 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
+import { QueryTabBar } from "./QueryTabBar";
 import type { SnippetModalProps } from "./SnippetModal";
 import { SnippetPanel } from "./SnippetPanel";
-import { QueryTabBar } from "./QueryTabBar";
 import { StaleWarningDialog } from "./StaleWarningDialog";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { VersionHistoryWarningDialog } from "./VersionHistoryWarningDialog";
@@ -193,7 +193,9 @@ export function EditorWorkspace({
     undefined,
   );
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const activeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const activeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(
+    null,
+  );
   const {
     isResultsOpen,
     resultsHeight,
@@ -614,8 +616,27 @@ export function EditorWorkspace({
 
   const handleInsertSnippet = useCallback((snippetBody: string) => {
     const editor = activeEditorRef.current;
-    if (!editor) return;
-    editor.trigger("snippet", "editor.action.insertSnippet", { snippet: snippetBody });
+    if (!editor) {
+      return;
+    }
+
+    const contribution = editor.getContribution<{
+      insert(snippet: string): void;
+      dispose(): void;
+    }>("snippetController2");
+    if (contribution) {
+      contribution.insert(snippetBody);
+    } else {
+      const selection = editor.getSelection();
+      if (selection) {
+        const plainText = snippetBody
+          .replace(/\$\{\d+:([^}]*)\}/g, "$1")
+          .replace(/\$\d+/g, "");
+        editor.executeEdits("snippet", [
+          { range: selection, text: plainText, forceMoveMarkers: true },
+        ]);
+      }
+    }
     editor.focus();
   }, []);
 
@@ -624,18 +645,24 @@ export function EditorWorkspace({
   }, []);
 
   const handleOpenEditSnippetModal = useCallback(
-    (
-      snippetId: string,
-      data: SnippetModalProps["initialData"],
-    ) => {
-      setSnippetModalState({ open: true, mode: "edit", initialData: data, snippetId });
+    (snippetId: string, data: SnippetModalProps["initialData"]) => {
+      setSnippetModalState({
+        open: true,
+        mode: "edit",
+        initialData: data,
+        snippetId,
+      });
     },
     [],
   );
 
   const handleOpenDuplicateSnippetModal = useCallback(
     (data: SnippetModalProps["initialData"]) => {
-      setSnippetModalState({ open: true, mode: "duplicate", initialData: data });
+      setSnippetModalState({
+        open: true,
+        mode: "duplicate",
+        initialData: data,
+      });
     },
     [],
   );
