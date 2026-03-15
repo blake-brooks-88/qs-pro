@@ -54,6 +54,27 @@ describe("ssrf-guard", () => {
     it("returns null for a valid public URL", () => {
       expect(validateWebhookUrl("https://example.com/hook")).toBeNull();
     });
+
+    it("returns an error for IPv4 private IP literal hostnames", () => {
+      expect(validateWebhookUrl("https://192.168.1.1/hook")).toMatch(
+        /private/i,
+      );
+      expect(validateWebhookUrl("https://10.0.0.1/hook")).toMatch(/private/i);
+    });
+
+    it("returns an error for IPv6 loopback literal hostnames", () => {
+      expect(validateWebhookUrl("https://[::1]/hook")).toMatch(/private/i);
+    });
+
+    it("returns an error for IPv4-mapped IPv6 literal hostnames", () => {
+      expect(validateWebhookUrl("https://[::ffff:10.0.0.1]/hook")).toMatch(
+        /private/i,
+      );
+    });
+
+    it("allows public IP literal hostnames", () => {
+      expect(validateWebhookUrl("https://93.184.216.34/hook")).toBeNull();
+    });
   });
 
   describe("assertPublicHostname", () => {

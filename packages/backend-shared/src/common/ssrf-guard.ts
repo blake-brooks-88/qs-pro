@@ -27,12 +27,29 @@ const PRIVATE_IP_RANGES = [
   { prefix: "192.168.", mask: 16 },
 ];
 
+function hexMappedToIpv4(suffix: string): string | null {
+  const parts = suffix.split(":");
+  if (parts.length !== 2) {
+    return null;
+  }
+  const hi = parseInt(parts[0] ?? "", 16);
+  const lo = parseInt(parts[1] ?? "", 16);
+  if (Number.isNaN(hi) || Number.isNaN(lo)) {
+    return null;
+  }
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+}
+
 function normalizeIp(address: string): string {
   // Strip IPv6 zone index (e.g. "fe80::1%lo0")
   const withoutZone = address.split("%")[0] ?? address;
-  // Normalize IPv4-mapped IPv6 ("::ffff:10.0.0.1")
+  // Normalize IPv4-mapped IPv6 ("::ffff:10.0.0.1" or "::ffff:a00:1")
   if (withoutZone.toLowerCase().startsWith("::ffff:")) {
-    return withoutZone.slice("::ffff:".length);
+    const suffix = withoutZone.slice("::ffff:".length);
+    if (suffix.includes(".")) {
+      return suffix;
+    }
+    return hexMappedToIpv4(suffix) ?? withoutZone;
   }
   return withoutZone;
 }
@@ -98,6 +115,10 @@ export function validateWebhookUrl(url: string): string | null {
     const parsed = new URL(url);
     if (isPrivateHostname(parsed.hostname)) {
       return `Webhook URL hostname '${parsed.hostname}' resolves to a private/internal network`;
+    }
+    const bare = parsed.hostname.replace(/^\[|\]$/g, "");
+    if (isIP(bare) && isPrivateIp(bare)) {
+      return `Webhook URL targets private IP '${parsed.hostname}'`;
     }
     return null;
   } catch {
