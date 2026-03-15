@@ -286,9 +286,13 @@ describe("LifecycleCleanupService (integration)", () => {
   it("treats invalid JSON deletion_metadata strings as 0 stripe attempts", async () => {
     stripeMock.customers.del.mockRejectedValue(new Error("Stripe API error"));
 
-    const tenantId = await createExpiredTenant("stripe-retry-invalid-json", 31, {
-      stripeCustomerId: "cus_lifecycle_retry_invalid_json",
-    });
+    const tenantId = await createExpiredTenant(
+      "stripe-retry-invalid-json",
+      31,
+      {
+        stripeCustomerId: "cus_lifecycle_retry_invalid_json",
+      },
+    );
 
     await privSql`
       UPDATE tenants

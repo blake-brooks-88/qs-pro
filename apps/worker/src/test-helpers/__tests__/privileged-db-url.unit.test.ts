@@ -54,7 +54,9 @@ describe("getPrivilegedUrl", () => {
       "DATABASE_URL=postgres://runtime:runtimepass@db/runtime\n",
     );
 
-    expect(getPrivilegedUrl()).toBe("postgres://runtime:runtimepass@db/runtime");
+    expect(getPrivilegedUrl()).toBe(
+      "postgres://runtime:runtimepass@db/runtime",
+    );
   });
 
   it("uses DATABASE_URL_MIGRATIONS env var when .env file is missing", () => {
@@ -83,7 +85,8 @@ describe("getPrivilegedUrl", () => {
     delete process.env.DATABASE_URL;
     delete process.env.DATABASE_URL_MIGRATIONS;
 
-    expect(() => getPrivilegedUrl()).toThrow(/Cannot determine database connection/i);
+    expect(() => getPrivilegedUrl()).toThrow(
+      /Cannot determine database connection/i,
+    );
   });
 });
-

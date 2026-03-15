@@ -100,7 +100,9 @@ export class LifecycleCleanupService {
       } catch {
         const currentAttempts = (() => {
           const metadata = tenant.deletionMetadata;
-          if (!metadata) return 0;
+          if (!metadata) {
+            return 0;
+          }
 
           const readAttemptsFromObject = (value: unknown): number => {
             if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -156,7 +158,9 @@ export class LifecycleCleanupService {
     }
 
     await this.db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
+      await tx.execute(
+        sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`,
+      );
 
       await tx.insert(deletionLedger).values({
         entityType: "tenant",

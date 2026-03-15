@@ -64,6 +64,36 @@ describe("ssrf-guard", () => {
       expect(mockLookup).not.toHaveBeenCalled();
     });
 
+    it("throws for link-local IPv6 (including zone indices)", async () => {
+      mockLookup.mockImplementationOnce(async () => [
+        { address: "fe80::1%lo0", family: 6 },
+      ]);
+
+      await expect(
+        assertPublicHostname("https://example.com/hook"),
+      ).rejects.toThrow(/SSRF blocked/i);
+    });
+
+    it("throws for unique-local IPv6 addresses", async () => {
+      mockLookup.mockImplementationOnce(async () => [
+        { address: "fd12:3456:789a::1", family: 6 },
+      ]);
+
+      await expect(
+        assertPublicHostname("https://example.com/hook"),
+      ).rejects.toThrow(/SSRF blocked/i);
+    });
+
+    it("throws for carrier-grade NAT IPv4 range (100.64.0.0/10)", async () => {
+      mockLookup.mockImplementationOnce(async () => [
+        { address: "100.64.12.34", family: 4 },
+      ]);
+
+      await expect(
+        assertPublicHostname("https://example.com/hook"),
+      ).rejects.toThrow(/SSRF blocked/i);
+    });
+
     it("throws when DNS resolves to a private IP", async () => {
       mockLookup.mockImplementationOnce(async () => [
         { address: "10.0.0.5", family: 4 },
@@ -71,7 +101,7 @@ describe("ssrf-guard", () => {
 
       await expect(
         assertPublicHostname("https://example.com/hook"),
-      ).rejects.toThrow(/resolves to private IP/i);
+      ).rejects.toThrow(/SSRF blocked/i);
     });
 
     it("throws when any DNS record resolves to a private IP", async () => {
@@ -82,7 +112,18 @@ describe("ssrf-guard", () => {
 
       await expect(
         assertPublicHostname("https://example.com/hook"),
-      ).rejects.toThrow(/resolves to private IP/i);
+      ).rejects.toThrow(/SSRF blocked/i);
+    });
+
+    it("ignores non-IP DNS records and succeeds if no private IPs are present", async () => {
+      mockLookup.mockImplementationOnce(async () => [
+        { address: "not-an-ip", family: 4 },
+        { address: "93.184.216.34", family: 4 },
+      ]);
+
+      await expect(
+        assertPublicHostname("https://example.com/hook"),
+      ).resolves.toBeUndefined();
     });
 
     it("throws for IPv4-mapped IPv6 private addresses", async () => {
@@ -92,7 +133,33 @@ describe("ssrf-guard", () => {
 
       await expect(
         assertPublicHostname("https://example.com/hook"),
-      ).rejects.toThrow(/resolves to private IP/i);
+      ).rejects.toThrow(/SSRF blocked/i);
+    });
+
+    it("blocks 172.16.0.0/12 but allows other 172.* ranges", async () => {
+      mockLookup.mockImplementationOnce(async () => [
+        { address: "172.16.0.1", family: 4 },
+      ]);
+      await expect(
+        assertPublicHostname("https://example.com/hook"),
+      ).rejects.toThrow(/SSRF blocked/i);
+
+      mockLookup.mockImplementationOnce(async () => [
+        { address: "172.32.0.1", family: 4 },
+      ]);
+      await expect(
+        assertPublicHostname("https://example.com/hook"),
+      ).resolves.toBeUndefined();
+    });
+
+    it("blocks unspecified IPv6 (::)", async () => {
+      mockLookup.mockImplementationOnce(async () => [
+        { address: "::", family: 6 },
+      ]);
+
+      await expect(
+        assertPublicHostname("https://example.com/hook"),
+      ).rejects.toThrow(/SSRF blocked/i);
     });
 
     it("resolves when DNS resolves to a public IP", async () => {
