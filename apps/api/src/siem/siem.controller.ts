@@ -28,23 +28,27 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from '../features/features.service';
 import { SiemService } from './siem.service';
 
+const webhookUrlSchema = z
+  .string()
+  .url()
+  .startsWith('https://')
+  .refine(
+    (url) => {
+      try {
+        const { hostname } = new URL(url);
+        return !isPrivateHostname(hostname);
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Webhook URL must not target private or internal networks' },
+  );
+
+const secretSchema = z.string().min(16).max(512);
+
 export const UpsertSiemConfigSchema = z.object({
-  webhookUrl: z
-    .string()
-    .url()
-    .startsWith('https://')
-    .refine(
-      (url) => {
-        try {
-          const { hostname } = new URL(url);
-          return !isPrivateHostname(hostname);
-        } catch {
-          return false;
-        }
-      },
-      { message: 'Webhook URL must not target private or internal networks' },
-    ),
-  secret: z.string().min(16).max(512),
+  webhookUrl: webhookUrlSchema,
+  secret: secretSchema.optional(),
 });
 
 type UpsertSiemConfigDto = z.infer<typeof UpsertSiemConfigSchema>;

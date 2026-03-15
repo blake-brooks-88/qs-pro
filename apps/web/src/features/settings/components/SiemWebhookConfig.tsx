@@ -209,7 +209,7 @@ function ManagementView() {
     setUrlError("");
     upsertMutation.mutate({
       webhookUrl,
-      secret: secret || "________________",
+      ...(secret ? { secret } : {}),
     });
   }, [webhookUrl, secret, upsertMutation]);
 

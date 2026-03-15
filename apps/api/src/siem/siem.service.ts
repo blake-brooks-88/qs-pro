@@ -81,7 +81,7 @@ export class SiemService {
   async upsertConfig(
     tenantId: string,
     mid: string,
-    data: { webhookUrl: string; secret: string },
+    data: { webhookUrl: string; secret?: string },
   ): Promise<SiemWebhookConfigResponse> {
     if (!data.webhookUrl.startsWith('https://')) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
@@ -96,24 +96,44 @@ export class SiemService {
       });
     }
 
-    const secretEncrypted = this.encryptionService.encrypt(data.secret);
-    if (!secretEncrypted) {
-      throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
-        reason: 'Failed to encrypt webhook secret',
-      });
+    let secretEncrypted: string | undefined;
+    if (data.secret) {
+      const encrypted = this.encryptionService.encrypt(data.secret);
+      if (!encrypted) {
+        throw new AppError(ErrorCode.INTERNAL_ERROR, undefined, {
+          reason: 'Failed to encrypt webhook secret',
+        });
+      }
+      secretEncrypted = encrypted;
     }
 
     const config = await this.rlsContext.runWithTenantContext(
       tenantId,
       mid,
-      () =>
-        this.siemRepo.upsert({
+      async () => {
+        if (!secretEncrypted) {
+          const existing = await this.siemRepo.findByTenantId(tenantId);
+          if (!existing) {
+            throw new AppError(ErrorCode.VALIDATION_ERROR, undefined, {
+              reason: 'Secret is required for initial configuration',
+            });
+          }
+          return this.siemRepo.upsert({
+            tenantId,
+            mid,
+            webhookUrl: data.webhookUrl,
+            secretEncrypted: existing.secretEncrypted,
+            enabled: true,
+          });
+        }
+        return this.siemRepo.upsert({
           tenantId,
           mid,
           webhookUrl: data.webhookUrl,
           secretEncrypted,
           enabled: true,
-        }),
+        });
+      },
     );
 
     return mapConfigToResponse(config);

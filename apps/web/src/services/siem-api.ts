@@ -39,7 +39,7 @@ export async function getSiemConfig(): Promise<SiemConfigResponse | null> {
 
 export async function upsertSiemConfig(body: {
   webhookUrl: string;
-  secret: string;
+  secret?: string;
 }): Promise<SiemConfigResponse> {
   const { data } = await api.put<SiemConfigResponse>(
     "/admin/siem/config",
