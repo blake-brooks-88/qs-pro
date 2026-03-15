@@ -67,6 +67,37 @@ function detectBracketedNames(code: string): DetectedPlaceholder[] {
   return results;
 }
 
+function detectColumnReferences(code: string): DetectedPlaceholder[] {
+  const seen = new Set<string>();
+  const results: DetectedPlaceholder[] = [];
+  const colPattern = /\b([a-zA-Z])\.([A-Za-z_][A-Za-z0-9_]*)\b/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = colPattern.exec(code)) !== null) {
+    const full = match[0] as string;
+    const matchIndex = match.index;
+
+    // Skip patterns already inside ${N:...} tab-stop syntax
+    const lastTabStop = code.lastIndexOf("${", matchIndex);
+    if (lastTabStop !== -1) {
+      const closingBrace = code.indexOf("}", lastTabStop);
+      if (closingBrace > matchIndex) {
+        continue;
+      }
+    }
+
+    if (!seen.has(full)) {
+      seen.add(full);
+      results.push({
+        original: full,
+        index: results.length + 1,
+        converted: false,
+      });
+    }
+  }
+  return results;
+}
+
 const TRIGGER_PREFIX_REGEX = /^[a-zA-Z][a-zA-Z0-9]*$/;
 
 function validateTriggerPrefix(value: string): string | null {
@@ -105,6 +136,7 @@ export function SnippetModal({
   const [prefixError, setPrefixError] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [placeholders, setPlaceholders] = useState<DetectedPlaceholder[]>([]);
+  const [columnRefs, setColumnRefs] = useState<DetectedPlaceholder[]>([]);
 
   // Reset form when modal opens or mode/initialData changes
   useEffect(() => {
@@ -121,8 +153,10 @@ export function SnippetModal({
       // Auto-detect placeholders for create mode with pre-filled code
       if (mode === "create" && initialData?.code) {
         setPlaceholders(detectBracketedNames(initialData.code));
+        setColumnRefs(detectColumnReferences(initialData.code));
       } else {
         setPlaceholders([]);
+        setColumnRefs([]);
       }
     }
   }, [open, initialData, mode]);
@@ -144,7 +178,10 @@ export function SnippetModal({
         return;
       }
 
-      const nextN = placeholders.filter((p) => p.converted).length + 1;
+      const nextN =
+        placeholders.filter((p) => p.converted).length +
+        columnRefs.filter((p) => p.converted).length +
+        1;
       const replacement = `\${${nextN}:${placeholder.original}}`;
       const escapedName = placeholder.original.replace(
         /[.*+?^${}()|[\]\\]/g,
@@ -162,7 +199,38 @@ export function SnippetModal({
         ),
       );
     },
-    [code, placeholders],
+    [code, placeholders, columnRefs],
+  );
+
+  const handleConvertColumnRef = useCallback(
+    (colRef: DetectedPlaceholder) => {
+      if (colRef.converted) {
+        return;
+      }
+
+      const nextN =
+        placeholders.filter((p) => p.converted).length +
+        columnRefs.filter((p) => p.converted).length +
+        1;
+      const columnName = colRef.original.split(".")[1] ?? colRef.original;
+      const replacement = `\${${nextN}:${columnName}}`;
+      const escapedFull = colRef.original.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+
+      const updatedCode = code.replace(
+        new RegExp(`\\b${escapedFull}\\b`, "g"),
+        replacement,
+      );
+      setCode(updatedCode);
+      setColumnRefs((prev) =>
+        prev.map((p) =>
+          p.original === colRef.original ? { ...p, converted: true } : p,
+        ),
+      );
+    },
+    [code, placeholders, columnRefs],
   );
 
   const validate = useCallback(() => {
@@ -247,6 +315,11 @@ export function SnippetModal({
   const unconvertedPlaceholders = useMemo(
     () => placeholders.filter((p) => !p.converted),
     [placeholders],
+  );
+
+  const unconvertedColumnRefs = useMemo(
+    () => columnRefs.filter((p) => !p.converted),
+    [columnRefs],
   );
 
   const editorOptions = useMemo(
@@ -395,6 +468,7 @@ export function SnippetModal({
                   }
                   if (mode === "create") {
                     setPlaceholders(detectBracketedNames(v ?? ""));
+                    setColumnRefs(detectColumnReferences(v ?? ""));
                   }
                 }}
                 options={editorOptions}
@@ -431,6 +505,25 @@ export function SnippetModal({
                       className="px-2 py-0.5 text-xs font-mono bg-primary/10 text-primary border border-primary/20 rounded hover:bg-primary/20 transition-colors"
                     >
                       [{p.original}]
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {unconvertedColumnRefs.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-foreground">
+                  Column references — click to convert to placeholders:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {unconvertedColumnRefs.map((p) => (
+                    <button
+                      key={p.original}
+                      type="button"
+                      onClick={() => handleConvertColumnRef(p)}
+                      className="px-2 py-0.5 text-xs font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded hover:bg-amber-500/20 transition-colors"
+                    >
+                      {p.original}
                     </button>
                   ))}
                 </div>
