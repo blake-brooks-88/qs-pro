@@ -95,28 +95,17 @@ describe("SnippetPanel", () => {
       expect(screen.getByText("Built-in")).toBeInTheDocument();
     });
 
-    it("shows only free-category built-in snippets on free tier", async () => {
+    it("shows all built-in snippets on free tier with pro ones blurred", async () => {
       const queryClient = createQueryClient();
       seedFreeTier(queryClient);
 
       render(<SnippetPanel />, { wrapper: createWrapper(queryClient) });
 
-      const freeSnippets = BUILT_IN_SNIPPETS.filter(
-        (s) => s.category === "free",
-      );
-      const proSnippets = BUILT_IN_SNIPPETS.filter((s) => s.category === "pro");
-
-      for (const snippet of freeSnippets) {
+      // All 10 built-in snippets are visible (free ones normal, pro ones blurred)
+      for (const snippet of BUILT_IN_SNIPPETS) {
         expect(
           await screen.findByText(snippet.triggerPrefix),
         ).toBeInTheDocument();
-      }
-
-      // Pro snippets' trigger prefixes should not appear
-      for (const snippet of proSnippets) {
-        expect(
-          screen.queryByText(snippet.triggerPrefix),
-        ).not.toBeInTheDocument();
       }
     });
 
