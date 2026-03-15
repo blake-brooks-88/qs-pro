@@ -94,7 +94,8 @@ export const BUILT_IN_SNIPPETS: BuiltInSnippet[] = [
     id: "builtin-track",
     title: "Tracking data consolidation",
     triggerPrefix: "track",
-    description: "Consolidate send, open, and click tracking data from MCE system DEs",
+    description:
+      "Consolidate send, open, and click tracking data from MCE system DEs",
     body: "SELECT\n  s.SubscriberKey,\n  s.EmailAddress,\n  j.EmailName,\n  j.DeliveredTime,\n  MAX(CASE WHEN o.SubscriberKey IS NOT NULL THEN 1 ELSE 0 END) AS Opened,\n  MAX(CASE WHEN c.SubscriberKey IS NOT NULL THEN 1 ELSE 0 END) AS Clicked\nFROM _Sent s\nLEFT JOIN _Job j\n  ON s.JobID = j.JobID\nLEFT JOIN _Open o\n  ON s.JobID = o.JobID\n  AND s.SubscriberKey = o.SubscriberKey\n  AND o.IsUnique = 1\nLEFT JOIN _Click c\n  ON s.JobID = c.JobID\n  AND s.SubscriberKey = c.SubscriberKey\n  AND c.IsUnique = 1\nGROUP BY\n  s.SubscriberKey,\n  s.EmailAddress,\n  j.EmailName,\n  j.DeliveredTime",
     isBuiltin: true,
     category: "pro",

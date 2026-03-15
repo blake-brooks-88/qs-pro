@@ -6,8 +6,8 @@ import type {
 } from "@qpp/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import api from "@/services/api";
 import { useFeature } from "@/hooks/use-feature";
+import api from "@/services/api";
 
 const SNIPPETS_KEY = ["snippets"] as const;
 
@@ -42,8 +42,17 @@ export function useUpdateSnippet() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateSnippetDto }) => {
-      const response = await api.patch<SnippetResponse>(`/snippets/${id}`, data);
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateSnippetDto;
+    }) => {
+      const response = await api.patch<SnippetResponse>(
+        `/snippets/${id}`,
+        data,
+      );
       return response.data;
     },
     onSuccess: () => {
