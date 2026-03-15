@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AppError, ErrorCode, RlsContextService } from '@qpp/backend-shared';
+import {
+  AppError,
+  ErrorCode,
+  getReservedSqlFromContext,
+  RlsContextService,
+} from '@qpp/backend-shared';
 import { EncryptionService } from '@qpp/backend-shared';
 import type {
   createDatabaseFromClient,
@@ -92,140 +97,160 @@ export class DataExportService {
       });
     }
 
-    // Collect data across all MIDs for complete GDPR export.
-    // Always include the caller's MID as fallback in case there are no
-    // credentials rows (e.g. data seeded without a login credential).
-    const discoveredMids =
-      await this.credRepo.findDistinctMidsByTenantId(tenantId);
-    const mids = discoveredMids.includes(callerMid)
-      ? discoveredMids
-      : [callerMid, ...discoveredMids];
-
-    const allQueries: GdprDataExport['savedQueries'] = [];
-    const allFolders: GdprDataExport['folders'] = [];
-    const allRuns: GdprDataExport['queryExecutionHistory'] = [];
-    const allSnippets: GdprDataExport['snippets'] = [];
-
-    for (const mid of mids) {
-      await this.rlsContext.runWithIsolatedUserContext(
+    // Use admin-bypass context to discover ALL MIDs across BUs,
+    // then collect per-MID data by switching app.mid on the reserved connection.
+    // This mirrors the pattern in UserDeletionService.deleteUser.
+    const { allQueries, allFolders, allRuns, allSnippets } =
+      await this.rlsContext.runWithIsolatedTenantContext(
         tenantId,
-        mid,
-        userId,
+        callerMid,
         async () => {
-          const midQueries = await this.db
-            .select({
-              id: savedQueries.id,
-              name: savedQueries.name,
-              sqlTextEncrypted: savedQueries.sqlTextEncrypted,
-              folderId: savedQueries.folderId,
-              createdAt: savedQueries.createdAt,
-              updatedAt: savedQueries.updatedAt,
-            })
-            .from(savedQueries)
-            .where(
-              and(
-                eq(savedQueries.userId, userId),
-                eq(savedQueries.tenantId, tenantId),
-              ),
+          const reservedSql = getReservedSqlFromContext();
+          if (reservedSql) {
+            await reservedSql`SELECT set_config('app.admin_action', 'true', true)`;
+          }
+
+          const discoveredMids =
+            await this.credRepo.findDistinctMidsByTenantId(tenantId);
+          const mids = discoveredMids.includes(callerMid)
+            ? discoveredMids
+            : [callerMid, ...discoveredMids];
+
+          const queries: GdprDataExport['savedQueries'] = [];
+          const foldersList: GdprDataExport['folders'] = [];
+          const runs: GdprDataExport['queryExecutionHistory'] = [];
+          const snippetsList: GdprDataExport['snippets'] = [];
+
+          for (const mid of mids) {
+            if (reservedSql) {
+              await reservedSql`SELECT set_config('app.mid', ${mid}, true)`;
+              await reservedSql`SELECT set_config('app.user_id', ${userId}, true)`;
+            }
+
+            const midQueries = await this.db
+              .select({
+                id: savedQueries.id,
+                name: savedQueries.name,
+                sqlTextEncrypted: savedQueries.sqlTextEncrypted,
+                folderId: savedQueries.folderId,
+                createdAt: savedQueries.createdAt,
+                updatedAt: savedQueries.updatedAt,
+              })
+              .from(savedQueries)
+              .where(
+                and(
+                  eq(savedQueries.userId, userId),
+                  eq(savedQueries.tenantId, tenantId),
+                ),
+              );
+
+            queries.push(
+              ...midQueries.map((q) => ({
+                id: q.id,
+                mid,
+                name: q.name,
+                sql:
+                  (this.encryptionService.decrypt(
+                    q.sqlTextEncrypted,
+                  ) as string) ?? '',
+                folderId: q.folderId ?? null,
+                createdAt: q.createdAt.toISOString(),
+                updatedAt: q.updatedAt.toISOString(),
+              })),
             );
 
-          allQueries.push(
-            ...midQueries.map((q) => ({
-              id: q.id,
-              mid,
-              name: q.name,
-              sql:
-                (this.encryptionService.decrypt(
-                  q.sqlTextEncrypted,
-                ) as string) ?? '',
-              folderId: q.folderId ?? null,
-              createdAt: q.createdAt.toISOString(),
-              updatedAt: q.updatedAt.toISOString(),
-            })),
-          );
+            const midFolders = await this.db
+              .select({
+                id: folders.id,
+                name: folders.name,
+                visibility: folders.visibility,
+                parentId: folders.parentId,
+                createdAt: folders.createdAt,
+              })
+              .from(folders)
+              .where(
+                and(eq(folders.userId, userId), eq(folders.tenantId, tenantId)),
+              );
 
-          const midFolders = await this.db
-            .select({
-              id: folders.id,
-              name: folders.name,
-              visibility: folders.visibility,
-              parentId: folders.parentId,
-              createdAt: folders.createdAt,
-            })
-            .from(folders)
-            .where(
-              and(eq(folders.userId, userId), eq(folders.tenantId, tenantId)),
+            foldersList.push(
+              ...midFolders.map((f) => ({
+                id: f.id,
+                mid,
+                name: f.name,
+                visibility: f.visibility,
+                parentId: f.parentId ?? null,
+                createdAt: f.createdAt.toISOString(),
+              })),
             );
 
-          allFolders.push(
-            ...midFolders.map((f) => ({
-              id: f.id,
-              mid,
-              name: f.name,
-              visibility: f.visibility,
-              parentId: f.parentId ?? null,
-              createdAt: f.createdAt.toISOString(),
-            })),
-          );
+            const midRuns = await this.db
+              .select({
+                id: shellQueryRuns.id,
+                sqlTextEncrypted: shellQueryRuns.sqlTextEncrypted,
+                status: shellQueryRuns.status,
+                rowCount: shellQueryRuns.rowCount,
+                createdAt: shellQueryRuns.createdAt,
+                completedAt: shellQueryRuns.completedAt,
+              })
+              .from(shellQueryRuns)
+              .where(
+                and(
+                  eq(shellQueryRuns.userId, userId),
+                  eq(shellQueryRuns.tenantId, tenantId),
+                ),
+              );
 
-          const midRuns = await this.db
-            .select({
-              id: shellQueryRuns.id,
-              sqlTextEncrypted: shellQueryRuns.sqlTextEncrypted,
-              status: shellQueryRuns.status,
-              rowCount: shellQueryRuns.rowCount,
-              createdAt: shellQueryRuns.createdAt,
-              completedAt: shellQueryRuns.completedAt,
-            })
-            .from(shellQueryRuns)
-            .where(
-              and(
-                eq(shellQueryRuns.userId, userId),
-                eq(shellQueryRuns.tenantId, tenantId),
-              ),
+            runs.push(
+              ...midRuns.map((r) => ({
+                id: r.id,
+                mid,
+                sql:
+                  (this.encryptionService.decrypt(
+                    r.sqlTextEncrypted,
+                  ) as string) ?? '',
+                status: r.status,
+                rowCount: r.rowCount ?? null,
+                createdAt: r.createdAt.toISOString(),
+                completedAt: r.completedAt?.toISOString() ?? null,
+              })),
             );
 
-          allRuns.push(
-            ...midRuns.map((r) => ({
-              id: r.id,
-              mid,
-              sql:
-                (this.encryptionService.decrypt(
-                  r.sqlTextEncrypted,
-                ) as string) ?? '',
-              status: r.status,
-              rowCount: r.rowCount ?? null,
-              createdAt: r.createdAt.toISOString(),
-              completedAt: r.completedAt?.toISOString() ?? null,
-            })),
-          );
+            const midSnippets = await this.db
+              .select({
+                id: snippets.id,
+                title: snippets.title,
+                code: snippets.code,
+                isShared: snippets.isShared,
+                createdAt: snippets.createdAt,
+              })
+              .from(snippets)
+              .where(
+                and(
+                  eq(snippets.userId, userId),
+                  eq(snippets.tenantId, tenantId),
+                ),
+              );
 
-          const midSnippets = await this.db
-            .select({
-              id: snippets.id,
-              title: snippets.title,
-              code: snippets.code,
-              isShared: snippets.isShared,
-              createdAt: snippets.createdAt,
-            })
-            .from(snippets)
-            .where(
-              and(eq(snippets.userId, userId), eq(snippets.tenantId, tenantId)),
+            snippetsList.push(
+              ...midSnippets.map((s) => ({
+                id: s.id,
+                mid,
+                title: s.title,
+                code: s.code,
+                isShared: s.isShared ?? false,
+                createdAt: s.createdAt?.toISOString() ?? null,
+              })),
             );
+          }
 
-          allSnippets.push(
-            ...midSnippets.map((s) => ({
-              id: s.id,
-              mid,
-              title: s.title,
-              code: s.code,
-              isShared: s.isShared ?? false,
-              createdAt: s.createdAt?.toISOString() ?? null,
-            })),
-          );
+          return {
+            allQueries: queries,
+            allFolders: foldersList,
+            allRuns: runs,
+            allSnippets: snippetsList,
+          };
         },
       );
-    }
 
     return {
       exportedAt: new Date().toISOString(),
