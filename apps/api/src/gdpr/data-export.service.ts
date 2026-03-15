@@ -46,6 +46,7 @@ export interface GdprDataExport {
   }>;
   snippets: Array<{
     id: string;
+    mid: string;
     title: string;
     code: string;
     isShared: boolean;
@@ -103,6 +104,7 @@ export class DataExportService {
     const allQueries: GdprDataExport['savedQueries'] = [];
     const allFolders: GdprDataExport['folders'] = [];
     const allRuns: GdprDataExport['queryExecutionHistory'] = [];
+    const allSnippets: GdprDataExport['snippets'] = [];
 
     for (const mid of mids) {
       await this.rlsContext.runWithIsolatedUserContext(
@@ -197,29 +199,33 @@ export class DataExportService {
               completedAt: r.completedAt?.toISOString() ?? null,
             })),
           );
+
+          const midSnippets = await this.db
+            .select({
+              id: snippets.id,
+              title: snippets.title,
+              code: snippets.code,
+              isShared: snippets.isShared,
+              createdAt: snippets.createdAt,
+            })
+            .from(snippets)
+            .where(
+              and(eq(snippets.userId, userId), eq(snippets.tenantId, tenantId)),
+            );
+
+          allSnippets.push(
+            ...midSnippets.map((s) => ({
+              id: s.id,
+              mid,
+              title: s.title,
+              code: s.code,
+              isShared: s.isShared ?? false,
+              createdAt: s.createdAt?.toISOString() ?? null,
+            })),
+          );
         },
       );
     }
-
-    // Snippets are tenant-scoped (no mid column), query without MID RLS
-    const userSnippets = await this.rlsContext.runWithIsolatedTenantContext(
-      tenantId,
-      mids[0] ?? callerMid,
-      async () => {
-        return this.db
-          .select({
-            id: snippets.id,
-            title: snippets.title,
-            code: snippets.code,
-            isShared: snippets.isShared,
-            createdAt: snippets.createdAt,
-          })
-          .from(snippets)
-          .where(
-            and(eq(snippets.userId, userId), eq(snippets.tenantId, tenantId)),
-          );
-      },
-    );
 
     return {
       exportedAt: new Date().toISOString(),
@@ -233,13 +239,7 @@ export class DataExportService {
       },
       savedQueries: allQueries,
       folders: allFolders,
-      snippets: userSnippets.map((s) => ({
-        id: s.id,
-        title: s.title,
-        code: s.code,
-        isShared: s.isShared ?? false,
-        createdAt: s.createdAt?.toISOString() ?? null,
-      })),
+      snippets: allSnippets,
       queryExecutionHistory: allRuns,
     };
   }
