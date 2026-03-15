@@ -206,6 +206,46 @@ describe("Drizzle Repositories", () => {
     expect(ownerCount).toBeGreaterThanOrEqual(1);
   });
 
+  it("should not create duplicate owners under concurrent promotion attempts", async () => {
+    // Create users first (upsert auto-promotes when no owner exists)
+    const fourthUser = await userRepo.upsert({
+      sfUserId: "repo-test-user-793",
+      tenantId: testTenantId,
+      email: "fourth@example.com",
+      name: "Fourth User",
+    });
+    const fifthUser = await userRepo.upsert({
+      sfUserId: "repo-test-user-794",
+      tenantId: testTenantId,
+      email: "fifth@example.com",
+      name: "Fifth User",
+    });
+
+    // Remove all owners AFTER creation so both promotion attempts race
+    const currentUsers = await userRepo.findByTenantId(testTenantId);
+    for (const u of currentUsers) {
+      if (u.role === "owner") {
+        await userRepo.updateRole(u.id, "member");
+      }
+    }
+
+    // Concurrent promotion attempts
+    const [result1, result2] = await Promise.all([
+      userRepo.assignOwnerIfNone(fourthUser.id, testTenantId),
+      userRepo.assignOwnerIfNone(fifthUser.id, testTenantId),
+    ]);
+
+    // Exactly one should succeed
+    expect([result1, result2].filter(Boolean)).toHaveLength(1);
+
+    // DB should have exactly one owner
+    const ownerCount = await userRepo.countByTenantIdAndRole(
+      testTenantId,
+      "owner",
+    );
+    expect(ownerCount).toBe(1);
+  });
+
   it("should upsert and find credentials", async () => {
     const mid = TEST_MID;
     const credData = {

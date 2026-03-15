@@ -143,17 +143,29 @@ export class DrizzleUserRepository implements IUserRepository {
   }
 
   async assignOwnerIfNone(userId: string, tenantId: string): Promise<boolean> {
-    const result = await this.db.execute(
-      sql`UPDATE users SET role = 'owner'
-          WHERE id = ${userId}::uuid
-            AND tenant_id = ${tenantId}::uuid
-            AND NOT EXISTS (
-              SELECT 1 FROM users
-              WHERE tenant_id = ${tenantId}::uuid AND role = 'owner'
-            )
-          RETURNING id`,
-    );
-    return result.length > 0;
+    try {
+      const result = await this.db.execute(
+        sql`UPDATE users SET role = 'owner'
+            WHERE id = ${userId}::uuid
+              AND tenant_id = ${tenantId}::uuid
+              AND NOT EXISTS (
+                SELECT 1 FROM users
+                WHERE tenant_id = ${tenantId}::uuid AND role = 'owner'
+              )
+            RETURNING id`,
+      );
+      return result.length > 0;
+    } catch (error: unknown) {
+      // Partial unique index users_one_owner_per_tenant rejects concurrent promotions.
+      // Another transaction already promoted a different user — return false.
+      if (
+        error instanceof Error &&
+        (error as Error & { code?: string }).code === "23505"
+      ) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async findByTenantId(tenantId: string): Promise<User[]> {
