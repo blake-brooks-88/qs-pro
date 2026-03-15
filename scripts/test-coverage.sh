@@ -68,9 +68,9 @@ run_vitest_with_coverage() {
   # Run vitest with coverage in each package directory
   # Track failures but continue to collect coverage from all packages
   if [ -n "$config_path" ]; then
-    (cd "$pkg" && npx vitest run --config "$config_path" --coverage --coverage.reportsDirectory "$reports_dir") || failures=1
+    (cd "$pkg" && npx vitest run --config "$config_path" --coverage --coverage.reportsDirectory "$reports_dir") || { echo "COVERAGE_FAILURE: $pkg ($variant) exited non-zero"; failures=1; }
   else
-    (cd "$pkg" && npx vitest run --config vitest.config.ts --coverage --coverage.reportsDirectory "$reports_dir") || failures=1
+    (cd "$pkg" && npx vitest run --config vitest.config.ts --coverage --coverage.reportsDirectory "$reports_dir") || { echo "COVERAGE_FAILURE: $pkg ($variant) exited non-zero"; failures=1; }
   fi
 
   # Copy coverage-final.json to temp directory with unique name
