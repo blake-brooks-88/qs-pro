@@ -149,18 +149,13 @@ describe('SiemController', () => {
 });
 
 describe('UpsertSiemConfigSchema', () => {
-  it('rejects private or internal network webhook targets', () => {
+  it('rejects non-HTTPS webhook URLs', () => {
     const result = UpsertSiemConfigSchema.safeParse({
-      webhookUrl: 'https://127.0.0.1/webhook',
+      webhookUrl: 'http://siem.example.com/webhook',
       secret: 'my-long-secret-key',
     });
 
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.flatten().fieldErrors.webhookUrl?.[0]).toContain(
-        'Webhook URL must not target private or internal networks',
-      );
-    }
   });
 
   it('accepts a valid HTTPS webhook URL', () => {

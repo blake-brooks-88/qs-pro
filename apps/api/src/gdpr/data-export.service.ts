@@ -116,6 +116,12 @@ export class DataExportService {
             ? discoveredMids
             : [callerMid, ...discoveredMids];
 
+          // Disable admin bypass before per-MID queries so RLS
+          // correctly scopes results to each MID individually.
+          if (reservedSql) {
+            await reservedSql`SELECT set_config('app.admin_action', 'false', true)`;
+          }
+
           const queries: GdprDataExport['savedQueries'] = [];
           const foldersList: GdprDataExport['folders'] = [];
           const runs: GdprDataExport['queryExecutionHistory'] = [];

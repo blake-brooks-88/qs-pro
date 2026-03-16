@@ -242,3 +242,26 @@ All lint rules, autocomplete suggestions, and editor validations MUST align with
 - Backend API: 3000
 - PostgreSQL: 5432
 - Redis: 6379
+
+## Git Worktree Infrastructure
+
+This project uses `worktree-compose` (`wtc`) for per-worktree Docker isolation. Each worktree gets its own Postgres and Redis on unique ports — no conflicts with other worktrees or the main checkout.
+
+**After creating a git worktree:**
+
+```bash
+wtc start          # Starts isolated Postgres + Redis with unique ports
+pnpm install       # Install dependencies
+pnpm db:migrate    # Run migrations against the worktree's database
+```
+
+**When cleaning up a worktree:**
+
+```bash
+wtc stop                          # Tears down containers (preserves volumes)
+git worktree remove <path>        # Removes the worktree
+```
+
+**Do NOT** use the main worktree's database (port 5432) from a secondary worktree. Each worktree's `wtc start` injects the correct ports into `.env` automatically.
+
+**Running tests in a worktree** works identically to the main checkout — `pnpm test`, `pnpm --filter api test:integration`, etc. — because `wtc` remaps ports in the environment.
