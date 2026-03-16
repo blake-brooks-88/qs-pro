@@ -52,6 +52,20 @@ describe("getTierFeatures", () => {
   });
 });
 
+describe("smartRelationships feature tiering", () => {
+  it("smartRelationships is NOT in the free tier", () => {
+    expect(TIER_FEATURES.free).not.toContain("smartRelationships");
+  });
+
+  it("smartRelationships IS in the pro tier", () => {
+    expect(TIER_FEATURES.pro).toContain("smartRelationships");
+  });
+
+  it("smartRelationships IS in the enterprise tier", () => {
+    expect(TIER_FEATURES.enterprise).toContain("smartRelationships");
+  });
+});
+
 describe("isTierFeature", () => {
   it("returns true for querySharing on pro tier", () => {
     expect(isTierFeature("pro", "querySharing")).toBe(true);

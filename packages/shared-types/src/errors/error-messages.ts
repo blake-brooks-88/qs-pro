@@ -61,6 +61,8 @@ export const ErrorMessages: Record<ErrorCode, string> = {
     "This feature is not enabled for your subscription.",
   [ErrorCode.STALE_CONTENT]:
     "This content was modified by another user. Please reload and try again.",
+  [ErrorCode.CONFIG_DE_CREATION_FAILED]:
+    "Failed to create relationship config data extension.",
 
   // Query Activity Errors
   [ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME]:
