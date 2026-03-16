@@ -4,6 +4,7 @@ import {
   CodeFile,
   Database,
   Folder as FolderIcon,
+  LockKeyhole,
 } from "@solar-icons/react";
 import { UsersGroupRounded } from "@solar-icons/react";
 import Fuse from "fuse.js";
@@ -12,18 +13,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuotaCountBadge } from "@/components/QuotaGate";
 import { useFolders } from "@/features/editor-workspace/hooks/use-folders";
 import { useDataExtensionFields } from "@/features/editor-workspace/hooks/use-metadata";
+import { useRelationshipGraph } from "@/features/editor-workspace/hooks/use-relationship-graph";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
 import type {
   DataExtension,
   Folder,
   SavedQuery,
 } from "@/features/editor-workspace/types";
+import { useFeature } from "@/hooks/use-feature";
 import { useRunUsage } from "@/hooks/use-run-usage";
 import { useTier, WARNING_THRESHOLD } from "@/hooks/use-tier";
 import { cn } from "@/lib/utils";
 
 import { getFolderAncestors, getFolderPath } from "../utils/folder-utils";
+import type { RelationshipGraph } from "../utils/relationship-graph/types";
 import { QueryTreeView } from "./QueryTreeView";
+import { RelationshipSection } from "./RelationshipSection";
 import {
   SidebarSearch,
   SidebarSearchResultItem,
@@ -53,9 +58,12 @@ interface DataExtensionNodeProps {
   depth: number;
   isExpanded: boolean;
   isSelected?: boolean;
+  isHighlighted?: boolean;
   onToggle: (id: string) => void;
   onSelectDE?: (id: string) => void;
   tenantId?: string | null;
+  relationshipGraph?: RelationshipGraph;
+  onNavigateToDE?: (deName: string) => void;
 }
 
 const sortByName = (a: { name: string }, b: { name: string }) =>
@@ -71,9 +79,12 @@ function DataExtensionNode({
   depth,
   isExpanded,
   isSelected,
+  isHighlighted,
   onToggle,
   onSelectDE,
   tenantId,
+  relationshipGraph,
+  onNavigateToDE,
 }: DataExtensionNodeProps) {
   const fieldsQuery = useDataExtensionFields({
     tenantId,
@@ -82,9 +93,19 @@ function DataExtensionNode({
   });
 
   const hasFields = (fieldsQuery.data?.length ?? 0) > 0;
+  const hasRelationships = relationshipGraph?.edges.some(
+    (e) =>
+      e.sourceDE === dataExtension.name || e.targetDE === dataExtension.name,
+  );
 
   return (
-    <div className="space-y-1">
+    <div
+      className={cn(
+        "space-y-1 transition-all duration-500",
+        isHighlighted && "ring-2 ring-primary/50 rounded",
+      )}
+      data-de-name={dataExtension.name}
+    >
       <button
         type="button"
         aria-expanded={isExpanded}
@@ -126,6 +147,14 @@ function DataExtensionNode({
       </button>
       {isExpanded ? (
         <div className="ml-6 border-l border-border/50 pl-3 space-y-1">
+          {hasRelationships && relationshipGraph && onNavigateToDE ? (
+            <RelationshipSection
+              deName={dataExtension.name}
+              graph={relationshipGraph}
+              folderId={dataExtension.folderId}
+              onNavigateToDE={onNavigateToDE}
+            />
+          ) : null}
           {fieldsQuery.isFetching ? (
             <div className="text-xs text-muted-foreground">
               Loading fields...
@@ -137,7 +166,16 @@ function DataExtensionNode({
                 title={field.name}
                 className="flex items-center justify-between gap-2 text-xs text-foreground/80"
               >
-                <span className="truncate">{field.name}</span>
+                <span className="flex items-center gap-1 truncate">
+                  {field.name}
+                  {field.isPrimaryKey ? (
+                    <LockKeyhole
+                      size={10}
+                      className="text-amber-500 shrink-0"
+                      aria-label="Primary key"
+                    />
+                  ) : null}
+                </span>
                 <span className="font-mono text-xs text-muted-foreground shrink-0">
                   {field.type}
                 </span>
@@ -198,6 +236,14 @@ export function WorkspaceSidebar({
   const { tier } = useTier();
   const { data: usageData } = useRunUsage();
   const { data: savedQueryFolders = [] } = useFolders();
+  const { enabled: smartRelationshipsEnabled } =
+    useFeature("smartRelationships");
+  const { graph: relationshipGraph } = useRelationshipGraph();
+  const [highlightedDEName, setHighlightedDEName] = useState<string | null>(
+    null,
+  );
+
+  const activeGraph = smartRelationshipsEnabled ? relationshipGraph : undefined;
 
   const folderVisibilityMap = useMemo(() => {
     const map = new Map<string, "personal" | "shared">();
@@ -408,6 +454,42 @@ export function WorkspaceSidebar({
     setExpandedDeIds(preSearchExpandedDEs);
   };
 
+  const handleNavigateToDE = useCallback(
+    (targetDEName: string) => {
+      const targetDE = dataExtensions.find((de) => de.name === targetDEName);
+      if (!targetDE) {
+        return;
+      }
+
+      setExpandedFolderIds((prev) => {
+        const next = { ...prev };
+        const folderIdToResolve = targetDE.folderId || null;
+        if (folderIdToResolve) {
+          const ancestors = getFolderAncestors(folders, folderIdToResolve);
+          for (const f of ancestors) {
+            next[f.id] = true;
+          }
+        }
+        return next;
+      });
+      setExpandedDeIds((prev) => ({ ...prev, [targetDE.id]: true }));
+
+      setHighlightedDEName(targetDEName);
+      requestAnimationFrame(() => {
+        const el = document.querySelector(
+          `[data-de-name="${CSS.escape(targetDEName)}"]`,
+        );
+        el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+
+      const timeout = setTimeout(() => {
+        setHighlightedDEName(null);
+      }, 1500);
+      return () => clearTimeout(timeout);
+    },
+    [dataExtensions, folders],
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isSearchOpen || searchResults.length === 0) {
       return;
@@ -536,11 +618,14 @@ export function WorkspaceSidebar({
                   depth={depth + 1}
                   isExpanded={Boolean(expandedDeIds[dataExtension.id])}
                   isSelected={focusedItemId === dataExtension.id}
+                  isHighlighted={highlightedDEName === dataExtension.name}
                   onToggle={(id) =>
                     setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
                   }
                   onSelectDE={onSelectDE}
                   tenantId={tenantId}
+                  relationshipGraph={activeGraph}
+                  onNavigateToDE={handleNavigateToDE}
                 />
               ))}
           </div>
@@ -685,11 +770,14 @@ export function WorkspaceSidebar({
                     depth={0}
                     isExpanded={Boolean(expandedDeIds[dataExtension.id])}
                     isSelected={focusedItemId === dataExtension.id}
+                    isHighlighted={highlightedDEName === dataExtension.name}
                     onToggle={(id) =>
                       setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
                     }
                     onSelectDE={onSelectDE}
                     tenantId={tenantId}
+                    relationshipGraph={activeGraph}
+                    onNavigateToDE={handleNavigateToDE}
                   />
                 ))}
             </>

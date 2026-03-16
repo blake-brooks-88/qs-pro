@@ -54,6 +54,21 @@ vi.mock("../QueryTreeView", () => ({
   ),
 }));
 
+vi.mock("@/features/editor-workspace/hooks/use-relationship-graph", () => ({
+  useRelationshipGraph: () => ({
+    graph: { edges: [], exclusions: [] },
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/hooks/use-feature", () => ({
+  useFeature: () => ({ enabled: false, isLoading: false }),
+}));
+
+vi.mock("../RelationshipSection", () => ({
+  RelationshipSection: () => null,
+}));
+
 vi.mock("@/components/QuotaGate", () => ({
   QuotaCountBadge: ({
     current,
