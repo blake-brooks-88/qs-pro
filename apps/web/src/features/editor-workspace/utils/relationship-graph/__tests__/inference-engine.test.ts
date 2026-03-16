@@ -60,9 +60,24 @@ describe("inferRelationships", () => {
     expect(aliasEdge?.confidence).toBe("medium");
   });
 
-  it("demotes columns appearing in 5+ DEs without PK to low confidence", () => {
+  it("drops inferred edges when neither side is a PK", () => {
     const des: DEFieldMetadata[] = Array.from({ length: 6 }, (_, idx) =>
       mkDE(`DE_${idx}`, [{ name: "Status" }]),
+    );
+
+    const edges = inferRelationships(des, []);
+
+    const statusEdges = edges.filter(
+      (e) =>
+        e.sourceColumn.toLowerCase() === "status" &&
+        e.targetColumn.toLowerCase() === "status",
+    );
+    expect(statusEdges).toHaveLength(0);
+  });
+
+  it("demotes high-frequency PK columns to low confidence", () => {
+    const des: DEFieldMetadata[] = Array.from({ length: 6 }, (_, idx) =>
+      mkDE(`DE_${idx}`, [{ name: "Status", isPrimaryKey: true }]),
     );
 
     const edges = inferRelationships(des, []);

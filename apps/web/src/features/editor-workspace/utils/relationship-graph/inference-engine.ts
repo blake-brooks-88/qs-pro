@@ -78,17 +78,23 @@ export function inferRelationships(
             continue;
           }
 
+          const hasPK = fieldA.isPrimaryKey || fieldB.isPrimaryKey;
+
+          // Only infer relationships when at least one side is a PK.
+          // Without PK involvement, a shared name (e.g. DateOfBirth)
+          // is just a coincidence, not a join-worthy relationship.
+          if (!hasPK) {
+            continue;
+          }
+
           let confidence: RelationshipEdge["confidence"];
 
           if (aliasMatch) {
             confidence = "medium";
           } else {
             const freq = columnFrequency.get(normA) ?? 0;
-            const hasPK = fieldA.isPrimaryKey || fieldB.isPrimaryKey;
 
-            if (hasPK) {
-              confidence = "high";
-            } else if (freq >= HIGH_FREQUENCY_THRESHOLD) {
+            if (freq >= HIGH_FREQUENCY_THRESHOLD) {
               confidence = "low";
             } else {
               confidence = "high";
