@@ -36,6 +36,7 @@ const TERMINAL_CODES = new Set<ErrorCode>([
   ErrorCode.VALIDATION_ERROR,
   ErrorCode.FEATURE_NOT_ENABLED,
   ErrorCode.STALE_CONTENT,
+  ErrorCode.CONFIG_DE_CREATION_FAILED,
 
   // Query Activity errors
   ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME,
@@ -160,6 +161,8 @@ export function getHttpStatus(code: ErrorCode): number {
       return 403;
     case ErrorCode.STALE_CONTENT:
       return 409;
+    case ErrorCode.CONFIG_DE_CREATION_FAILED:
+      return 502; // Bad Gateway — upstream MCE failure
 
     // Query Activity errors
     case ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME:
@@ -206,6 +209,7 @@ export function getErrorTitle(code: ErrorCode): string {
     [ErrorCode.VALIDATION_ERROR]: "Validation Error",
     [ErrorCode.FEATURE_NOT_ENABLED]: "Feature Not Enabled",
     [ErrorCode.STALE_CONTENT]: "Stale Content",
+    [ErrorCode.CONFIG_DE_CREATION_FAILED]: "Config DE Creation Failed",
     [ErrorCode.DUPLICATE_QUERY_ACTIVITY_NAME]: "Duplicate Query Activity Name",
     [ErrorCode.DUPLICATE_CUSTOMER_KEY]: "Duplicate Customer Key",
     [ErrorCode.SHARED_DE_ACCESS_DENIED]: "Shared Data Extension Access Denied",
