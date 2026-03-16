@@ -7,6 +7,10 @@ import type { ExecutionResult } from "@/features/editor-workspace/types";
 
 import { EditorResultsPane } from "../EditorResultsPane";
 
+vi.mock("@/hooks/use-feature", () => ({
+  useFeature: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("../ResultsPane", () => ({
   ResultsPane: ({
     result,

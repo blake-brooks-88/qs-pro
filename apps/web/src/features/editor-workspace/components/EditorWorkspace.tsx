@@ -932,6 +932,7 @@ export function EditorWorkspace({
                       }}
                       onCancel={handleCancel}
                       onViewInContactBuilder={onViewInContactBuilder}
+                      executedSql={safeActiveTab.content}
                     />
                   </div>
                 </>
