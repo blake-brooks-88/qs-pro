@@ -3,7 +3,6 @@ import { useMemo } from "react";
 
 import { useFeature } from "@/hooks/use-feature";
 import api from "@/services/api";
-import { useAuthStore } from "@/store/auth-store";
 
 import type { DataExtensionField } from "../types";
 import { buildRelationshipGraph } from "../utils/relationship-graph/build-graph";
@@ -34,7 +33,6 @@ export function useRelationshipGraph(): {
 } {
   const { enabled: featureEnabled } = useFeature("smartRelationships");
   const queryClient = useQueryClient();
-  const _tenantId = useAuthStore((s) => s.tenant?.id);
   const fieldsFetchingCount = useIsFetching({
     queryKey: ["metadata", "fields"],
   });
