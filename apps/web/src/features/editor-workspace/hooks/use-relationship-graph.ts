@@ -1,11 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useFeature } from "@/hooks/use-feature";
 import api from "@/services/api";
+import { useAuthStore } from "@/store/auth-store";
 
+import type { DataExtensionField } from "../types";
 import { buildRelationshipGraph } from "../utils/relationship-graph/build-graph";
 import type {
+  DEFieldMetadata,
   RelationshipGraph,
   RelationshipGraphResponse,
 } from "../utils/relationship-graph/types";
@@ -30,6 +33,11 @@ export function useRelationshipGraph(): {
   isLoading: boolean;
 } {
   const { enabled: featureEnabled } = useFeature("smartRelationships");
+  const queryClient = useQueryClient();
+  const _tenantId = useAuthStore((s) => s.tenant?.id);
+  const fieldsFetchingCount = useIsFetching({
+    queryKey: ["metadata", "fields"],
+  });
 
   const graphQuery = useQuery({
     queryKey: relationshipGraphKeys.graph,
@@ -37,6 +45,36 @@ export function useRelationshipGraph(): {
     staleTime: GRAPH_STALE_TIME_MS,
     enabled: featureEnabled,
   });
+
+  const allDEMetadata = useMemo(() => {
+    const cachedFieldQueries = queryClient.getQueriesData<DataExtensionField[]>(
+      {
+        queryKey: ["metadata", "fields"],
+      },
+    );
+
+    const result: DEFieldMetadata[] = [];
+    for (const [queryKey, fields] of cachedFieldQueries) {
+      if (!fields || fields.length === 0) {
+        continue;
+      }
+      const customerKey = queryKey[3] as string;
+      if (!customerKey || customerKey === "unknown") {
+        continue;
+      }
+      result.push({
+        deName: customerKey,
+        fields: fields.map((f) => ({
+          name: f.name,
+          fieldType: f.type,
+          isPrimaryKey: f.isPrimaryKey,
+        })),
+      });
+    }
+    return result;
+    // fieldsFetchingCount triggers recomputation when field cache entries change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient, fieldsFetchingCount]);
 
   const graph = useMemo(() => {
     if (!featureEnabled || !graphQuery.data) {
@@ -47,8 +85,13 @@ export function useRelationshipGraph(): {
     const apiEdges = edges.filter((e) => e.source === "attribute_group");
     const userEdges = edges.filter((e) => e.source === "user");
 
-    return buildRelationshipGraph(apiEdges, userEdges, exclusions, []);
-  }, [featureEnabled, graphQuery.data]);
+    return buildRelationshipGraph(
+      apiEdges,
+      userEdges,
+      exclusions,
+      allDEMetadata,
+    );
+  }, [featureEnabled, graphQuery.data, allDEMetadata]);
 
   return {
     graph,
