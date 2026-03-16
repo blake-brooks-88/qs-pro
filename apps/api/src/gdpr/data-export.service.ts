@@ -126,6 +126,7 @@ export class DataExportService {
           const foldersList: GdprDataExport['folders'] = [];
           const runs: GdprDataExport['queryExecutionHistory'] = [];
           const snippetsList: GdprDataExport['snippets'] = [];
+          const seenSnippetIds = new Set<string>();
 
           for (const mid of mids) {
             if (reservedSql) {
@@ -228,6 +229,7 @@ export class DataExportService {
                 code: snippets.code,
                 isShared: snippets.isShared,
                 createdAt: snippets.createdAt,
+                mid: snippets.mid,
               })
               .from(snippets)
               .where(
@@ -237,16 +239,19 @@ export class DataExportService {
                 ),
               );
 
-            snippetsList.push(
-              ...midSnippets.map((s) => ({
-                id: s.id,
-                mid,
-                title: s.title,
-                code: s.code,
-                isShared: s.isShared ?? false,
-                createdAt: s.createdAt?.toISOString() ?? null,
-              })),
-            );
+            for (const s of midSnippets) {
+              if (!seenSnippetIds.has(s.id)) {
+                seenSnippetIds.add(s.id);
+                snippetsList.push({
+                  id: s.id,
+                  mid: s.mid,
+                  title: s.title,
+                  code: s.code,
+                  isShared: s.isShared ?? false,
+                  createdAt: s.createdAt?.toISOString() ?? null,
+                });
+              }
+            }
           }
 
           return {
