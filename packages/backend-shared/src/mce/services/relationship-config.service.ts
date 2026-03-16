@@ -109,7 +109,8 @@ export class RelationshipConfigService {
     } catch (error) {
       if (
         error instanceof AppError &&
-        error.code === ErrorCode.RESOURCE_NOT_FOUND
+        (error.code === ErrorCode.RESOURCE_NOT_FOUND ||
+          error.code === ErrorCode.MCE_BAD_REQUEST)
       ) {
         return [];
       }

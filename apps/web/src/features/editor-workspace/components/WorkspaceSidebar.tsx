@@ -60,7 +60,6 @@ interface DataExtensionNodeProps {
   isSelected?: boolean;
   isHighlighted?: boolean;
   onToggle: (id: string) => void;
-  onSelectDE?: (id: string) => void;
   tenantId?: string | null;
   relationshipGraph?: RelationshipGraph;
   onNavigateToDE?: (deName: string) => void;
@@ -81,7 +80,6 @@ function DataExtensionNode({
   isSelected,
   isHighlighted,
   onToggle,
-  onSelectDE,
   tenantId,
   relationshipGraph,
   onNavigateToDE,
@@ -111,7 +109,6 @@ function DataExtensionNode({
         aria-expanded={isExpanded}
         onClick={() => {
           onToggle(dataExtension.id);
-          onSelectDE?.(dataExtension.id);
         }}
         title={dataExtension.name}
         className={cn(
@@ -622,7 +619,6 @@ export function WorkspaceSidebar({
                   onToggle={(id) =>
                     setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
                   }
-                  onSelectDE={onSelectDE}
                   tenantId={tenantId}
                   relationshipGraph={activeGraph}
                   onNavigateToDE={handleNavigateToDE}
@@ -774,7 +770,6 @@ export function WorkspaceSidebar({
                     onToggle={(id) =>
                       setExpandedDeIds((prev) => toggleExpandedDeId(prev, id))
                     }
-                    onSelectDE={onSelectDE}
                     tenantId={tenantId}
                     relationshipGraph={activeGraph}
                     onNavigateToDE={handleNavigateToDE}
