@@ -4,6 +4,7 @@ import type { DataExtensionField } from "@/features/editor-workspace/types";
 import { getInlineCompletionReplacementEndOffset } from "@/features/editor-workspace/utils/inline-completion-range";
 import type { InlineSuggestionContext } from "@/features/editor-workspace/utils/inline-suggestions";
 import { evaluateInlineSuggestions } from "@/features/editor-workspace/utils/inline-suggestions";
+import type { RelationshipGraph } from "@/features/editor-workspace/utils/relationship-graph/types";
 import { getSqlCursorContext } from "@/features/editor-workspace/utils/sql-context";
 
 export function registerSqlInlineCompletionsProvider(options: {
@@ -13,8 +14,10 @@ export function registerSqlInlineCompletionsProvider(options: {
     customerKey: string,
     signal?: AbortSignal,
   ) => Promise<DataExtensionField[]>;
+  getRelationshipGraph?: () => RelationshipGraph | undefined;
 }): Monaco.IDisposable {
-  const { monaco, resolveDataExtension, fetchFields } = options;
+  const { monaco, resolveDataExtension, fetchFields, getRelationshipGraph } =
+    options;
 
   return monaco.languages.registerInlineCompletionsProvider("sql", {
     provideInlineCompletions: async (model, position) => {
@@ -47,6 +50,7 @@ export function registerSqlInlineCompletionsProvider(options: {
           const customerKey = dataExtension?.customerKey ?? table.name;
           return fetchFields(customerKey);
         },
+        relationshipGraph: getRelationshipGraph?.(),
       };
 
       const suggestion = await evaluateInlineSuggestions(ctx);
