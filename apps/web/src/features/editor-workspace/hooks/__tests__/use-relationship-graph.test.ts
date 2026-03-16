@@ -5,7 +5,10 @@ import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DataExtensionField } from "@/features/editor-workspace/types";
+import type {
+  DataExtension,
+  DataExtensionField,
+} from "@/features/editor-workspace/types";
 import type { RelationshipGraphResponse } from "@/features/editor-workspace/utils/relationship-graph/types";
 import { server } from "@/test/mocks/server";
 
@@ -222,6 +225,112 @@ describe("useRelationshipGraph", () => {
         subscriberKeyEdge?.targetDE ?? "",
       ].sort(),
     ).toEqual(["Orders", "Subscribers"]);
+  });
+
+  it("uses DE name (not customerKey) for inferred edge identifiers", async () => {
+    mockUseFeature.mockReturnValue({ enabled: true, isLoading: false });
+
+    server.use(
+      http.get("/api/relationships/graph", () => {
+        return HttpResponse.json({ edges: [], exclusions: [] });
+      }),
+    );
+
+    // customerKeys differ from names — this is common in SFMC
+    const customersFields: DataExtensionField[] = [
+      {
+        name: "CustomerID",
+        type: "Text",
+        isPrimaryKey: true,
+        isNullable: false,
+      },
+      {
+        name: "Email",
+        type: "EmailAddress",
+        isPrimaryKey: false,
+        isNullable: true,
+      },
+    ];
+    const ordersFields: DataExtensionField[] = [
+      {
+        name: "OrderID",
+        type: "Text",
+        isPrimaryKey: true,
+        isNullable: false,
+      },
+      {
+        name: "CustomerID",
+        type: "Text",
+        isPrimaryKey: false,
+        isNullable: false,
+      },
+    ];
+
+    const queryClient = createQueryClient();
+
+    // Field cache is keyed by customerKey (different from display name)
+    queryClient.setQueryData(
+      metadataQueryKeys.fields("test-tenant", "Customer\\Customers"),
+      customersFields,
+    );
+    queryClient.setQueryData(
+      metadataQueryKeys.fields("test-tenant", "Customer\\Orders"),
+      ordersFields,
+    );
+
+    // DE cache contains the name-to-customerKey mapping
+    const deList: DataExtension[] = [
+      {
+        id: "de-1",
+        name: "Customers",
+        customerKey: "Customer\\Customers",
+        folderId: "folder-1",
+        description: "",
+        fields: [],
+        isShared: false,
+      },
+      {
+        id: "de-2",
+        name: "Orders",
+        customerKey: "Customer\\Orders",
+        folderId: "folder-1",
+        description: "",
+        fields: [],
+        isShared: false,
+      },
+    ];
+    queryClient.setQueryData(
+      metadataQueryKeys.dataExtensions("test-tenant", "unknown"),
+      deList,
+    );
+
+    const { result } = renderHook(() => useRelationshipGraph(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const inferredEdges = result.current.graph.edges.filter(
+      (e) => e.source === "inferred",
+    );
+    expect(inferredEdges.length).toBeGreaterThanOrEqual(1);
+
+    // Edges must use DE names, not customerKeys
+    const customerIdEdge = inferredEdges.find(
+      (e) => e.sourceColumn === "CustomerID" && e.targetColumn === "CustomerID",
+    );
+    expect(customerIdEdge).toBeDefined();
+    expect(
+      [customerIdEdge?.sourceDE ?? "", customerIdEdge?.targetDE ?? ""].sort(),
+    ).toEqual(["Customers", "Orders"]);
+
+    // Must NOT contain customerKeys as identifiers
+    const hasCustomerKey = inferredEdges.some(
+      (e) => e.sourceDE.includes("\\") || e.targetDE.includes("\\"),
+    );
+    expect(hasCustomerKey).toBe(false);
   });
 
   it("returns no inferred edges when no field data is cached", async () => {

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useFeature } from "@/hooks/use-feature";
 import api from "@/services/api";
 
-import type { DataExtensionField } from "../types";
+import type { DataExtension, DataExtensionField } from "../types";
 import { buildRelationshipGraph } from "../utils/relationship-graph/build-graph";
 import type {
   DEFieldMetadata,
@@ -45,6 +45,20 @@ export function useRelationshipGraph(): {
   });
 
   const allDEMetadata = useMemo(() => {
+    // Build customerKey → name map from the DE cache
+    const cachedDEQueries = queryClient.getQueriesData<DataExtension[]>({
+      queryKey: ["metadata", "data-extensions"],
+    });
+    const ckToName = new Map<string, string>();
+    for (const [, deList] of cachedDEQueries) {
+      if (!deList) {
+        continue;
+      }
+      for (const de of deList) {
+        ckToName.set(de.customerKey, de.name);
+      }
+    }
+
     const cachedFieldQueries = queryClient.getQueriesData<DataExtensionField[]>(
       {
         queryKey: ["metadata", "fields"],
@@ -61,7 +75,7 @@ export function useRelationshipGraph(): {
         continue;
       }
       result.push({
-        deName: customerKey,
+        deName: ckToName.get(customerKey) ?? customerKey,
         fields: fields.map((f) => ({
           name: f.name,
           fieldType: f.type,
