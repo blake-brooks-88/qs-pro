@@ -34,4 +34,3 @@ describe("getBackofficeAuthConfigFromEnv", () => {
     expect(withoutOrigin.trustedOrigins).toEqual(["http://localhost:5174"]);
   });
 });
-

@@ -159,6 +159,15 @@ export {
 // Auth
 export { PasswordSchema } from "./auth.js";
 
+// Roles
+export type { AdminAction, OrgRole } from "./roles.js";
+export {
+  hasPermission,
+  OrgRoleSchema,
+  ROLE_PERMISSIONS,
+  ROLE_WEIGHT,
+} from "./roles.js";
+
 // Query Versions
 export type {
   UpdateVersionNameDto,
@@ -172,3 +181,19 @@ export {
   VersionListItemSchema,
   VersionListResponseSchema,
 } from "./query-versions.js";
+
+// Snippets
+export type {
+  CreateSnippetDto,
+  SnippetListItem,
+  SnippetResponse,
+  SnippetScope,
+  UpdateSnippetDto,
+} from "./snippets.js";
+export {
+  CreateSnippetSchema,
+  SnippetListItemSchema,
+  SnippetResponseSchema,
+  SnippetScopeSchema,
+  UpdateSnippetSchema,
+} from "./snippets.js";

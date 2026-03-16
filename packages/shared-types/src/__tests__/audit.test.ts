@@ -34,8 +34,15 @@ describe("AuditLogQueryParamsSchema", () => {
     expect(() => AuditLogQueryParamsSchema.parse({ pageSize: 0 })).toThrow();
   });
 
-  it("should reject pageSize above 100", () => {
-    expect(() => AuditLogQueryParamsSchema.parse({ pageSize: 200 })).toThrow();
+  it("should reject pageSize above 10000", () => {
+    expect(() =>
+      AuditLogQueryParamsSchema.parse({ pageSize: 10_001 }),
+    ).toThrow();
+  });
+
+  it("should accept pageSize of 200", () => {
+    const result = AuditLogQueryParamsSchema.parse({ pageSize: 200 });
+    expect(result.pageSize).toBe(200);
   });
 
   it("should accept full ISO datetime for dateFrom/dateTo", () => {

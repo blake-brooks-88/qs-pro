@@ -26,6 +26,7 @@ function createIcon(displayName: string) {
 
 export const AddCircle = createIcon("AddCircle");
 export const AddFolder = createIcon("AddFolder");
+export const AddSquare = createIcon("AddSquare");
 export const AltArrowDown = createIcon("AltArrowDown");
 export const AltArrowLeft = createIcon("AltArrowLeft");
 export const AltArrowRight = createIcon("AltArrowRight");
@@ -71,3 +72,4 @@ export const Sun = createIcon("Sun");
 export const TrashBinMinimalistic = createIcon("TrashBinMinimalistic");
 export const TrashBinTrash = createIcon("TrashBinTrash");
 export const UsersGroupRounded = createIcon("UsersGroupRounded");
+export const ShieldCheck = createIcon("ShieldCheck");

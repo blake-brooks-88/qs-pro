@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IAuditLogRepository } from '../audit.repository';
 import { type AuditLogEntry, AuditService } from '../audit.service';
-import type { AuditLogRow } from '../drizzle-audit-log.repository';
+import type { AuditLogRowResolved } from '../drizzle-audit-log.repository';
 
 const TENANT_ID = 'tenant-1';
 const MID = 'mid-100';
@@ -220,7 +220,10 @@ describe('AuditService', () => {
     });
 
     it('returns items and total from repo.findAll', async () => {
-      const mockRow = { id: 'row-1', eventType: 'auth.login' } as AuditLogRow;
+      const mockRow = {
+        id: 'row-1',
+        eventType: 'auth.login',
+      } as AuditLogRowResolved;
       repoStub.findAll.mockResolvedValue({ items: [mockRow], total: 1 });
 
       const result = await service.findAll(TENANT_ID, MID, defaultParams);
@@ -234,6 +237,86 @@ describe('AuditService', () => {
       await expect(
         service.findAll(TENANT_ID, MID, defaultParams),
       ).rejects.toThrow('query failed');
+    });
+  });
+
+  describe('SIEM integration', () => {
+    let siemService: AuditService;
+    let siemRepoStub: ReturnType<typeof createAuditLogRepoStub>;
+    let siemRlsStub: RlsContextStub;
+    let mockSiemProducer: { enqueue: ReturnType<typeof vi.fn> };
+    let mockSiemRepo: {
+      findByTenantId: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      siemRepoStub = createAuditLogRepoStub();
+      siemRlsStub = createRlsContextStub();
+      mockSiemProducer = { enqueue: vi.fn().mockResolvedValue(undefined) };
+      mockSiemRepo = {
+        findByTenantId: vi.fn(),
+      };
+
+      siemService = new AuditService(
+        siemRepoStub as unknown as IAuditLogRepository,
+        siemRlsStub as any,
+        mockSiemProducer as any,
+        mockSiemRepo as any,
+      );
+    });
+
+    it('enqueues SIEM webhook when config is enabled', async () => {
+      mockSiemRepo.findByTenantId.mockResolvedValue({
+        enabled: true,
+        webhookUrl: 'https://x.com',
+        secretEncrypted: 'enc:s',
+      });
+
+      await siemService.log(createFullEntry());
+      await vi.waitFor(() => {
+        expect(mockSiemProducer.enqueue).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantId: TENANT_ID,
+            webhookUrl: 'https://x.com',
+          }),
+        );
+      });
+    });
+
+    it('skips SIEM enqueue when no config exists', async () => {
+      mockSiemRepo.findByTenantId.mockResolvedValue(undefined);
+
+      await siemService.log(createFullEntry());
+      await vi.waitFor(() => {
+        expect(siemRepoStub.insert).toHaveBeenCalled();
+      });
+      expect(mockSiemProducer.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('skips SIEM enqueue when config is disabled', async () => {
+      mockSiemRepo.findByTenantId.mockResolvedValue({
+        enabled: false,
+        webhookUrl: 'https://x.com',
+        secretEncrypted: 'enc:s',
+      });
+
+      await siemService.log(createFullEntry());
+      await vi.waitFor(() => {
+        expect(siemRepoStub.insert).toHaveBeenCalled();
+      });
+      expect(mockSiemProducer.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('does not prevent audit log write when SIEM enqueue fails', async () => {
+      mockSiemRepo.findByTenantId.mockResolvedValue({
+        enabled: true,
+        webhookUrl: 'https://x.com',
+        secretEncrypted: 'enc:s',
+      });
+      mockSiemProducer.enqueue.mockRejectedValue(new Error('queue down'));
+
+      await expect(siemService.log(createFullEntry())).resolves.toBeUndefined();
+      expect(siemRepoStub.insert).toHaveBeenCalledOnce();
     });
   });
 });

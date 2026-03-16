@@ -7,6 +7,7 @@ export interface User {
   sfUserId: string;
   email: string | null;
   name: string | null;
+  role: "owner" | "admin" | "member";
 }
 
 export interface Tenant {

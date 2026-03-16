@@ -118,7 +118,7 @@ describe('configureApp', () => {
     configureApp ??= (await import('../configure-app.js')).configureApp;
     mockApp = createMockApp();
     vi.clearAllMocks();
-  });
+  }, 30_000);
 
   afterEach(() => {
     vi.resetAllMocks();

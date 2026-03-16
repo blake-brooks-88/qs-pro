@@ -10,6 +10,7 @@ export function createUserStub(overrides?: Partial<User>): User {
     sfUserId: "005xx000001234AAA",
     email: "test@example.com",
     name: "Test User",
+    role: "member",
     ...overrides,
   };
 }

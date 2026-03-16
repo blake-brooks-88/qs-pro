@@ -59,7 +59,9 @@ describe("CheckoutReturnPage", () => {
     });
 
     expect(mockConfirmCheckoutSession).toHaveBeenCalledWith("cs_success");
-    expect(mockBroadcastCheckoutReturnSignal).toHaveBeenCalledWith("success");
+    await waitFor(() => {
+      expect(mockBroadcastCheckoutReturnSignal).toHaveBeenCalledWith("success");
+    });
     await waitFor(() => {
       expect(window.close).toHaveBeenCalledTimes(1);
     });

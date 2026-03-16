@@ -22,6 +22,7 @@ function createMockDrizzleDb() {
   let selectResult: unknown[] = [];
   let insertResult: unknown[] = [];
   let insertError: Error | null = null;
+  let executeResult: unknown[] = [];
   const capturedWhereArgs: unknown[][] = [];
   const capturedInsertValues: unknown[] = [];
 
@@ -81,11 +82,14 @@ function createMockDrizzleDb() {
     set: mockSet,
   });
 
+  const mockExecute = vi.fn().mockImplementation(async () => executeResult);
+
   return {
     select: mockSelect,
     insert: mockInsert,
     delete: mockDelete,
     update: mockUpdate,
+    execute: mockExecute,
     // Helpers for test configuration
     setSelectResult: (result: unknown[]) => {
       selectResult = result;
@@ -96,6 +100,9 @@ function createMockDrizzleDb() {
     setInsertError: (error: Error | null) => {
       insertError = error;
     },
+    setExecuteResult: (result: unknown[]) => {
+      executeResult = result;
+    },
     getCapturedWhereArgs: () => capturedWhereArgs,
     getCapturedInsertValues: () => capturedInsertValues,
     getCapturedSetArgs: () => capturedSetArgs,
@@ -104,6 +111,7 @@ function createMockDrizzleDb() {
       capturedInsertValues.length = 0;
       capturedSetArgs.length = 0;
       insertError = null;
+      executeResult = [];
     },
     // Access to mocks for assertions
     mocks: {
@@ -119,6 +127,7 @@ function createMockDrizzleDb() {
       update: mockUpdate,
       set: mockSet,
       updateWhere: mockUpdateWhere,
+      execute: mockExecute,
     },
   };
 }
@@ -270,6 +279,53 @@ describe("DrizzleUserRepository", () => {
         }),
       ).rejects.toThrow("insert or update violates foreign key constraint");
     });
+  });
+});
+
+describe("DrizzleUserRepository – assignOwnerIfNone", () => {
+  let mockDb: MockDrizzleDb;
+  let userRepo: DrizzleUserRepository;
+
+  beforeEach(() => {
+    mockDb = createMockDrizzleDb();
+    userRepo = new DrizzleUserRepository(
+      mockDb as unknown as PostgresJsDatabase,
+    );
+    mockDb.resetCaptures();
+  });
+
+  it("returns true when promotion succeeds", async () => {
+    mockDb.setExecuteResult([{ id: "user-1" }]);
+
+    const result = await userRepo.assignOwnerIfNone("user-1", "tenant-1");
+    expect(result).toBe(true);
+  });
+
+  it("returns false when no rows updated (owner already exists)", async () => {
+    mockDb.setExecuteResult([]);
+
+    const result = await userRepo.assignOwnerIfNone("user-1", "tenant-1");
+    expect(result).toBe(false);
+  });
+
+  it("returns false on unique constraint violation (concurrent owner race)", async () => {
+    const uniqueError = new Error(
+      "duplicate key value violates unique constraint",
+    ) as Error & { code: string };
+    uniqueError.code = "23505";
+    mockDb.mocks.execute.mockRejectedValueOnce(uniqueError);
+
+    const result = await userRepo.assignOwnerIfNone("user-1", "tenant-1");
+    expect(result).toBe(false);
+  });
+
+  it("rethrows non-unique-constraint errors", async () => {
+    const otherError = new Error("connection lost");
+    mockDb.mocks.execute.mockRejectedValueOnce(otherError);
+
+    await expect(
+      userRepo.assignOwnerIfNone("user-1", "tenant-1"),
+    ).rejects.toThrow("connection lost");
   });
 });
 

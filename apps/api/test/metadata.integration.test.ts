@@ -300,20 +300,9 @@ describe('Metadata Endpoints (integration)', () => {
 
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
-  });
 
-  afterAll(async () => {
-    server.close();
-    await app.close();
-  });
-
-  beforeEach(async () => {
-    // Reset SOAP call counters
-    folderSoapCallCount = 0;
-    fieldsSoapCallCount = 0;
-    dataExtensionSoapCallCount = 0;
-
-    // Create authenticated agent for tests
+    // Create authenticated agent for all tests (avoid leaking sockets by re-creating
+    // supertest agents in per-test hooks).
     authenticatedAgent = superagent(app.getHttpServer());
     const secret = getRequiredEnv('MCE_JWT_SIGNING_SECRET');
     const encodedSecret = new TextEncoder().encode(secret);
@@ -339,6 +328,18 @@ describe('Metadata Endpoints (integration)', () => {
 
     const meResponse = await authenticatedAgent.get('/auth/me').expect(200);
     csrfToken = meResponse.body.csrfToken;
+  });
+
+  afterAll(async () => {
+    server.close();
+    await app.close();
+  });
+
+  beforeEach(() => {
+    // Reset SOAP call counters
+    folderSoapCallCount = 0;
+    fieldsSoapCallCount = 0;
+    dataExtensionSoapCallCount = 0;
   });
 
   afterEach(() => {

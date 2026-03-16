@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:16
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     command: ["postgres", "-c", "idle_in_transaction_session_timeout=30s"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -21,7 +21,7 @@ services:
   redis:
     image: redis:alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
 
 volumes:
   postgres_data:

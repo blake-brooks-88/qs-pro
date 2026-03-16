@@ -15,6 +15,7 @@ import { SentryModule } from '@sentry/nestjs/setup';
 import { BullMQOtel } from 'bullmq-otel';
 import Redis from 'ioredis';
 
+import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
@@ -22,6 +23,7 @@ import { SessionThrottlerGuard } from './common/guards/session-throttler.guard';
 import { DevToolsModule } from './dev-tools/dev-tools.module';
 import { FeaturesModule } from './features/features.module';
 import { FoldersModule } from './folders/folders.module';
+import { GdprModule } from './gdpr/gdpr.module';
 import { MceModule } from './mce/mce.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { QueryActivitiesModule } from './query-activities/query-activities.module';
@@ -29,6 +31,8 @@ import { QueryVersionsModule } from './query-versions/query-versions.module';
 import { RedisModule } from './redis/redis.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { ShellQueryModule } from './shell-query/shell-query.module';
+import { SiemModule } from './siem/siem.module';
+import { SnippetsModule } from './snippets/snippets.module';
 import { TrialModule } from './trial/trial.module';
 import { UsageModule } from './usage/usage.module';
 
@@ -77,6 +81,7 @@ import { UsageModule } from './usage/usage.module';
       inject: [ConfigService],
     }),
     DatabaseModule,
+    AdminModule,
     AuditModule,
     AuthModule,
     MceModule,
@@ -84,14 +89,17 @@ import { UsageModule } from './usage/usage.module';
     ShellQueryModule,
     BillingModule,
     FeaturesModule,
+    GdprModule,
     FoldersModule,
     SavedQueriesModule,
+    SnippetsModule,
     QueryActivitiesModule,
     QueryVersionsModule,
     TrialModule,
     UsageModule,
     DevToolsModule,
     ObservabilityModule,
+    SiemModule,
   ],
   providers: [
     {

@@ -46,6 +46,7 @@ const mockEditorInstance = {
     })),
   })),
   addCommand: vi.fn(),
+  addAction: vi.fn(),
   onKeyDown: vi.fn(),
   onDidChangeModelContent: vi.fn(() => mockContentChangeDisposable),
   onDidChangeCursorPosition: vi.fn(() => mockCursorPositionDisposable),

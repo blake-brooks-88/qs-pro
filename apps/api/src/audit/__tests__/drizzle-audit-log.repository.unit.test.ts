@@ -35,7 +35,11 @@ function createMockRow(overrides: Record<string, unknown> = {}) {
     eventType: 'saved_query.created',
     actorType: 'user',
     actorId: 'user-1',
+    actorName: null,
+    actorEmail: null,
     targetId: 'target-1',
+    targetName: null,
+    targetEmail: null,
     metadata: { queryName: 'Test Query' },
     ipAddress: '127.0.0.1',
     userAgent: 'TestAgent/1.0',
@@ -47,37 +51,39 @@ function createMockRow(overrides: Record<string, unknown> = {}) {
 /**
  * Creates a mock Drizzle DB that supports the full query chains used by the repository:
  * - insert(table).values(data)
- * - select().from(table).where().orderBy().offset().limit()
- * - select({count}).from(table).where()
+ * - select({fields}).from(table).leftJoin().leftJoin().where().orderBy().offset().limit()  (items)
+ * - select({count}).from(table).where()  (count)
  */
 function createMockDb() {
   const selectItems: unknown[] = [];
   const countResult = [{ count: 0 }];
+  let selectCallIndex = 0;
 
   const valuesFn = vi.fn().mockResolvedValue(undefined);
   const insertFn = vi.fn(() => ({ values: valuesFn }));
 
-  const createSelectChain = (isCountQuery: boolean) => {
-    const limitFn = vi.fn(() => (isCountQuery ? countResult : selectItems));
+  const createItemsChain = () => {
+    const limitFn = vi.fn(() => selectItems);
     const offsetFn = vi.fn(() => ({ limit: limitFn }));
     const orderByFn = vi.fn(() => ({ offset: offsetFn }));
-    const whereFn = vi.fn(() =>
-      isCountQuery ? countResult : { orderBy: orderByFn },
-    );
+    const whereFn = vi.fn(() => ({ orderBy: orderByFn }));
+    const leftJoinFn2 = vi.fn(() => ({ where: whereFn }));
+    const leftJoinFn1 = vi.fn(() => ({ leftJoin: leftJoinFn2 }));
     return {
-      from: vi.fn(() => ({ where: whereFn })),
-      _where: whereFn,
-      _orderBy: orderByFn,
-      _offset: offsetFn,
-      _limit: limitFn,
+      from: vi.fn(() => ({ leftJoin: leftJoinFn1 })),
     };
   };
 
-  // Use a select mock that alternates: first call = items, second call = count
-  // (matches the Promise.all in findAll)
-  const selectFn = vi.fn((...args: unknown[]) => {
-    const isCountQuery = args.length > 0; // select({ count: count() }) has args
-    return createSelectChain(isCountQuery);
+  const createCountChain = () => {
+    const whereFn = vi.fn(() => countResult);
+    return {
+      from: vi.fn(() => ({ where: whereFn })),
+    };
+  };
+
+  const selectFn = vi.fn(() => {
+    const idx = selectCallIndex++;
+    return idx === 0 ? createItemsChain() : createCountChain();
   });
 
   return {
@@ -93,6 +99,9 @@ function createMockDb() {
     },
     setCount: (n: number) => {
       countResult[0] = { count: n };
+    },
+    resetSelectIndex: () => {
+      selectCallIndex = 0;
     },
   };
 }

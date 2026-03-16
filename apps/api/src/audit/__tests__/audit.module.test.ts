@@ -1,19 +1,39 @@
+import { getQueueToken } from '@nestjs/bullmq';
+import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { RlsContextService } from '@qpp/backend-shared';
+import { EncryptionService, RlsContextService } from '@qpp/backend-shared';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AuditController } from '../audit.controller';
 import { AuditModule } from '../audit.module';
 import { AuditService } from '../audit.service';
 
+const encryptionStub = { encrypt: vi.fn(), decrypt: vi.fn() };
+
+@Global()
+@Module({
+  providers: [{ provide: EncryptionService, useValue: encryptionStub }],
+  exports: [EncryptionService],
+})
+class StubEncryptionModule {}
+
+@Global()
+@Module({
+  providers: [{ provide: 'REDIS_CLIENT', useValue: {} }],
+  exports: ['REDIS_CLIENT'],
+})
+class StubRedisModule {}
+
 describe('AuditModule', () => {
   it('compiles with all providers wired correctly', async () => {
     const module = await Test.createTestingModule({
-      imports: [AuditModule],
+      imports: [StubEncryptionModule, StubRedisModule, AuditModule],
     })
       .overrideProvider(ConfigService)
       .useValue({ get: vi.fn() })
+      .overrideProvider(EncryptionService)
+      .useValue(encryptionStub)
       .overrideProvider('SQL_CLIENT')
       .useValue({})
       .overrideProvider('DATABASE')
@@ -22,6 +42,12 @@ describe('AuditModule', () => {
       .useValue(() => ({}))
       .overrideProvider(RlsContextService)
       .useValue({ runWithTenantContext: vi.fn() })
+      .overrideProvider('STRIPE_CLIENT')
+      .useValue(null)
+      .overrideProvider(getQueueToken('siem-webhook'))
+      .useValue({ add: vi.fn() })
+      .overrideProvider('USER_REPOSITORY')
+      .useValue({})
       .compile();
 
     expect(module.get(AuditController)).toBeInstanceOf(AuditController);

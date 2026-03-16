@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuditService } from '../src/audit/audit.service';
 import { AuthController } from '../src/auth/auth.controller';
+import { LastActiveService } from '../src/auth/last-active.service';
 import { configureApp } from '../src/configure-app';
 import { TrialService } from '../src/trial/trial.service';
 
@@ -26,6 +27,11 @@ describe('AuthController session infrastructure errors (integration)', () => {
           provide: TrialService,
           useValue: { activateTrial: vi.fn(), getTrialState: vi.fn() },
         },
+        {
+          provide: LastActiveService,
+          useValue: { touchLastActive: vi.fn().mockResolvedValue(undefined) },
+        },
+        { provide: 'DATABASE', useValue: {} },
       ],
     }).compile();
 

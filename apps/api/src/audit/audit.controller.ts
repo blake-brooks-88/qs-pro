@@ -3,6 +3,8 @@ import { AppError, ErrorCode, SessionGuard } from '@qpp/backend-shared';
 import type { AuditLogQueryParams } from '@qpp/shared-types';
 import { AuditLogQueryParamsSchema } from '@qpp/shared-types';
 
+import { RequireRole } from '../admin/require-role.decorator';
+import { RolesGuard } from '../admin/roles.guard';
 import {
   CurrentUser,
   type UserSession,
@@ -10,10 +12,10 @@ import {
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { FeaturesService } from '../features/features.service';
 import { AuditService } from './audit.service';
-import type { AuditLogRow } from './drizzle-audit-log.repository';
+import type { AuditLogRowResolved } from './drizzle-audit-log.repository';
 
 @Controller('audit-logs')
-@UseGuards(SessionGuard)
+@UseGuards(SessionGuard, RolesGuard)
 export class AuditController {
   constructor(
     private readonly auditService: AuditService,
@@ -21,6 +23,7 @@ export class AuditController {
   ) {}
 
   @Get()
+  @RequireRole('owner', 'admin')
   async findAll(
     @CurrentUser() user: UserSession,
     @Query(new ZodValidationPipe(AuditLogQueryParamsSchema))
@@ -52,7 +55,7 @@ export class AuditController {
   }
 }
 
-function toResponse(row: AuditLogRow) {
+function toResponse(row: AuditLogRowResolved) {
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -60,7 +63,11 @@ function toResponse(row: AuditLogRow) {
     eventType: row.eventType,
     actorType: row.actorType,
     actorId: row.actorId,
+    actorName: row.actorName,
+    actorEmail: row.actorEmail,
     targetId: row.targetId,
+    targetName: row.targetName,
+    targetEmail: row.targetEmail,
     metadata: row.metadata,
     ipAddress: row.ipAddress,
     userAgent: row.userAgent,

@@ -22,6 +22,8 @@ export const tenants = pgTable("tenants", {
   tssd: varchar("tssd").notNull(), // Tenant Specific Subdomain
   auditRetentionDays: integer("audit_retention_days").default(365),
   installedAt: timestamp("installed_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+  deletionMetadata: jsonb("deletion_metadata").$type<Record<string, unknown>>(),
 });
 
 export const tenantFeatureOverrides = pgTable(
@@ -29,7 +31,7 @@ export const tenantFeatureOverrides = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull(),
     featureKey: varchar("feature_key").notNull(),
     enabled: boolean("enabled").notNull(),
@@ -44,9 +46,17 @@ export const tenantFeatureOverrides = pgTable(
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   sfUserId: varchar("sf_user_id").notNull().unique(),
-  tenantId: uuid("tenant_id").references(() => tenants.id),
+  tenantId: uuid("tenant_id").references(() => tenants.id, {
+    onDelete: "cascade",
+  }),
   email: varchar("email"),
   name: varchar("name"),
+  role: varchar("role")
+    .$type<"owner" | "admin" | "member">()
+    .default("member")
+    .notNull(),
+  lastActiveAt: timestamp("last_active_at"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export type StripeSubscriptionStatus =
@@ -168,8 +178,12 @@ export const credentials = pgTable(
   "credentials",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    tenantId: uuid("tenant_id").references(() => tenants.id),
-    userId: uuid("user_id").references(() => users.id),
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "cascade",
+    }),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     mid: varchar("mid").notNull(), // Business Unit context
     accessToken: text("access_token").notNull(),
     refreshToken: text("refresh_token").notNull(), // Encrypted!
@@ -184,12 +198,24 @@ export const credentials = pgTable(
 // 5. Saved Snippets
 export const snippets = pgTable("snippets", {
   id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id),
-  tenantId: uuid("tenant_id").references(() => tenants.id),
+  userId: uuid("user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  tenantId: uuid("tenant_id").references(() => tenants.id, {
+    onDelete: "cascade",
+  }),
   title: varchar("title").notNull(),
   code: text("code").notNull(),
   isShared: boolean("is_shared").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  triggerPrefix: varchar("trigger_prefix").notNull().default(""),
+  description: text("description"),
+  mid: varchar("mid").notNull().default("0"),
+  scope: varchar("scope").notNull().default("bu"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
 });
 
 // 6. Shell Query Runs
@@ -205,11 +231,11 @@ export const shellQueryRuns = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull(),
-    userId: uuid("user_id")
-      .references(() => users.id)
-      .notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     mid: varchar("mid").notNull(),
     snippetName: varchar("snippet_name"),
     sqlTextHash: varchar("sql_text_hash").notNull(),
@@ -245,7 +271,7 @@ export const tenantSettings = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull(),
     mid: varchar("mid").notNull(),
     qppFolderId: integer("qpp_folder_id"),
@@ -262,12 +288,12 @@ export const folders = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull(),
     mid: varchar("mid").notNull(),
-    userId: uuid("user_id")
-      .references(() => users.id)
-      .notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     parentId: uuid("parent_id").references((): AnyPgColumn => folders.id),
     name: varchar("name").notNull(),
     visibility: varchar("visibility")
@@ -291,12 +317,12 @@ export const savedQueries = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull(),
     mid: varchar("mid").notNull(),
-    userId: uuid("user_id")
-      .references(() => users.id)
-      .notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     folderId: uuid("folder_id").references(() => folders.id),
     name: varchar("name").notNull(),
     sqlTextEncrypted: text("sql_text_encrypted").notNull(),
@@ -306,7 +332,9 @@ export const savedQueries = pgTable(
     linkedAt: timestamp("linked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    updatedByUserId: uuid("updated_by_user_id").references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
   },
   (t) => ({
     tenantIdIdx: index("saved_queries_tenant_id_idx").on(t.tenantId),
@@ -327,12 +355,12 @@ export const queryVersions = pgTable(
       .references(() => savedQueries.id, { onDelete: "cascade" })
       .notNull(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull(),
     mid: varchar("mid").notNull(),
-    userId: uuid("user_id")
-      .references(() => users.id)
-      .notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     sqlTextEncrypted: text("sql_text_encrypted").notNull(),
     sqlTextHash: varchar("sql_text_hash").notNull(),
     versionName: varchar("version_name", { length: 255 }),
@@ -365,12 +393,12 @@ export const queryPublishEvents = pgTable(
       .references(() => queryVersions.id, { onDelete: "cascade" })
       .notNull(),
     tenantId: uuid("tenant_id")
-      .references(() => tenants.id)
+      .references(() => tenants.id, { onDelete: "cascade" })
       .notNull(),
     mid: varchar("mid").notNull(),
-    userId: uuid("user_id")
-      .references(() => users.id)
-      .notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     linkedQaCustomerKey: varchar("linked_qa_customer_key").notNull(),
     publishedSqlHash: varchar("published_sql_hash").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -470,16 +498,56 @@ export const boTwoFactors = pgTable("bo_two_factors", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// 14. Backoffice Audit Logs (Cross-tenant, no RLS — separate from tenant audit_logs)
+// 14. SIEM Webhook Configs (Tenant-level SIEM integration settings)
+export const siemWebhookConfigs = pgTable(
+  "siem_webhook_configs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id, { onDelete: "cascade" })
+      .notNull()
+      .unique(),
+    mid: varchar("mid").notNull(),
+    webhookUrl: text("webhook_url").notNull(),
+    secretEncrypted: text("secret_encrypted").notNull(),
+    enabled: boolean("enabled").default(true).notNull(),
+    consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+    lastSuccessAt: timestamp("last_success_at"),
+    lastFailureAt: timestamp("last_failure_at"),
+    lastFailureReason: text("last_failure_reason"),
+    disabledAt: timestamp("disabled_at"),
+    disabledReason: text("disabled_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    tenantIdIdx: index("siem_webhook_configs_tenant_id_idx").on(t.tenantId),
+  }),
+);
+
+// 15. Backoffice Audit Logs (Cross-tenant, no RLS — separate from tenant audit_logs)
 export const backofficeAuditLogs = pgTable("backoffice_audit_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   backofficeUserId: varchar("backoffice_user_id").references(() => boUsers.id, {
     onDelete: "set null",
   }),
-  targetTenantId: uuid("target_tenant_id").references(() => tenants.id),
+  targetTenantId: uuid("target_tenant_id").references(() => tenants.id, {
+    onDelete: "set null",
+  }),
   eventType: varchar("event_type", { length: 100 }).notNull(),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 16. Deletion Ledger (GDPR compliance audit trail — no RLS, no FKs)
+export const deletionLedger = pgTable("deletion_ledger", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(),
+  entityId: uuid("entity_id").notNull(),
+  entityIdentifier: varchar("entity_identifier", { length: 255 }),
+  deletedBy: varchar("deleted_by", { length: 255 }).notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -567,3 +635,11 @@ export const selectBackofficeAuditLogSchema =
   createSelectSchema(backofficeAuditLogs);
 export const insertBackofficeAuditLogSchema =
   createInsertSchema(backofficeAuditLogs);
+
+export const selectSiemWebhookConfigSchema =
+  createSelectSchema(siemWebhookConfigs);
+export const insertSiemWebhookConfigSchema =
+  createInsertSchema(siemWebhookConfigs);
+
+export const selectDeletionLedgerSchema = createSelectSchema(deletionLedger);
+export const insertDeletionLedgerSchema = createInsertSchema(deletionLedger);

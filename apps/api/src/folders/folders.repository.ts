@@ -2,7 +2,7 @@ export interface Folder {
   id: string;
   tenantId: string;
   mid: string;
-  userId: string;
+  userId: string | null;
   parentId: string | null;
   name: string;
   visibility: 'personal' | 'shared';

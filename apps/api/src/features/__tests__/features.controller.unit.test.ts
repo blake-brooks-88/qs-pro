@@ -60,14 +60,12 @@ describe('FeaturesController', () => {
     const guard = module.get(SessionGuard);
 
     // Verify the guard throws UnauthorizedException
-    expect(() => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({}),
-        }),
-      } as unknown as ExecutionContext;
-      guard.canActivate(mockContext);
-    }).toThrow(UnauthorizedException);
+    const mockContext = {
+      switchToHttp: () => ({
+        getRequest: () => ({}),
+      }),
+    } as unknown as ExecutionContext;
+    expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException);
   });
 
   it('returns correct features for authenticated tenant', async () => {

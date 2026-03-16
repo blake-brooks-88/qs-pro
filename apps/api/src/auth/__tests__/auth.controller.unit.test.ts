@@ -17,6 +17,7 @@ import { AuditService } from '../../audit/audit.service';
 import type { UserSession } from '../../common/decorators/current-user.decorator';
 import { TrialService } from '../../trial/trial.service';
 import { AuthController } from '../auth.controller';
+import { LastActiveService } from '../last-active.service';
 
 type SecureSession = {
   get(key: string): unknown;
@@ -103,11 +104,18 @@ function createMockTrialService() {
   };
 }
 
+function createMockLastActiveService() {
+  return {
+    touchLastActive: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: ReturnType<typeof createMockAuthService>;
   let configService: ReturnType<typeof createMockConfigService>;
   let trialService: ReturnType<typeof createMockTrialService>;
+  let lastActiveService: ReturnType<typeof createMockLastActiveService>;
 
   beforeEach(async () => {
     resetFactories();
@@ -115,6 +123,7 @@ describe('AuthController', () => {
     authService = createMockAuthService();
     configService = createMockConfigService();
     trialService = createMockTrialService();
+    lastActiveService = createMockLastActiveService();
     configService.get.mockReturnValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -124,6 +133,7 @@ describe('AuthController', () => {
         { provide: ConfigService, useValue: configService },
         { provide: AuditService, useValue: { log: vi.fn() } },
         { provide: TrialService, useValue: trialService },
+        { provide: LastActiveService, useValue: lastActiveService },
       ],
     })
       .overrideGuard(SessionGuard)

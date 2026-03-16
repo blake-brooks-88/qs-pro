@@ -5,7 +5,8 @@ type PricingSource =
   | "header"
   | "quota_limit"
   | "trial_banner"
-  | "run_limit";
+  | "run_limit"
+  | "settings_billing";
 
 interface PricingOverlayState {
   isOpen: boolean;

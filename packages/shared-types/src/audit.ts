@@ -42,6 +42,23 @@ export type AuditEventType =
   | "subscription.webhook_conflict"
   // Checkout
   | "checkout.expired"
+  // Roles
+  | "role.changed"
+  | "role.ownership_transferred"
+  // SIEM
+  | "siem.config_updated"
+  | "siem.config_deleted"
+  // Snippets
+  | "snippet.created"
+  | "snippet.updated"
+  | "snippet.deleted"
+  // GDPR / Lifecycle
+  | "tenant.soft_deleted"
+  | "tenant.restored"
+  | "tenant.hard_deleted"
+  | "user.deleted"
+  | "user.audit_anonymized"
+  | "gdpr.data_exported"
   // System
   | "system.sweeper_run"
   | "system.retention_purge";
@@ -80,6 +97,19 @@ export const AUDIT_EVENT_TYPES: AuditEventType[] = [
   "subscription.dispute_closed",
   "subscription.webhook_conflict",
   "checkout.expired",
+  "role.changed",
+  "role.ownership_transferred",
+  "siem.config_updated",
+  "siem.config_deleted",
+  "snippet.created",
+  "snippet.updated",
+  "snippet.deleted",
+  "tenant.soft_deleted",
+  "tenant.restored",
+  "tenant.hard_deleted",
+  "user.deleted",
+  "user.audit_anonymized",
+  "gdpr.data_exported",
   "system.sweeper_run",
   "system.retention_purge",
 ] as const;
@@ -109,7 +139,7 @@ export type AuditLogListResponse = z.infer<typeof AuditLogListResponseSchema>;
 
 export const AuditLogQueryParamsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(10_000).default(25),
   eventType: z.string().max(100).optional(),
   actorId: z.string().uuid().optional(),
   targetId: z.string().max(255).optional(),

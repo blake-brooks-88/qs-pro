@@ -47,6 +47,8 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
+      deletedAt: null,
+      deletionMetadata: null,
     };
 
     vi.mocked(tenantRepo.findById).mockResolvedValue(mockTenant);
@@ -78,6 +80,8 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
+      deletedAt: null,
+      deletionMetadata: null,
     };
 
     vi.mocked(tenantRepo.findById).mockResolvedValue(mockTenant);
@@ -112,6 +116,8 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
+      deletedAt: null,
+      deletionMetadata: null,
     };
 
     vi.mocked(tenantRepo.findById).mockResolvedValue(mockTenant);
@@ -146,6 +152,8 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
+      deletedAt: null,
+      deletionMetadata: null,
     };
 
     vi.mocked(tenantRepo.findById).mockResolvedValue(mockTenant);
@@ -185,6 +193,8 @@ describe('SeatLimitService', () => {
       tssd: 'test-tssd',
       auditRetentionDays: 365,
       installedAt: new Date(),
+      deletedAt: null,
+      deletionMetadata: null,
     };
 
     vi.mocked(tenantRepo.findById).mockResolvedValue(mockTenant);

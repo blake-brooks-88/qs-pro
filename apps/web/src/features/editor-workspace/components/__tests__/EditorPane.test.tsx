@@ -33,6 +33,7 @@ const mockEditorInstance = {
     })),
   })),
   addCommand: vi.fn(),
+  addAction: vi.fn(),
   onKeyDown: vi.fn(),
   onDidChangeModelContent: vi.fn(() => ({ dispose: vi.fn() })),
   onDidChangeCursorPosition: vi.fn(() => ({ dispose: vi.fn() })),

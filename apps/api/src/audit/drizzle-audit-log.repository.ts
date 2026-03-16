@@ -11,14 +11,34 @@ import {
   like,
   lte,
   sql,
+  users,
 } from '@qpp/database';
 import type { AuditLogQueryParams } from '@qpp/shared-types';
+import { alias } from 'drizzle-orm/pg-core';
 
 import type { IAuditLogRepository, NewAuditLogEntry } from './audit.repository';
 
 type Database = ReturnType<typeof createDatabaseFromClient>;
 
 export type AuditLogRow = typeof auditLogs.$inferSelect;
+
+export interface AuditLogRowResolved extends AuditLogRow {
+  actorName: string | null;
+  actorEmail: string | null;
+  targetName: string | null;
+  targetEmail: string | null;
+}
+
+const actorUser = alias(users, 'actor_user');
+const targetUser = alias(users, 'target_user');
+
+const targetUserId = sql<string | null>`
+  CASE
+    WHEN ${auditLogs.targetId} ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    THEN ${auditLogs.targetId}::uuid
+    ELSE NULL
+  END
+`;
 
 export class DrizzleAuditLogRepository implements IAuditLogRepository {
   constructor(private readonly db: Database) {}
@@ -43,7 +63,7 @@ export class DrizzleAuditLogRepository implements IAuditLogRepository {
 
   async findAll(
     params: AuditLogQueryParams,
-  ): Promise<{ items: AuditLogRow[]; total: number }> {
+  ): Promise<{ items: AuditLogRowResolved[]; total: number }> {
     const conditions = [];
 
     if (params.eventType) {
@@ -96,8 +116,38 @@ export class DrizzleAuditLogRepository implements IAuditLogRepository {
 
     const [items, countResult] = await Promise.all([
       db
-        .select()
+        .select({
+          id: auditLogs.id,
+          tenantId: auditLogs.tenantId,
+          mid: auditLogs.mid,
+          eventType: auditLogs.eventType,
+          actorType: auditLogs.actorType,
+          actorId: auditLogs.actorId,
+          targetId: auditLogs.targetId,
+          metadata: auditLogs.metadata,
+          ipAddress: auditLogs.ipAddress,
+          userAgent: auditLogs.userAgent,
+          createdAt: auditLogs.createdAt,
+          actorName: actorUser.name,
+          actorEmail: actorUser.email,
+          targetName: targetUser.name,
+          targetEmail: targetUser.email,
+        })
         .from(auditLogs)
+        .leftJoin(
+          actorUser,
+          and(
+            eq(auditLogs.actorId, actorUser.id),
+            eq(actorUser.tenantId, auditLogs.tenantId),
+          ),
+        )
+        .leftJoin(
+          targetUser,
+          and(
+            eq(targetUser.id, targetUserId),
+            eq(targetUser.tenantId, auditLogs.tenantId),
+          ),
+        )
         .where(whereClause)
         .orderBy(orderByClause)
         .offset((params.page - 1) * params.pageSize)

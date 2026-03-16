@@ -25,6 +25,7 @@ describe("auth service", () => {
           sfUserId: "sf-456",
           email: "user@example.com",
           name: "Test User",
+          role: "member",
         },
         tenant: {
           id: "tenant-789",
@@ -55,6 +56,7 @@ describe("auth service", () => {
           sfUserId: "sf-no-email",
           email: null,
           name: null,
+          role: "member",
         },
         tenant: {
           id: "tenant-1",
@@ -199,6 +201,7 @@ describe("auth service", () => {
           sfUserId: "sf-1",
           email: "user@example.com",
           name: "User",
+          role: "member" as const,
         },
         tenant: { id: "tenant-1", eid: "eid-1", tssd: "tssd-1" },
         csrfToken: "csrf-1",
@@ -229,6 +232,7 @@ describe("auth service", () => {
           sfUserId: "sf-1",
           email: "user@example.com",
           name: "User",
+          role: "member" as const,
         },
         tenant: { id: "tenant-1", eid: "eid-1", tssd: "tssd-1" },
         csrfToken: "csrf-1",
