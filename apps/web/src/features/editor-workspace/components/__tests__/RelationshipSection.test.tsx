@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useRelationshipStore } from "@/features/editor-workspace/store/relationship-store";
 import type {
   RelationshipEdge,
   RelationshipGraph,
@@ -105,6 +106,7 @@ function renderSection(
 describe("RelationshipSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useRelationshipStore.setState({ configDEConfirmed: true });
   });
 
   it("renders nothing when graph has no edges for the given DE", () => {

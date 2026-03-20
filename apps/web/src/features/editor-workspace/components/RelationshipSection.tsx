@@ -14,6 +14,7 @@ import {
   useDismissRelationship,
   useSaveRelationship,
 } from "../hooks/use-relationship-config";
+import { useRelationshipStore } from "../store/relationship-store";
 import type {
   RelationshipEdge,
   RelationshipGraph,
@@ -153,6 +154,10 @@ function SuggestedRelationships({
   const [isExpanded, setIsExpanded] = useState(false);
   const saveMutation = useSaveRelationship();
   const dismissMutation = useDismissRelationship();
+  const configDEConfirmed = useRelationshipStore((s) => s.configDEConfirmed);
+  const openFirstSaveDialog = useRelationshipStore(
+    (s) => s.openFirstSaveDialog,
+  );
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const visibleEdges = edges.filter((edge) => {
@@ -209,15 +214,24 @@ function SuggestedRelationships({
                 <span className="ml-auto flex items-center gap-1 shrink-0">
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      if (!configDEConfirmed) {
+                        openFirstSaveDialog({
+                          sourceDE: edge.sourceDE,
+                          sourceColumn: edge.sourceColumn,
+                          targetDE: edge.targetDE,
+                          targetColumn: edge.targetColumn,
+                        });
+                        return;
+                      }
                       saveMutation.mutate({
                         ruleType: "explicit_link",
                         sourceDE: edge.sourceDE,
                         sourceColumn: edge.sourceColumn,
                         targetDE: edge.targetDE,
                         targetColumn: edge.targetColumn,
-                      })
-                    }
+                      });
+                    }}
                     className="p-0.5 rounded text-green-500/70 hover:text-green-400 hover:bg-green-500/10 transition-colors"
                     aria-label={`Confirm relationship with ${edge.linkedDE}`}
                     title="Confirm"
@@ -227,6 +241,15 @@ function SuggestedRelationships({
                   <button
                     type="button"
                     onClick={() => {
+                      if (!configDEConfirmed) {
+                        openFirstSaveDialog({
+                          sourceDE: edge.sourceDE,
+                          sourceColumn: edge.sourceColumn,
+                          targetDE: edge.targetDE,
+                          targetColumn: edge.targetColumn,
+                        });
+                        return;
+                      }
                       dismissMutation.mutate({
                         sourceDE: edge.sourceDE,
                         sourceColumn: edge.sourceColumn,
