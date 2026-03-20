@@ -446,6 +446,43 @@ vi.mock(
   }),
 );
 
+let mockSmartRelEnabled = false;
+vi.mock("@/hooks/use-feature", () => ({
+  useFeature: (featureName: string) => ({
+    enabled: featureName === "smartRelationships" ? mockSmartRelEnabled : false,
+    isLoading: false,
+  }),
+}));
+
+const mockRelGraph = { edges: [], exclusions: [] };
+vi.mock("@/features/editor-workspace/hooks/use-relationship-graph", () => ({
+  useRelationshipGraph: () => ({ graph: mockRelGraph, isLoading: false }),
+  relationshipGraphKeys: { graph: ["relationships", "graph"] },
+}));
+
+const mockSaveRelMutate = vi.fn();
+vi.mock("@/features/editor-workspace/hooks/use-relationship-config", () => ({
+  useSaveRelationship: () => ({
+    mutate: mockSaveRelMutate,
+    isPending: false,
+  }),
+}));
+
+vi.mock("@/features/editor-workspace/store/relationship-store", () => ({
+  useRelationshipStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      configDEConfirmed: false,
+      setConfigDEConfirmed: vi.fn(),
+      showFirstSaveDialog: false,
+      pendingSave: null,
+      openFirstSaveDialog: vi.fn(),
+      closeFirstSaveDialog: vi.fn(),
+      sessionDismissals: new Set(),
+      dismissForSession: vi.fn(),
+      isDismissedForSession: vi.fn().mockReturnValue(false),
+    }),
+}));
+
 // Helper functions
 function createDefaultProps(): Parameters<typeof EditorWorkspace>[0] {
   return {
@@ -511,6 +548,7 @@ describe("EditorWorkspace", () => {
     vi.clearAllMocks();
     mockQueryExecutionReturn = { ...defaultMockQueryExecution };
     mockSavedQueryData = null;
+    mockSmartRelEnabled = false;
     // Reset Zustand stores before each test
     useTabsStore.getState().reset();
     useActivityBarStore.setState({ activeView: "dataExtensions" });
@@ -1262,6 +1300,24 @@ describe("EditorWorkspace", () => {
       await waitFor(() => {
         expect(screen.getByText("Original Query (copy)")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("smart relationships wiring", () => {
+    it("renders EditorWorkspace without errors when smart relationships feature is enabled", () => {
+      mockSmartRelEnabled = true;
+
+      renderEditorWorkspace();
+
+      expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
+    });
+
+    it("renders EditorWorkspace without errors when smart relationships feature is disabled", () => {
+      mockSmartRelEnabled = false;
+
+      renderEditorWorkspace();
+
+      expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
     });
   });
 });
