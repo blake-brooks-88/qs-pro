@@ -24,7 +24,6 @@ const SaveRuleSchema = z.object({
   sourceColumn: z.string().min(1),
   targetDE: z.string().min(1),
   targetColumn: z.string().min(1),
-  folderId: z.string().min(1),
 });
 
 const DismissSchema = z.object({
@@ -32,7 +31,6 @@ const DismissSchema = z.object({
   sourceColumn: z.string().min(1),
   targetDE: z.string().min(1),
   targetColumn: z.string().min(1),
-  folderId: z.string().min(1),
 });
 
 type SaveRuleDto = z.infer<typeof SaveRuleSchema>;

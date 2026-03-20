@@ -2,7 +2,6 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AppError,
-  type AttributeGroup,
   type ConfigRule,
   ContactBuilderService,
   ErrorCode,
@@ -39,7 +38,6 @@ interface SaveRuleParams {
   sourceColumn: string;
   targetDE: string;
   targetColumn: string;
-  folderId: string;
 }
 
 export type {
@@ -73,12 +71,16 @@ export class RelationshipsService {
       return cached;
     }
 
-    const [attributeGroups, configRules] = await Promise.all([
-      this.contactBuilder.getAttributeGroups(tenantId, userId, mid),
+    const [contactBuilderEdges, configRules] = await Promise.all([
+      this.contactBuilder.getRelationshipEdges(tenantId, userId, mid),
       this.configService.getRules(tenantId, userId, mid),
     ]);
 
-    const attrEdges = this.attributeGroupsToEdges(attributeGroups);
+    const attrEdges: RelationshipEdge[] = contactBuilderEdges.map((e) => ({
+      ...e,
+      confidence: 'confirmed' as const,
+      source: 'attribute_group' as const,
+    }));
     const { userEdges, exclusions } = this.configRulesToEdges(configRules);
 
     const graph: RelationshipGraph = {
@@ -106,13 +108,17 @@ export class RelationshipsService {
     });
 
     try {
-      await this.configService.ensureConfigDE(
-        tenantId,
-        userId,
-        mid,
-        params.folderId,
-      );
+      await this.configService.ensureConfigDE(tenantId, userId, mid);
     } catch (error) {
+      this.logger.error(
+        `ensureConfigDE failed: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      if (error instanceof AppError && error.context) {
+        this.logger.error(
+          `ensureConfigDE SOAP context: ${JSON.stringify(error.context)}`,
+        );
+      }
       if (error instanceof AppError) {
         throw new AppError(ErrorCode.CONFIG_DE_CREATION_FAILED, error, {
           operation: 'ensureConfigDE',
@@ -163,33 +169,6 @@ export class RelationshipsService {
       ...params,
       ruleType: 'exclusion',
     });
-  }
-
-  private attributeGroupsToEdges(groups: AttributeGroup[]): RelationshipEdge[] {
-    const edges: RelationshipEdge[] = [];
-
-    for (const group of groups) {
-      if (!group.attributeSets) {
-        continue;
-      }
-      for (const attrSet of group.attributeSets) {
-        if (!attrSet.links || !attrSet.dataExtensionName) {
-          continue;
-        }
-        for (const link of attrSet.links) {
-          edges.push({
-            sourceDE: attrSet.dataExtensionName,
-            sourceColumn: link.field,
-            targetDE: group.name,
-            targetColumn: link.relatedField,
-            confidence: 'confirmed',
-            source: 'attribute_group',
-          });
-        }
-      }
-    }
-
-    return edges;
   }
 
   private configRulesToEdges(rules: ConfigRule[]): {

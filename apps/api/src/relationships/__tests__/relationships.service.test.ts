@@ -2,8 +2,8 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
   AppError,
-  type AttributeGroup,
   type ConfigRule,
+  type ContactBuilderEdge,
   ContactBuilderService,
   ErrorCode,
   RelationshipConfigService,
@@ -14,6 +14,7 @@ import { RelationshipsService } from '../relationships.service';
 
 function createContactBuilderStub() {
   return {
+    getRelationshipEdges: vi.fn().mockResolvedValue([]),
     getAttributeGroups: vi.fn().mockResolvedValue([]),
     getAttributeSetDefinition: vi.fn().mockResolvedValue(null),
   };
@@ -73,19 +74,13 @@ describe('RelationshipsService', () => {
   });
 
   describe('getGraph', () => {
-    it('merges attribute group edges and config rules into a single graph', async () => {
-      const groups: AttributeGroup[] = [
+    it('merges Contact Builder edges and config rules into a single graph', async () => {
+      const cbEdges: ContactBuilderEdge[] = [
         {
-          id: 'ag-1',
-          name: 'ContactGroup',
-          attributeSets: [
-            {
-              id: 'as-1',
-              name: 'EmailSet',
-              dataExtensionName: 'EmailDE',
-              links: [{ field: 'SubscriberKey', relatedField: 'ContactKey' }],
-            },
-          ],
+          sourceDE: 'EmailDE',
+          sourceColumn: 'SubscriberKey',
+          targetDE: 'ContactGroup',
+          targetColumn: 'ContactKey',
         },
       ];
 
@@ -102,7 +97,7 @@ describe('RelationshipsService', () => {
         },
       ];
 
-      contactBuilderStub.getAttributeGroups.mockResolvedValue(groups);
+      contactBuilderStub.getRelationshipEdges.mockResolvedValue(cbEdges);
       configServiceStub.getRules.mockResolvedValue(rules);
 
       const graph = await service.getGraph(TENANT_ID, USER_ID, MID);
@@ -214,7 +209,6 @@ describe('RelationshipsService', () => {
         sourceColumn: 'B',
         targetDE: 'C',
         targetColumn: 'D',
-        folderId: '100',
       });
 
       expect(callOrder).toEqual([
@@ -236,7 +230,6 @@ describe('RelationshipsService', () => {
           sourceColumn: 'B',
           targetDE: 'C',
           targetColumn: 'D',
-          folderId: '100',
         }),
       ).rejects.toThrow(
         expect.objectContaining({ code: ErrorCode.CONFIG_DE_CREATION_FAILED }),
@@ -267,7 +260,6 @@ describe('RelationshipsService', () => {
         sourceColumn: 'B',
         targetDE: 'C',
         targetColumn: 'D',
-        folderId: '100',
       });
 
       expect(configServiceStub.upsertRule).toHaveBeenCalledWith(
