@@ -238,14 +238,13 @@ export class ContactBuilderService {
             continue;
           }
 
-          const key = [leftSet.name, leftAttr, rightSet.name, rightAttr]
-            .sort()
-            .join("|");
+          const forwardKey = `${leftSet.name}|${leftAttr}|${rightSet.name}|${rightAttr}`;
+          const reverseKey = `${rightSet.name}|${rightAttr}|${leftSet.name}|${leftAttr}`;
 
-          if (seen.has(key)) {
+          if (seen.has(forwardKey) || seen.has(reverseKey)) {
             continue;
           }
-          seen.add(key);
+          seen.add(forwardKey);
 
           edges.push({
             sourceDE: leftSet.name,
