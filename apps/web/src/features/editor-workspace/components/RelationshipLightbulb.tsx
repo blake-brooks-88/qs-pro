@@ -19,7 +19,6 @@ export interface JoinRelationship {
 interface RelationshipLightbulbProps {
   queryRelationships: JoinRelationship[];
   graph: RelationshipGraph;
-  folderId: string;
   onSave: (rel: JoinRelationship) => void;
 }
 
@@ -44,7 +43,6 @@ function isConfirmedInGraph(
 export function RelationshipLightbulb({
   queryRelationships,
   graph,
-  folderId,
   onSave,
 }: RelationshipLightbulbProps) {
   const isDismissedForSession = useRelationshipStore(
@@ -149,14 +147,13 @@ export function RelationshipLightbulb({
           sourceColumn: rel.sourceColumn,
           targetDE: rel.targetDE,
           targetColumn: rel.targetColumn,
-          folderId,
         });
         return;
       }
       onSave(rel);
       animateOut(makeKey(rel));
     },
-    [configDEConfirmed, openFirstSaveDialog, folderId, onSave, animateOut],
+    [configDEConfirmed, openFirstSaveDialog, onSave, animateOut],
   );
 
   const handleDismiss = useCallback(

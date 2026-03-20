@@ -148,7 +148,6 @@ function DataExtensionNode({
             <RelationshipSection
               deName={dataExtension.name}
               graph={relationshipGraph}
-              folderId={dataExtension.folderId}
               onNavigateToDE={onNavigateToDE}
             />
           ) : null}

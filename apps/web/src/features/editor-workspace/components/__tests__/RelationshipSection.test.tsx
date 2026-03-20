@@ -92,7 +92,6 @@ function renderSection(
     <RelationshipSection
       deName={deName}
       graph={graph}
-      folderId="folder-1"
       onNavigateToDE={onNavigateToDE}
     />,
     { wrapper: createWrapper() },
@@ -190,7 +189,6 @@ describe("RelationshipSection", () => {
         sourceColumn: "EmailAddress",
         targetDE: "Campaigns",
         targetColumn: "Email",
-        folderId: "folder-1",
       }),
     );
   });

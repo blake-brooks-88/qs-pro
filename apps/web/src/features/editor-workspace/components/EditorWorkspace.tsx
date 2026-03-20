@@ -743,19 +743,15 @@ export function EditorWorkspace({
 
   const handleSaveRelationship = useCallback(
     (rel: JoinRelationship) => {
-      if (!activeQueryFolderId) {
-        return;
-      }
       saveRelationshipMutation.mutate({
         ruleType: "explicit_link",
         sourceDE: rel.sourceDE,
         sourceColumn: rel.sourceColumn,
         targetDE: rel.targetDE,
         targetColumn: rel.targetColumn,
-        folderId: activeQueryFolderId,
       });
     },
-    [activeQueryFolderId, saveRelationshipMutation],
+    [saveRelationshipMutation],
   );
 
   const handleConfirmFirstSave = useCallback(
@@ -764,7 +760,6 @@ export function EditorWorkspace({
       sourceColumn: string;
       targetDE: string;
       targetColumn: string;
-      folderId: string;
     }) => {
       saveRelationshipMutation.mutate({
         ruleType: "explicit_link",
@@ -984,7 +979,6 @@ export function EditorWorkspace({
                       relationshipGraph={
                         isSmartRelEnabled ? relationshipGraph : undefined
                       }
-                      folderId={activeQueryFolderId ?? undefined}
                       onSaveRelationship={
                         isSmartRelEnabled ? handleSaveRelationship : undefined
                       }

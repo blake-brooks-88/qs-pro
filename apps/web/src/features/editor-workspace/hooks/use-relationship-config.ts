@@ -10,7 +10,6 @@ interface SaveRelationshipParams {
   sourceColumn: string;
   targetDE: string;
   targetColumn: string;
-  folderId: string;
 }
 
 interface DismissRelationshipParams {
@@ -18,7 +17,6 @@ interface DismissRelationshipParams {
   sourceColumn: string;
   targetDE: string;
   targetColumn: string;
-  folderId: string;
 }
 
 export function useSaveRelationship() {

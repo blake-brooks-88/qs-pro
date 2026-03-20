@@ -25,14 +25,12 @@ export function EditorResultsPane(props: {
   onViewInContactBuilder?: (subscriberKey: string) => void;
   executedSql?: string;
   relationshipGraph?: RelationshipGraph;
-  folderId?: string;
   onSaveRelationship?: (rel: JoinRelationship) => void;
   onConfirmFirstSave?: (pending: {
     sourceDE: string;
     sourceColumn: string;
     targetDE: string;
     targetColumn: string;
-    folderId: string;
   }) => void;
 }) {
   const {
@@ -47,7 +45,6 @@ export function EditorResultsPane(props: {
     onViewInContactBuilder,
     executedSql,
     relationshipGraph,
-    folderId,
     onSaveRelationship,
     onConfirmFirstSave,
   } = props;
@@ -88,12 +85,10 @@ export function EditorResultsPane(props: {
           </div>
           {queryRelationships.length > 0 &&
           relationshipGraph &&
-          folderId &&
           onSaveRelationship ? (
             <RelationshipLightbulb
               queryRelationships={queryRelationships}
               graph={relationshipGraph}
-              folderId={folderId}
               onSave={onSaveRelationship}
             />
           ) : null}

@@ -70,7 +70,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[]}
         graph={emptyGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );
@@ -82,7 +81,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[ordersCustomersRel]}
         graph={confirmedGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );
@@ -94,7 +92,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[ordersCustomersRel, ordersProductsRel]}
         graph={confirmedGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );
@@ -112,7 +109,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[ordersProductsRel]}
         graph={emptyGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );
@@ -133,7 +129,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[ordersProductsRel]}
         graph={emptyGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );
@@ -154,7 +149,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[ordersProductsRel]}
         graph={emptyGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );
@@ -189,7 +183,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[ordersProductsRel]}
         graph={emptyGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );
@@ -203,7 +196,6 @@ describe("RelationshipLightbulb", () => {
       sourceColumn: "ProductId",
       targetDE: "Products",
       targetColumn: "Id",
-      folderId: "folder-1",
     });
     expect(onSave).not.toHaveBeenCalled();
   });
@@ -217,7 +209,6 @@ describe("RelationshipLightbulb", () => {
       <RelationshipLightbulb
         queryRelationships={[ordersProductsRel]}
         graph={emptyGraph}
-        folderId="folder-1"
         onSave={onSave}
       />,
     );

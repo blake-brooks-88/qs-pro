@@ -22,7 +22,6 @@ import type {
 interface RelationshipSectionProps {
   deName: string;
   graph: RelationshipGraph;
-  folderId: string;
   onNavigateToDE: (deName: string) => void;
 }
 
@@ -146,11 +145,9 @@ function ConfirmedRelationships({
 
 function SuggestedRelationships({
   edges,
-  folderId,
   onNavigateToDE,
 }: {
   edges: Array<RelationshipEdge & { linkedDE: string; displayColumns: string }>;
-  folderId: string;
   onNavigateToDE: (deName: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -209,7 +206,7 @@ function SuggestedRelationships({
                 <span className="text-muted-foreground/60 text-xs truncate">
                   {edge.displayColumns}
                 </span>
-                <span className="ml-auto flex items-center gap-0.5 shrink-0">
+                <span className="ml-auto flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={() =>
@@ -219,14 +216,13 @@ function SuggestedRelationships({
                         sourceColumn: edge.sourceColumn,
                         targetDE: edge.targetDE,
                         targetColumn: edge.targetColumn,
-                        folderId,
                       })
                     }
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-green-500"
+                    className="p-0.5 rounded text-green-500/70 hover:text-green-400 hover:bg-green-500/10 transition-colors"
                     aria-label={`Confirm relationship with ${edge.linkedDE}`}
                     title="Confirm"
                   >
-                    <CheckCircle size={12} />
+                    <CheckCircle size={14} />
                   </button>
                   <button
                     type="button"
@@ -236,15 +232,14 @@ function SuggestedRelationships({
                         sourceColumn: edge.sourceColumn,
                         targetDE: edge.targetDE,
                         targetColumn: edge.targetColumn,
-                        folderId,
                       });
                       setDismissed((prev) => new Set(prev).add(key));
                     }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                    className="p-0.5 rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
                     aria-label={`Dismiss relationship with ${edge.linkedDE}`}
                     title="Dismiss"
                   >
-                    <CloseCircle size={12} />
+                    <CloseCircle size={14} />
                   </button>
                 </span>
               </div>
@@ -259,7 +254,6 @@ function SuggestedRelationships({
 export function RelationshipSection({
   deName,
   graph,
-  folderId,
   onNavigateToDE,
 }: RelationshipSectionProps) {
   const allEdges = getEdgesForDE(graph.edges, deName);
@@ -283,7 +277,6 @@ export function RelationshipSection({
       />
       <SuggestedRelationships
         edges={suggestedEdges}
-        folderId={folderId}
         onNavigateToDE={onNavigateToDE}
       />
     </div>

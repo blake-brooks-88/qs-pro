@@ -16,7 +16,6 @@ interface PendingSave {
   sourceColumn: string;
   targetDE: string;
   targetColumn: string;
-  folderId: string;
 }
 
 interface RelationshipStoreState {

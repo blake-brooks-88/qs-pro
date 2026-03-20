@@ -17,7 +17,6 @@ interface FirstSaveConfirmationProps {
     sourceColumn: string;
     targetDE: string;
     targetColumn: string;
-    folderId: string;
   }) => void;
 }
 
