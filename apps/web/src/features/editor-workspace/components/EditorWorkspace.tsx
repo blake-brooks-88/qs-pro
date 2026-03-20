@@ -33,6 +33,7 @@ import { useStaleDetection } from "@/features/editor-workspace/hooks/use-stale-d
 import { useUnlinkFlow } from "@/features/editor-workspace/hooks/use-unlink-flow";
 import { useVersionHistoryFlow } from "@/features/editor-workspace/hooks/use-version-history-flow";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
+import { useRelationshipStore } from "@/features/editor-workspace/store/relationship-store";
 import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
   EditorWorkspaceProps,
@@ -754,6 +755,10 @@ export function EditorWorkspace({
     [saveRelationshipMutation],
   );
 
+  const setConfigDEConfirmed = useRelationshipStore(
+    (s) => s.setConfigDEConfirmed,
+  );
+
   const handleConfirmFirstSave = useCallback(
     (pending: {
       sourceDE: string;
@@ -761,12 +766,17 @@ export function EditorWorkspace({
       targetDE: string;
       targetColumn: string;
     }) => {
-      saveRelationshipMutation.mutate({
-        ruleType: "explicit_link",
-        ...pending,
-      });
+      saveRelationshipMutation.mutate(
+        {
+          ruleType: "explicit_link",
+          ...pending,
+        },
+        {
+          onSuccess: () => setConfigDEConfirmed(true),
+        },
+      );
     },
-    [saveRelationshipMutation],
+    [saveRelationshipMutation, setConfigDEConfirmed],
   );
 
   const handleRunToTarget = useCallback(() => {

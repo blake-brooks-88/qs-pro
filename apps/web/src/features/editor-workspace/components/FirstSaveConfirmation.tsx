@@ -30,12 +30,8 @@ export function FirstSaveConfirmation({
   const closeFirstSaveDialog = useRelationshipStore(
     (s) => s.closeFirstSaveDialog,
   );
-  const setConfigDEConfirmed = useRelationshipStore(
-    (s) => s.setConfigDEConfirmed,
-  );
 
   const handleConfirm = () => {
-    setConfigDEConfirmed(true);
     if (pendingSave) {
       onConfirmSave(pendingSave);
     }
