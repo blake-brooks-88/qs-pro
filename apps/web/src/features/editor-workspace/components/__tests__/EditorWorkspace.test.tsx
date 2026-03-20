@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -307,6 +307,20 @@ vi.mock("../QueryTabBar", () => ({
   ),
 }));
 
+let capturedOnConfirmFirstSave:
+  | ((pending: Record<string, string>) => void)
+  | undefined;
+vi.mock("../FirstSaveConfirmation", () => ({
+  FirstSaveConfirmation: ({
+    onConfirmSave,
+  }: {
+    onConfirmSave: (pending: Record<string, string>) => void;
+  }) => {
+    capturedOnConfirmFirstSave = onConfirmSave;
+    return <div data-testid="mock-first-save-confirmation">FirstSave</div>;
+  },
+}));
+
 // Mock schema-inferrer for "Create DE From Query" flow
 vi.mock("../../utils/schema-inferrer", () => ({
   inferSchemaFromQuery: vi.fn().mockResolvedValue([]),
@@ -548,6 +562,7 @@ describe("EditorWorkspace", () => {
       pendingSave: null,
       sessionDismissals: new Set(),
     });
+    capturedOnConfirmFirstSave = undefined;
   });
 
   // Tab lifecycle tests removed - these were mock-heavy and implementation-coupled.
@@ -1295,6 +1310,80 @@ describe("EditorWorkspace", () => {
       await waitFor(() => {
         expect(screen.getByText("Original Query (copy)")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("smart relationships", () => {
+    it("handleConfirmFirstSave calls save mutation and sets configDEConfirmed on success", async () => {
+      mockSmartRelEnabled = true;
+      mockSaveRelMutate.mockImplementation(
+        (_params: unknown, options?: { onSuccess?: () => void }) => {
+          options?.onSuccess?.();
+        },
+      );
+
+      mockQueryExecutionReturn = {
+        ...defaultMockQueryExecution,
+        status: "success",
+      };
+
+      renderEditorWorkspace({
+        executionResult: createMockExecutionResult({ status: "success" }),
+      });
+
+      await waitFor(() => {
+        expect(capturedOnConfirmFirstSave).toBeDefined();
+      });
+
+      const pending = {
+        sourceDE: "Subscribers",
+        sourceColumn: "SubscriberKey",
+        targetDE: "Orders",
+        targetColumn: "SubscriberKey",
+      };
+
+      act(() => {
+        capturedOnConfirmFirstSave?.(pending);
+      });
+
+      expect(mockSaveRelMutate).toHaveBeenCalledWith(
+        {
+          ruleType: "explicit_link",
+          ...pending,
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+      expect(useRelationshipStore.getState().configDEConfirmed).toBe(true);
+    });
+
+    it("handleConfirmFirstSave does not set configDEConfirmed when mutation has not succeeded", () => {
+      mockSmartRelEnabled = true;
+      mockSaveRelMutate.mockImplementation(() => {
+        // mutation fires but onSuccess is NOT called (simulating pending/error)
+      });
+
+      mockQueryExecutionReturn = {
+        ...defaultMockQueryExecution,
+        status: "success",
+      };
+
+      renderEditorWorkspace({
+        executionResult: createMockExecutionResult({ status: "success" }),
+      });
+
+      const pending = {
+        sourceDE: "A",
+        sourceColumn: "c",
+        targetDE: "B",
+        targetColumn: "d",
+      };
+
+      act(() => {
+        capturedOnConfirmFirstSave?.(pending);
+      });
+
+      expect(mockSaveRelMutate).toHaveBeenCalled();
+      expect(useRelationshipStore.getState().configDEConfirmed).toBe(false);
     });
   });
 });

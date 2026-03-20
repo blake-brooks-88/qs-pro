@@ -277,6 +277,53 @@ describe("relationshipJoinRule.getSuggestion (JOIN)", () => {
     expect(result.alternatives).toHaveLength(2);
   });
 
+  it("suggests via reverse-direction edge when target is in scope", async () => {
+    const sql = "SELECT * FROM Subscribers s JOIN ";
+    const ctx = makeCtx({
+      sql,
+      cursorIndex: sql.length,
+      relationshipGraph: makeGraph([
+        makeEdge("Orders", "SubscriberKey", "Subscribers", "SubscriberKey"),
+      ]),
+      tablesInScope: [makeTable("Subscribers", "s")],
+      existingAliases: new Set(["s"]),
+      sqlContext: {
+        ...makeCtx({}).sqlContext,
+        lastKeyword: "join",
+        currentWord: "",
+      },
+    });
+
+    const result = await relationshipJoinRule.getSuggestion(ctx);
+
+    assert(result);
+    expect(result.text).toContain("Orders");
+    expect(result.text).toContain("ON s.SubscriberKey =");
+  });
+
+  it("uses qualifiedName in ON clause when source table has no alias", async () => {
+    const sql = "SELECT * FROM Subscribers JOIN ";
+    const ctx = makeCtx({
+      sql,
+      cursorIndex: sql.length,
+      relationshipGraph: makeGraph([
+        makeEdge("Subscribers", "SubscriberKey", "Orders", "SubscriberKey"),
+      ]),
+      tablesInScope: [makeTable("Subscribers")],
+      existingAliases: new Set(),
+      sqlContext: {
+        ...makeCtx({}).sqlContext,
+        lastKeyword: "join",
+        currentWord: "",
+      },
+    });
+
+    const result = await relationshipJoinRule.getSuggestion(ctx);
+
+    assert(result);
+    expect(result.text).toContain("ON Subscribers.SubscriberKey =");
+  });
+
   it("excludes tables already in scope", async () => {
     const sql = "SELECT * FROM Subscribers s JOIN Orders o JOIN ";
     const ctx = makeCtx({
@@ -379,6 +426,26 @@ describe("relationshipJoinRule.getSuggestion (ON)", () => {
 
     const result = await relationshipJoinRule.getSuggestion(ctx);
     expect(result).toBeNull();
+  });
+
+  it("returns no alternatives when only one edge matches", async () => {
+    const ctx = makeCtx({
+      relationshipGraph: makeGraph([
+        makeEdge("Subscribers", "SubscriberKey", "Orders", "SubscriberKey"),
+      ]),
+      tablesInScope: [makeTable("Subscribers", "s"), makeTable("Orders", "o")],
+      sqlContext: {
+        ...makeCtx({}).sqlContext,
+        lastKeyword: "on",
+        currentWord: "",
+      },
+    });
+
+    const result = await relationshipJoinRule.getSuggestion(ctx);
+
+    assert(result);
+    expect(result.text).toBe("s.SubscriberKey = o.SubscriberKey");
+    expect(result.alternatives).toBeUndefined();
   });
 
   it("sorts by confidence and returns up to 3 alternatives", async () => {
