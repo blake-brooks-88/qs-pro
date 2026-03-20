@@ -72,6 +72,7 @@ export {
   type AttributeSet,
   type AttributeSetDefinition,
   type AttributeSetLink,
+  type ContactBuilderEdge,
   ContactBuilderService,
 } from "./mce/services/contact-builder.service";
 export {
