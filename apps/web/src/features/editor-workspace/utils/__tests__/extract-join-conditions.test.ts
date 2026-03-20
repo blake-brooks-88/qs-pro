@@ -92,6 +92,51 @@ describe("extractJoinConditions", () => {
     ]);
   });
 
+  it("extracts conditions with bracketed column names", () => {
+    const sql =
+      "SELECT * FROM [My DE] a JOIN [Other DE] b ON a.[Contact Key] = b.[Contact Key]";
+    const result = extractJoinConditions(sql);
+
+    expect(result).toEqual([
+      {
+        leftTable: "My DE",
+        leftColumn: "Contact Key",
+        rightTable: "Other DE",
+        rightColumn: "Contact Key",
+      },
+    ]);
+  });
+
+  it("extracts conditions with fully bracketed identifiers", () => {
+    const sql =
+      "SELECT * FROM [My DE] a JOIN [Other DE] b ON [My DE].[Contact Key] = [Other DE].[Email]";
+    const result = extractJoinConditions(sql);
+
+    expect(result).toEqual([
+      {
+        leftTable: "My DE",
+        leftColumn: "Contact Key",
+        rightTable: "Other DE",
+        rightColumn: "Email",
+      },
+    ]);
+  });
+
+  it("extracts conditions with mixed bare and bracketed identifiers", () => {
+    const sql =
+      "SELECT * FROM Subscribers s JOIN [Order History] o ON s.SubscriberKey = o.[Subscriber Key]";
+    const result = extractJoinConditions(sql);
+
+    expect(result).toEqual([
+      {
+        leftTable: "Subscribers",
+        leftColumn: "SubscriberKey",
+        rightTable: "Order History",
+        rightColumn: "Subscriber Key",
+      },
+    ]);
+  });
+
   it("skips subquery JOINs", () => {
     const sql =
       "SELECT * FROM A a JOIN (SELECT id FROM B) sub ON a.id = sub.id";

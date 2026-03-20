@@ -11,7 +11,18 @@ export interface JoinCondition {
 const JOIN_ON_RE =
   /\bJOIN\b[\s\S]*?\bON\b\s+([\s\S]*?)(?=\bJOIN\b|\bWHERE\b|\bGROUP\b|\bORDER\b|\bHAVING\b|\bLIMIT\b|\bUNION\b|$)/gi;
 
-const CONDITION_RE = /(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)/g;
+const BRACKET_OR_WORD = String.raw`(?:\[([^\]]+)\]|(\w+))`;
+const CONDITION_RE = new RegExp(
+  `${BRACKET_OR_WORD}\\.${BRACKET_OR_WORD}\\s*=\\s*${BRACKET_OR_WORD}\\.${BRACKET_OR_WORD}`,
+  "gi",
+);
+
+function unquote(
+  bracketed: string | undefined,
+  bare: string | undefined,
+): string | undefined {
+  return bracketed ?? bare;
+}
 
 function buildAliasMap(refs: SqlTableReference[]): Map<string, string> {
   const map = new Map<string, string>();
@@ -52,7 +63,21 @@ export function extractJoinConditions(sql: string): JoinCondition[] {
     CONDITION_RE.lastIndex = 0;
 
     while ((condMatch = CONDITION_RE.exec(onClause)) !== null) {
-      const [, leftAlias, leftCol, rightAlias, rightCol] = condMatch;
+      const [
+        ,
+        lAliasBr,
+        lAliasW,
+        lColBr,
+        lColW,
+        rAliasBr,
+        rAliasW,
+        rColBr,
+        rColW,
+      ] = condMatch;
+      const leftAlias = unquote(lAliasBr, lAliasW);
+      const leftCol = unquote(lColBr, lColW);
+      const rightAlias = unquote(rAliasBr, rAliasW);
+      const rightCol = unquote(rColBr, rColW);
       if (!leftAlias || !leftCol || !rightAlias || !rightCol) {
         continue;
       }
