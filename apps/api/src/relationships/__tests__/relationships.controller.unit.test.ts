@@ -28,13 +28,13 @@ function createServiceStub() {
 describe('RelationshipsController', () => {
   let controller: RelationshipsController;
   let service: ReturnType<typeof createServiceStub>;
-
-  const mockUser = createMockUserSession() as UserSession;
+  let mockUser: UserSession;
 
   beforeEach(async () => {
     resetFactories();
     vi.resetAllMocks();
 
+    mockUser = createMockUserSession() as UserSession;
     service = createServiceStub();
 
     const module: TestingModule = await Test.createTestingModule({

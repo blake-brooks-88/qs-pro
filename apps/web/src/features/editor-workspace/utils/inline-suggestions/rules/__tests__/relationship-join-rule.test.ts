@@ -68,7 +68,9 @@ function makeCtx(
     },
     tablesInScope: [],
     existingAliases: new Set(),
-    getFieldsForTable: vi.fn().mockResolvedValue([]),
+    getFieldsForTable: vi
+      .fn()
+      .mockRejectedValue(new Error("unexpected call to getFieldsForTable")),
     ...overrides,
   };
 }
@@ -222,7 +224,8 @@ describe("relationshipJoinRule.getSuggestion (JOIN)", () => {
     const result = await relationshipJoinRule.getSuggestion(ctx);
 
     assert(result);
-    expect(result.text).toContain("ders");
+    expect(result.text).toMatch(/^ders/);
+    expect(result.text).toContain("ON s.SubscriberKey =");
     expect(result.text).not.toContain("Campaigns");
   });
 
