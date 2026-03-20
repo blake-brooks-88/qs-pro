@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -68,7 +69,7 @@ export class RelationshipsController {
   @UseGuards(CsrfGuard)
   async deleteRule(
     @CurrentUser() user: UserSession,
-    @Param('ruleId') ruleId: string,
+    @Param('ruleId', new ParseUUIDPipe({ version: '4' })) ruleId: string,
   ) {
     await this.relationshipsService.deleteRule(
       user.tenantId,
