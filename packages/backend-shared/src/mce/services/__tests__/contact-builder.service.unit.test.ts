@@ -252,7 +252,7 @@ describe("ContactBuilderService", () => {
     });
 
     it("rethrows AppError with non-swallowed error codes", async () => {
-      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_TIMEOUT));
+      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_SERVER_ERROR));
 
       await expect(service.getRelationshipEdges(T, U, M)).rejects.toThrow(
         AppError,
