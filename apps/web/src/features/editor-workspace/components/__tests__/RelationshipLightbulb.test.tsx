@@ -102,6 +102,24 @@ describe("RelationshipLightbulb", () => {
     expect(rows[0]).toHaveTextContent("Products.Id");
   });
 
+  it("persists until user explicitly dismisses", async () => {
+    render(
+      <RelationshipLightbulb
+        queryRelationships={[ordersProductsRel]}
+        graph={emptyGraph}
+        onSave={onSave}
+      />,
+    );
+
+    expect(screen.getByTestId("lightbulb-row")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(screen.getByTestId("lightbulb-row")).toBeInTheDocument();
+  });
+
   it("clicking dismiss removes the row after animation", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -119,58 +137,6 @@ describe("RelationshipLightbulb", () => {
 
     await act(async () => {
       vi.advanceTimersByTime(400);
-    });
-
-    expect(screen.queryByTestId("lightbulb-row")).not.toBeInTheDocument();
-  });
-
-  it("auto-dismiss fires after ~10 seconds", async () => {
-    render(
-      <RelationshipLightbulb
-        queryRelationships={[ordersProductsRel]}
-        graph={emptyGraph}
-        onSave={onSave}
-      />,
-    );
-
-    expect(screen.getByTestId("lightbulb-row")).toBeInTheDocument();
-
-    await act(async () => {
-      vi.advanceTimersByTime(10_000);
-    });
-
-    expect(screen.queryByTestId("lightbulb-row")).not.toBeInTheDocument();
-  });
-
-  it("hovering pauses the auto-dismiss timer", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    render(
-      <RelationshipLightbulb
-        queryRelationships={[ordersProductsRel]}
-        graph={emptyGraph}
-        onSave={onSave}
-      />,
-    );
-
-    const container = screen.getByTestId("relationship-lightbulb");
-
-    await act(async () => {
-      vi.advanceTimersByTime(5_000);
-    });
-
-    await user.hover(container);
-
-    await act(async () => {
-      vi.advanceTimersByTime(10_000);
-    });
-
-    expect(screen.getByTestId("lightbulb-row")).toBeInTheDocument();
-
-    await user.unhover(container);
-
-    await act(async () => {
-      vi.advanceTimersByTime(10_000);
     });
 
     expect(screen.queryByTestId("lightbulb-row")).not.toBeInTheDocument();

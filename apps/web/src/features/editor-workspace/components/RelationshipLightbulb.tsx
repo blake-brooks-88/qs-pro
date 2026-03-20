@@ -1,12 +1,11 @@
 import { Lightbulb } from "@solar-icons/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { RelationshipGraph } from "@/features/editor-workspace/utils/relationship-graph";
 
 import { useRelationshipStore } from "../store/relationship-store";
 
-const AUTO_DISMISS_MS = 10_000;
 const EXIT_ANIMATION_MS = 300;
 
 export interface JoinRelationship {
@@ -71,9 +70,6 @@ export function RelationshipLightbulb({
 
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [exitingKeys, setExitingKeys] = useState<Set<string>>(new Set());
-  const [autoDismissed, setAutoDismissed] = useState(false);
-  const isHoveredRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const makeKey = (r: JoinRelationship) =>
     `${r.sourceDE}:${r.sourceColumn}:${r.targetDE}:${r.targetColumn}`;
@@ -87,41 +83,7 @@ export function RelationshipLightbulb({
     const keys = new Set(unsavedKeyString.split("|").filter(Boolean));
     setVisibleKeys(keys);
     setExitingKeys(new Set());
-    setAutoDismissed(false);
   }, [unsavedKeyString, queryRelationships]);
-
-  const clearTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const startTimer = useCallback(() => {
-    clearTimer();
-    timerRef.current = setTimeout(() => {
-      setAutoDismissed(true);
-    }, AUTO_DISMISS_MS);
-  }, [clearTimer]);
-
-  useEffect(() => {
-    if (visibleKeys.size > 0 && !autoDismissed) {
-      startTimer();
-    }
-    return clearTimer;
-  }, [visibleKeys.size, autoDismissed, startTimer, clearTimer]);
-
-  const handleMouseEnter = useCallback(() => {
-    isHoveredRef.current = true;
-    clearTimer();
-  }, [clearTimer]);
-
-  const handleMouseLeave = useCallback(() => {
-    isHoveredRef.current = false;
-    if (visibleKeys.size > 0 && !autoDismissed) {
-      startTimer();
-    }
-  }, [visibleKeys.size, autoDismissed, startTimer]);
 
   const animateOut = useCallback((key: string) => {
     setExitingKeys((prev) => new Set(prev).add(key));
@@ -169,7 +131,7 @@ export function RelationshipLightbulb({
     [dismissForSession, animateOut],
   );
 
-  if (autoDismissed || visibleKeys.size === 0) {
+  if (visibleKeys.size === 0) {
     return null;
   }
 
@@ -184,8 +146,6 @@ export function RelationshipLightbulb({
     <div
       data-testid="relationship-lightbulb"
       className="border-b border-border"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       {visibleRelationships.map((rel) => {
         const key = makeKey(rel);
@@ -194,7 +154,7 @@ export function RelationshipLightbulb({
           <div
             key={key}
             data-testid="lightbulb-row"
-            className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 dark:bg-amber-950/20 text-xs transition-all duration-300 ease-out"
+            className="flex items-center gap-2 px-4 py-1.5 bg-surface text-xs transition-all duration-300 ease-out"
             style={{
               opacity: isExiting ? 0 : 1,
               maxHeight: isExiting ? 0 : 48,
@@ -228,7 +188,7 @@ export function RelationshipLightbulb({
                 data-testid="lightbulb-dismiss"
                 onClick={() => handleDismiss(rel)}
               >
-                <span aria-hidden>\u00d7</span>
+                <span aria-hidden>&times;</span>
                 <span className="sr-only">Dismiss</span>
               </Button>
             </div>
