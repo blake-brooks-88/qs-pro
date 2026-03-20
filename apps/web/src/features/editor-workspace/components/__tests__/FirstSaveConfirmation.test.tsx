@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,6 +33,7 @@ describe("FirstSaveConfirmation", () => {
       showFirstSaveDialog: false,
       pendingSave: null,
       configDEConfirmed: false,
+      sessionDismissals: new Set(),
     });
   });
 
@@ -80,6 +81,8 @@ describe("FirstSaveConfirmation", () => {
     await user.click(screen.getByText("Create & Save"));
 
     expect(onConfirmSave).toHaveBeenCalledWith(pendingSave);
+    expect(useRelationshipStore.getState().showFirstSaveDialog).toBe(false);
+    expect(useRelationshipStore.getState().pendingSave).toBeNull();
   });
 
   it("Cancel closes dialog without calling onConfirmSave", async () => {
@@ -100,21 +103,21 @@ describe("FirstSaveConfirmation", () => {
     expect(useRelationshipStore.getState().showFirstSaveDialog).toBe(false);
   });
 
-  it("dialog is not dismissible via Escape key", () => {
+  it("dialog is not dismissible via Escape key", async () => {
     useRelationshipStore.setState({
       showFirstSaveDialog: true,
       pendingSave,
     });
 
+    const user = userEvent.setup();
     const onConfirmSave = vi.fn();
     render(<FirstSaveConfirmation onConfirmSave={onConfirmSave} />, {
       wrapper: createWrapper(),
     });
 
-    fireEvent.keyDown(screen.getByText("Save Relationship"), {
-      key: "Escape",
-    });
+    await user.keyboard("{Escape}");
 
     expect(screen.getByText("Save Relationship")).toBeInTheDocument();
+    expect(useRelationshipStore.getState().showFirstSaveDialog).toBe(true);
   });
 });

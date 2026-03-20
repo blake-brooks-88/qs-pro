@@ -1,26 +1,12 @@
+import {
+  createDataExtensionServiceStub,
+  createDataFolderServiceStub,
+  createMceBridgeStub,
+} from "@qpp/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppError, ErrorCode } from "../../../common/errors";
 import { RelationshipConfigService } from "../relationship-config.service";
-
-const mockRequest = vi.fn();
-const mockMceBridge = {
-  request: mockRequest,
-} as unknown as ConstructorParameters<typeof RelationshipConfigService>[0];
-
-const mockRetrieveByCustomerKey = vi.fn();
-const mockCreate = vi.fn();
-const mockDataExtensionService = {
-  retrieveByCustomerKey: mockRetrieveByCustomerKey,
-  create: mockCreate,
-} as unknown as ConstructorParameters<typeof RelationshipConfigService>[1];
-
-const mockFolderRetrieve = vi.fn();
-const mockFolderCreate = vi.fn();
-const mockDataFolderService = {
-  retrieve: mockFolderRetrieve,
-  create: mockFolderCreate,
-} as unknown as ConstructorParameters<typeof RelationshipConfigService>[2];
 
 const T = "tenant-1";
 const U = "user-1";
@@ -28,41 +14,53 @@ const M = "mid-1";
 
 describe("RelationshipConfigService", () => {
   let service: RelationshipConfigService;
+  let mceBridge: ReturnType<typeof createMceBridgeStub>;
+  let dataExtensionService: ReturnType<typeof createDataExtensionServiceStub>;
+  let dataFolderService: ReturnType<typeof createDataFolderServiceStub>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mceBridge = createMceBridgeStub();
+    dataExtensionService = createDataExtensionServiceStub();
+    dataFolderService = createDataFolderServiceStub();
     service = new RelationshipConfigService(
-      mockMceBridge,
-      mockDataExtensionService,
-      mockDataFolderService,
+      mceBridge as unknown as ConstructorParameters<
+        typeof RelationshipConfigService
+      >[0],
+      dataExtensionService as unknown as ConstructorParameters<
+        typeof RelationshipConfigService
+      >[1],
+      dataFolderService as unknown as ConstructorParameters<
+        typeof RelationshipConfigService
+      >[2],
     );
   });
 
   describe("ensureConfigDE", () => {
     it("returns early without creating when config DE already exists", async () => {
-      mockRetrieveByCustomerKey.mockResolvedValue({
+      dataExtensionService.retrieveByCustomerKey.mockResolvedValue({
         name: "QPP_RelationshipConfig",
       });
 
       await service.ensureConfigDE(T, U, M);
 
-      expect(mockRetrieveByCustomerKey).toHaveBeenCalledWith(
+      expect(dataExtensionService.retrieveByCustomerKey).toHaveBeenCalledWith(
         T,
         U,
         M,
         "QPP_RelationshipConfig",
       );
-      expect(mockCreate).not.toHaveBeenCalled();
+      expect(dataExtensionService.create).not.toHaveBeenCalled();
     });
 
     it("creates DE with 3 fields when config DE does not exist", async () => {
-      mockRetrieveByCustomerKey.mockResolvedValue(null);
-      mockFolderRetrieve.mockResolvedValue([{ id: 100 }]);
-      mockCreate.mockResolvedValue(undefined);
+      dataExtensionService.retrieveByCustomerKey.mockResolvedValue(null);
+      dataFolderService.retrieve.mockResolvedValue([{ id: 100 }]);
+      dataExtensionService.create.mockResolvedValue(undefined);
 
       await service.ensureConfigDE(T, U, M);
 
-      expect(mockCreate).toHaveBeenCalledWith(T, U, M, {
+      expect(dataExtensionService.create).toHaveBeenCalledWith(T, U, M, {
         name: "QPP_RelationshipConfig",
         customerKey: "QPP_RelationshipConfig",
         categoryId: 100,
@@ -75,22 +73,21 @@ describe("RelationshipConfigService", () => {
     });
 
     it("creates QPP Results folder when it does not exist", async () => {
-      mockRetrieveByCustomerKey.mockResolvedValue(null);
-      // First call: QPP Results folder not found; second call: root DE folder found
-      mockFolderRetrieve
+      dataExtensionService.retrieveByCustomerKey.mockResolvedValue(null);
+      dataFolderService.retrieve
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: 1 }]);
-      mockFolderCreate.mockResolvedValue({ id: 200 });
-      mockCreate.mockResolvedValue(undefined);
+      dataFolderService.create.mockResolvedValue({ id: 200 });
+      dataExtensionService.create.mockResolvedValue(undefined);
 
       await service.ensureConfigDE(T, U, M);
 
-      expect(mockFolderCreate).toHaveBeenCalledWith(T, U, M, {
+      expect(dataFolderService.create).toHaveBeenCalledWith(T, U, M, {
         name: "QueryPlusPlus Results",
         parentFolderId: 1,
         contentType: "dataextension",
       });
-      expect(mockCreate).toHaveBeenCalledWith(
+      expect(dataExtensionService.create).toHaveBeenCalledWith(
         T,
         U,
         M,
@@ -98,17 +95,19 @@ describe("RelationshipConfigService", () => {
       );
     });
 
-    it("throws when root DE folder is not found", async () => {
-      mockRetrieveByCustomerKey.mockResolvedValue(null);
-      mockFolderRetrieve.mockResolvedValue([]);
+    it("throws MCE_BAD_REQUEST when root DE folder is not found", async () => {
+      dataExtensionService.retrieveByCustomerKey.mockResolvedValue(null);
+      dataFolderService.retrieve.mockResolvedValue([]);
 
-      await expect(service.ensureConfigDE(T, U, M)).rejects.toThrow(AppError);
+      await expect(service.ensureConfigDE(T, U, M)).rejects.toMatchObject({
+        code: ErrorCode.MCE_BAD_REQUEST,
+      });
     });
   });
 
   describe("getRules", () => {
     it("parses rowset response into rule objects", async () => {
-      mockRequest.mockResolvedValue({
+      mceBridge.request.mockResolvedValue({
         items: [
           {
             keys: { RuleID: "r1" },
@@ -130,7 +129,7 @@ describe("RelationshipConfigService", () => {
     });
 
     it("returns empty array for empty rowset", async () => {
-      mockRequest.mockResolvedValue({ items: [] });
+      mceBridge.request.mockResolvedValue({ items: [] });
 
       const rules = await service.getRules(T, U, M);
 
@@ -138,7 +137,7 @@ describe("RelationshipConfigService", () => {
     });
 
     it("returns empty array when response has no items", async () => {
-      mockRequest.mockResolvedValue({});
+      mceBridge.request.mockResolvedValue({});
 
       const rules = await service.getRules(T, U, M);
 
@@ -146,7 +145,9 @@ describe("RelationshipConfigService", () => {
     });
 
     it("swallows RESOURCE_NOT_FOUND and returns empty array", async () => {
-      mockRequest.mockRejectedValue(new AppError(ErrorCode.RESOURCE_NOT_FOUND));
+      mceBridge.request.mockRejectedValue(
+        new AppError(ErrorCode.RESOURCE_NOT_FOUND),
+      );
 
       const rules = await service.getRules(T, U, M);
 
@@ -154,7 +155,9 @@ describe("RelationshipConfigService", () => {
     });
 
     it("swallows MCE_BAD_REQUEST and returns empty array", async () => {
-      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_BAD_REQUEST));
+      mceBridge.request.mockRejectedValue(
+        new AppError(ErrorCode.MCE_BAD_REQUEST),
+      );
 
       const rules = await service.getRules(T, U, M);
 
@@ -162,7 +165,7 @@ describe("RelationshipConfigService", () => {
     });
 
     it("rethrows other errors", async () => {
-      mockRequest.mockRejectedValue(new Error("network failure"));
+      mceBridge.request.mockRejectedValue(new Error("network failure"));
 
       await expect(service.getRules(T, U, M)).rejects.toThrow(
         "network failure",
@@ -172,7 +175,7 @@ describe("RelationshipConfigService", () => {
 
   describe("upsertRule", () => {
     it("sends correct rowset upsert payload", async () => {
-      mockRequest.mockResolvedValue(undefined);
+      mceBridge.request.mockResolvedValue(undefined);
 
       await service.upsertRule(T, U, M, {
         RuleID: "r1",
@@ -180,7 +183,7 @@ describe("RelationshipConfigService", () => {
         Payload: '{"sourceDE":"A"}',
       });
 
-      expect(mockRequest).toHaveBeenCalledWith(
+      expect(mceBridge.request).toHaveBeenCalledWith(
         T,
         U,
         M,
@@ -204,11 +207,11 @@ describe("RelationshipConfigService", () => {
 
   describe("deleteRule", () => {
     it("calls correct MCE endpoint with ruleId path", async () => {
-      mockRequest.mockResolvedValue(undefined);
+      mceBridge.request.mockResolvedValue(undefined);
 
       await service.deleteRule(T, U, M, "r1");
 
-      expect(mockRequest).toHaveBeenCalledWith(
+      expect(mceBridge.request).toHaveBeenCalledWith(
         T,
         U,
         M,
