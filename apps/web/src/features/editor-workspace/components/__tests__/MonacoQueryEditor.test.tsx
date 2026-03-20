@@ -107,6 +107,14 @@ const mockMonacoInstance = {
 
 let capturedOnMount: OnMount | null = null;
 
+vi.mock("@/features/editor-workspace/hooks/use-relationship-graph", () => ({
+  useRelationshipGraph: () => ({
+    graph: { edges: [], exclusions: [] },
+    isLoading: false,
+  }),
+  relationshipGraphKeys: { graph: ["relationships", "graph"] },
+}));
+
 vi.mock("@monaco-editor/react", () => ({
   default: vi.fn(({ value, onChange, onMount }) => {
     capturedOnMount = onMount;
@@ -1138,6 +1146,26 @@ describe("MonacoQueryEditor", () => {
             mockMonacoInstance.KeyCode.KeyS),
       );
       expect(saveAsCall).toBeUndefined();
+    });
+  });
+
+  describe("Relationship Graph Integration", () => {
+    it("renders and mounts without errors when relationship graph is available", () => {
+      const queryClient = createQueryClient();
+
+      render(
+        <MonacoQueryEditor
+          value="SELECT * FROM [Test] a JOIN [Orders] b ON a.id = b.id"
+          onChange={vi.fn()}
+          diagnostics={[]}
+          dataExtensions={createMockDataExtensions()}
+          folders={[]}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+      triggerMount();
+
+      expect(screen.getByTestId("monaco-editor")).toBeInTheDocument();
     });
   });
 });
