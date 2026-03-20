@@ -442,6 +442,7 @@ describe('Trial Lifecycle (integration)', () => {
         runToTargetDE: true,
         executionHistory: true,
         versionHistory: true,
+        smartRelationships: true,
       });
     });
 
@@ -476,6 +477,7 @@ describe('Trial Lifecycle (integration)', () => {
         runToTargetDE: false,
         executionHistory: false,
         versionHistory: false,
+        smartRelationships: false,
       });
     });
 
@@ -514,6 +516,7 @@ describe('Trial Lifecycle (integration)', () => {
         runToTargetDE: true,
         executionHistory: true,
         versionHistory: true,
+        smartRelationships: true,
       });
     });
 
