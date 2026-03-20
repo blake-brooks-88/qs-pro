@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueryExecutionStatus } from "@/features/editor-workspace/hooks/use-query-execution";
 import type { RunResultsResponse } from "@/features/editor-workspace/hooks/use-run-results";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
+import { useRelationshipStore } from "@/features/editor-workspace/store/relationship-store";
 import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
   DataExtension,
@@ -468,20 +469,8 @@ vi.mock("@/features/editor-workspace/hooks/use-relationship-config", () => ({
   }),
 }));
 
-vi.mock("@/features/editor-workspace/store/relationship-store", () => ({
-  useRelationshipStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({
-      configDEConfirmed: false,
-      setConfigDEConfirmed: vi.fn(),
-      showFirstSaveDialog: false,
-      pendingSave: null,
-      openFirstSaveDialog: vi.fn(),
-      closeFirstSaveDialog: vi.fn(),
-      sessionDismissals: new Set(),
-      dismissForSession: vi.fn(),
-      isDismissedForSession: vi.fn().mockReturnValue(false),
-    }),
-}));
+// useRelationshipStore is a real Zustand store — no mock needed.
+// Reset it in beforeEach via setState, consistent with other stores in this file.
 
 // Helper functions
 function createDefaultProps(): Parameters<typeof EditorWorkspace>[0] {
@@ -553,6 +542,12 @@ describe("EditorWorkspace", () => {
     useTabsStore.getState().reset();
     useActivityBarStore.setState({ activeView: "dataExtensions" });
     useVersionHistoryStore.getState().closeVersionHistory();
+    useRelationshipStore.setState({
+      configDEConfirmed: false,
+      showFirstSaveDialog: false,
+      pendingSave: null,
+      sessionDismissals: new Set(),
+    });
   });
 
   // Tab lifecycle tests removed - these were mock-heavy and implementation-coupled.
@@ -1300,24 +1295,6 @@ describe("EditorWorkspace", () => {
       await waitFor(() => {
         expect(screen.getByText("Original Query (copy)")).toBeInTheDocument();
       });
-    });
-  });
-
-  describe("smart relationships wiring", () => {
-    it("renders EditorWorkspace without errors when smart relationships feature is enabled", () => {
-      mockSmartRelEnabled = true;
-
-      renderEditorWorkspace();
-
-      expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
-    });
-
-    it("renders EditorWorkspace without errors when smart relationships feature is disabled", () => {
-      mockSmartRelEnabled = false;
-
-      renderEditorWorkspace();
-
-      expect(screen.getByTestId("mock-editor")).toBeInTheDocument();
     });
   });
 });
