@@ -65,6 +65,8 @@ function makeCtx(
       cursorInTableReference: false,
       hasFromJoinTable: false,
       cursorInFromJoinTable: false,
+      tablesInScope: [],
+      aliasMap: new Map(),
     },
     tablesInScope: [],
     existingAliases: new Set(),

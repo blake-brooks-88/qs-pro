@@ -1324,7 +1324,7 @@ describe("EditorWorkspace", () => {
 
       mockQueryExecutionReturn = {
         ...defaultMockQueryExecution,
-        status: "success",
+        status: "ready",
       };
 
       renderEditorWorkspace({
@@ -1364,7 +1364,7 @@ describe("EditorWorkspace", () => {
 
       mockQueryExecutionReturn = {
         ...defaultMockQueryExecution,
-        status: "success",
+        status: "ready",
       };
 
       renderEditorWorkspace({

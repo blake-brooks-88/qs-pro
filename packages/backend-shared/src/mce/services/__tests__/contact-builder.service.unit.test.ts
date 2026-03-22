@@ -259,4 +259,134 @@ describe("ContactBuilderService", () => {
       );
     });
   });
+
+  describe("getAttributeGroups", () => {
+    it("returns attribute groups from response items", async () => {
+      const groups = [
+        { id: "g1", name: "My Contacts" },
+        { id: "g2", name: "Custom Objects", attributeSets: [] },
+      ];
+      mockRequest.mockResolvedValue({ count: 2, items: groups });
+
+      const result = await service.getAttributeGroups(T, U, M);
+
+      expect(result).toEqual(groups);
+      expect(mockRequest).toHaveBeenCalledWith(
+        T,
+        U,
+        M,
+        { method: "GET", url: "/contacts/v1/attributeGroups" },
+        expect.any(Number),
+      );
+    });
+
+    it("returns empty array when response is null", async () => {
+      mockRequest.mockResolvedValue(null);
+
+      const result = await service.getAttributeGroups(T, U, M);
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when items is not an array", async () => {
+      mockRequest.mockResolvedValue({ count: 0, items: "not-an-array" });
+
+      const result = await service.getAttributeGroups(T, U, M);
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when MCE returns MCE_FORBIDDEN", async () => {
+      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_FORBIDDEN));
+
+      const result = await service.getAttributeGroups(T, U, M);
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when MCE returns MCE_BAD_REQUEST", async () => {
+      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_BAD_REQUEST));
+
+      const result = await service.getAttributeGroups(T, U, M);
+
+      expect(result).toEqual([]);
+    });
+
+    it("rethrows non-AppError errors", async () => {
+      mockRequest.mockRejectedValue(new Error("network failure"));
+
+      await expect(service.getAttributeGroups(T, U, M)).rejects.toThrow(
+        "network failure",
+      );
+    });
+
+    it("rethrows AppError with non-swallowed error codes", async () => {
+      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_SERVER_ERROR));
+
+      await expect(service.getAttributeGroups(T, U, M)).rejects.toThrow(
+        AppError,
+      );
+    });
+  });
+
+  describe("getAttributeSetDefinition", () => {
+    const SET_ID = "set-123";
+
+    it("returns attribute set definition on success", async () => {
+      const definition = {
+        id: SET_ID,
+        name: "My Data Extension",
+        fields: [
+          { name: "Email", dataType: "EmailAddress", isPrimaryKey: true },
+        ],
+      };
+      mockRequest.mockResolvedValue(definition);
+
+      const result = await service.getAttributeSetDefinition(T, U, M, SET_ID);
+
+      expect(result).toEqual(definition);
+      expect(mockRequest).toHaveBeenCalledWith(
+        T,
+        U,
+        M,
+        {
+          method: "GET",
+          url: `/contacts/v1/attributeSetDefinitions/${SET_ID}`,
+        },
+        expect.any(Number),
+      );
+    });
+
+    it("returns null when MCE returns MCE_FORBIDDEN", async () => {
+      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_FORBIDDEN));
+
+      const result = await service.getAttributeSetDefinition(T, U, M, SET_ID);
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when MCE returns MCE_BAD_REQUEST", async () => {
+      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_BAD_REQUEST));
+
+      const result = await service.getAttributeSetDefinition(T, U, M, SET_ID);
+
+      expect(result).toBeNull();
+    });
+
+    it("rethrows non-AppError errors", async () => {
+      mockRequest.mockRejectedValue(new Error("network failure"));
+
+      await expect(
+        service.getAttributeSetDefinition(T, U, M, SET_ID),
+      ).rejects.toThrow("network failure");
+    });
+
+    it("rethrows AppError with non-swallowed error codes", async () => {
+      mockRequest.mockRejectedValue(new AppError(ErrorCode.MCE_SERVER_ERROR));
+
+      await expect(
+        service.getAttributeSetDefinition(T, U, M, SET_ID),
+      ).rejects.toThrow(AppError);
+    });
+  });
 });
