@@ -52,6 +52,23 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-format.sh",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/typecheck-affected.sh",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

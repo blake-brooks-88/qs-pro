@@ -23,6 +23,8 @@ import {
   useQueryVersions,
   versionHistoryKeys,
 } from "@/features/editor-workspace/hooks/use-query-versions";
+import { useSaveRelationship } from "@/features/editor-workspace/hooks/use-relationship-config";
+import { useRelationshipGraph } from "@/features/editor-workspace/hooks/use-relationship-graph";
 import { useResultsPaneResize } from "@/features/editor-workspace/hooks/use-results-pane-resize";
 import { useRunRequestHandler } from "@/features/editor-workspace/hooks/use-run-request-handler";
 import { useSaveFlows } from "@/features/editor-workspace/hooks/use-save-flows";
@@ -31,6 +33,7 @@ import { useStaleDetection } from "@/features/editor-workspace/hooks/use-stale-d
 import { useUnlinkFlow } from "@/features/editor-workspace/hooks/use-unlink-flow";
 import { useVersionHistoryFlow } from "@/features/editor-workspace/hooks/use-version-history-flow";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
+import { useRelationshipStore } from "@/features/editor-workspace/store/relationship-store";
 import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
   EditorWorkspaceProps,
@@ -62,6 +65,7 @@ import { EditorWorkspaceModals } from "./EditorWorkspaceModals";
 import { HistoryPanel } from "./HistoryPanel";
 import { MonacoQueryEditor } from "./MonacoQueryEditor";
 import { QueryTabBar } from "./QueryTabBar";
+import type { JoinRelationship } from "./RelationshipLightbulb";
 import type { SnippetModalProps } from "./SnippetModal";
 import { SnippetPanel } from "./SnippetPanel";
 import { StaleWarningDialog } from "./StaleWarningDialog";
@@ -172,6 +176,11 @@ export function EditorWorkspace({
   const publishMutation = usePublishQuery();
   const { enabled: isDeployFeatureEnabled } = useFeature("deployToAutomation");
   const { enabled: isTeamCollabEnabled } = useFeature("teamCollaboration");
+  const { enabled: isSmartRelEnabled } = useFeature("smartRelationships");
+
+  // Smart Relationships: graph + save mutation
+  const { graph: relationshipGraph } = useRelationshipGraph();
+  const saveRelationshipMutation = useSaveRelationship();
 
   // Zustand store - single source of truth for tabs
   const tabs = useTabsStore((state) => state.tabs);
@@ -257,16 +266,23 @@ export function EditorWorkspace({
     };
   }, [activeTab, tabs]);
 
+  const activeQueryFolderId = useMemo(() => {
+    if (!safeActiveTab.queryId) {
+      return null;
+    }
+    return (
+      savedQueries?.find((q) => q.id === safeActiveTab.queryId)?.folderId ??
+      null
+    );
+  }, [safeActiveTab.queryId, savedQueries]);
+
   const isActiveQueryInSharedFolder = useMemo(() => {
-    const folderId = safeActiveTab.queryId
-      ? savedQueries?.find((q) => q.id === safeActiveTab.queryId)?.folderId
-      : null;
-    if (!folderId) {
+    if (!activeQueryFolderId) {
       return false;
     }
-    const folder = allFolders.find((f) => f.id === folderId);
+    const folder = allFolders.find((f) => f.id === activeQueryFolderId);
     return folder?.visibility === "shared";
-  }, [safeActiveTab.queryId, savedQueries, allFolders]);
+  }, [activeQueryFolderId, allFolders]);
 
   const {
     isSaveModalOpen,
@@ -726,6 +742,43 @@ export function EditorWorkspace({
     [showHistoryForQuery],
   );
 
+  const handleSaveRelationship = useCallback(
+    (rel: JoinRelationship) => {
+      saveRelationshipMutation.mutate({
+        ruleType: "explicit_link",
+        sourceDE: rel.sourceDE,
+        sourceColumn: rel.sourceColumn,
+        targetDE: rel.targetDE,
+        targetColumn: rel.targetColumn,
+      });
+    },
+    [saveRelationshipMutation],
+  );
+
+  const setConfigDEConfirmed = useRelationshipStore(
+    (s) => s.setConfigDEConfirmed,
+  );
+
+  const handleConfirmFirstSave = useCallback(
+    (pending: {
+      sourceDE: string;
+      sourceColumn: string;
+      targetDE: string;
+      targetColumn: string;
+    }) => {
+      saveRelationshipMutation.mutate(
+        {
+          ruleType: "explicit_link",
+          ...pending,
+        },
+        {
+          onSuccess: () => setConfigDEConfirmed(true),
+        },
+      );
+    },
+    [saveRelationshipMutation, setConfigDEConfirmed],
+  );
+
   const handleRunToTarget = useCallback(() => {
     setIsTargetDEModalOpen(true);
   }, []);
@@ -932,6 +985,16 @@ export function EditorWorkspace({
                       }}
                       onCancel={handleCancel}
                       onViewInContactBuilder={onViewInContactBuilder}
+                      executedSql={safeActiveTab.content}
+                      relationshipGraph={
+                        isSmartRelEnabled ? relationshipGraph : undefined
+                      }
+                      onSaveRelationship={
+                        isSmartRelEnabled ? handleSaveRelationship : undefined
+                      }
+                      onConfirmFirstSave={
+                        isSmartRelEnabled ? handleConfirmFirstSave : undefined
+                      }
                     />
                   </div>
                 </>

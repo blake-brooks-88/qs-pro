@@ -29,6 +29,7 @@ import { ObservabilityModule } from './observability/observability.module';
 import { QueryActivitiesModule } from './query-activities/query-activities.module';
 import { QueryVersionsModule } from './query-versions/query-versions.module';
 import { RedisModule } from './redis/redis.module';
+import { RelationshipsModule } from './relationships/relationships.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { ShellQueryModule } from './shell-query/shell-query.module';
 import { SiemModule } from './siem/siem.module';
@@ -95,6 +96,7 @@ import { UsageModule } from './usage/usage.module';
     SnippetsModule,
     QueryActivitiesModule,
     QueryVersionsModule,
+    RelationshipsModule,
     TrialModule,
     UsageModule,
     DevToolsModule,

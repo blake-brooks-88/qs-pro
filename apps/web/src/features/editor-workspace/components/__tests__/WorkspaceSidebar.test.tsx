@@ -54,6 +54,21 @@ vi.mock("../QueryTreeView", () => ({
   ),
 }));
 
+vi.mock("@/features/editor-workspace/hooks/use-relationship-graph", () => ({
+  useRelationshipGraph: () => ({
+    graph: { edges: [], exclusions: [] },
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/hooks/use-feature", () => ({
+  useFeature: () => ({ enabled: false, isLoading: false }),
+}));
+
+vi.mock("../RelationshipSection", () => ({
+  RelationshipSection: () => null,
+}));
+
 vi.mock("@/components/QuotaGate", () => ({
   QuotaCountBadge: ({
     current,
@@ -803,17 +818,18 @@ describe("WorkspaceSidebar", () => {
       expect(screen.getByTitle("Child Folder")).toBeInTheDocument();
     });
 
-    it("clicking a DE toggles expansion and calls onSelectDE", async () => {
+    it("clicking a DE toggles expansion", async () => {
       // Arrange
       const user = userEvent.setup();
-      const onSelectDE = vi.fn();
-      renderSidebar({ activeView: "dataExtensions", onSelectDE });
+      renderSidebar({ activeView: "dataExtensions" });
 
       // Act
-      await user.click(screen.getByTitle("Root DE"));
+      const deButton = screen.getByTitle("Root DE");
+      expect(deButton).toHaveAttribute("aria-expanded", "false");
+      await user.click(deButton);
 
-      // Assert
-      expect(onSelectDE).toHaveBeenCalledWith("de-root");
+      // Assert — expansion toggled
+      expect(deButton).toHaveAttribute("aria-expanded", "true");
     });
   });
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import type { RelationshipGraph } from "../relationship-graph/types";
 import { getSqlCursorContext } from "../sql-context";
 import { evaluateInlineSuggestions } from "./rule-engine";
 import type { InlineSuggestionContext } from "./types";
@@ -7,6 +8,7 @@ import type { InlineSuggestionContext } from "./types";
 const buildContext = (
   sql: string,
   cursorIndex: number = sql.length,
+  relationshipGraph?: RelationshipGraph,
 ): InlineSuggestionContext => {
   const sqlContext = getSqlCursorContext(sql, cursorIndex);
   return {
@@ -20,6 +22,7 @@ const buildContext = (
         .filter((a): a is string => Boolean(a)),
     ),
     getFieldsForTable: async () => [],
+    relationshipGraph,
   };
 };
 
@@ -167,6 +170,83 @@ describe("evaluateInlineSuggestions", () => {
       );
       const suggestion = await evaluateInlineSuggestions(ctx);
       expect(suggestion?.text).toBe(" AS co");
+    });
+  });
+
+  describe("relationship-join-rule integration", () => {
+    const graphWithEdges: RelationshipGraph = {
+      edges: [
+        {
+          sourceDE: "_Subscribers",
+          sourceColumn: "SubscriberKey",
+          targetDE: "Purchases",
+          targetColumn: "SubscriberKey",
+          confidence: "confirmed",
+          source: "user",
+        },
+        {
+          sourceDE: "_Subscribers",
+          sourceColumn: "EmailAddress",
+          targetDE: "EmailEvents",
+          targetColumn: "Email",
+          confidence: "medium",
+          source: "attribute_group",
+        },
+      ],
+      exclusions: [],
+    };
+
+    test("withGraph_afterJoinKeyword_returnsSuggestionWithTargetDEAndONClause", async () => {
+      const ctx = buildContext(
+        "SELECT * FROM [_Subscribers] s JOIN ",
+        undefined,
+        graphWithEdges,
+      );
+      const suggestion = await evaluateInlineSuggestions(ctx);
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.priority).toBe(90);
+      expect(suggestion?.text).toContain("Purchases");
+      expect(suggestion?.text).toContain("ON");
+      expect(suggestion?.text).toContain("SubscriberKey");
+    });
+
+    test("withoutGraph_afterJoinKeyword_doesNotFireRelationshipRule", async () => {
+      const ctx = buildContext(
+        "SELECT * FROM [_Subscribers] s JOIN ",
+        undefined,
+        undefined,
+      );
+      const suggestion = await evaluateInlineSuggestions(ctx);
+      // Without a graph, the relationship-join-rule does not fire.
+      // Falls through to alias or on-keyword rules; since there's no table after
+      // JOIN yet, no alias rule matches either.
+      expect(suggestion?.priority !== 90).toBe(true);
+    });
+
+    test("withGraph_noMatchingEdges_fallsThroughToExistingRules", async () => {
+      const graphNoMatch: RelationshipGraph = {
+        edges: [
+          {
+            sourceDE: "Unrelated",
+            sourceColumn: "Id",
+            targetDE: "AlsoUnrelated",
+            targetColumn: "Id",
+            confidence: "confirmed",
+            source: "user",
+          },
+        ],
+        exclusions: [],
+      };
+      const ctx = buildContext(
+        "SELECT * FROM [_Subscribers] s JOIN [Orders] ",
+        undefined,
+        graphNoMatch,
+      );
+      const suggestion = await evaluateInlineSuggestions(ctx);
+      // Falls through to alias-suggestion-rule (priority 80)
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.priority).toBe(80);
+      expect(suggestion?.text).toBe(" AS o");
     });
   });
 });

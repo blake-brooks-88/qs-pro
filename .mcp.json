@@ -8,6 +8,10 @@
         "--cdp-endpoint",
         "http://localhost:9222"
       ]
+    },
+    "sentry": {
+      "command": "npx",
+      "args": ["-y", "@sentry/mcp-server"]
     }
   }
 }

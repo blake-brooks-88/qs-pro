@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueryExecutionStatus } from "@/features/editor-workspace/hooks/use-query-execution";
 import type { RunResultsResponse } from "@/features/editor-workspace/hooks/use-run-results";
 import { useActivityBarStore } from "@/features/editor-workspace/store/activity-bar-store";
+import { useRelationshipStore } from "@/features/editor-workspace/store/relationship-store";
 import { useVersionHistoryStore } from "@/features/editor-workspace/store/version-history-store";
 import type {
   DataExtension,
@@ -306,6 +307,20 @@ vi.mock("../QueryTabBar", () => ({
   ),
 }));
 
+let capturedOnConfirmFirstSave:
+  | ((pending: Record<string, string>) => void)
+  | undefined;
+vi.mock("../FirstSaveConfirmation", () => ({
+  FirstSaveConfirmation: ({
+    onConfirmSave,
+  }: {
+    onConfirmSave: (pending: Record<string, string>) => void;
+  }) => {
+    capturedOnConfirmFirstSave = onConfirmSave;
+    return <div data-testid="mock-first-save-confirmation">FirstSave</div>;
+  },
+}));
+
 // Mock schema-inferrer for "Create DE From Query" flow
 vi.mock("../../utils/schema-inferrer", () => ({
   inferSchemaFromQuery: vi.fn().mockResolvedValue([]),
@@ -446,6 +461,31 @@ vi.mock(
   }),
 );
 
+let mockSmartRelEnabled = false;
+vi.mock("@/hooks/use-feature", () => ({
+  useFeature: (featureName: string) => ({
+    enabled: featureName === "smartRelationships" ? mockSmartRelEnabled : false,
+    isLoading: false,
+  }),
+}));
+
+const mockRelGraph = { edges: [], exclusions: [] };
+vi.mock("@/features/editor-workspace/hooks/use-relationship-graph", () => ({
+  useRelationshipGraph: () => ({ graph: mockRelGraph, isLoading: false }),
+  relationshipGraphKeys: { graph: ["relationships", "graph"] },
+}));
+
+const mockSaveRelMutate = vi.fn();
+vi.mock("@/features/editor-workspace/hooks/use-relationship-config", () => ({
+  useSaveRelationship: () => ({
+    mutate: mockSaveRelMutate,
+    isPending: false,
+  }),
+}));
+
+// useRelationshipStore is a real Zustand store — no mock needed.
+// Reset it in beforeEach via setState, consistent with other stores in this file.
+
 // Helper functions
 function createDefaultProps(): Parameters<typeof EditorWorkspace>[0] {
   return {
@@ -511,10 +551,18 @@ describe("EditorWorkspace", () => {
     vi.clearAllMocks();
     mockQueryExecutionReturn = { ...defaultMockQueryExecution };
     mockSavedQueryData = null;
+    mockSmartRelEnabled = false;
     // Reset Zustand stores before each test
     useTabsStore.getState().reset();
     useActivityBarStore.setState({ activeView: "dataExtensions" });
     useVersionHistoryStore.getState().closeVersionHistory();
+    useRelationshipStore.setState({
+      configDEConfirmed: false,
+      showFirstSaveDialog: false,
+      pendingSave: null,
+      sessionDismissals: new Set(),
+    });
+    capturedOnConfirmFirstSave = undefined;
   });
 
   // Tab lifecycle tests removed - these were mock-heavy and implementation-coupled.
@@ -1262,6 +1310,80 @@ describe("EditorWorkspace", () => {
       await waitFor(() => {
         expect(screen.getByText("Original Query (copy)")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("smart relationships", () => {
+    it("handleConfirmFirstSave calls save mutation and sets configDEConfirmed on success", async () => {
+      mockSmartRelEnabled = true;
+      mockSaveRelMutate.mockImplementation(
+        (_params: unknown, options?: { onSuccess?: () => void }) => {
+          options?.onSuccess?.();
+        },
+      );
+
+      mockQueryExecutionReturn = {
+        ...defaultMockQueryExecution,
+        status: "ready",
+      };
+
+      renderEditorWorkspace({
+        executionResult: createMockExecutionResult({ status: "success" }),
+      });
+
+      await waitFor(() => {
+        expect(capturedOnConfirmFirstSave).toBeDefined();
+      });
+
+      const pending = {
+        sourceDE: "Subscribers",
+        sourceColumn: "SubscriberKey",
+        targetDE: "Orders",
+        targetColumn: "SubscriberKey",
+      };
+
+      act(() => {
+        capturedOnConfirmFirstSave?.(pending);
+      });
+
+      expect(mockSaveRelMutate).toHaveBeenCalledWith(
+        {
+          ruleType: "explicit_link",
+          ...pending,
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+      expect(useRelationshipStore.getState().configDEConfirmed).toBe(true);
+    });
+
+    it("handleConfirmFirstSave does not set configDEConfirmed when mutation has not succeeded", () => {
+      mockSmartRelEnabled = true;
+      mockSaveRelMutate.mockImplementation(() => {
+        // mutation fires but onSuccess is NOT called (simulating pending/error)
+      });
+
+      mockQueryExecutionReturn = {
+        ...defaultMockQueryExecution,
+        status: "ready",
+      };
+
+      renderEditorWorkspace({
+        executionResult: createMockExecutionResult({ status: "success" }),
+      });
+
+      const pending = {
+        sourceDE: "A",
+        sourceColumn: "c",
+        targetDE: "B",
+        targetColumn: "d",
+      };
+
+      act(() => {
+        capturedOnConfirmFirstSave?.(pending);
+      });
+
+      expect(mockSaveRelMutate).toHaveBeenCalled();
+      expect(useRelationshipStore.getState().configDEConfirmed).toBe(false);
     });
   });
 });

@@ -67,6 +67,15 @@ export {
   AsyncStatusService,
 } from "./mce/services/async-status.service";
 export {
+  type AttributeGroup,
+  type AttributeGroupResponse,
+  type AttributeSet,
+  type AttributeSetDefinition,
+  type AttributeSetLink,
+  type ContactBuilderEdge,
+  ContactBuilderService,
+} from "./mce/services/contact-builder.service";
+export {
   type CreateDataExtensionParams,
   type DataExtension,
   type DataExtensionField,
@@ -83,6 +92,11 @@ export {
   type QueryDefinition,
   QueryDefinitionService,
 } from "./mce/services/query-definition.service";
+export {
+  type ConfigRule,
+  RelationshipConfigService,
+  type RuleType,
+} from "./mce/services/relationship-config.service";
 export { RestDataService } from "./mce/services/rest-data.service";
 export { escapeXml } from "./mce/soap/helpers";
 export { buildDeleteQueryDefinition } from "./mce/soap/request-bodies/query-definition";

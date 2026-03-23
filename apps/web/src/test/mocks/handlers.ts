@@ -175,4 +175,8 @@ export const handlers = [
       pro: { monthly: 2900, annual: 24900 },
     });
   }),
+
+  http.get("/api/relationships/graph", () => {
+    return HttpResponse.json({ edges: [] });
+  }),
 ];

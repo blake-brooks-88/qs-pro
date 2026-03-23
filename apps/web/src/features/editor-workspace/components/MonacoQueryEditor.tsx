@@ -27,6 +27,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useFeature } from "@/hooks/use-feature";
 import { cn } from "@/lib/utils";
 
+import { useRelationshipGraph } from "../hooks/use-relationship-graph";
 import { applySqlDecorations } from "./monaco/apply-sql-decorations";
 import { applySqlMarkers } from "./monaco/apply-sql-markers";
 import {
@@ -96,6 +97,12 @@ export function MonacoQueryEditor({
   const queryClient = useQueryClient();
   const { data: snippetsData } = useSnippets();
   const { enabled: isTeamSnippetsEnabled } = useFeature("teamSnippets");
+  const { graph: relationshipGraph } = useRelationshipGraph();
+  const relationshipGraphRef = useRef(relationshipGraph);
+
+  useEffect(() => {
+    relationshipGraphRef.current = relationshipGraph;
+  }, [relationshipGraph]);
 
   const snippetsRef = useRef<SnippetListItem[]>([]);
   const isTeamSnippetsEnabledRef = useRef(isTeamSnippetsEnabled);
@@ -327,6 +334,7 @@ export function MonacoQueryEditor({
           monaco: monacoInstance,
           resolveDataExtension,
           fetchFields,
+          getRelationshipGraph: () => relationshipGraphRef.current,
         });
 
       monacoInstance.languages.setLanguageConfiguration("sql", {

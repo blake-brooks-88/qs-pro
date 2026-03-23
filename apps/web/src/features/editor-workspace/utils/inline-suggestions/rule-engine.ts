@@ -9,6 +9,7 @@ import {
 import { aliasSuggestionRule } from "./rules/alias-suggestion-rule";
 import { joinKeywordRule } from "./rules/join-keyword-rule";
 import { onKeywordRule } from "./rules/on-keyword-rule";
+import { relationshipJoinRule } from "./rules/relationship-join-rule";
 import type { InlineSuggestion, InlineSuggestionContext } from "./types";
 
 /**
@@ -17,6 +18,7 @@ import type { InlineSuggestion, InlineSuggestionContext } from "./types";
  */
 const RULES = [
   joinKeywordRule, // Priority 100: INNER → " JOIN"
+  relationshipJoinRule, // Priority 90: JOIN → "Table alias ON ..." (from relationship graph)
   aliasSuggestionRule, // Priority 80: table → " AS alias"
   onKeywordRule, // Priority 70: alias → " ON "
 ];

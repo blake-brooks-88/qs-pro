@@ -1,5 +1,6 @@
 import type { DataExtensionField } from "@/features/editor-workspace/types";
 
+import type { RelationshipGraph } from "../relationship-graph/types";
 import type { SqlCursorContext, SqlTableReference } from "../sql-context";
 
 /**
@@ -23,6 +24,8 @@ export interface InlineSuggestionContext {
   getFieldsForTable: (
     table: SqlTableReference,
   ) => Promise<DataExtensionField[]>;
+  /** Relationship graph for JOIN suggestions (optional; absent when feature is disabled) */
+  relationshipGraph?: RelationshipGraph;
 }
 
 /**

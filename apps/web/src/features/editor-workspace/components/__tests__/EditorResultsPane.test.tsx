@@ -7,6 +7,23 @@ import type { ExecutionResult } from "@/features/editor-workspace/types";
 
 import { EditorResultsPane } from "../EditorResultsPane";
 
+let mockSmartRelEnabled = false;
+vi.mock("@/hooks/use-feature", () => ({
+  useFeature: () => ({ enabled: mockSmartRelEnabled, isLoading: false }),
+}));
+
+vi.mock("../RelationshipLightbulb", () => ({
+  RelationshipLightbulb: () => (
+    <div data-testid="relationship-lightbulb">Lightbulb</div>
+  ),
+}));
+
+vi.mock("../FirstSaveConfirmation", () => ({
+  FirstSaveConfirmation: () => (
+    <div data-testid="first-save-confirmation">FirstSave</div>
+  ),
+}));
+
 vi.mock("../ResultsPane", () => ({
   ResultsPane: ({
     result,
@@ -54,6 +71,7 @@ describe("EditorResultsPane", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSmartRelEnabled = false;
   });
 
   it("renders expand button when results pane is collapsed", () => {
@@ -123,5 +141,94 @@ describe("EditorResultsPane", () => {
 
     const resizeHandle = container.querySelector(".cursor-row-resize");
     expect(resizeHandle).not.toBeInTheDocument();
+  });
+
+  describe("smart relationships", () => {
+    it("renders RelationshipLightbulb when conditions are met", () => {
+      mockSmartRelEnabled = true;
+
+      render(
+        <EditorResultsPane
+          {...defaultProps}
+          shouldShowResultsPane={true}
+          result={createExecutionResult({ status: "success" })}
+          executedSql="SELECT * FROM A a JOIN B b ON a.id = b.id"
+          relationshipGraph={{
+            edges: [
+              {
+                sourceDE: "A",
+                sourceColumn: "id",
+                targetDE: "B",
+                targetColumn: "id",
+                confidence: "confirmed",
+                source: "user",
+              },
+            ],
+            exclusions: [],
+          }}
+          onSaveRelationship={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("relationship-lightbulb")).toBeInTheDocument();
+    });
+
+    it("does not render lightbulb when feature is disabled", () => {
+      mockSmartRelEnabled = false;
+
+      render(
+        <EditorResultsPane
+          {...defaultProps}
+          shouldShowResultsPane={true}
+          result={createExecutionResult({ status: "success" })}
+          executedSql="SELECT * FROM A a JOIN B b ON a.id = b.id"
+          relationshipGraph={{
+            edges: [
+              {
+                sourceDE: "A",
+                sourceColumn: "id",
+                targetDE: "B",
+                targetColumn: "id",
+                confidence: "confirmed",
+                source: "user",
+              },
+            ],
+            exclusions: [],
+          }}
+          onSaveRelationship={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("relationship-lightbulb"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders FirstSaveConfirmation when onConfirmFirstSave is provided", () => {
+      render(
+        <EditorResultsPane
+          {...defaultProps}
+          shouldShowResultsPane={true}
+          result={createExecutionResult({ status: "success" })}
+          onConfirmFirstSave={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("first-save-confirmation")).toBeInTheDocument();
+    });
+
+    it("does not render FirstSaveConfirmation when onConfirmFirstSave is absent", () => {
+      render(
+        <EditorResultsPane
+          {...defaultProps}
+          shouldShowResultsPane={true}
+          result={createExecutionResult({ status: "success" })}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("first-save-confirmation"),
+      ).not.toBeInTheDocument();
+    });
   });
 });

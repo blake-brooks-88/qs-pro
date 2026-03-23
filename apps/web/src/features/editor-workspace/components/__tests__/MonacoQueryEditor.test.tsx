@@ -107,6 +107,14 @@ const mockMonacoInstance = {
 
 let capturedOnMount: OnMount | null = null;
 
+vi.mock("@/features/editor-workspace/hooks/use-relationship-graph", () => ({
+  useRelationshipGraph: () => ({
+    graph: { edges: [], exclusions: [] },
+    isLoading: false,
+  }),
+  relationshipGraphKeys: { graph: ["relationships", "graph"] },
+}));
+
 vi.mock("@monaco-editor/react", () => ({
   default: vi.fn(({ value, onChange, onMount }) => {
     capturedOnMount = onMount;

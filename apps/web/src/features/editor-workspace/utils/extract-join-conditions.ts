@@ -1,0 +1,106 @@
+import type { SqlTableReference } from "./sql-context";
+import { extractTableReferences } from "./sql-context";
+
+export interface JoinCondition {
+  leftTable: string;
+  leftColumn: string;
+  rightTable: string;
+  rightColumn: string;
+}
+
+const JOIN_ON_RE =
+  /\bJOIN\b[\s\S]*?\bON\b\s+([\s\S]*?)(?=\bJOIN\b|\bWHERE\b|\bGROUP\b|\bORDER\b|\bHAVING\b|\bLIMIT\b|\bUNION\b|$)/gi;
+
+const BRACKET_OR_WORD = String.raw`(?:\[([^\]]+)\]|(\w+))`;
+const CONDITION_RE = new RegExp(
+  `${BRACKET_OR_WORD}\\.${BRACKET_OR_WORD}\\s*=\\s*${BRACKET_OR_WORD}\\.${BRACKET_OR_WORD}`,
+  "gi",
+);
+
+function unquote(
+  bracketed: string | undefined,
+  bare: string | undefined,
+): string | undefined {
+  return bracketed ?? bare;
+}
+
+function buildAliasMap(refs: SqlTableReference[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const ref of refs) {
+    if (ref.isSubquery) {
+      if (ref.alias) {
+        map.set(ref.alias.toLowerCase(), "__subquery__");
+      }
+      continue;
+    }
+    if (ref.scopeDepth > 0) {
+      continue;
+    }
+    if (ref.alias) {
+      map.set(ref.alias.toLowerCase(), ref.qualifiedName);
+    }
+    map.set(ref.qualifiedName.toLowerCase(), ref.qualifiedName);
+    map.set(ref.name.toLowerCase(), ref.qualifiedName);
+  }
+  return map;
+}
+
+export function extractJoinConditions(sql: string): JoinCondition[] {
+  const refs = extractTableReferences(sql);
+  const aliasMap = buildAliasMap(refs);
+  const conditions: JoinCondition[] = [];
+
+  let joinMatch: RegExpExecArray | null = null;
+  JOIN_ON_RE.lastIndex = 0;
+
+  while ((joinMatch = JOIN_ON_RE.exec(sql)) !== null) {
+    const onClause = joinMatch[1];
+    if (!onClause) {
+      continue;
+    }
+
+    let condMatch: RegExpExecArray | null = null;
+    CONDITION_RE.lastIndex = 0;
+
+    while ((condMatch = CONDITION_RE.exec(onClause)) !== null) {
+      const [
+        ,
+        lAliasBr,
+        lAliasW,
+        lColBr,
+        lColW,
+        rAliasBr,
+        rAliasW,
+        rColBr,
+        rColW,
+      ] = condMatch;
+      const leftAlias = unquote(lAliasBr, lAliasW);
+      const leftCol = unquote(lColBr, lColW);
+      const rightAlias = unquote(rAliasBr, rAliasW);
+      const rightCol = unquote(rColBr, rColW);
+      if (!leftAlias || !leftCol || !rightAlias || !rightCol) {
+        continue;
+      }
+
+      const leftTable = aliasMap.get(leftAlias.toLowerCase());
+      const rightTable = aliasMap.get(rightAlias.toLowerCase());
+
+      if (!leftTable || !rightTable) {
+        continue;
+      }
+
+      if (leftTable === "__subquery__" || rightTable === "__subquery__") {
+        continue;
+      }
+
+      conditions.push({
+        leftTable,
+        leftColumn: leftCol,
+        rightTable,
+        rightColumn: rightCol,
+      });
+    }
+  }
+
+  return conditions;
+}

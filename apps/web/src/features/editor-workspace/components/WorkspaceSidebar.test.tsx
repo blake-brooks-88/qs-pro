@@ -264,9 +264,8 @@ describe("WorkspaceSidebar", () => {
   });
 
   describe("Selection callbacks", () => {
-    it("calls onSelectDE when data extension is clicked", async () => {
+    it("toggles DE expansion when data extension is clicked", async () => {
       const user = userEvent.setup();
-      const onSelectDE = vi.fn();
 
       server.use(
         http.get("/api/metadata/fields", () => {
@@ -302,7 +301,6 @@ describe("WorkspaceSidebar", () => {
           folders={folders}
           savedQueries={[]}
           dataExtensions={dataExtensions}
-          onSelectDE={onSelectDE}
         />,
         { wrapper: createWrapper(queryClient) },
       );
@@ -310,10 +308,11 @@ describe("WorkspaceSidebar", () => {
       // Expand root folder
       await user.click(screen.getByRole("button", { name: /root folder/i }));
 
-      // Click on data extension
-      await user.click(screen.getByRole("button", { name: /customers/i }));
-
-      expect(onSelectDE).toHaveBeenCalledWith("de-1");
+      // Click on data extension - toggles expansion
+      const deButton = screen.getByRole("button", { name: /customers/i });
+      expect(deButton).toHaveAttribute("aria-expanded", "false");
+      await user.click(deButton);
+      expect(deButton).toHaveAttribute("aria-expanded", "true");
     });
 
     it("calls onSelectQuery when query is clicked in queries view", async () => {

@@ -1,9 +1,16 @@
 import { AltArrowUp } from "@solar-icons/react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { useMemo } from "react";
 
+import { useFeature } from "@/hooks/use-feature";
 import { cn } from "@/lib/utils";
 
 import type { ExecutionResult } from "../types";
+import { extractJoinConditions } from "../utils/extract-join-conditions";
+import type { RelationshipGraph } from "../utils/relationship-graph";
+import { FirstSaveConfirmation } from "./FirstSaveConfirmation";
+import type { JoinRelationship } from "./RelationshipLightbulb";
+import { RelationshipLightbulb } from "./RelationshipLightbulb";
 import { ResultsPane } from "./ResultsPane";
 
 export function EditorResultsPane(props: {
@@ -16,6 +23,15 @@ export function EditorResultsPane(props: {
   onPageChange: (page: number) => void;
   onCancel: () => void;
   onViewInContactBuilder?: (subscriberKey: string) => void;
+  executedSql?: string;
+  relationshipGraph?: RelationshipGraph;
+  onSaveRelationship?: (rel: JoinRelationship) => void;
+  onConfirmFirstSave?: (pending: {
+    sourceDE: string;
+    sourceColumn: string;
+    targetDE: string;
+    targetColumn: string;
+  }) => void;
 }) {
   const {
     shouldShowResultsPane,
@@ -27,7 +43,25 @@ export function EditorResultsPane(props: {
     onPageChange,
     onCancel,
     onViewInContactBuilder,
+    executedSql,
+    relationshipGraph,
+    onSaveRelationship,
+    onConfirmFirstSave,
   } = props;
+
+  const { enabled: isSmartRelEnabled } = useFeature("smartRelationships");
+
+  const queryRelationships: JoinRelationship[] = useMemo(() => {
+    if (!isSmartRelEnabled || !executedSql || result.status !== "success") {
+      return [];
+    }
+    return extractJoinConditions(executedSql).map((c) => ({
+      sourceDE: c.leftTable,
+      sourceColumn: c.leftColumn,
+      targetDE: c.rightTable,
+      targetColumn: c.rightColumn,
+    }));
+  }, [isSmartRelEnabled, executedSql, result.status]);
 
   return (
     <div
@@ -49,6 +83,18 @@ export function EditorResultsPane(props: {
           >
             <div className="mx-auto mt-0.5 h-1 w-10 rounded-full bg-muted-foreground/30" />
           </div>
+          {queryRelationships.length > 0 &&
+          relationshipGraph &&
+          onSaveRelationship ? (
+            <RelationshipLightbulb
+              queryRelationships={queryRelationships}
+              graph={relationshipGraph}
+              onSave={onSaveRelationship}
+            />
+          ) : null}
+          {onConfirmFirstSave ? (
+            <FirstSaveConfirmation onConfirmSave={onConfirmFirstSave} />
+          ) : null}
           <div className="flex-1 min-h-0">
             <ResultsPane
               result={result}

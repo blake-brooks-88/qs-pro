@@ -9,9 +9,11 @@ import { MceBridgeService } from "./mce-bridge.service";
 import { MceHttpClient } from "./mce-http-client";
 import { MetadataService } from "./metadata.service";
 import { AsyncStatusService } from "./services/async-status.service";
+import { ContactBuilderService } from "./services/contact-builder.service";
 import { DataExtensionService } from "./services/data-extension.service";
 import { DataFolderService } from "./services/data-folder.service";
 import { QueryDefinitionService } from "./services/query-definition.service";
+import { RelationshipConfigService } from "./services/relationship-config.service";
 import { RestDataService } from "./services/rest-data.service";
 
 @Module({
@@ -24,6 +26,8 @@ import { RestDataService } from "./services/rest-data.service";
     DataFolderService,
     QueryDefinitionService,
     AsyncStatusService,
+    ContactBuilderService,
+    RelationshipConfigService,
     RestDataService,
     {
       provide: MCE_AUTH_PROVIDER,
@@ -37,6 +41,8 @@ import { RestDataService } from "./services/rest-data.service";
     DataFolderService,
     QueryDefinitionService,
     AsyncStatusService,
+    ContactBuilderService,
+    RelationshipConfigService,
     RestDataService,
   ],
 })
